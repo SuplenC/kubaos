@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Removes /etc/default/dropbox-repo when it is the one ./opt-out wrote, word for word; any other
+# is left.
+# Usage: ./opt-in <path of dropbox-repo>
+set -euo pipefail
+ours='# KubaOS sets Dropbox'"'"'s repository up in dropbox.sources, with a key for it alone. This file
+# being here keeps Dropbox'"'"'s package from adding the repository a second time.'
+if [[ -f "$1" && "$(<"$1")" == "$ours" ]]; then
+  rm -f "$1"
+fi

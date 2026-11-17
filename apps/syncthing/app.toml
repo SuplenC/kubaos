@@ -1,0 +1,50 @@
+# Syncthing from its signed apt repository, the stable-v2 channel, whose key system/packages.toml
+# pins ([repo.syncthing]): 2.x, where Ubuntu's archive has 1.29. Its package writes no source of
+# its own. It runs as you, the package's user unit syncthing.service, enabled and started, so it
+# syncs whenever you're logged in. Its web page, where you add folders and devices, answers on this
+# machine alone: a drop-in of the unit sets STGUIADDRESS=127.0.0.1:8384, which outranks the
+# address in Syncthing's own settings. On the network it listens for other devices on TCP and
+# UDP (QUIC) 22000 on every network, and finds them on the LAN through broadcasts and multicasts
+# to UDP 21027; beyond the LAN it uses Syncthing's global discovery and relays. Nothing syncs until
+# you add a device and share a folder with it. Its package also raises the kernel's socket buffers
+# for QUIC (/usr/lib/sysctl.d/30-syncthing.conf), from the next boot.
+# https://apt.syncthing.net/
+name = "Syncthing"
+category = "system"
+tags = ["sync", "files", "folders", "peer to peer", "backup"]
+summary = "Keeps your folders the same on all your machines, with nobody's cloud in the middle."
+# Syncthing publishes no AppStream metainfo, and its site's words aren't under a licence that
+# allows copying them, so this is ours.
+description = """\
+Syncthing keeps folders in sync between your devices, directly from one to the other over \
+encrypted connections, on the LAN or across the internet, with no server of anyone else's \
+holding your files. Each device and each folder is shared by hand, and its web page on this \
+machine, http://127.0.0.1:8384, is where you do it."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), the name Syncthing's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "syncthing"
+keeps = """\
+Your synced folders stay where you put them, and Syncthing's settings, device id and keys in \
+~/.local/state/syncthing (or ~/.config/syncthing, where an older Syncthing made them): install \
+Syncthing again and it's the same device."""
+
+[[action]]
+name = "Install Syncthing"
+kind = "apt"
+repo = "syncthing"
+packages = ["syncthing"]
+
+[[action]]
+name = "Keep Syncthing's web page to this machine"
+kind = "file"
+to = "~/.config/systemd/user/syncthing.service.d/kubaos-gui.conf"
+from = "kubaos-gui.conf"
+
+[[action]]
+name = "Start Syncthing whenever you log in"
+kind = "unit"
+unit = "syncthing.service"
+scope = "user"
+enable = true
+start = true

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Writes the file whose being there keeps Dropbox's package from adding its repository: its
+# postinst adds it as dropbox.list, with a key of its own in /etc/apt/keyrings/dropbox.asc, unless
+# /etc/default/dropbox-repo is there, so KubaOS's dropbox.sources alone would leave apt with the
+# repository twice and two keys for it, which fails every apt run.
+# Usage: ./opt-out <path of dropbox-repo>
+set -euo pipefail
+[[ -e "$1" ]] && exit 0
+cat >"$1" <<'TEXT'
+# KubaOS sets Dropbox's repository up in dropbox.sources, with a key for it alone. This file
+# being here keeps Dropbox's package from adding the repository a second time.
+TEXT
+chmod 644 "$1"

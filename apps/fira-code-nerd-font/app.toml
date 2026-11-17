@@ -1,0 +1,27 @@
+# Fira Code Nerd Font from nixpkgs, through the User flake: nerd-fonts.fira-code, Nerd Fonts 3.4.0
+# of Fira Code 6.2, where Nerd Fonts is at 3.5.1. Ubuntu's archive has no Nerd Font. The home's
+# switch puts it in the profile's fonts, ~/.nix-profile/share/fonts, which fontconfig reads for
+# every app, apt's and Nix's, and builds the profile's font cache with it, so the cache is up to
+# date as it lands and as it goes. Its fonts are under the SIL Open Font License 1.1, Nerd Fonts'
+# patcher under MIT.
+# https://search.nixos.org/packages?show=nerd-fonts.fira-code
+name = "Fira Code Nerd Font"
+category = "system"
+tags = ["font", "monospace", "terminal", "nerd font", "ligatures", "fira"]
+summary = "Ligatures that turn != and => into real symbols, plus icons. Your code looks smarter than it is."
+# Nerd Fonts' and the font's own words aren't under a licence that allows copying them without
+# their notice, so this is ours.
+description = """\
+Fira Code is a monospaced font with programming ligatures, built on Mozilla's Fira Mono: \
+sequences such as ->, != and <= are drawn as one symbol in editors and terminals that support \
+them, in Nerd Fonts' build: the same letters with thousands of icons patched in (Powerline's \
+arrows, Font Awesome, Devicons, Material Design and more), which shell prompts, file managers and \
+status lines draw with. Its families are named FiraCode Nerd Font, Mono and Propo."""
+description_from = "kubaos"
+# Colloid's font icon, the system's icon theme (home/curated.nix), as a font has none of its own.
+icon = "fonts"
+
+[[action]]
+name = "Install Fira Code Nerd Font"
+kind = "nix"
+packages = ["nerd-fonts.fira-code"]

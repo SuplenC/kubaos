@@ -1,0 +1,58 @@
+# Dropbox from its signed apt repository, whose key system/packages.toml pins ([repo.dropbox]),
+# amd64 only. Its package is the `dropbox` command and a Nautilus plugin; as it installs, its
+# postinst adds the repository as /etc/apt/sources.list.d/dropbox.list, with a key of its own,
+# unless /etc/default/dropbox-repo is there, so the first step puts that file in place, Dropbox's
+# own opt-out (./opt-out; check: the file is there, whoever wrote it; undo: the file removed while
+# it is the one ./opt-out wrote, word for word). A Dropbox installed by hand has both already: its
+# dropbox.list stays and repo setup turns its line off. The sync daemon itself isn't in the
+# package: the first `dropbox start -i` (its menu entry) downloads it from Dropbox into
+# ~/.dropbox-dist and checks it against Dropbox's signature with python3-gpg, which the package
+# only suggests and the second step installs, then keeps it up to date there; as it first runs it
+# writes its start-at-login entry, ~/.config/autostart/dropbox.desktop. The last two steps make
+# both the app's, so a removal takes the daemon and the entry, while ones already there stay.
+# https://www.dropbox.com/install-linux
+name = "Dropbox"
+category = "system"
+tags = ["sync", "files", "cloud", "backup", "sharing"]
+summary = "A folder that's also in the cloud. Two gigabytes free, then the upsell never fucking stops."
+# Dropbox's own words are its metainfo's, which read as an advert, so this is ours.
+description = """\
+Dropbox keeps a folder, ~/Dropbox, in sync with your Dropbox account and every other device signed \
+in to it: back files up, share a folder or a link, and get older versions of a file back. Its \
+menu entry starts it; the first start downloads Dropbox's sync daemon and signs you in."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), the name Dropbox's package gives, so the
+# Command menu shows it before the package is installed.
+icon = "dropbox"
+keeps = """\
+Your files stay in ~/Dropbox, and your sign-in and Dropbox's settings in ~/.dropbox: install \
+Dropbox again and it's still signed in."""
+
+[[ready]]
+check = ["./closed"]
+says = "Dropbox is running: quit it from its tray icon, or run dropbox stop, then try again"
+
+[[action]]
+name = "Keep Dropbox's package from adding its repository again"
+kind = "run"
+root = true
+do = ["./opt-out", "/etc/default/dropbox-repo"]
+check = ["./opted-out", "/etc/default/dropbox-repo"]
+undo = ["./opt-in", "/etc/default/dropbox-repo"]
+
+[[action]]
+name = "Install Dropbox"
+kind = "apt"
+repo = "dropbox"
+arch = "amd64"
+packages = ["dropbox", "python3-gpg"]
+
+[[action]]
+name = "Make room for the Dropbox daemon it downloads"
+kind = "output"
+path = "~/.dropbox-dist"
+
+[[action]]
+name = "Make room for Dropbox's start-at-login entry"
+kind = "output"
+path = "~/.config/autostart/dropbox.desktop"

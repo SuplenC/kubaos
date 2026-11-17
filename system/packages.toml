@@ -259,6 +259,43 @@ key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xBC
 fingerprint = "BC7345F522079769F5BBE987EFC71127F425E228"
 keyring = "/etc/apt/keyrings/obs-studio.gpg"
 
+# Tailscale's repository, for the app of the catalog (apps/tailscale/), for
+# amd64 and arm64. Its package writes no source of its own; the keyring
+# package it recommends, tailscale-archive-keyring, isn't installed.
+[repo.tailscale]
+key_url = "https://pkgs.tailscale.com/stable/ubuntu/resolute.noarmor.gpg"
+fingerprint = "2596A99EAAB33821893C0A79458CA832957F5868"
+keyring = "/etc/apt/keyrings/tailscale.gpg"
+
+# Syncthing's repository, its stable-v2 channel, for the app of the catalog
+# (apps/syncthing/), a release series ahead of Ubuntu's archive. Its index is
+# signed by this key and by an older one too, which apt doesn't need. Its
+# package writes no source of its own.
+[repo.syncthing]
+key_url = "https://syncthing.net/release-key.gpg"
+fingerprint = "FBA2E162F2F44657B38F0309E5665F9BD5970C47"
+keyring = "/etc/apt/keyrings/syncthing.gpg"
+
+# ppa:nextcloud-devs/client, the Launchpad PPA of Nextcloud's desktop client
+# developers, for the app of the catalog (apps/nextcloud/), a release series
+# ahead of Ubuntu's archive. It builds the client for amd64 only. Its package
+# writes no source of its own.
+[repo.nextcloud]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x1FCD77DD0DBEF5699AD2610160EE47FBAD3DD469"
+fingerprint = "1FCD77DD0DBEF5699AD2610160EE47FBAD3DD469"
+keyring = "/etc/apt/keyrings/nextcloud.gpg"
+
+# Dropbox's repository, for the app of the catalog (apps/dropbox/), amd64 only,
+# at the plain-HTTP address Dropbox's own package writes, so repo setup turns
+# off the source a Dropbox installed by hand added; its index is checked
+# against the pinned key. The package adds that source, with a key of its own
+# in /etc/apt/keyrings/dropbox.asc, unless /etc/default/dropbox-repo is there,
+# which the app writes first.
+[repo.dropbox]
+key_url = "https://linux.dropbox.com/fedora/rpm-public-key.asc"
+fingerprint = "1C61A2656FB57B7E4DE0F4C1FC918B335044912E"
+keyring = "/etc/apt/keyrings/dropbox.gpg"
+
 # ppa:inkscape.dev/stable, the Launchpad PPA of Inkscape's developers, for the
 # app of the catalog (apps/inkscape/). Its package writes no source of its own.
 [repo.inkscape]

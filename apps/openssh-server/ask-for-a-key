@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Says on the desktop that nobody can log in over SSH yet: passwords are off and no key is listed.
+set -euo pipefail
+notify-send --app-name=KubaOS --icon=dialog-information \
+  "Nobody can log in over SSH yet" \
+  "Passwords are off, and ~/.ssh/authorized_keys lists no key. Copy in the public key of the machine you'll log in from."

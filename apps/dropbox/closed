@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Ready: Dropbox's daemon isn't running for this user, as an install or a removal changes the
+# folder it runs from.
+set -euo pipefail
+! pgrep -u "$(id -u)" -x dropbox >/dev/null
