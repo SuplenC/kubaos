@@ -24,7 +24,12 @@ import { slider } from "../../lib/slider.ts";
 import { setTabDisabled, tabs } from "../../lib/tabs.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { floatingTooltip, tooltip } from "../../lib/tooltip.ts";
-import { APP_ICONS } from "../../site/app-icons.ts";
+import chromium from "../../assets/apps/chromium.svg?url";
+import discord from "../../assets/apps/discord.svg?url";
+import firefox from "../../assets/apps/firefox.svg?url";
+import spotify from "../../assets/apps/spotify.svg?url";
+import steam from "../../assets/apps/steam.svg?url";
+import vscodeInsiders from "../../assets/apps/vscode-insiders.svg?url";
 import { ALL, CHROME } from "../../site/settings.ts";
 import { voice } from "../molecules/meter.ts";
 import { mutePill, type MuteOptions, volumeIcon } from "./bar-audio-parts.ts";
@@ -137,26 +142,25 @@ export interface App {
   readonly muted?: boolean;
 }
 
-const [KUBAOS, PLATE, DISC, , WIDE] = APP_ICONS;
 
 export const PLAYING: readonly App[] = [
-  { name: "Spotify", picture: DISC!.picture, level: 0.7 },
-  { name: "Firefox", picture: KUBAOS!.picture, device: SPEAKERS, level: 0.45 },
+  { name: "Spotify", picture: spotify, level: 0.7 },
+  { name: "Firefox", picture: firefox, device: SPEAKERS, level: 0.45 },
 ];
 
-export const RECORDING: readonly App[] = [{ name: "Discord", picture: PLATE!.picture, level: 0.6 }];
+export const RECORDING: readonly App[] = [{ name: "Discord", picture: discord, level: 0.6 }];
 
 /** Many apps playing at once, for the Apps card past its room. */
 export const MANY: readonly App[] = [
   ...PLAYING,
-  { name: "Discord", picture: PLATE!.picture, device: HEADSET, level: 0.8 },
+  { name: "Discord", picture: discord, device: HEADSET, level: 0.8 },
   { name: "mpv", level: 1 },
-  { name: "Steam", picture: WIDE!.picture, device: SCREEN, level: 0.35, muted: true },
-  { name: "Chromium", picture: KUBAOS!.picture, level: 0.55 },
+  { name: "Steam", picture: steam, device: SCREEN, level: 0.35, muted: true },
+  { name: "Chromium", picture: chromium, level: 0.55 },
 ];
 
 /** An app whose name runs long. */
-export const LONG_APP: App = { name: "Visual Studio Code — Insiders (Electron)", picture: KUBAOS!.picture, device: LONG_DEVICE, level: 0.5 };
+export const LONG_APP: App = { name: "Visual Studio Code — Insiders (Electron)", picture: vscodeInsiders, device: LONG_DEVICE, level: 0.5 };
 
 export const TABS = ["Output", "Input", "Options"] as const;
 

@@ -15,7 +15,10 @@ import { withHint } from "../../lib/hint.ts";
 import { type MenuEntry, menu } from "../../lib/menu.ts";
 import { pill } from "../../lib/pill.ts";
 import { popover } from "../../lib/tooltip.ts";
-import { APP_ICONS } from "../../site/app-icons.ts";
+import discord from "../../assets/apps/discord.svg?url";
+import firefox from "../../assets/apps/firefox.svg?url";
+import spotify from "../../assets/apps/spotify.svg?url";
+import strawberry from "../../assets/apps/strawberry.svg?url";
 
 /** A circle pinned in a state, as the specimens pin them. */
 export type CirclePinned = "lit" | "pressed";
@@ -145,17 +148,15 @@ export interface Player {
   readonly picture?: string;
 }
 
-const [KUBAOS, PLATE, DISC, STAR] = APP_ICONS;
-
-/** The shots' players: the app names are stand-ins, each on one of the IconTile's kinds of icon. */
+/** The shots' players, each with its app's icon as the system's icon theme draws it. */
 export const PLAYERS: readonly Player[] = [
-  { app: "Spotify", picture: DISC!.picture },
-  { app: "Firefox", picture: KUBAOS!.picture },
-  { app: "Discord", picture: PLATE!.picture },
+  { app: "Spotify", picture: spotify },
+  { app: "Firefox", picture: firefox },
+  { app: "Discord", picture: discord },
 ];
 
 /** A player whose app's name runs long, for the menu's longest line. */
-export const LONG_PLAYER: Player = { app: "Strawberry Music Player (Flatpak)", picture: STAR!.picture };
+export const LONG_PLAYER: Player = { app: "Strawberry Music Player (Flatpak)", picture: strawberry };
 
 /** Which circle of now playing is pinned: its icon, previous, play or pause, next. */
 export type PlayingPart = "icon" | "previous" | "play" | "next";
