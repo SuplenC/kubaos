@@ -4,11 +4,11 @@
 //!
 //! Its `PATH` is one folder, the sandbox's `bin`, and nothing else. In it, every command an app's
 //! script or a host can call that changes the machine or the session (systemd, logind, apt, dpkg,
-//! debconf, pkexec, sudo, T3, Docker, the group tools, the openers, nftables) is a stand-in that
-//! logs its call and changes nothing, and the harmless tools a script needs (a shell, coreutils,
-//! jq, tar, sed, awk, grep, python) are links to the real ones. Any other command is not found, so
-//! a script that reaches for one fails, loudly, rather than run the real one. The session and
-//! system buses point at a socket that isn't there, and `XDG_RUNTIME_DIR` is a folder of the
+//! debconf, pkexec, sudo, T3, Docker, the group tools, the openers, nftables, NetworkManager) is a
+//! stand-in that logs its call and changes nothing, and the harmless tools a script needs (a shell,
+//! coreutils, jq, tar, sed, awk, grep, python) are links to the real ones. Any other command is not
+//! found, so a script that reaches for one fails, loudly, rather than run the real one. The session
+//! and system buses point at a socket that isn't there, and `XDG_RUNTIME_DIR` is a folder of the
 //! sandbox's own, so even a program called by its full path finds no user manager, logind or polkit
 //! to talk to. `HOME` and the `XDG_*` folders are the test's.
 //!
@@ -92,6 +92,7 @@ pub const STUBBED: &[&str] = &[
     "shutdown",
     "poweroff",
     "nft",
+    "nmcli",
 ];
 
 /// The stand-ins that answer as a machine where nothing matches: no process found.

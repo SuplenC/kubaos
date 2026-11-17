@@ -66,8 +66,8 @@ fn groups(world: &World) -> Vec<String> {
 /// The shipped app `id`'s world: its .debs served; `getent`, `groupadd` and `groupdel` keep their
 /// groups in a file of the test's, so a script never reads the machine's `/etc/group`; each VPN's
 /// units are there as its package ships them, neither enabled nor running, as the fake's apt
-/// installs no files; and 1Password's cleanup works in the fake machine's `/` rather than the real
-/// one.
+/// installs no files; and 1Password's and Proton VPN's cleanups work in the fake machine's `/`
+/// rather than the real one.
 fn security_world(id: &str) -> World {
     let world = world(id);
     let file = group_file(&world);
@@ -96,11 +96,16 @@ fn security_world(id: &str) -> World {
         }
     }
     serve_the_debs(&world, id);
-    if id == "1password" {
+    let script = match id {
+        "1password" => Some("./ungroup"),
+        "proton-vpn" => Some("./kill-switch-off"),
+        _ => None,
+    };
+    if let Some(script) = script {
         let text = fs::read_to_string(world.catalog.join(id).join("app.toml")).unwrap();
         let root = world.system_path("/").display().to_string();
-        let ours = text.replace(r#"["./ungroup", "/"]"#, &format!(r#"["./ungroup", "{root}"]"#));
-        assert_ne!(ours, text, "1Password's cleanup names the machine's /");
+        let ours = text.replace(&format!(r#"["{script}", "/"]"#), &format!(r#"["{script}", "{root}"]"#));
+        assert_ne!(ours, text, "{id}'s cleanup names the machine's /");
         world.write_app(id, &ours);
     }
     world
@@ -331,6 +336,79 @@ fn proton_vpns_removal_turns_its_kill_switch_off_before_its_packages_go() {
         at("run ./kill-switch-off").is_some_and(|off| at("apt remove").is_some_and(|gone| off < gone)),
         "{log:#?}"
     );
+}
+
+/// Proton VPN installed, with Proton's own command failing as when what it reaches is down, and
+/// no nftables table up.
+fn proton_vpn() -> World {
+    let world = security_world("proton-vpn");
+    let sandbox = world.host.sandbox();
+    sandbox.stub("python3", "exit 1");
+    sandbox.stub("nft", "exit 1");
+    run(&world, |e| e.add("proton-vpn", None, &picks("proton-vpn"))).unwrap();
+    world
+}
+
+/// A running NetworkManager whose connections are the lines of a file of the test's, holding
+/// `names`, as the stand-in `nmcli`; with `deletes`, deleting one takes its line away. The file.
+fn network_manager(world: &World, names: &str, deletes: bool) -> PathBuf {
+    let file = world.host_home().join("../../connections");
+    fs::write(&file, names).unwrap();
+    let f = file.display();
+    let delete = if deletes {
+        format!("grep -vx \"$4\" '{f}' >'{f}.new'; mv '{f}.new' '{f}'")
+    } else {
+        ":".to_owned()
+    };
+    world.host.sandbox().stub(
+        "nmcli",
+        &format!("case $1 in\n-g) cat '{f}' ;;\nconnection) {delete} ;;\nesac"),
+    );
+    file
+}
+
+#[test]
+fn proton_vpns_removal_deletes_its_kill_switchs_connections_networkmanager_still_has() {
+    let world = proton_vpn();
+    let connections = network_manager(
+        &world,
+        "pvpn-killswitch-perm\npvpn-routed-killswitch\nHome Wi-Fi\n",
+        true,
+    );
+
+    run(&world, |e| e.remove_with("proton-vpn", &Picks::default())).unwrap();
+
+    assert_eq!(fs::read_to_string(&connections).unwrap(), "Home Wi-Fi\n");
+}
+
+#[test]
+fn proton_vpns_removal_deletes_its_saved_kill_switch_with_networkmanager_down() {
+    let world = proton_vpn();
+    // NetworkManager isn't running, as nmcli says.
+    world.host.sandbox().stub("nmcli", "exit 8");
+    let saved = world.system_path("/etc/NetworkManager/system-connections");
+    fs::create_dir_all(&saved).unwrap();
+    let ours = saved.join("pvpn-killswitch-perm.nmconnection");
+    fs::write(&ours, "[connection]\nid=pvpn-killswitch-perm\ntype=dummy\n").unwrap();
+    let theirs = saved.join("home.nmconnection");
+    fs::write(&theirs, "[connection]\nid=Home Wi-Fi\ntype=wifi\n").unwrap();
+
+    run(&world, |e| e.remove_with("proton-vpn", &Picks::default())).unwrap();
+
+    assert!(!ours.exists());
+    assert!(theirs.is_file());
+}
+
+#[test]
+fn a_proton_kill_switch_connection_that_stays_stops_the_removal_with_the_packages_kept() {
+    let world = proton_vpn();
+    // NetworkManager won't let it go.
+    network_manager(&world, "pvpn-killswitch-perm\n", false);
+
+    let removed = run(&world, |e| e.remove_with("proton-vpn", &Picks::default()));
+
+    assert!(removed.is_err(), "the removal went through");
+    assert!(world.host.state.borrow().dpkg.contains_key("proton-vpn-gnome-desktop"));
 }
 
 #[test]
