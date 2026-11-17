@@ -11,7 +11,7 @@ summary = "A Rust code editor drawn on your GPU. Opens before you've finished bl
 description = """\
 Productive coding starts with a tool that stays out of your way. Zed blends the power of an IDE \
 with the speed of a lightweight editor for productivity you can feel under your fingertips."""
-description_from = "https://github.com/zed-industries/zed/blob/v1.28.1/crates/zed/resources/flatpak/zed.metainfo.xml.in"
+description_from = "https://github.com/zed-industries/zed/blob/v1.25.3/crates/zed/resources/flatpak/zed.metainfo.xml.in"
 # Colloid's, the system's icon theme (home/curated.nix).
 icon = "zed"
 keeps = """\
