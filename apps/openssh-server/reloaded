@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Done: sshd isn't running, so it reads the drop-in as it next starts, or it last started or
+# reloaded after the drop-in was written. The times are systemd's: ssh.service's start, and the
+# start of each of its reload commands.
+# Usage: ./reloaded <path of the drop-in>
+set -euo pipefail
+[[ "$(systemctl show ssh.service -p ActiveState --value)" == active ]] || exit 0
+written=$(stat -c %Y "$1")
+times=$(systemctl show ssh.service --timestamp=unix -p ExecMainStartTimestamp --value)$'\n'
+times+=$(systemctl show ssh.service --timestamp=unix -p ExecReload --value |
+  grep -o 'start_time=\[[^]]*\]' | sed 's/^start_time=\[\(.*\)\]$/\1/') || true
+while IFS= read -r at; do
+  [[ -n $at && $at != n/a ]] || continue
+  seconds=$(date -d "$at" +%s 2>/dev/null) || continue
+  if ((seconds >= written)); then
+    exit 0
+  fi
+done <<<"$times"
+exit 1

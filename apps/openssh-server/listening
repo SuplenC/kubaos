@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Done: sshd starts at boot already, through ssh.socket or through ssh.service enabled the classic
+# way, which holds port 22 itself, so the socket is never started against it.
+set -euo pipefail
+for unit in ssh.socket ssh.service; do
+  if [[ "$(systemctl is-enabled "$unit" 2>/dev/null)" == enabled ]]; then
+    exit 0
+  fi
+done
+exit 1

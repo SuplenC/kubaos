@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Says on the desktop that nobody can log in over SSH yet: passwords are off and no key is listed.
+# A notice and no more: one that can't be shown (no notification daemon) fails nothing, and an
+# update says the same as a note until a key is there.
 set -euo pipefail
 notify-send --app-name=KubaOS --icon=dialog-information \
   "Nobody can log in over SSH yet" \
-  "Passwords are off, and ~/.ssh/authorized_keys lists no key. Copy in the public key of the machine you'll log in from."
+  "Passwords are off, and ~/.ssh/authorized_keys lists no key. Copy in the public key of the machine you'll log in from." ||
+  true

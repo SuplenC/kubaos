@@ -890,7 +890,11 @@ fn penpots_removal_takes_the_images_its_install_pulled_and_keeps_the_ones_the_ma
             r#"images='{images}'
 file() {{ printf '%s/%s' "$images" "$(printf %s "$1" | tr '/:@' '___')"; }}
 case "$1 $2" in
-"image inspect") [ -e "$(file "$3")" ]; exit ;;
+"image inspect")
+	for image; do :; done
+	[ -e "$(file "$image")" ] && exit 0
+	echo "Error response from daemon: No such image: $image" >&2
+	exit 1 ;;
 "image rm") rm "$(file "$3")"; exit ;;
 esac
 for arg; do
@@ -926,6 +930,80 @@ exit 1"#,
     assert!(!pulled.exists(), "the image the install pulled stayed");
     assert!(had.exists(), "the image the machine had went");
     assert!(!dir.join("pulled-images").exists() && !dir.join("secret.env").exists());
+}
+
+/// A sandbox whose `docker` lacks every image and answers an image's inspect with `inspect`, a
+/// shell command, and whose `up` fails, as a start that can't pull does; with Penpot's `up` in it,
+/// its stack's folder `dir`.
+fn penpot_up_against(tmp: &Path, dir: &Path, inspect: &str) -> (crate::sandbox::Sandbox, PathBuf) {
+    let home = tmp.join("home");
+    fs::create_dir_all(&home).unwrap();
+    fs::create_dir_all(dir).unwrap();
+    let sandbox = crate::sandbox::Sandbox::new(&tmp.join("sandbox"), &home, "tester");
+    sandbox.stub(
+        "docker",
+        &format!(
+            r#"case "$1 $2" in
+"image inspect") {inspect} ;;
+esac
+for arg; do
+	case $arg in
+	config) printf '%s\n' 'penpotapp/frontend:2.19.2' 'postgres:15'; exit 0 ;;
+	up) exit 1 ;;
+	esac
+done
+exit 1"#
+        ),
+    );
+    fs::write(dir.join("secret.env"), "PENPOT_SECRET_KEY=earlier\n").unwrap();
+    (sandbox, penpot_script("up", tmp, dir))
+}
+
+#[test]
+fn penpots_up_lists_no_image_while_docker_cant_say_whether_it_has_it() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("penpot");
+    let (sandbox, up) = penpot_up_against(
+        tmp.path(),
+        &dir,
+        "echo 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?' >&2; exit 1",
+    );
+
+    let ran = sandbox.command(&up).output().unwrap();
+
+    assert!(!ran.status.success(), "{ran:?}");
+    let said = String::from_utf8_lossy(&ran.stderr);
+    assert!(said.contains("Cannot connect to the Docker daemon"), "{said}");
+    assert!(
+        !dir.join("pulled-images").exists(),
+        "an image the user may have was listed"
+    );
+    assert!(
+        !sandbox.calls().iter().any(|c| c.contains(" up ")),
+        "{:#?}",
+        sandbox.calls()
+    );
+}
+
+#[test]
+fn penpots_up_lists_an_image_docker_lacks_once_however_many_starts_fail() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("penpot");
+    let (sandbox, up) = penpot_up_against(
+        tmp.path(),
+        &dir,
+        r#"for image; do :; done; echo "Error response from daemon: No such image: $image" >&2; exit 1"#,
+    );
+
+    for _ in 0..2 {
+        let ran = sandbox.command(&up).output().unwrap();
+        assert!(!ran.status.success(), "the pull fails offline: {ran:?}");
+    }
+
+    assert_eq!(
+        fs::read_to_string(dir.join("pulled-images")).unwrap(),
+        "penpotapp/frontend:2.19.2\npostgres:15\n"
+    );
 }
 
 #[test]
