@@ -6,15 +6,34 @@
 -- Objects read the world live, as Hyprland's do, so a workspace renumbered
 -- keeps its object.
 --
--- A screen arrives as Hyprland brings one: `monitor.added` fires while it
--- still sits at 0,0, the layout is arranged afterwards and
--- `monitor.layout_changed` fires, and timers run only when the test lets
--- them (`settle()`). Focus moving to a screen fires `monitor.focused`, as
--- Hyprland's does. `events` lists the socket events a move or a renumber
--- would send the bar, in order, and `commands` what `hl.exec_cmd` ran.
+-- Time runs as in Hyprland's event loop. Each thing the test makes happen
+-- (a screen plugged in, a window opened, a bind run) is one turn: the Lua it
+-- calls runs nested inside it, and once it returns, the work Hyprland defers
+-- with `doLater` runs (applying the workspace rules, adding or removing the
+-- fallback output), then the timers due on the next turn (`IDLE_MS`). Longer
+-- timers run only when the test lets them (`tick()`, `settle()`).
+--
+-- A screen arrives as Hyprland brings one (`CMonitor::onConnect`): it shows a
+-- new workspace under the lowest free number, takes back the workspaces that
+-- last lived on its connector and, when it is the only real screen, those no
+-- screen holds, shows the workspace it showed when it went, and only then
+-- does `monitor.added` fire, while it still sits at 0,0; the layout is
+-- arranged afterwards and `monitor.layout_changed` fires. The last real
+-- screen going leaves its workspaces on no screen and brings the `FALLBACK`
+-- output, which goes again once a real screen is back. Focus moving to a
+-- screen fires `monitor.focused`, as Hyprland's does. A config reload starts
+-- a new Lua state (`reload()`). `events` lists the socket events a move or a
+-- renumber would send the bar, in order, and `commands` what `hl.exec_cmd`
+-- ran.
 
 local F = {}
 F.__index = F
+
+-- The output Hyprland adds while no real screen is plugged in.
+F.FALLBACK = "FALLBACK"
+
+-- Timers this short run on the turn after the one that set them.
+F.IDLE_MS = 1
 
 function F.new()
   local world = setmetatable({
@@ -24,7 +43,12 @@ function F.new()
     rules = {},
     handlers = {},
     timers = {},
+    later = {},
     hidden = {},
+    remembered = {},
+    depth = 0,
+    draining = false,
+    refresh_queued = false,
     focused = nil,
     next_monitor_id = 0,
     next_window = 1,
@@ -35,6 +59,61 @@ function F.new()
   }, F)
   world.hl = world:api()
   return world
+end
+
+-- Runs `fn` as Hyprland runs a dispatch: when it is the outermost, the
+-- deferred work and the next turn's timers follow it.
+function F:step(fn, ...)
+  self.depth = self.depth + 1
+  local results = table.pack(fn(...))
+  self.depth = self.depth - 1
+  if self.depth == 0 and not self.draining then
+    self.draining = true
+    self:drain()
+    self.draining = false
+  end
+  return table.unpack(results, 1, results.n)
+end
+
+-- The `doLater` work in the order it was queued, then each timer of
+-- `IDLE_MS` or less, until nothing is left.
+function F:drain()
+  while true do
+    local job = table.remove(self.later, 1)
+    if job then
+      self:step(job)
+    else
+      local timer = nil
+      for _, candidate in ipairs(self.timers) do
+        if candidate.enabled and not candidate.fired and candidate.timeout <= F.IDLE_MS then
+          timer = candidate
+          break
+        end
+      end
+      if not timer then
+        return
+      end
+      timer.fired = true
+      self:step(timer.callback)
+    end
+  end
+end
+
+function F:defer(job)
+  self.later[#self.later + 1] = job
+end
+
+-- Hyprland applies changed workspace rules once, after the dispatch that
+-- changed them returns.
+function F:schedule_refresh()
+  if self.refresh_queued then
+    return
+  end
+  self.refresh_queued = true
+  self:defer(function()
+    self.refresh_queued = false
+    self:refresh()
+  end)
 end
 
 function F:monitor_record(name)
@@ -56,9 +135,12 @@ function F:workspace_record(id)
 end
 
 function F:fire(event, ...)
-  for _, handler in ipairs(self.handlers[event] or {}) do
-    handler(...)
-  end
+  local args = table.pack(...)
+  self:step(function()
+    for _, handler in ipairs(self.handlers[event] or {}) do
+      handler(table.unpack(args, 1, args.n))
+    end
+  end)
 end
 
 -- Focus moves to a screen, and `monitor.focused` fires when it is another.
@@ -109,26 +191,64 @@ function F:create(id, monitor)
   return record
 end
 
+-- The screen an enabled rule binds workspace `id` to, if any.
+function F:bound(id)
+  for _, rule in ipairs(self.rules) do
+    if rule.enabled and rule.monitor and tonumber(rule.workspace) == id then
+      return rule.monitor
+    end
+  end
+  return nil
+end
+
+-- The lowest number no workspace has and no rule binds to another screen
+-- than `monitor`, as Hyprland picks a new screen's workspace and the one that
+-- fills a gap.
+function F:lowest_free(monitor)
+  local id = 1
+  while self:workspace_record(id) or (self:bound(id) and self:bound(id) ~= monitor.name) do
+    id = id + 1
+  end
+  return id
+end
+
+-- Shows another workspace on a screen whose shown one moved away: any other on
+-- it, or a new one under the lowest free number.
+function F:refill(monitor)
+  for _, record in ipairs(self.workspaces) do
+    if record.monitor == monitor and record ~= monitor.active then
+      monitor.active = record
+      return
+    end
+  end
+  monitor.active = self:create(self:lowest_free(monitor), monitor)
+end
+
+-- `moveWorkspaceToMonitor`: the screen it leaves shows another when it
+-- showed this one.
+function F:move_workspace(record, monitor)
+  if record.monitor == monitor then
+    return
+  end
+  local from = record.monitor
+  record.monitor = monitor
+  self.moves = self.moves + 1
+  if from and from.active == record then
+    self:refill(from)
+  end
+end
+
 -- Hyprland's refresh after a workspace rule changes: each enabled persistent
 -- rule whose screen is plugged in has its workspace there, created or moved,
--- and every other workspace loses its persistence. Hyprland runs it at the end
--- of the current event, once a screen being removed is gone; here it runs at
--- once and passes over that screen.
+-- and every other workspace loses its persistence.
 function F:refresh()
   local persistent = {}
   for _, rule in ipairs(self.rules) do
     local monitor = rule.enabled and rule.persistent and self:monitor_record(rule.monitor)
-    if monitor and not monitor.removing then
+    if monitor then
       local id = tonumber(rule.workspace)
       local record = self:workspace_record(id) or self:create(id, monitor)
-      if record.monitor ~= monitor then
-        local from = record.monitor
-        record.monitor = monitor
-        self.moves = self.moves + 1
-        if from and from.active == record then
-          self:refill(from)
-        end
-      end
+      self:move_workspace(record, monitor)
       persistent[record] = true
     end
   end
@@ -139,7 +259,8 @@ function F:refresh()
 end
 
 -- `hl.workspace_rule`: merged into the first enabled rule for the same
--- workspace, as Hyprland's `replaceOrAdd` does, else added.
+-- workspace, as Hyprland's `replaceOrAdd` does, else added; applied once the
+-- dispatch returns.
 function F:workspace_rule(options)
   local rule = nil
   for _, candidate in ipairs(self.rules) do
@@ -158,19 +279,20 @@ function F:workspace_rule(options)
   if options.persistent ~= nil then
     rule.persistent = options.persistent
   end
-  self:refresh()
+  self:schedule_refresh()
   local world = self
   return {
     set_enabled = function(_, enabled)
       rule.enabled = enabled
-      world:refresh()
+      world:schedule_refresh()
     end,
     is_enabled = function() return rule.enabled end,
   }
 end
 
--- `hl.timer`: a one-shot timer the test fires with `settle()`.
+-- `hl.timer`: a one-shot timer. Hyprland refuses a timeout of 0.
 function F:timer(callback, options)
+  assert(options.timeout > 0, "hl.timer: opts.timeout must be > 0")
   local timer = { callback = callback, timeout = options.timeout, enabled = true, fired = false }
   self.timers[#self.timers + 1] = timer
   return {
@@ -178,14 +300,6 @@ function F:timer(callback, options)
     is_enabled = function() return timer.enabled end,
     set_timeout = function(_, timeout) timer.timeout = timeout end,
   }
-end
-
-function F:lowest_free()
-  local id = 1
-  while self:workspace_record(id) do
-    id = id + 1
-  end
-  return id
 end
 
 function F:monitor_object(record)
@@ -238,6 +352,20 @@ function F:workspace_object(record)
   })
 end
 
+function F:window_object(window)
+  if not window then
+    return nil
+  end
+  local world = self
+  return setmetatable({}, {
+    __index = function(_, key)
+      if key == "address" then return window.address end
+      if key == "workspace" then return world:workspace_object(window.workspace) end
+      return nil
+    end,
+  })
+end
+
 -- A monitor selector: a connector, or l/r/u/d by the screens' order left to
 -- right (they all sit in one row here).
 function F:select_monitor(selector)
@@ -269,6 +397,15 @@ function F:active_window()
   return nil
 end
 
+function F:window_record(address)
+  for _, window in ipairs(self.windows) do
+    if window.address == address then
+      return window
+    end
+  end
+  return nil
+end
+
 function F:focus_workspace(id)
   local record = self:workspace_record(id)
   if record then
@@ -280,18 +417,6 @@ function F:focus_workspace(id)
   self:cleanup()
 end
 
--- Shows another workspace on a screen whose shown one moved away: any other on
--- it, or a new one under the lowest free number.
-function F:refill(monitor)
-  for _, record in ipairs(self.workspaces) do
-    if record.monitor == monitor and record ~= monitor.active then
-      monitor.active = record
-      return
-    end
-  end
-  monitor.active = self:create(self:lowest_free(), monitor)
-end
-
 function F:apply(action)
   local kind, args = action.kind, action.args
   if kind == "focus" then
@@ -300,12 +425,10 @@ function F:apply(action)
     elseif args.workspace then
       self:focus_workspace(tonumber(args.workspace))
     elseif args.window then
-      local address = args.window:gsub("^address:", "")
-      for _, window in ipairs(self.windows) do
-        if window.address == address then
-          self:set_focused(window.workspace.monitor)
-          window.workspace.monitor.active = window.workspace
-        end
+      local window = self:window_record((args.window:gsub("^address:", "")))
+      if window then
+        self:set_focused(window.workspace.monitor)
+        window.workspace.monitor.active = window.workspace
       end
     end
   elseif kind == "workspace.move" then
@@ -329,19 +452,22 @@ function F:apply(action)
     record.id = args.id
     self.renumbered = self.renumbered + 1
   elseif kind == "window.move" then
-    local address = args.window:gsub("^address:", "")
+    local window = self:window_record((args.window:gsub("^address:", "")))
     local id = tonumber(args.workspace)
-    local record = self:workspace_record(id) or self:create(id, self.focused)
-    for _, window in ipairs(self.windows) do
-      if window.address == address then
-        window.workspace = record
-      end
+    -- `Actions::moveToWorkspace` does nothing for a window already there.
+    if not window or window.workspace.id == id then
+      return
     end
+    local record = self:workspace_record(id) or self:create(id, self.focused)
+    -- `CWindow::moveToWorkspace` reports the move before the layout takes the
+    -- window off its old workspace, and before the follow, so the counts are
+    -- still those of before the move.
+    self:fire("window.move_to_workspace", self:window_object(window), self:workspace_object(record))
+    window.workspace = record
     if args.follow then
       self:focus_workspace(id)
     end
     self:cleanup()
-    self:fire("window.move_to_workspace")
   else
     error("the fake has no dispatcher " .. kind)
   end
@@ -365,7 +491,7 @@ function F:api()
     exec_cmd = function(command) world.commands[#world.commands + 1] = command end,
     dispatch = function(action)
       if type(action) == "function" then
-        action()
+        world:step(action)
       else
         world:apply(action)
       end
@@ -394,33 +520,25 @@ function F:api()
     end,
     get_workspace = function(id) return world:workspace_object(world:workspace_record(id)) end,
     get_active_workspace = function() return world:workspace_object(world.focused and world.focused.active) end,
-    get_active_window = function()
-      local window = world:active_window()
-      return window and { address = window.address } or nil
-    end,
+    get_active_window = function() return world:window_object(world:active_window()) end,
     get_window = function(selector)
-      local address = selector:gsub("^address:", "")
-      for _, window in ipairs(world.windows) do
-        if window.address == address then
-          return { address = address }
-        end
-      end
-      return nil
+      return world:window_object(world:window_record((selector:gsub("^address:", ""))))
     end,
   }
 end
 
--- What the tests drive: plugging screens in and out, and opening windows.
+-- What the tests drive: plugging screens in and out, opening windows,
+-- reloading the config.
 
--- The timers due now fire, in the order they were set; one set while firing
--- waits for the next tick.
+-- The timers set so far fire, in the order they were set; one set while
+-- firing waits for the next tick.
 function F:tick()
   local due = #self.timers
   for index = 1, due do
     local timer = self.timers[index]
     if timer.enabled and not timer.fired then
       timer.fired = true
-      timer.callback()
+      self:step(timer.callback)
     end
   end
 end
@@ -434,24 +552,79 @@ function F:settle()
   end
 end
 
--- A screen arrives at 0,0 on a workspace under the lowest free number, as
--- Hyprland puts it, and `monitor.added` fires before the layout is arranged.
+-- `hyprctl reload`: Hyprland clears the workspace rules, cancels every Lua
+-- timer and runs the config in a new Lua state, where `load()` brings the
+-- module in again, then fires `config.reloaded`.
+function F:reload(load)
+  return self:step(function()
+    for _, timer in ipairs(self.timers) do
+      timer.enabled = false
+    end
+    self.rules = {}
+    self.handlers = {}
+    self:schedule_refresh()
+    local module = load()
+    self:fire("config.reloaded")
+    return module
+  end)
+end
+
+function F:real_monitors()
+  local count = 0
+  for _, record in ipairs(self.monitors) do
+    if record.name ~= F.FALLBACK then
+      count = count + 1
+    end
+  end
+  return count
+end
+
+-- A screen arrives as `CMonitor::onConnect` brings it, and `monitor.added`
+-- fires before the layout is arranged.
 function F:attach(name, description)
-  local record = { name = name, description = description, id = self.next_monitor_id, x = 0, y = 0 }
-  self.next_monitor_id = self.next_monitor_id + 1
-  self.monitors[#self.monitors + 1] = record
-  record.active = self:create(self:lowest_free(), record)
-  self.focused = self.focused or record
-  self:fire("monitor.added", self:monitor_object(record))
-  return record
+  return self:step(function()
+    local record = { name = name, description = description, id = self.next_monitor_id, x = 0, y = 0 }
+    self.next_monitor_id = self.next_monitor_id + 1
+    self.monitors[#self.monitors + 1] = record
+    -- The pass that puts persistent workspaces on their screens is queued
+    -- first, ahead of any rule a handler changes.
+    self:schedule_refresh()
+    record.active = self:create(self:lowest_free(record), record)
+    local alone = self:real_monitors() == 1 and name ~= F.FALLBACK
+    for _, workspace in ipairs(self.workspaces) do
+      local returning = workspace.last_monitor == name
+      if returning or (alone and not workspace.monitor) then
+        self:move_workspace(workspace, record)
+        if returning then
+          workspace.last_monitor = nil
+        end
+      end
+    end
+    if not self.focused then
+      self:set_focused(record)
+    end
+    local remembered = self.remembered[name] and self:workspace_record(self.remembered[name])
+    if remembered then
+      self:move_workspace(remembered, record)
+      record.active = remembered
+    end
+    self:cleanup()
+    self:fire("monitor.added", self:monitor_object(record))
+    if name ~= F.FALLBACK and self:monitor_record(F.FALLBACK) then
+      self:defer(function() self:detach(F.FALLBACK) end)
+    end
+    return record
+  end)
 end
 
 -- Hyprland's arrange: the screen takes its place and `monitor.layout_changed`
 -- fires.
 function F:arrange(name, x, y)
-  local record = self:monitor_record(name)
-  record.x, record.y = x or 0, y or 0
-  self:fire("monitor.layout_changed")
+  self:step(function()
+    local record = self:monitor_record(name)
+    record.x, record.y = x or 0, y or 0
+    self:fire("monitor.layout_changed")
+  end)
 end
 
 -- A screen plugged in and arranged at `x`, `y`, with the time to settle.
@@ -461,41 +634,60 @@ function F:plug(name, description, x, y)
   self:settle()
 end
 
--- Hyprland moves the screen's workspaces to the first other screen in its
--- list (`backup` names another), and when the screen had focus, shows the
--- workspace it showed on the backup and focuses the backup, with the
--- screen's own view already cleared; then fires `monitor.removed` while it
--- still lists the screen, and takes it off the list.
+-- Hyprland marks the screen's workspaces as last living there, moves them to
+-- the first other screen in its list (`backup` names another), and when the
+-- screen had focus, shows the workspace it showed on the backup and focuses
+-- the backup, with the screen's own view already cleared; then fires
+-- `monitor.removed` while it still lists the screen, and takes it off the
+-- list. With no other screen the workspaces are left on none, and the
+-- fallback output comes.
 function F:detach(name, backup_name)
-  local record = self:monitor_record(name)
-  local backup = backup_name and self:monitor_record(backup_name)
-  for _, other in ipairs(self.monitors) do
-    if other ~= record then
-      backup = backup or other
+  self:step(function()
+    local record = self:monitor_record(name)
+    local backup = backup_name and self:monitor_record(backup_name)
+    for _, other in ipairs(self.monitors) do
+      if other ~= record then
+        backup = backup or other
+      end
     end
-  end
-  for _, workspace in ipairs(self.workspaces) do
-    if workspace.monitor == record then
-      workspace.monitor = backup
+    for _, workspace in ipairs(self.workspaces) do
+      if workspace.monitor == record or not workspace.monitor then
+        workspace.last_monitor = workspace.last_monitor or name
+        workspace.monitor = backup or workspace.monitor
+      end
     end
-  end
-  if self.focused == record and record.active and backup then
-    backup.active = record.active
-  end
-  record.active = nil
-  record.removing = true
-  if self.focused == record then
-    self:set_focused(backup)
-  end
-  self:cleanup()
-  self:fire("monitor.removed", self:monitor_object(record))
-  local kept = {}
-  for _, other in ipairs(self.monitors) do
-    if other ~= record then
-      kept[#kept + 1] = other
+    if record.active then
+      self.remembered[name] = record.active.id
     end
-  end
-  self.monitors = kept
+    if self.focused == record and record.active and backup then
+      backup.active = record.active
+    end
+    record.active = nil
+    if self.focused == record then
+      if backup then
+        self:set_focused(backup)
+      else
+        self.focused = nil
+      end
+    end
+    self:cleanup()
+    self:fire("monitor.removed", self:monitor_object(record))
+    local kept = {}
+    for _, other in ipairs(self.monitors) do
+      if other ~= record then
+        kept[#kept + 1] = other
+      end
+    end
+    self.monitors = kept
+    for _, workspace in ipairs(self.workspaces) do
+      if workspace.monitor == record then
+        workspace.monitor = nil
+      end
+    end
+    if #self.monitors == 0 and name ~= F.FALLBACK then
+      self:defer(function() self:attach(F.FALLBACK, "") end)
+    end
+  end)
 end
 
 -- A screen unplugged, with the time to settle.
@@ -506,11 +698,13 @@ end
 
 -- A window on the focused screen's shown workspace, focused.
 function F:open_window()
-  local window = { address = string.format("0x%x", self.next_window), workspace = self.focused.active }
-  self.next_window = self.next_window + 1
-  self.windows[#self.windows + 1] = window
-  self:fire("window.open")
-  return window
+  return self:step(function()
+    local window = { address = string.format("0x%x", self.next_window), workspace = self.focused.active }
+    self.next_window = self.next_window + 1
+    self.windows[#self.windows + 1] = window
+    self:fire("window.open", self:window_object(window))
+    return window
+  end)
 end
 
 -- A window on workspace `id`, created on `monitor_name` if it doesn't exist,
@@ -523,20 +717,34 @@ function F:window_on(id, monitor_name)
   return window
 end
 
-function F:close_window(window)
-  local kept = {}
-  for _, other in ipairs(self.windows) do
-    if other ~= window then
-      kept[#kept + 1] = other
+-- A window unmapped: `window.close` fires while it still counts on its
+-- workspace, then it leaves it. An X11 app closing to the tray stops here.
+function F:unmap_window(window)
+  self:step(function()
+    self:fire("window.close", self:window_object(window))
+    local kept = {}
+    for _, other in ipairs(self.windows) do
+      if other ~= window then
+        kept[#kept + 1] = other
+      end
     end
-  end
-  self.windows = kept
-  self:cleanup()
-  self:fire("window.destroy")
+    self.windows = kept
+    self:cleanup()
+  end)
+end
+
+-- A window closed: unmapped, and destroyed once its close animation is done.
+function F:close_window(window)
+  self:step(function()
+    self:unmap_window(window)
+    self:defer(function() self:fire("window.destroy", self:window_object(window)) end)
+  end)
 end
 
 function F:focus_monitor(name)
-  self:set_focused(self:monitor_record(name))
+  self:step(function()
+    self:set_focused(self:monitor_record(name))
+  end)
 end
 
 -- The ids on a screen, in order.

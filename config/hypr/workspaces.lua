@@ -42,11 +42,12 @@
 -- Hyprland reports a screen's arrival before it arranges the layout, so the
 -- screen still sits at 0,0 and its position can't be read yet; a dock brings
 -- two screens a moment apart, and takes them away the same way, and while
--- one arrives the other can be missing from the list. So an arrival or a
--- removal only starts a short wait, restarted by every layout change, and
--- the reconcile runs once the layout has held still. The mapping it
--- computes, screen -> block, is the only one there is until the next
--- reconcile: a window opening or closing never recomputes positions.
+-- one arrives the other can be missing from the list. So an arrival, a
+-- removal or a screen moving in the layout only starts a short wait,
+-- restarted by every layout change, and the reconcile runs once the layout
+-- has held still. The mapping it computes, screen -> block, is the only one
+-- there is until the next reconcile: a window opening or closing never
+-- recomputes positions.
 --
 -- HAZARD: no workspace is renumbered on unplug or replug. The bar keys its
 -- cells by id, so a renumbered workspace would leave and grow back in another
@@ -89,8 +90,16 @@ local function state_dir()
   return state_home .. "/kubaos/hypr"
 end
 
+-- Cleared once the user's last session ends, so a new login says again what
+-- the last one said.
+local function runtime_dir()
+  local runtime = os.getenv("XDG_RUNTIME_DIR") or ("/tmp/kubaos-" .. (os.getenv("USER") or "session"))
+  return runtime .. "/kubaos/hypr"
+end
+
 local SCREENS_FILE = state_dir() .. "/workspace-screens"
 local GROUPS_FILE = user_layer.file("workspaces", "groups.toml")
+local TOASTS_FILE = runtime_dir() .. "/workspace-groups-toasts"
 
 local M = { slots = SLOTS }
 
@@ -109,13 +118,14 @@ local function read(path)
   return read_file(path) or ""
 end
 
--- Written whole or not at all: the bar reads the file on every change, and a
--- half-written one would map a screen to no block.
+-- Written whole or not at all, its folder made when missing: the bar reads
+-- the screens file on every change, and a half-written one would map a screen
+-- to no block.
 local function write(path, text)
   local temp = path .. ".tmp"
   local file = io.open(temp, "w")
   if not file then
-    os.execute("mkdir -p '" .. state_dir():gsub("'", "'\\''") .. "'")
+    os.execute("mkdir -p '" .. path:match("^(.*)/"):gsub("'", "'\\''") .. "'")
     file = io.open(temp, "w")
   end
   if not file then
@@ -129,8 +139,12 @@ end
 -- Position -> block and position -> the screen there now or last, kept across
 -- sessions. `legacy` holds the rows of a screens file keyed by screen until
 -- the first screens are known to migrate it.
-local places, seen, legacy = blocks_lib.parse_places(read(SCREENS_FILE))
-local written = nil
+local screens_text = read(SCREENS_FILE)
+local places, seen, legacy = blocks_lib.parse_places(screens_text)
+-- The text the file holds. The module loads afresh on every config reload,
+-- and the bar reads the file again on every write, so the same text isn't
+-- written twice.
+local written = screens_text
 
 -- The workspace groups the user pinned screens to (`workspace_blocks.
 -- parse_groups`), and the text they were read from. A file that doesn't
@@ -141,40 +155,78 @@ local groups, groups_text = {}, nil
 -- the shell shows it.
 local TOAST_TRIES = 60
 
+-- What the toasts about the groups file have said, from the toasts file: the
+-- last token handed out, the problem shown, and the one being tried, with its
+-- token and the time its tries run out. A problem is kept on one line.
+local function read_toasts()
+  local toasts = { token = 0 }
+  for line in read(TOASTS_FILE):gmatch("[^\n]+") do
+    local token = line:match("^token\t(%d+)$")
+    local shown = line:match("^shown\t(.*)$")
+    local trying, expires, problem = line:match("^trying\t(%d+)\t(%d+)\t(.*)$")
+    if token then
+      toasts.token = tonumber(token)
+    elseif shown then
+      toasts.shown = shown
+    elseif trying then
+      toasts.trying = { token = tonumber(trying), expires = tonumber(expires), problem = problem }
+    end
+  end
+  return toasts
+end
+
+local function write_toasts(toasts)
+  local lines = { "token\t" .. toasts.token }
+  if toasts.shown then
+    lines[#lines + 1] = "shown\t" .. toasts.shown
+  end
+  local trying = toasts.trying
+  if trying then
+    lines[#lines + 1] = ("trying\t%d\t%d\t%s"):format(trying.token, trying.expires, trying.problem)
+  end
+  write(TOASTS_FILE, table.concat(lines, "\n") .. "\n")
+end
+
 -- Says what is wrong with the groups file, in a toast. At login Hyprland
 -- loads its config before the shell, which is the notification server, is up,
 -- so a shell tries `notify-send` once a second until it shows, then calls
 -- `problem_shown()` with the toast's token. Only then is the problem kept as
--- shown, in `dot`, which outlives a config reload, so a lid change or
--- `hyprctl reload` doesn't show it again; one still being tried isn't tried
--- twice.
+-- shown. The module loads afresh on every config reload, so what was said
+-- lives in the toasts file, and a lid change or `hyprctl reload` doesn't show
+-- it again; one still being tried isn't tried twice.
 local function warn(problem)
+  local toasts = read_toasts()
   if not problem then
-    dot.workspace_groups_problem, dot.workspace_groups_toasting = nil, nil
+    if toasts.shown or toasts.trying then
+      toasts.shown, toasts.trying = nil, nil
+      write_toasts(toasts)
+    end
     return
   end
-  local toasting = dot.workspace_groups_toasting
-  if dot.workspace_groups_problem == problem
-    or (toasting and toasting.problem == problem and os.time() < toasting.expires) then
+  problem = problem:gsub("\n", " ")
+  local trying = toasts.trying
+  if toasts.shown == problem or (trying and trying.problem == problem and os.time() < trying.expires) then
     return
   end
-  local token = (dot.workspace_groups_token or 0) + 1
-  dot.workspace_groups_token = token
-  dot.workspace_groups_toasting = { problem = problem, token = token, expires = os.time() + TOAST_TRIES }
+  toasts.token = toasts.token + 1
+  toasts.trying = { problem = problem, token = toasts.token, expires = os.time() + TOAST_TRIES }
+  write_toasts(toasts)
   local body = ("In groups.toml, %s. Until it's fixed, no screen is pinned: they take their places left to right.")
     :format(problem)
   local toast = "notify-send -a 'Workspace groups' -i video-display -u critical 'Workspace groups' '"
     .. body:gsub("'", "'\\''") .. "'"
   hl.exec_cmd(("for try in $(seq %d); do %s && exec hyprctl dispatch 'dot.workspaces.problem_shown(%d)'; sleep 1; done")
-    :format(TOAST_TRIES, toast, token))
+    :format(TOAST_TRIES, toast, toasts.token))
 end
 
 -- The shell showed the toast with `token`, so its problem counts as shown.
 function M.problem_shown(token)
   return function()
-    local toasting = dot.workspace_groups_toasting
-    if toasting and toasting.token == token then
-      dot.workspace_groups_problem, dot.workspace_groups_toasting = toasting.problem, nil
+    local toasts = read_toasts()
+    local trying = toasts.trying
+    if trying and trying.token == token then
+      toasts.shown, toasts.trying = trying.problem, nil
+      write_toasts(toasts)
     end
   end
 end
@@ -227,6 +279,20 @@ end
 -- Connector -> block as the last reconcile mapped the screens. Every action
 -- and window event reads it; only a reconcile writes it.
 local current = {}
+
+-- The screens as the last reconcile saw them (`layout_of`); nil while none is
+-- mapped.
+local reconciled_layout = nil
+
+-- Each screen's connector, description and place, one line each: what a
+-- reconcile reads from the layout.
+local function layout_of(monitors)
+  local lines = {}
+  for _, monitor in ipairs(monitors) do
+    lines[#lines + 1] = table.concat({ monitor.name, monitor.description or "", monitor.x, monitor.y }, "\t")
+  end
+  return table.concat(lines, "\n")
+end
 
 local function regular(workspace)
   return workspace and not workspace.special and workspace.id > 0
@@ -342,6 +408,7 @@ end
 -- carried from screen to screen by merging into it, so rules never pile up;
 -- a second one appears only for a released rule still naming a screen that
 -- is plugged in, since enabling that would move the workspace there first.
+-- The workspace kept on that screen again enables that rule.
 local rules, kept = {}, {}
 
 local function release(id)
@@ -364,7 +431,14 @@ local function keep(id, connector, present)
   local held = rules[id] or {}
   rules[id] = held
   local from = kept[id]
-  if from and from ~= connector then
+  if from and from ~= connector and held[connector] then
+    -- Merging would leave the released rule for `connector` in Hyprland
+    -- with no handle, so the two swap instead.
+    if held[from] then
+      held[from]:set_enabled(false)
+    end
+    held[connector]:set_enabled(true)
+  elseif from and from ~= connector then
     held[connector] = hl.workspace_rule({ workspace = tostring(id), persistent = true, monitor = connector })
     held[from] = nil
   elseif held[connector] then
@@ -399,11 +473,15 @@ local function present_set(monitors)
 end
 
 -- Bring Hyprland's persistent workspaces in line with `workspace_blocks.kept`
--- for `monitors` mapped by `by_connector`.
+-- for `monitors` mapped by `by_connector`. With no screen plugged in, no
+-- workspace would be wanted, so the rules stay as they are until one comes.
 -- HAZARD: release before keeping. Once the handler ends Hyprland moves every
 -- persistent workspace to the screen its rule names, so a rule left naming a
 -- screen a workspace is leaving would pull it back there.
 local function sync_kept_on(monitors, by_connector)
+  if #monitors == 0 then
+    return
+  end
   local screens = {}
   for _, monitor in ipairs(monitors) do
     if by_connector[monitor.name] then
@@ -522,6 +600,10 @@ local function target_monitor(name)
   return hl.get_active_monitor()
 end
 
+-- Connector -> the workspace the user last went to on that screen, which the
+-- reconcile leaves in view, empty or not, until the screen shows another.
+local went = {}
+
 -- Show workspace `id` on a screen and focus it, bringing it back from another
 -- screen, or creating it here.
 local function go(monitor, id)
@@ -529,6 +611,7 @@ local function go(monitor, id)
     hl.dispatch(hl.dsp.focus({ monitor = monitor.name }))
   end
   reclaim(monitor, id)
+  went[monitor.name] = id
   hl.dispatch(hl.dsp.focus({ workspace = tostring(id) }))
 end
 
@@ -576,12 +659,15 @@ function M.go_to_position(position)
     end
     local lowest = nil
     for _, workspace in ipairs(hl.get_workspaces()) do
-      if regular(workspace) and block_of(workspace.id) == block and (not lowest or workspace.id < lowest) then
-        lowest = workspace.id
+      if regular(workspace) and block_of(workspace.id) == block and (not lowest or workspace.id < lowest.id) then
+        lowest = workspace
       end
     end
     if lowest then
-      hl.dispatch(hl.dsp.focus({ workspace = tostring(lowest) }))
+      if lowest.monitor then
+        went[lowest.monitor.name] = lowest.id
+      end
+      hl.dispatch(hl.dsp.focus({ workspace = tostring(lowest.id) }))
     else
       go(monitors[1], blocks_lib.id_of(block, 1))
     end
@@ -653,7 +739,8 @@ end
 
 -- Move the active window to the workspace after the last with windows of the
 -- focused group, the empty one kept there, and follow it. Does nothing when
--- all ten have windows.
+-- all ten have windows, or when the window is alone on its workspace and no
+-- other comes after it.
 function M.move_window_to_new()
   return function()
     local monitor = hl.get_active_monitor()
@@ -661,8 +748,16 @@ function M.move_window_to_new()
       return
     end
     local monitors, by_connector = mapping()
-    local id = blocks_lib.append_slot(focused_block(monitor, monitors, by_connector), occupied_ids())
-    if id then
+    local occupied = occupied_ids()
+    -- A window alone on its workspace leaves it empty by moving, so it
+    -- doesn't count as the last with windows.
+    local window = hl.get_active_window()
+    local from = window and window.workspace
+    if regular(from) and from.windows == 1 then
+      occupied[from.id] = nil
+    end
+    local id = blocks_lib.append_slot(focused_block(monitor, monitors, by_connector), occupied)
+    if id and id ~= (regular(from) and from.id) then
       move_active_window(id, true)
     end
   end
@@ -723,13 +818,17 @@ end
 
 -- Put every workspace whose screen is plugged in back on it, and every screen
 -- on a workspace of its own. `added` is the set of screens that just arrived,
--- which leave whatever Hyprland put them on.
+-- which leave whatever Hyprland put them on. With no screen plugged in no
+-- screen is mapped, so the next screen on a connector one had isn't taken for
+-- it, and no screen is waited for.
 function M.reconcile(added)
   added = added or {}
   local monitors = connected()
   if #monitors == 0 then
+    current, reconciled_layout = {}, nil
     return
   end
+  reconciled_layout = layout_of(monitors)
 
   if legacy then
     places, seen = blocks_lib.migrate(legacy, monitors, groups)
@@ -770,10 +869,13 @@ function M.reconcile(added)
       -- A workspace of a position no screen holds stays in view where it was
       -- put, when it was in view before this reconcile and the screen hasn't
       -- only just arrived on it; one a move of this reconcile brought into
-      -- view gives way, and an empty one is only the number Hyprland starts a
-      -- screen on.
+      -- view gives way. An empty one is only the number Hyprland starts a
+      -- screen on, unless the user went to it.
       local guest = regular(active) and not owner(active.id, monitors, by_connector) and not added[monitor.name]
-        and active.id == shown[monitor.name] and (active.windows or 0) > 0
+        and active.id == shown[monitor.name] and ((active.windows or 0) > 0 or went[monitor.name] == active.id)
+      if not (regular(active) and went[monitor.name] == active.id) then
+        went[monitor.name] = nil
+      end
       if not own and not guest then
         local id = home(monitor, block)
         if id ~= (regular(active) and active.id) then
@@ -978,11 +1080,37 @@ hl.on("config.reloaded", function()
   M.reconcile()
 end)
 
+-- Point the rule of each kept workspace Hyprland moved to another plugged-in
+-- screen at the screen it is on now.
+-- HAZARD: run it in `monitor.added`. Hyprland has moved the workspaces that
+-- last lived on the screen's connector back to it by then, and right after
+-- the handler puts every persistent workspace on the screen its rule names:
+-- a rule still naming the screen a workspace waited on would pull it back
+-- there until the reconcile.
+local function keep_where_they_are()
+  local present = present_set(connected())
+  for id, connector in pairs(kept) do
+    local workspace = hl.get_workspace(id)
+    local now = workspace and workspace.monitor and workspace.monitor.name
+    if now and now ~= connector and present[now] then
+      keep(id, now, present)
+    end
+  end
+end
+
 hl.on("monitor.added", function(monitor)
+  keep_where_they_are()
   settle_later(monitor and monitor.name)
 end)
 
+-- Hyprland reports a layout change twice for every pass over its monitor
+-- rules, and for a new mode alone (the refresh rate a power profile sets).
+-- One that leaves every screen where the last reconcile saw it, with no
+-- screen arriving or going, changes no position.
 hl.on("monitor.layout_changed", function()
+  if not pending and layout_of(connected()) == reconciled_layout then
+    return
+  end
   settle_later()
 end)
 
@@ -1018,10 +1146,25 @@ hl.on("monitor.removed", function(monitor)
   settle_later(nil, name)
 end)
 
+-- Whether a `sync_kept` is waiting to run.
+local sync_queued = false
+
 -- A window arriving on a workspace or leaving it moves where its group ends.
-for _, event in ipairs({ "window.open", "window.destroy", "window.move_to_workspace" }) do
+-- Hyprland reports a move (`window.move_to_workspace`) and an unmap
+-- (`window.close`) while the window still counts on the workspace it leaves,
+-- so the sync runs on the next turn of its event loop, once for every event
+-- of the turn. An X11 app closing to the tray only unmaps.
+-- HAZARD: the timeout stays above 0, which `hl.timer` refuses as an error.
+for _, event in ipairs({ "window.open", "window.close", "window.destroy", "window.move_to_workspace" }) do
   hl.on(event, function()
-    sync_kept()
+    if sync_queued then
+      return
+    end
+    sync_queued = true
+    hl.timer(function()
+      sync_queued = false
+      sync_kept()
+    end, { timeout = 1, type = "oneshot" })
   end)
 end
 
