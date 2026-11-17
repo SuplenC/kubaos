@@ -468,7 +468,7 @@ fn shipped() -> Catalog {
 }
 
 /// Every app of the shipped catalog, by id, in the catalog's order.
-const SHIPPED: [&str; 134] = [
+const SHIPPED: [&str; 135] = [
     "1password",
     "aider",
     "alacritty",
@@ -596,6 +596,7 @@ const SHIPPED: [&str; 134] = [
     "wireshark",
     "xbox-cloud-gaming",
     "xournalpp",
+    "xpadneo",
     "youtube-music",
     "yubico-authenticator",
     "zed",

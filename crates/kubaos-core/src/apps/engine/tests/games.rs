@@ -18,7 +18,7 @@ use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 use crate::update::event::UpdateEvent;
 
-const APPS: [&str; 13] = [
+const APPS: [&str; 14] = [
     "gamescope",
     "geforce-now",
     "heroic",
@@ -32,6 +32,7 @@ const APPS: [&str; 13] = [
     "steam",
     "sunshine",
     "xbox-cloud-gaming",
+    "xpadneo",
 ];
 
 const MINECRAFT: &str = "minecraft-launcher";
@@ -79,6 +80,35 @@ fn minecraft_tarball(world: &World) -> Vec<u8> {
     fs::read(archive).unwrap()
 }
 
+/// A kernel of the fake machine, with its headers, and the serial of the MOK DKMS signs with.
+const KERNEL: &str = "7.0.0-43-generic";
+const MOK: &str = "1A:21:AB:C9";
+
+/// A gzip tarball as GitHub serves xpadneo's tag: its one folder, `xpadneo-0.10.5`, holding the
+/// module's folder `hid-xpadneo` beside the rest of the repository, made by the tar of `world`'s
+/// sandbox.
+fn xpadneo_tarball(world: &World) -> Vec<u8> {
+    let src = tempfile::tempdir().unwrap();
+    let top = src.path().join("xpadneo-0.10.5");
+    fs::create_dir_all(top.join("hid-xpadneo/src")).unwrap();
+    fs::write(top.join("hid-xpadneo/src/Makefile"), "obj-m += hid-xpadneo.o\n").unwrap();
+    fs::write(top.join("install.sh"), "#!/bin/bash\n").unwrap();
+    let archive = src.path().join("xpadneo.tar.gz");
+    let made = world
+        .host
+        .sandbox()
+        .command("tar")
+        .arg("-czf")
+        .arg(&archive)
+        .arg("-C")
+        .arg(src.path())
+        .arg("xpadneo-0.10.5")
+        .status()
+        .unwrap();
+    assert!(made.success());
+    fs::read(archive).unwrap()
+}
+
 /// The shipped game `id`'s world, its `.deb`s and downloads served at the pins its folder names
 /// for amd64.
 fn served(id: &str) -> World {
@@ -94,6 +124,14 @@ fn served(id: &str) -> World {
     }
     let catalog = Catalog::load(&world.catalog).unwrap();
     for action in catalog.get(id).unwrap().all_actions() {
+        if let Kind::Dkms { url, sha256, .. } = &action.kind {
+            let tarball = xpadneo_tarball(&world);
+            let mut state = world.host.state.borrow_mut();
+            state.downloads.insert(url.clone(), (sha256.clone(), tarball));
+            state.kernels.insert(KERNEL.to_owned());
+            state.mok = Some(MOK.to_owned());
+            continue;
+        }
         let body = match &action.kind {
             Kind::Deb { package, version, .. } => format!("deb {package} {version}").into_bytes(),
             Kind::Download { .. } => minecraft_tarball(&world),
@@ -137,6 +175,10 @@ fn in_place(world: &World, app: &Folder) {
             // Each app's own test checks what its runs did.
             Kind::Run { .. } => {}
             Kind::Architecture { architecture } => assert!(state.foreign.contains(architecture), "{id}"),
+            Kind::Dkms { module, version, .. } => {
+                let kernels = &state.dkms[&format!("{module}/{version}")];
+                assert_eq!(kernels.get(KERNEL), Some(&Some(MOK.to_owned())), "{id}");
+            }
             Kind::Setting { file, key, .. } => {
                 let text = fs::read_to_string(home_or_system(file)).unwrap();
                 assert!(
@@ -208,6 +250,7 @@ fn which_games_a_machine_can_have_follows_its_architecture() {
             "prismlauncher",
             "retroarch",
             "sunshine",
+            "xpadneo",
         ]
     );
 }
@@ -582,4 +625,25 @@ fn the_source_of_a_steam_installed_by_hand_stays_and_so_does_i386() {
 
     assert_eq!(fs::read_to_string(&list).unwrap(), valves);
     assert!(world.host.state.borrow().foreign.contains("i386"));
+}
+
+#[test]
+fn xpadneo_builds_from_its_tags_module_folder_with_its_version_and_binds_the_controllers() {
+    let world = served("xpadneo");
+
+    run(&world, |e| e.add("xpadneo", None, &picks("xpadneo"))).unwrap();
+
+    let source = world.system_path("/usr/src/hid-xpadneo-0.10.5");
+    assert!(source.join("src/Makefile").is_file());
+    assert!(!source.join("install.sh").exists(), "only the module's folder");
+    let conf = fs::read_to_string(source.join("dkms.conf")).unwrap();
+    assert!(conf.contains("\nPACKAGE_VERSION=\"0.10.5\"\n"), "{conf}");
+    assert!(conf.contains("\nAUTOINSTALL=\"yes\"\n"), "{conf}");
+    let aliases = fs::read_to_string(world.system_path("/etc/modprobe.d/xpadneo.conf")).unwrap();
+    assert!(
+        aliases.contains("alias hid:b0005g*v0000045Ep00000B13 hid_xpadneo"),
+        "{aliases}"
+    );
+    let rules = world.system_path("/etc/udev/rules.d/60-xpadneo.rules");
+    assert!(fs::read_to_string(rules).unwrap().contains("TAG+=\"uaccess\""));
 }

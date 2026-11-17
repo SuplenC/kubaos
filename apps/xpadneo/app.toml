@@ -1,0 +1,63 @@
+# xpadneo, the driver of Xbox wireless controllers over Bluetooth, from its release's source
+# (atar-axis/xpadneo v0.10.5, the tag's tarball pinned by our sha256, as GitHub publishes none),
+# built by DKMS: no archive packages it, and upstream installs it from source with DKMS. DKMS
+# builds it for every kernel with its headers and, as its dkms.conf says, for each kernel
+# installed later, signing it each time with the Machine Owner Key it signs every module with
+# (on Ubuntu, shim-signed's, as the TUXEDO drivers are). With Secure Boot on, that key must be
+# enrolled at the console once; the step says how while it isn't, and mokutil is installed for it.
+# linux-headers-generic follows the kernel KubaOS installs, linux-generic. The modprobe aliases
+# and udev rules are upstream's: the controllers bound to xpadneo, their joystick nodes the
+# seat's, their raw HID nodes hidden from Steam, which would read them past the driver; udev
+# reads changed rules by itself before its next event, and a controller connected already takes
+# xpadneo when it connects again.
+# https://github.com/atar-axis/xpadneo
+name = "xpadneo"
+category = "games"
+tags = ["xbox", "controller", "gamepad", "bluetooth", "driver"]
+summary = "Xbox controllers over Bluetooth: rumble, battery, every paddle. Microsoft's pad, minus Microsoft."
+# From its AppStream metainfo, CC0-1.0.
+description = """\
+Wireless driver for Xbox One S, Xbox Elite Series 2, and Xbox Series X|S controllers connected \
+via Bluetooth. Supports force feedback, rumble effects, trigger force feedback, battery level \
+indication, and working paddle buttons."""
+description_from = "https://github.com/atar-axis/xpadneo/blob/v0.10.5/io.github.atar_axis.xpadneo.metainfo.xml"
+keeps = """\
+Your controllers stay paired with this machine: without xpadneo they still work, through the \
+kernel's own driver, with fewer of their buttons and no trigger rumble."""
+
+[[action]]
+name = "Install DKMS, the kernel's headers and mokutil"
+kind = "apt"
+packages = ["dkms", "linux-headers-generic", "mokutil"]
+
+[[action]]
+name = "Build the xpadneo driver for each kernel"
+kind = "dkms"
+module = "hid-xpadneo"
+version = "0.10.5"
+url = "https://github.com/atar-axis/xpadneo/archive/refs/tags/v0.10.5.tar.gz"
+sha256 = "084c1ef57b4567c54cb4e4c01c9ae47b180c59a001457ad1e0ed574fdd09b59b"
+strip = 1
+folder = "hid-xpadneo"
+conf = "dkms.conf"
+
+[[action]]
+name = "Bind the controllers to xpadneo"
+kind = "file"
+to = "/etc/modprobe.d/xpadneo.conf"
+from = "xpadneo.conf"
+mode = "644"
+
+[[action]]
+name = "Give you the controllers' input"
+kind = "file"
+to = "/etc/udev/rules.d/60-xpadneo.rules"
+from = "60-xpadneo.rules"
+mode = "644"
+
+[[action]]
+name = "Keep the controllers' raw input from other programs"
+kind = "file"
+to = "/etc/udev/rules.d/70-xpadneo-disable-hidraw.rules"
+from = "70-xpadneo-disable-hidraw.rules"
+mode = "644"
