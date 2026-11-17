@@ -718,20 +718,22 @@
   overflow: hidden;
 }
 
+/* What a tile holds is centred both ways on the nearest whole device pixel, an odd one before it,
+   as `kubaos_ui::snap::centre` places a box centred both ways. */
 .k-icon-tile > .k-icon {
   position: absolute;
-  left: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
-  top: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
+  left: round(nearest, calc((var(--side) - var(--icon)) / 2), 1px);
+  top: round(nearest, calc((var(--side) - var(--icon)) / 2), 1px);
   width: var(--icon);
   height: var(--icon);
 }
 
-/* A count or an app's initial in the symbol's place, centred on whole device pixels as the symbol
-   is: across on its advance, down on its line, which is the symbol's box tall and centred on its ink. */
+/* A count or an app's initial in the symbol's place, centred as the symbol is: across on its
+   advance, down on its line, which is the symbol's box tall and centred on its ink. */
 .k-icon-tile > :is(.k-icon-tile-count, .k-icon-tile-initial) {
   position: absolute;
-  left: round(down, calc((var(--side) - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
-  top: round(down, calc((var(--side) - var(--t-line)) / 2), 1px);
+  left: round(nearest, calc((var(--side) - round(up, calc(var(--natural) * var(--px) - 0.001px), 1px)) / 2), 1px);
+  top: round(nearest, calc((var(--side) - var(--t-line)) / 2), 1px);
 }
 
 /* An app's picture, scaled so its drawing's box fits `--fit` whole, the box snapped to whole
@@ -744,8 +746,8 @@
   --drawn-width: round(calc(var(--fit) * var(--box-width)), 1px);
   --drawn-height: round(calc(var(--fit) * var(--box-height)), 1px);
   position: absolute;
-  left: calc(round(down, calc((var(--side) - var(--drawn-width)) / 2), 1px) - var(--fit) * var(--box-x));
-  top: calc(round(down, calc((var(--side) - var(--drawn-height)) / 2), 1px) - var(--fit) * var(--box-y));
+  left: calc(round(nearest, calc((var(--side) - var(--drawn-width)) / 2), 1px) - var(--fit) * var(--box-x));
+  top: calc(round(nearest, calc((var(--side) - var(--drawn-height)) / 2), 1px) - var(--fit) * var(--box-y));
   width: calc(var(--fit) * var(--picture-width));
   height: calc(var(--fit) * var(--picture-height));
 }

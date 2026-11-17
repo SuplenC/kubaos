@@ -1,16 +1,20 @@
 // An icon tile: `kubaos-ui`'s `icon_tile`, `KubaOS.Components`' `IconTile`
 // (`docs/design/components/icon-tile.md`). What an app or a sender looks like in a row: a symbol
 // or a picture on a tinted square of one size at the control radius, so a list of apps reads as
-// one set whatever each vendor drew. The symbol is centred on a whole device pixel, the odd one
-// after it, as `kubaos_ui::snap::centre` places it.
+// one set whatever each vendor drew. The symbol is centred on the nearest whole device pixel, the
+// odd one before it, as `kubaos_ui::snap::centre` places a box centred both ways.
 //
 // An app's icon is measured once when it loads, and the result is kept per address: the box of
 // what it draws, without the margin its theme left round it, and whether that box is a plate (a
 // square it covers) or a shape. A plate fills the tile, cut by the tile's corners, so the two make
 // one edge; a shape fits `space.s4` inside it. Either is kept whole, never cropped or stretched.
 //
-// The symbol shows until the picture has loaded and been measured, and stays when it can't be read
-// or draws nothing, so a row keeps the room a picture takes whether or not one arrives.
+// An app with no symbol shows its initial in the symbol's place: the first character of its name,
+// upper-cased, in the type style whose symbol box is the tile's, centred on its ink's box.
+//
+// The symbol, or the initial, shows until the picture has loaded and been measured, and stays when
+// it can't be read or draws nothing, so a row keeps the room a picture takes whether or not one
+// arrives.
 
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";

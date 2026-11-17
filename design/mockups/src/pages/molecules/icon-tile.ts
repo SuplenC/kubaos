@@ -4,8 +4,9 @@
 import appIcon from "../../../../../branding/png/kubaos-icon-128.png?url";
 import photo from "../../../../../branding/photo/neon-sign-lit.jpg?url";
 import type { Words } from "../../lib/content.ts";
+import { declare } from "../../lib/probe.ts";
 import { iconTile, measure, TILE_MEASURES, TILE_SIZES, type TileOptions, type TileSize } from "../../lib/icon-tile.ts";
-import { filling, flow, row, stack, within } from "../../lib/layout.ts";
+import { filling, row, stack, within } from "../../lib/layout.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
 import { el, label } from "../../site/dom.ts";
@@ -27,8 +28,10 @@ const BESIDE: Record<TileSize, string> = {
 /** A tile beside its words, laid out as the row it sits in lays it out. */
 function besideWords(size: TileSize, options: Partial<TileOptions> = {}, name = "Kitchen"): HTMLElement {
   const tile = iconTile({ glyph: "wifi", size, ...options });
-  if (size === "Sm") return row("s12", "centre", tile, clamped(name, "body_strong", "on_surface"));
-  if (size === "Md") return row("s12", "centre", tile, stack(0, "start", clamped(name, "body_strong", "on_surface"), text("Connected · WPA2", "small", "on_surface_variant")));
+  // A network's name varies: cut with an ellipsis where it doesn't fit.
+  const title = declare(clamped(name, "body_strong", "on_surface"), { variable: true });
+  if (size === "Sm") return row("s12", "centre", tile, title);
+  if (size === "Md") return row("s12", "centre", tile, filling(stack(0, "start", title, text("Connected · WPA2", "small", "on_surface_variant"))));
   return stack("s12", "centre", tile, text(name, "headline", "on_surface"));
 }
 
@@ -85,6 +88,7 @@ const ROWS: readonly { name: string; options: TileOptions }[] = [
   { name: "A symbol", options: { glyph: "terminal", size: "Md" } },
   { name: "An app's icon", options: { glyph: "terminal", size: "Md", picture: appIcon } },
   { name: "A photo", options: { glyph: "notifications", size: "Md", photo } },
+  { name: "An app's icon, no symbol", options: { name: "k9s", size: "Md", picture: appIcon } },
 ];
 
 export default page({
@@ -94,7 +98,7 @@ export default page({
   lede: "A symbol or a picture on a tinted square of one size, so a list of apps, senders or devices reads as one set.",
   code: { rust: "icon_tile::icon_tile", qml: "IconTile" },
   stage: {
-    live: () => within("100%", filling(flow("s48", senders(), stack("s16", "start", ...TILE_SIZES.map((size) => besideWords(size)))))),
+    live: () => row("s48", "start", senders(), stack("s16", "start", ...TILE_SIZES.map((size) => besideWords(size)))),
     hint: "a mark: its row lights, not the tile",
     daylight: true,
   },
@@ -120,7 +124,7 @@ export default page({
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: (state: MatrixState) => iconTile({ ...options, pending: state === "loading" }) }))),
     looks: {
       rest: "symbol, plate or photo on `surface_container_highest`",
-      loading: "the symbol holds the place; nothing moves when it arrives",
+      loading: "the symbol, else the initial, holds the place",
     },
   },
   focus: doesntApply("it takes no input and has no line: its row lights."),

@@ -14,6 +14,7 @@ header
 hint
 icon
 icon-button
+icon-tile
 motion
 notification-card
 order-list
