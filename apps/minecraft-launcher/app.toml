@@ -1,8 +1,10 @@
 # The Minecraft Launcher from Mojang's tarball, pinned to its sha256. Mojang keeps no apt
 # repository and publishes no checksum, and its .deb can't be installed on Ubuntu 26.04: it asks
 # for libgdk-pixbuf2.0-0, a name the archive no longer has. The tarball is the same program,
-# 2.1.3 (the .deb's version, byte for byte), at an address that doesn't change with it: when
-# Mojang replaces it, the download refuses the new file until a release of KubaOS moves the pin.
+# 2.1.3 (the .deb's version, byte for byte). Its address is an exception to the catalog's
+# versioned ones, as Mojang publishes no versioned URL: the same address serves each release, and
+# the sha256 pin makes that fail safe. When Mojang replaces the file, the download refuses it and
+# the install stops, until a release of KubaOS moves the pin; it can never install another file.
 # nixpkgs dropped its Minecraft as broken. Mojang builds it for amd64 only. The program is a
 # bootstrap: it downloads the launcher itself, a Chromium app, into ~/.minecraft and keeps it up
 # to date, and the Java each Minecraft version asks for, so the first step installs what Mojang's
