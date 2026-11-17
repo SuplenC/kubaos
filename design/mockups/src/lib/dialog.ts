@@ -6,8 +6,10 @@
 // 24 symbol (`heading`'s) beside a `heading` title on one row, the `body` `space.s12` under them,
 // what it lists or asks for (a labelled field) `space.s16` under the body, each across the whole
 // width, and its button bar (`lib/button-bar.ts`) `space.s24` under the last, Cancel's label on
-// the edge and the last button's box on the right one. A Danger dialog shows the warning sign in
-// `error` with an edge of `error`, and its action is a Danger button.
+// the edge and the last button's box as far past the right one as Cancel's is past the left, the
+// bar hanging as far into the padding under it, so its boxes sit alike on three sides. A
+// Danger dialog shows the warning sign in `error` with an edge of `error`, and its action is a
+// Danger button.
 //
 // It is never shorter than `aspect.dialog` of its width: a dialog that asks little gains the room
 // above its buttons, which stay at its foot, and its words stay at the top. It is never taller

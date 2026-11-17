@@ -417,6 +417,12 @@
   transition: translate var(--motion-long) var(--easing-emphasized_decel);
 }
 
+/* Its button bar starts after the bar's own controls, not at the pill's edge, and the pill's
+   `space.s8` has no room for Done to hang: Done's box stays on the edge. */
+.gl-bar .k-button-bar {
+  --hang-end: 0;
+}
+
 /* The full screen's own parts of the bar, the picture's name and its neighbours, and the step's two
    buttons: each in a cell whose width eases from nothing to its own as the picture grows to the
    screen, and back, over the same time on the same curve (`--step-time`), its content fading with

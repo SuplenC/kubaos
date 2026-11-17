@@ -3205,6 +3205,21 @@
   margin-inline-end: calc(-1 * var(--hang, 1) * var(--padding));
 }
 
+/* In a button bar (`lib/button-bar.ts`) whose dismiss button hangs, the last action of another kind
+   hangs as far at the end, the Text button's own padding (`--text-padding`), so the two end boxes
+   sit the same distance in from the surface's edges. Only the bar: a row that holds more than
+   buttons (Kōbō's footer band) keeps its last button's box on the edge. A bar that starts
+   after other controls, not at its surface's edge, sets `--hang-end` to 0. */
+.k-button-bar:not([data-stacked]) > [data-hangs]:has(> .k-button[data-kind="Text"]:not([data-icon-only]):first-child) > .k-button:not([data-kind="Text"]):last-child {
+  margin-inline-end: calc(-1 * var(--hang-end, var(--hang, 1)) * var(--text-padding));
+}
+
+/* The same bar hangs its foot as far into its surface's padding, so the gap under the buttons'
+   boxes is the gap beside the end ones: one measure on three sides. */
+.k-button-bar:not([data-stacked]):has(> [data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):first-child) {
+  margin-block-end: calc(-1 * var(--hang-end, var(--hang, 1)) * var(--text-padding));
+}
+
 /* A Collapsible on a page or in a card (`hangs` on it) hangs its header's `space.s12` the same
    way, so its chevron is on the content's edge, in line with the fields round it, and its
    summary ends on the other edge; its lit tube reaches into the padding. */

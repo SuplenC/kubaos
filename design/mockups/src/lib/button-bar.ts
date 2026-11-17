@@ -7,12 +7,14 @@
 // own: it sits in its surface's padding like any other content, as wide as the room it is given.
 // A Text button at its start or end hangs its own padding outside it (`hangs`), so its label sits
 // on the content's edge like everything above it, its tube and press fill reaching into the
-// surface's padding.
+// surface's padding. Where the dismiss button hangs so, the last action hangs as far at the end and
+// the bar as far at its foot, so the buttons' boxes sit the same distance in from the surface's
+// sides and bottom.
 //
 // Where its buttons don't fit on one line, they stack `space.s8` apart, each the bar's full width,
 // the one Enter presses on top and the dismiss button at the bottom.
 
-import { button, type Kind, type Size } from "./button.ts";
+import { button, type Kind, METRICS, type Size } from "./button.ts";
 import { row } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
 import { length } from "./tokens.ts";
@@ -68,6 +70,9 @@ export function buttonBar(options: ButtonBarOptions): ButtonBar {
   const line = hangs(row("s8", "centre", ...(dismiss ? [dismiss] : []), spacer, ...actions));
   const bar = document.createElement("span");
   bar.className = "k-button-bar";
+  // How far a Text button at its start hangs, which the last action matches at its end and the
+  // bar at its foot.
+  bar.style.setProperty("--text-padding", `var(--space-${METRICS[size].textPadding})`);
   bar.append(line);
   stackWhenCramped(bar, line);
   return { element: bar, dismiss, actions };
