@@ -61,7 +61,12 @@
 -- one, so each group keeps two empty ones as persistent workspaces
 -- (`workspace_blocks.kept`): its first, and one after its last with windows,
 -- where a new workspace opens. Once a window lands on that one, the next id
--- is kept in its place and the old rule is released. Next and previous walk
+-- is kept in its place and the old rule is released. A pinned window counts
+-- nowhere: it follows its screen from workspace to workspace, and Hyprland
+-- counts it on each in turn, so every empty one visited would read as holding
+-- a window. A workspace holding only pinned windows is empty here, as it is
+-- to Hyprland once the view moves on: the pinned windows go along, and the
+-- workspace goes away unless it is kept. Next and previous walk
 -- the same workspaces in the same order (`workspace_blocks.step`). SUPER + 1-0
 -- address the focused group: the screen's own, or the waiting group whose
 -- workspace it shows.
@@ -302,11 +307,31 @@ local function regular(workspace)
   return workspace and not workspace.special and workspace.id > 0
 end
 
--- The ids of every regular workspace with windows, as a set.
-local function occupied_ids()
+-- Workspace id -> how many pinned windows it holds, read once per pass over
+-- the workspaces.
+local function pinned_counts()
+  local counts = {}
+  for _, window in ipairs(hl.get_windows()) do
+    local workspace = window.pinned and window.workspace
+    if workspace then
+      counts[workspace.id] = (counts[workspace.id] or 0) + 1
+    end
+  end
+  return counts
+end
+
+-- How many windows `workspace` holds that are not pinned; `pinned` comes from
+-- `pinned_counts()`.
+local function windows_of(workspace, pinned)
+  return (workspace.windows or 0) - (pinned[workspace.id] or 0)
+end
+
+-- The ids of every regular workspace with windows, as a set; `pinned` comes
+-- from `pinned_counts()`.
+local function occupied_ids(pinned)
   local occupied = {}
   for _, workspace in ipairs(hl.get_workspaces()) do
-    if regular(workspace) and (workspace.windows or 0) > 0 then
+    if regular(workspace) and windows_of(workspace, pinned) > 0 then
       occupied[workspace.id] = true
     end
   end
@@ -327,7 +352,7 @@ end
 -- The blocks with a window in them, as a set.
 local function busy_blocks()
   local busy = {}
-  for id in pairs(occupied_ids()) do
+  for id in pairs(occupied_ids(pinned_counts())) do
     busy[block_of(id)] = true
   end
   return busy
@@ -492,13 +517,14 @@ local function sync_kept_on(monitors, by_connector)
       screens[#screens + 1] = { name = monitor.name, block = by_connector[monitor.name] }
     end
   end
+  local pinned = pinned_counts()
   local workspaces = {}
   for _, workspace in ipairs(hl.get_workspaces()) do
     if regular(workspace) then
       workspaces[#workspaces + 1] = {
         id = workspace.id,
         monitor = workspace.monitor and workspace.monitor.name,
-        windows = workspace.windows,
+        windows = windows_of(workspace, pinned),
       }
     end
   end
@@ -754,12 +780,13 @@ function M.move_window_to_new()
       return
     end
     local monitors, by_connector = mapping()
-    local occupied = occupied_ids()
+    local pinned = pinned_counts()
+    local occupied = occupied_ids(pinned)
     -- A window alone on its workspace leaves it empty by moving, so it
     -- doesn't count as the last with windows.
     local window = hl.get_active_window()
     local from = window and window.workspace
-    if regular(from) and from.windows == 1 then
+    if regular(from) and windows_of(from, pinned) == 1 then
       occupied[from.id] = nil
     end
     local id = blocks_lib.append_slot(focused_block(monitor, monitors, by_connector), occupied)
@@ -770,9 +797,9 @@ function M.move_window_to_new()
 end
 
 -- Move the active workspace to the screen in a direction, where it joins that
--- screen's block, under the same number when it is free. With all ten taken it
--- keeps its number and stays a guest until the screen at its position wants
--- it back.
+-- screen's block, under the same number when it is free, else the block's
+-- first free one. With all ten taken, or no block for that screen yet, it
+-- does nothing.
 function M.move_to_monitor(direction)
   return function()
     local workspace = hl.get_active_workspace()
@@ -789,22 +816,25 @@ function M.move_to_monitor(direction)
     local from = hl.get_active_monitor()
     -- A screen that arrived within the wait has no block yet; by the time a
     -- key reaches it, Hyprland has arranged it, so the wait ends here. Should
-    -- the layout still look mid-change, the workspace moves as a guest and
-    -- the reconcile sends it home.
+    -- the layout still look mid-change, it has none after the wait either.
     if not current[target.name] then
       M.flush()
     end
     local monitors, by_connector = mapping()
     local block = by_connector[target.name]
+    if not block then
+      return
+    end
     -- Renumbered before it moves, so the move names the new id: the bar's
     -- Quickshell keys a workspace by the first id an event names for it, and
     -- a move naming the old id would leave it there for good.
-    if block and block_of(id) ~= block then
+    if block_of(id) ~= block then
       local wanted = blocks_lib.adopt_id(block, id, taken_ids())
-      if wanted then
-        renumber(workspace, wanted)
-        id = wanted
+      if not wanted then
+        return
       end
+      renumber(workspace, wanted)
+      id = wanted
     end
     hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(id), monitor = target.name }))
 
@@ -867,6 +897,7 @@ function M.reconcile(added)
   -- lowest, not on whichever moved last; a screen that just arrived ends
   -- there too, not on the number Hyprland parked it on.
   local function own_views()
+    local pinned = pinned_counts()
     for _, monitor in ipairs(monitors) do
       local block = by_connector[monitor.name]
       local active = monitor.active_workspace
@@ -878,7 +909,7 @@ function M.reconcile(added)
       -- view gives way. An empty one is only the number Hyprland starts a
       -- screen on, unless the user went to it.
       local guest = regular(active) and not owner(active.id, monitors, by_connector) and not added[monitor.name]
-        and active.id == shown[monitor.name] and ((active.windows or 0) > 0 or went[monitor.name] == active.id)
+        and active.id == shown[monitor.name] and (windows_of(active, pinned) > 0 or went[monitor.name] == active.id)
       if not (regular(active) and went[monitor.name] == active.id) then
         went[monitor.name] = nil
       end
@@ -900,8 +931,9 @@ function M.reconcile(added)
   -- one is only the number Hyprland parked a screen on, and goes away once the
   -- screen shows its own.
   local function place()
+    local pinned = pinned_counts()
     for _, workspace in ipairs(hl.get_workspaces()) do
-      if regular(workspace) and workspace.monitor and (workspace.windows or 0) > 0 then
+      if regular(workspace) and workspace.monitor and windows_of(workspace, pinned) > 0 then
         local home_monitor = owner(workspace.id, monitors, by_connector)
         if home_monitor and home_monitor.name ~= workspace.monitor.name then
           hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(workspace.id), monitor = home_monitor.name }))
@@ -916,8 +948,9 @@ function M.reconcile(added)
   -- to go away.
   local function gather()
     local primary = monitors[1]
+    local pinned = pinned_counts()
     for _, workspace in ipairs(hl.get_workspaces()) do
-      if regular(workspace) and workspace.monitor and (workspace.windows or 0) > 0
+      if regular(workspace) and workspace.monitor and windows_of(workspace, pinned) > 0
         and not owner(workspace.id, monitors, by_connector) and workspace.monitor.name ~= primary.name then
         hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(workspace.id), monitor = primary.name }))
         changed = true
@@ -1133,7 +1166,7 @@ local function leave_foreign(backup)
     return
   end
   local foreign = block_of(active.id) ~= own
-  local parked = (active.windows or 0) == 0 and not kept[active.id]
+  local parked = windows_of(active, pinned_counts()) <= 0 and not kept[active.id]
   if foreign or parked then
     show(monitor, home(monitor, own))
   end
@@ -1158,13 +1191,15 @@ end)
 -- Whether a `sync_kept` is waiting to run.
 local sync_queued = false
 
--- A window arriving on a workspace or leaving it moves where its group ends.
--- Hyprland reports a move (`window.move_to_workspace`) and an unmap
--- (`window.close`) while the window still counts on the workspace it leaves,
--- so the sync runs on the next turn of its event loop, once for every event
--- of the turn. An X11 app closing to the tray only unmaps.
+-- A window arriving on a workspace or leaving it, or pinned or unpinned there,
+-- moves where its group ends. Hyprland reports a move
+-- (`window.move_to_workspace`, also for each pinned window following a
+-- switch) and an unmap (`window.close`) while the window still counts on the
+-- workspace it leaves, so the sync runs on the next turn of its event loop,
+-- once for every event of the turn. An X11 app closing to the tray only
+-- unmaps.
 -- HAZARD: the timeout stays above 0, which `hl.timer` refuses as an error.
-for _, event in ipairs({ "window.open", "window.close", "window.destroy", "window.move_to_workspace" }) do
+for _, event in ipairs({ "window.open", "window.close", "window.destroy", "window.move_to_workspace", "window.pin" }) do
   hl.on(event, function()
     if sync_queued then
       return

@@ -28,7 +28,10 @@ import qs.services
 // and animates instead of being rebuilt.
 //
 // The active indicator stretches toward the new workspace: its leading edge
-// moves fast, the trailing edge follows a little later.
+// moves fast, the trailing edge follows a little later. While the shown
+// workspace isn't among the cells (a screen just plugged in, before Hyprland
+// reports what it shows), the indicator fades out, and it fades in on its
+// cell once that is known, as the cell's number changes colour.
 //
 // It draws its own pill, as tall as the bar's other pills, rather than being
 // a `K.Pill`: the cells glide their widths every frame, and a positioner
@@ -425,6 +428,8 @@ Item {
             property real end: root.cell
             property int lastId: 0
             property bool ready: false
+            // Whether it stands on the shown workspace's cell; false while that isn't drawn.
+            property bool placed: false
             property int lead: K.Tokens.duration.medium
             property int trail: K.Tokens.duration.long
 
@@ -438,8 +443,14 @@ Item {
                 const target = root.activeX;
                 if (root.probed)
                     root.probeIndicator(target);
-                if (target < 0)
+                if (target < 0) {
+                    placed = false;
                     return;
+                }
+                if (!placed) {
+                    appear(target);
+                    return;
+                }
                 const stretch = root.activeId !== lastId;
                 const right = target > start;
                 lastId = root.activeId;
@@ -447,6 +458,18 @@ Item {
                 endAnim.duration = !stretch ? root.glide : right ? lead : trail;
                 start = target;
                 end = target + root.cell;
+            }
+
+            // Puts both edges on the cell at `target` at once, so the indicator appearing neither
+            // slides in nor stretches from where it last stood.
+            function appear(target: real): void {
+                const animated = ready;
+                ready = false;
+                start = target;
+                end = target + root.cell;
+                lastId = root.activeId;
+                ready = animated;
+                placed = true;
             }
 
             Component.onCompleted: {
@@ -459,6 +482,7 @@ Item {
             height: root.cell
             radius: K.Tokens.radius.full
             color: K.Tokens.color.primary
+            opacity: placed ? 1 : 0
 
             // Deferred, so a change of the active id and of the layout in the
             // same turn place the indicator once, from both.
@@ -493,6 +517,17 @@ Item {
 
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: K.Tokens.easing.emphasized_decel
+                }
+            }
+
+            // As the cell's number changes colour, so the two change together.
+            Behavior on opacity {
+                enabled: indicator.ready
+
+                NumberAnimation {
+                    duration: K.Tokens.duration.short
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: K.Tokens.easing.standard
                 }
             }
         }

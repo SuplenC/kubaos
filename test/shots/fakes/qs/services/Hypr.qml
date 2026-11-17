@@ -12,12 +12,13 @@ QtObject {
             "1": "Desk"
         })
     property var staleIds: ({})
-    // As the service works it out: each window's own workspace.
+    // As the service works it out (`occupied.js`): each window's own workspace, pinned windows
+    // left out.
     readonly property string occupiedIds: {
         const ids = [];
         for (const toplevel of Hyprland.toplevels.values) {
             const id = toplevel.workspace?.id;
-            if (id !== undefined && !ids.includes(id))
+            if (id !== undefined && toplevel.lastIpcObject?.pinned !== true && !ids.includes(id))
                 ids.push(id);
         }
         return `,${ids.sort((a, b) => a - b).join(",")},`;

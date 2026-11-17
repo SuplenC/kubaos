@@ -7,6 +7,7 @@ import Quickshell.Hyprland
 import qs.settings
 import KubaOS.Components as K
 import "dnd.js" as Dnd
+import "occupied.js" as Occupied
 
 // Small helpers on top of the Hyprland IPC, and each screen's workspaces.
 //
@@ -93,22 +94,12 @@ Singleton {
         return active > 0 ? blockOf(active) : 0;
     }
 
-    // The ids of the workspaces that hold windows, sorted, each between commas. Worked out once
-    // here and kept as a string, which signals only when its text changes, so a window event
-    // reaches the bar's cells only when the set changes: each cell scanning the windows itself
-    // took about 1.2 ms of script per window event across three screens, the set about 30 µs.
-    // Each window's own workspace counts, not a workspace's list of windows: a workspace
-    // renumbered away from keeps its list, and the object is reused when Hyprland creates that id
-    // again.
-    readonly property string occupiedIds: {
-        const ids = [];
-        for (const toplevel of Hyprland.toplevels.values) {
-            const id = toplevel.workspace?.id;
-            if (id !== undefined && !ids.includes(id))
-                ids.push(id);
-        }
-        return `,${ids.sort((a, b) => a - b).join(",")},`;
-    }
+    // The ids of the workspaces that hold windows other than pinned ones, sorted, each between
+    // commas (`occupied.js`). Worked out once here and kept as a string, which signals only when
+    // its text changes, so a window event reaches the bar's cells only when the set changes: each
+    // cell scanning the windows itself took about 1.2 ms of script per window event across three
+    // screens, the set about 30 µs.
+    readonly property string occupiedIds: Occupied.ids(Hyprland.toplevels.values)
 
     function occupied(id: int): bool {
         return root.occupiedIds.includes(`,${id},`);
@@ -172,11 +163,12 @@ Singleton {
         }
     }
 
-    // The client list read once more after a burst of `fullscreen` events has settled. Quickshell
-    // drops a read asked for while another is in flight, so the last change of a burst (a window
-    // leaving fullscreen right after entering it) could otherwise be missed until the next one.
+    // The client list read once more after a burst of `fullscreen` or `pin` events has settled.
+    // Quickshell drops a read asked for while another is in flight, so the last change of a burst
+    // (a window leaving fullscreen right after entering it) could otherwise be missed until the
+    // next one.
     Timer {
-        id: fullscreenRead
+        id: clientsRead
 
         interval: K.Tokens.duration.short
         onTriggered: Hyprland.refreshToplevels()
@@ -261,9 +253,11 @@ Singleton {
                 settledRead.restart();
             if (event.name === "screencast") {
                 root.shares = Dnd.screencast(root.shares, event.data);
-            } else if (event.name === "fullscreen") {
+            } else if (event.name === "fullscreen" || event.name === "pin") {
+                // A window's fullscreen mode and whether it is pinned are only in the client list,
+                // which Quickshell reads on neither event.
                 Hyprland.refreshToplevels();
-                fullscreenRead.restart();
+                clientsRead.restart();
             } else if (event.name === "moveworkspacev2") {
                 const fields = event.parse(3);
                 const next = Object.assign({}, root.movedTo);

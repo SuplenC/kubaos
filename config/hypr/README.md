@@ -136,7 +136,9 @@ workspace with windows. The bar draws that last one as a faint `+` until it is
 shown. Once a window lands on it, the next number is kept in its place and the
 one no longer needed is released, on the turn after the window's event, when
 Hyprland's counts have caught up. A group full up to 10 keeps no empty one
-after it.
+after it. A pinned window counts on no workspace: it follows the screen from
+workspace to workspace, so a workspace holding only pinned windows is empty,
+and pinning or unpinning a window brings the kept ones in line.
 
 Next and previous (`SUPER + Tab`, `SUPER + CTRL + →/←`, `SUPER + wheel`, the
 bar's wheel) and the three-finger swipe walk the focused screen's workspaces in
@@ -150,6 +152,11 @@ its place). `SUPER + CTRL + ALT + →/←` jump to the first workspace of the ne
 or previous group. `SUPER + 1..0` address the focused group: the screen's own,
 or the waiting group whose workspace it shows, so on a waiting group
 `SUPER + 2` is that group's 2.
+
+`SUPER + SHIFT + ALT + arrows` move the focused workspace to the screen that
+way, into its group under the same number, else the group's first free one.
+When that group has all ten, or the screen arrived a moment ago and the layout
+is still changing, nothing moves.
 
 No workspace is renumbered when a screen comes or goes. The Quickshell the
 bar runs (v0.3.2) keeps the id a workspace had when it first saw it, so a

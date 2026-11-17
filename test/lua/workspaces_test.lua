@@ -1374,16 +1374,49 @@ test("moving a workspace to another screen renumbers it into that block before i
   same(world:kept(), { "1@eDP-1", "11@DP-1", "13@DP-1" }, "kept")
 end)
 
-test("moving a workspace to a screen whose block is full keeps its number", function()
+-- What moving a workspace could change: the screens' workspaces and views,
+-- focus, the rules, and what the bar would hear.
+local function snapshot(world)
+  return {
+    world:ids_on("eDP-1"), world:ids_on("DP-1"), world:ids_on("DP-2"),
+    world:shown_on("eDP-1"), world:shown_on("DP-1"), world:shown_on("DP-2") or 0,
+    world.focused.name, world:all_rules(), world.renumbered, world.moves, { table.unpack(world.events) },
+  }
+end
+
+test("moving a workspace to a screen whose group has all ten does nothing", function()
   local world, module = two_screens()
   fill(world, module, "DP-1", 10)
   world:focus_monitor("eDP-1")
   run(module.focus(2))
   local window = world:open_window()
+  world.events = {}
+  local before = snapshot(world)
 
   run(module.move_to_monitor("r"))
 
-  same({ window.workspace.id, window.workspace.monitor.name, world.renumbered }, { 2, "DP-1", 0 }, "a guest")
+  same(snapshot(world), before, "unchanged")
+  same({ window.workspace.id, window.workspace.monitor.name }, { 2, "eDP-1" }, "the window stays")
+end)
+
+test("moving a workspace to a screen that has no group yet, the layout still changing, does nothing", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(2))
+  local window = world:open_window()
+  world:attach("DP-2", LG_B)
+  world:arrange("DP-2", 3840, 0)
+  world.hidden["eDP-1"] = true
+  world.events = {}
+  local before = snapshot(world)
+
+  run(module.move_to_monitor("r"))
+
+  same(snapshot(world), before, "unchanged")
+  same({ window.workspace.id, window.workspace.monitor.name }, { 12, "DP-1" }, "the window stays")
+  world.hidden["eDP-1"] = nil
+  world:settle()
+  same({ window.workspace.id, window.workspace.monitor.name, world:shown_on("DP-2") }, { 12, "DP-1", 21 }, "and after the wait")
 end)
 
 -- Regression: an empty workspace 1, once left, was out of reach of every
@@ -1553,6 +1586,35 @@ test("windows opening together bring the kept workspaces in line once", function
 
   same(#world.timers - before, 1, "one wait")
   same(world:kept(), { "1@eDP-1", "2@eDP-1", "11@DP-1" }, "kept")
+end)
+
+test("going to empty workspaces with a pinned window leaves the kept workspaces where they were", function()
+  local world, module = two_screens()
+  world:open_window()
+  world:pin(world:open_window())
+  same(world:kept(), { "1@eDP-1", "2@eDP-1", "11@DP-1" }, "kept")
+
+  run(module.focus(2))
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2 } }, "on the kept empty one")
+  run(module.focus(5))
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2, 5 } }, "on another")
+  run(module.focus(1))
+
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2 } }, "back")
+end)
+
+test("pinning the only window on a group's last workspace moves the empty one kept after it back", function()
+  local world, module = two_screens()
+  world:open_window()
+  run(module.focus(2))
+  local window = world:open_window()
+  same(world:kept(), { "1@eDP-1", "3@eDP-1", "11@DP-1" }, "kept")
+
+  world:pin(window)
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2 } }, "pinned")
+
+  world:pin(window, false)
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "3@eDP-1", "11@DP-1" }, { 1, 2, 3 } }, "unpinned")
 end)
 
 test("SUPER + SHIFT + CTRL + Right leaves a window alone after the others where it is", function()

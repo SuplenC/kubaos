@@ -21,10 +21,12 @@
 -- arranged afterwards and `monitor.layout_changed` fires. The last real
 -- screen going leaves its workspaces on no screen and brings the `FALLBACK`
 -- output, which goes again once a real screen is back. Focus moving to a
--- screen fires `monitor.focused`, as Hyprland's does. A config reload starts
--- a new Lua state (`reload()`). `events` lists the socket events a move or a
--- renumber would send the bar, in order, and `commands` what `hl.exec_cmd`
--- ran.
+-- screen fires `monitor.focused`, as Hyprland's does. A pinned window follows
+-- its screen from the workspace it showed to the one it shows next
+-- (`CMonitor::changeWorkspace`), and counts on each in turn. A config reload
+-- starts a new Lua state (`reload()`). `events` lists the socket events a
+-- move or a renumber would send the bar, in order, and `commands` what
+-- `hl.exec_cmd` ran.
 
 local F = {}
 F.__index = F
@@ -164,6 +166,24 @@ function F:window_count(record)
   return count
 end
 
+-- `CMonitor::changeWorkspace`: the screen shows `record`, and every pinned
+-- window on the workspace it showed goes with it. Hyprland reports each such
+-- window's move (`window.move_to_workspace`) before the layout takes it off
+-- the old workspace, so the counts are still those of before the switch.
+function F:change_view(monitor, record)
+  local old = monitor.active
+  monitor.active = record
+  if not old or old == record then
+    return
+  end
+  for _, window in ipairs(self.windows) do
+    if window.pinned and window.workspace == old then
+      self:fire("window.move_to_workspace", self:window_object(window), self:workspace_object(record))
+      window.workspace = record
+    end
+  end
+end
+
 function F:shown(record)
   for _, monitor in ipairs(self.monitors) do
     if monitor.active == record then
@@ -217,11 +237,11 @@ end
 function F:refill(monitor)
   for _, record in ipairs(self.workspaces) do
     if record.monitor == monitor and record ~= monitor.active then
-      monitor.active = record
+      self:change_view(monitor, record)
       return
     end
   end
-  monitor.active = self:create(self:lowest_free(monitor), monitor)
+  self:change_view(monitor, self:create(self:lowest_free(monitor), monitor))
 end
 
 -- `moveWorkspaceToMonitor`: the screen it leaves shows another when it
@@ -325,7 +345,7 @@ function F:monitor_object(record)
               world.moves = world.moves + 1
             end
             target.monitor = record
-            record.active = target
+            world:change_view(record, target)
             world:cleanup()
           end
         end
@@ -361,6 +381,7 @@ function F:window_object(window)
     __index = function(_, key)
       if key == "address" then return window.address end
       if key == "workspace" then return world:workspace_object(window.workspace) end
+      if key == "pinned" then return window.pinned == true end
       return nil
     end,
   })
@@ -413,7 +434,7 @@ function F:focus_workspace(id)
   else
     record = self:create(id, self.focused)
   end
-  record.monitor.active = record
+  self:change_view(record.monitor, record)
   self:cleanup()
 end
 
@@ -428,7 +449,7 @@ function F:apply(action)
       local window = self:window_record((args.window:gsub("^address:", "")))
       if window then
         self:set_focused(window.workspace.monitor)
-        window.workspace.monitor.active = window.workspace
+        self:change_view(window.workspace.monitor, window.workspace)
       end
     end
   elseif kind == "workspace.move" then
@@ -440,10 +461,12 @@ function F:apply(action)
     end
     self.events[#self.events + 1] = "moveworkspacev2>>" .. record.id .. "," .. record.id .. "," .. target.name
     record.monitor = target
-    target.active = record
+    -- `moveWorkspaceToMonitor` fills the gap on the screen it leaves first, so
+    -- that screen's pinned windows stay there, then shows it on the other.
     if from.active == record then
       self:refill(from)
     end
+    self:change_view(target, record)
     self:cleanup()
   elseif kind == "workspace.change_id" then
     local record = self:workspace_record(tonumber(args.workspace))
@@ -521,6 +544,13 @@ function F:api()
     get_workspace = function(id) return world:workspace_object(world:workspace_record(id)) end,
     get_active_workspace = function() return world:workspace_object(world.focused and world.focused.active) end,
     get_active_window = function() return world:window_object(world:active_window()) end,
+    get_windows = function()
+      local objects = {}
+      for _, window in ipairs(world.windows) do
+        objects[#objects + 1] = world:window_object(window)
+      end
+      return objects
+    end,
     get_window = function(selector)
       return world:window_object(world:window_record((selector:gsub("^address:", ""))))
     end,
@@ -738,6 +768,14 @@ function F:close_window(window)
   self:step(function()
     self:unmap_window(window)
     self:defer(function() self:fire("window.destroy", self:window_object(window)) end)
+  end)
+end
+
+-- A window pinned, or unpinned with `pinned` false, and `window.pin` fired.
+function F:pin(window, pinned)
+  self:step(function()
+    window.pinned = pinned ~= false
+    self:fire("window.pin", self:window_object(window))
   end)
 end
 
