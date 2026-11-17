@@ -72,7 +72,7 @@ function measured(picture: string): HTMLElement {
 /** Names with no picture and no symbol: one word, several, a lowercase start and another script. */
 /** A dialog another program opens, its caller's tile over the title on the dialog's own fill. */
 function onDialog(): HTMLElement {
-  return dialog({ title: "Restart", body: "Updates are installed. Restart now?", caller: { name: "update.sh" }, dismiss: "Cancel", actions: [{ label: "Restart" }] }).element;
+  return dialog({ title: "Restart", body: "Updates are installed. Restart now?", caller: { name: "KubaOS", picture: appIcon }, dismiss: "Cancel", actions: [{ label: "Restart" }] }).element;
 }
 
 const NAMES = ["Blender", "LM Studio", "k9s", "日本語入力"] as const;
