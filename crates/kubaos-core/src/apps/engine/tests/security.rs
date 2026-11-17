@@ -1,6 +1,7 @@
 //! The security and VPN apps of the shipped catalog, installed and removed on the fake machine.
 
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
@@ -349,20 +350,25 @@ fn proton_vpn() -> World {
     world
 }
 
-/// A running NetworkManager whose connections are the lines of a file of the test's, holding
-/// `names`, as the stand-in `nmcli`; with `deletes`, deleting one takes its line away. The file.
+/// A running NetworkManager whose connections are `names`, one a line, as the stand-in `nmcli`:
+/// it lists each as `<uuid>:<name>`, `u<n>` its UUID, from a file of the test's; with `deletes`,
+/// deleting one by its UUID takes its line away. The file.
 fn network_manager(world: &World, names: &str, deletes: bool) -> PathBuf {
     let file = world.host_home().join("../../connections");
-    fs::write(&file, names).unwrap();
+    let mut listed = String::new();
+    for (n, name) in names.lines().enumerate() {
+        writeln!(listed, "u{n}:{name}").unwrap();
+    }
+    fs::write(&file, listed).unwrap();
     let f = file.display();
     let delete = if deletes {
-        format!("grep -vx \"$4\" '{f}' >'{f}.new'; mv '{f}.new' '{f}'")
+        format!("[ \"$3\" = uuid ] && grep -v \"^$4:\" '{f}' >'{f}.new'; mv '{f}.new' '{f}'")
     } else {
         ":".to_owned()
     };
     world.host.sandbox().stub(
         "nmcli",
-        &format!("case $1 in\n-g) cat '{f}' ;;\nconnection) {delete} ;;\nesac"),
+        &format!("case $1 in\n-t) cat '{f}' ;;\nconnection) {delete} ;;\nesac"),
     );
     file
 }
@@ -378,7 +384,7 @@ fn proton_vpns_removal_deletes_its_kill_switchs_connections_networkmanager_still
 
     run(&world, |e| e.remove_with("proton-vpn", &Picks::default())).unwrap();
 
-    assert_eq!(fs::read_to_string(&connections).unwrap(), "Home Wi-Fi\n");
+    assert_eq!(fs::read_to_string(&connections).unwrap(), "u2:Home Wi-Fi\n");
 }
 
 #[test]
@@ -404,6 +410,23 @@ fn a_proton_kill_switch_connection_that_stays_stops_the_removal_with_the_package
     let world = proton_vpn();
     // NetworkManager won't let it go.
     network_manager(&world, "pvpn-killswitch-perm\n", false);
+
+    let removed = run(&world, |e| e.remove_with("proton-vpn", &Picks::default()));
+
+    assert!(removed.is_err(), "the removal went through");
+    assert!(world.host.state.borrow().dpkg.contains_key("proton-vpn-gnome-desktop"));
+}
+
+#[test]
+fn a_failing_nmcli_stops_proton_vpns_removal_once_it_answered() {
+    let world = proton_vpn();
+    // It lists its connections once, then fails.
+    let asked = world.host_home().join("../../asked");
+    let a = asked.display();
+    world.host.sandbox().stub(
+        "nmcli",
+        &format!("case $1 in\n-t) [ -e '{a}' ] && exit 10; touch '{a}'; echo 'u0:Home Wi-Fi' ;;\nesac"),
+    );
 
     let removed = run(&world, |e| e.remove_with("proton-vpn", &Picks::default()));
 
