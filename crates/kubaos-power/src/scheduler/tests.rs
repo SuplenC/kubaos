@@ -1,5 +1,4 @@
 use std::fs;
-use std::process::Command;
 
 use super::*;
 use crate::fake::FakeRoot;
@@ -415,15 +414,11 @@ fn helper(root: &FakeRoot, args: &[&str]) -> (bool, String) {
     let mut permissions = fs::metadata(&systemctl).expect("stat").permissions();
     std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
     fs::set_permissions(&systemctl, permissions).expect("chmod");
-    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap_or_default());
-    let script = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../system/files/power/kubaos-power-write"
-    );
-    let output = Command::new("bash")
-        .arg(script)
+    let sandbox = root.sandbox();
+    let path = format!("{}:{}", bin.display(), sandbox.bin().display());
+    let output = root
+        .helper(&sandbox)
         .args(args)
-        .env("KUBAOS_POWER_ROOT", root.dir.path())
         .env("PATH", path)
         .output()
         .expect("run the helper");

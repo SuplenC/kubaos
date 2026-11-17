@@ -19,9 +19,7 @@ use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::process::Output;
-use std::process::Stdio;
 
 use super::changelog;
 use super::changelog::Changelog;
@@ -195,9 +193,9 @@ impl RemoteRefs {
     ///
     /// [`RefsError`] when git can't reach `url`.
     pub fn fetch(url: &str, local: GitRefs) -> Result<Self, RefsError> {
-        let out = Command::new("git")
+        let mut command = kubaos_git::anywhere();
+        let out = crate::started::prepare(&mut command)
             .args(["ls-remote", "--", url, "refs/heads/main", "refs/tags/v*"])
-            .stdin(Stdio::null())
             .output()
             .map_err(|e| RefsError::new(format!("git ls-remote {url}"), e))?;
         if !out.status.success() {
@@ -267,12 +265,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .stdin(Stdio::null())
-        .output()
+    crate::started::git(dir).args(args).output()
 }
 
 fn stderr(out: &Output) -> String {

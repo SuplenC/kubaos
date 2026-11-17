@@ -866,13 +866,14 @@ fn is_alive_state(state: &str) -> bool {
     matches!(state, "active" | "activating" | "deactivating" | "reloading")
 }
 
-/// Runs `argv` to the end with stdin closed.
+/// Runs `argv` to the end with stdin closed and none of git's variables: Nix reads the flakes
+/// from their git checkouts, which must be theirs, not a repository the caller's environment names.
 fn run(argv: &[OsString], stdout: Stdio, stderr: Stdio) -> Result<(), HostError> {
     let Some((executable, rest)) = argv.split_first() else {
         return Err(HostError::spawn("", io::Error::other("empty command")));
     };
     let program = executable.to_string_lossy().into_owned();
-    let status = Command::new(executable)
+    let status = kubaos_git::clear(&mut Command::new(executable))
         .args(rest)
         .stdin(Stdio::null())
         .stdout(stdout)
@@ -886,13 +887,14 @@ fn run(argv: &[OsString], stdout: Stdio, stderr: Stdio) -> Result<(), HostError>
     }
 }
 
-/// Runs `argv` to the end with stdin closed and stderr dropped, returning what it printed.
+/// Runs `argv` to the end with stdin closed, stderr dropped and none of git's variables (it may
+/// be git: [`Systemd::worktrees`]), returning what it printed.
 fn output(argv: &[OsString]) -> Result<String, HostError> {
     let Some((executable, rest)) = argv.split_first() else {
         return Err(HostError::spawn("", io::Error::other("empty command")));
     };
     let program = executable.to_string_lossy().into_owned();
-    let out = Command::new(executable)
+    let out = kubaos_git::clear(&mut Command::new(executable))
         .args(rest)
         .stdin(Stdio::null())
         .stderr(Stdio::null())

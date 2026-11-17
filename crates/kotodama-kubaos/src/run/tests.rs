@@ -1,4 +1,45 @@
+use kubaos_core::sandbox::Sandbox;
+use tempfile::TempDir;
+
 use super::*;
+
+/// [`Programs`]' runs, each in a sandbox: what a program reaches is the test's, and a launch
+/// starts its program as a child in the sandbox, never as a service of the session's user
+/// manager.
+struct Sandboxed {
+    sandbox: Sandbox,
+    _dir: TempDir,
+}
+
+impl Sandboxed {
+    fn new() -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+        Self { sandbox, _dir: dir }
+    }
+}
+
+impl Runner for Sandboxed {
+    fn output(&self, argv: &[String]) -> Result<String, RunError> {
+        super::output(argv, |command| {
+            self.sandbox.confine(command);
+        })
+    }
+
+    fn launch(&self, argv: &[String], delay: Duration) -> Result<(), RunError> {
+        let sandbox = self.sandbox.clone();
+        super::launch_after(argv, delay, move |argv| {
+            let (program, rest) = argv.split_first().expect("a program");
+            sandbox.command(program).args(rest).spawn().map(drop)
+        })
+    }
+
+    fn background(&self, argv: &[String], line: OnLine, ended: OnEnd) -> Result<(), RunError> {
+        super::background(argv, line, ended, |command| {
+            self.sandbox.confine(command);
+        })
+    }
+}
 
 fn argv(words: &[&str]) -> Vec<String> {
     words.iter().map(|&word| word.to_owned()).collect()
@@ -6,14 +47,14 @@ fn argv(words: &[&str]) -> Vec<String> {
 
 #[test]
 fn output_is_what_the_program_wrote_to_stdout() {
-    let output = Programs.output(&argv(&["sh", "-c", "echo hello"])).unwrap();
+    let output = Sandboxed::new().output(&argv(&["sh", "-c", "echo hello"])).unwrap();
 
     assert_eq!(output, "hello\n");
 }
 
 #[test]
 fn a_program_that_fails_says_its_last_line_on_stderr() {
-    let err = Programs
+    let err = Sandboxed::new()
         .output(&argv(&["sh", "-c", "echo first >&2; echo 'no such sink' >&2; exit 3"]))
         .unwrap_err();
 
@@ -22,14 +63,14 @@ fn a_program_that_fails_says_its_last_line_on_stderr() {
 
 #[test]
 fn a_program_that_fails_silently_says_how_it_exited() {
-    let err = Programs.output(&argv(&["sh", "-c", "exit 3"])).unwrap_err();
+    let err = Sandboxed::new().output(&argv(&["sh", "-c", "exit 3"])).unwrap_err();
 
     assert!(err.to_string().starts_with("sh failed: exit"), "{err}");
 }
 
 #[test]
 fn a_missing_program_cannot_start() {
-    let err = Programs.output(&argv(&["kubaos-no-such-program"])).unwrap_err();
+    let err = Sandboxed::new().output(&argv(&["kubaos-no-such-program"])).unwrap_err();
 
     assert!(matches!(err, RunError::Start { .. }), "{err:?}");
     assert_eq!(err.to_string(), "couldn't start kubaos-no-such-program");
@@ -39,8 +80,9 @@ fn a_missing_program_cannot_start() {
 fn a_delayed_launch_starts_the_program_after_the_delay() {
     let dir = tempfile::tempdir().unwrap();
     let marker = dir.path().join("ran");
+    let runner = Sandboxed::new();
 
-    Programs
+    runner
         .launch(
             &argv(&["sh", "-c", &format!("touch '{}'", marker.display())]),
             Duration::from_millis(50),
@@ -66,7 +108,8 @@ fn background(script: &str) -> (Vec<String>, bool) {
 fn background_taking(script: &str, each: Duration) -> (Vec<String>, bool) {
     let (sender, received) = std::sync::mpsc::channel();
     let ended = sender.clone();
-    Programs
+    let runner = Sandboxed::new();
+    runner
         .background(
             &argv(&["sh", "-c", script]),
             Box::new(move |line| {
@@ -143,7 +186,7 @@ fn a_background_programs_end_comes_after_every_line_even_with_its_output_held_op
 
 #[test]
 fn a_background_program_that_cant_start_is_an_error() {
-    let started = Programs.background(&argv(&["kubaos-no-such-program"]), Box::new(|_| {}), Box::new(|_| {}));
+    let started = Sandboxed::new().background(&argv(&["kubaos-no-such-program"]), Box::new(|_| {}), Box::new(|_| {}));
 
     assert!(matches!(started, Err(RunError::Start { .. })), "{started:?}");
 }

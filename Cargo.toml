@@ -1,4 +1,5 @@
-# The KubaOS Rust workspace: the engine (`kubaos-core`), the `kubaos` CLI
+# The KubaOS Rust workspace: the engine (`kubaos-core`), git as it runs it
+# (`kubaos-git`), the `kubaos` CLI
 # (`kubaos-cli`), the recoloured pointer it writes (`kubaos-cursor`), Kōbō
 # (`kubaos-kobo`), its graphical front end, the Command menu's KubaOS
 # Extension (`kotodama-kubaos`), yazi's launcher and the Downloads tidy
@@ -23,6 +24,7 @@
 resolver = "3"
 members = [
     "crates/kubaos-core",
+    "crates/kubaos-git",
     "crates/kubaos-cli",
     "crates/kubaos-cursor",
     "crates/kubaos-kobo",
@@ -58,6 +60,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 kubaos-core = { path = "crates/kubaos-core" }
+kubaos-git = { path = "crates/kubaos-git" }
 kubaos-automount = { path = "crates/kubaos-automount" }
 kubaos-launches = { path = "crates/kubaos-launches" }
 kubaos-cursor = { path = "crates/kubaos-cursor" }

@@ -19,6 +19,8 @@ use kotodama_protocol::NamespacedKind;
 use kotodama_protocol::Outcome;
 use kotodama_protocol::Table;
 use kotodama_protocol::ToExtension;
+use kubaos_core::sandbox::Sandbox;
+use tempfile::TempDir;
 
 const WAIT: Duration = Duration::from_secs(5);
 
@@ -31,8 +33,14 @@ const AT_ONCE: usize = 3;
 /// The Extensions running, under [`AT_ONCE`].
 static RUNNING: (Mutex<usize>, Condvar) = (Mutex::new(0), Condvar::new());
 
-/// A running Extension, which holds its place under [`AT_ONCE`] until it is dropped.
-struct Running(Spawned);
+/// A running Extension, which holds its place under [`AT_ONCE`] until it is dropped, and its
+/// sandbox: its home and runtime folder are the test's, its `PATH` holds stand-ins for the
+/// commands that reach the session or the machine, and it finds no bus or user manager, so a
+/// program an action starts is its child, never a unit in the session's user manager.
+struct Running {
+    spawned: Spawned,
+    _sandbox: TempDir,
+}
 
 impl Drop for Running {
     fn drop(&mut self) {
@@ -46,7 +54,7 @@ impl Deref for Running {
     type Target = Spawned;
 
     fn deref(&self) -> &Spawned {
-        &self.0
+        &self.spawned
     }
 }
 
@@ -55,7 +63,7 @@ impl Deref for Running {
 impl Running {
     fn recv(&self) -> FromExtension {
         loop {
-            match self.0.recv() {
+            match self.spawned.recv() {
                 FromExtension::TargetAction { .. } => {}
                 other => return other,
             }
@@ -77,7 +85,7 @@ impl Running {
     }
 
     fn outcome(&self, invocation: u64, skip: impl Fn(&FromExtension) -> bool) -> Outcome {
-        self.0.outcome(invocation, |message| {
+        self.spawned.outcome(invocation, |message| {
             matches!(message, FromExtension::TargetAction { .. }) || skip(message)
         })
     }
@@ -85,12 +93,17 @@ impl Running {
 
 impl DerefMut for Running {
     fn deref_mut(&mut self) -> &mut Spawned {
-        &mut self.0
+        &mut self.spawned
     }
 }
 
-/// `command`, the Extension, once fewer than [`AT_ONCE`] run.
-fn spawn(command: &mut Command, wait: Duration) -> Running {
+/// The Extension, in a sandbox of its own and as `build` leaves its command, once fewer than
+/// [`AT_ONCE`] run.
+fn spawn(build: impl FnOnce(&mut Command)) -> Running {
+    let dir = tempfile::tempdir().expect("a folder for the sandbox");
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+    let mut command = sandbox.command(env!("CARGO_BIN_EXE_kotodama-kubaos"));
+    build(&mut command);
     let (count, freed) = &RUNNING;
     let mut running = count.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     while *running >= AT_ONCE {
@@ -98,11 +111,14 @@ fn spawn(command: &mut Command, wait: Duration) -> Running {
     }
     *running += 1;
     drop(running);
-    Running(Spawned::start(command, wait))
+    Running {
+        spawned: Spawned::start(&mut command, WAIT),
+        _sandbox: dir,
+    }
 }
 
 fn start() -> Running {
-    spawn(&mut Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")), WAIT)
+    spawn(|_| {})
 }
 
 fn config(text: &str) -> ToExtension {
@@ -126,12 +142,9 @@ fn it_is_usable_from_the_start() {
 #[test]
 fn the_layouts_app_is_usable_from_the_start() {
     let config_home = tempfile::tempdir().expect("a config folder");
-    let extension = spawn(
-        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
-            .arg("layouts")
-            .env("XDG_CONFIG_HOME", config_home.path()),
-        WAIT,
-    );
+    let extension = spawn(|command| {
+        command.arg("layouts").env("XDG_CONFIG_HOME", config_home.path());
+    });
 
     assert_eq!(extension.status(), (true, None));
 }
@@ -182,10 +195,9 @@ fn the_upgrade_action_is_listed_while_the_update_check_has_one() {
         "upgrade=0.2.0\nupgrade-codename=akihabara\n",
     )
     .expect("write the check");
-    let mut extension = spawn(
-        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_STATE_HOME", state.path()),
-        WAIT,
-    );
+    let mut extension = spawn(|command| {
+        command.env("XDG_STATE_HOME", state.path());
+    });
     extension.send(config(
         "[actions.upgrade]\ntitle = \"Upgrade KubaOS\"\nrun = [\"kubaos\", \"upgrade\"]\n\
          [actions.update]\ntitle = \"Update KubaOS\"\nrun = [\"kubaos\", \"update\"]",
@@ -207,12 +219,11 @@ fn the_upgrade_action_is_listed_while_the_update_check_has_one() {
 fn turning_the_greeting_off_swaps_its_pair_in_the_menu() {
     let config_home = tempfile::tempdir().expect("a config folder");
     let runtime = tempfile::tempdir().expect("a runtime folder");
-    let mut extension = spawn(
-        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
+    let mut extension = spawn(|command| {
+        command
             .env("XDG_CONFIG_HOME", config_home.path())
-            .env("XDG_RUNTIME_DIR", runtime.path()),
-        WAIT,
-    );
+            .env("XDG_RUNTIME_DIR", runtime.path());
+    });
     extension.send(config(
         r#"
         [actions.greeting-on]
@@ -290,10 +301,9 @@ fn a_run_that_fails_says_why_and_keeps_the_menu_open() {
 #[test]
 fn a_date_query_is_answered_and_its_answer_copies() {
     let config = tempfile::tempdir().expect("a config folder");
-    let mut extension = spawn(
-        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_CONFIG_HOME", config.path()),
-        WAIT,
-    );
+    let mut extension = spawn(|command| {
+        command.env("XDG_CONFIG_HOME", config.path());
+    });
     extension.status();
 
     extension.send(ToExtension::LiveQuery {
@@ -348,10 +358,9 @@ fn a_query_that_is_not_a_date_is_answered_with_nothing() {
 #[test]
 fn ram_is_answered_by_the_monitor() {
     let runtime = tempfile::tempdir().expect("a runtime folder");
-    let mut extension = spawn(
-        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_RUNTIME_DIR", runtime.path()),
-        WAIT,
-    );
+    let mut extension = spawn(|command| {
+        command.env("XDG_RUNTIME_DIR", runtime.path());
+    });
     extension.status();
 
     extension.send(ToExtension::LiveQuery {
@@ -382,16 +391,15 @@ fn start_on_login_is_offered_on_the_apps_that_do_not_start_and_its_opposite_on_t
     write("share/applications/chrome.desktop", app);
     write("share/applications/solaar.desktop", app);
     write("config/autostart/solaar.desktop", app);
-    let extension = spawn(
-        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
+    let extension = spawn(|command| {
+        command
             .env("XDG_CONFIG_HOME", home.path().join("config"))
             .env("XDG_CONFIG_DIRS", home.path().join("etc"))
             .env("XDG_DATA_HOME", home.path().join("share"))
-            .env("XDG_DATA_DIRS", home.path().join("none")),
-        WAIT,
-    );
+            .env("XDG_DATA_DIRS", home.path().join("none"));
+    });
 
-    let sets: Vec<FromExtension> = (0..2).map(|_| extension.0.recv()).collect();
+    let sets: Vec<FromExtension> = (0..2).map(|_| extension.spawned.recv()).collect();
 
     assert_eq!(
         sets,

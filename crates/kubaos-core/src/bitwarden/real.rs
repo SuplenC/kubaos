@@ -255,6 +255,8 @@ impl Host for Real {
 
     fn run(&mut self, cmd: &Cmd) -> Result<Ran, String> {
         let mut c = Command::new(&cmd.program);
+        // git among them, which must find the repository it is given, not the caller's.
+        kubaos_git::clear(&mut c);
         c.args(&cmd.args).env_remove("BW_SESSION");
         c.envs(cmd.env.iter().map(|(k, v)| (k, v)));
         c.stdin(if cmd.stdin.is_some() {

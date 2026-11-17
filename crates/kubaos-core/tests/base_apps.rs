@@ -13,7 +13,6 @@ use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 use kubaos_core::apps::Catalog;
 use kubaos_core::apps::Picks;
@@ -36,7 +35,7 @@ const DOCKER: [&str; 5] = [
 
 /// The user running the tests, by name.
 fn me() -> String {
-    let out = Command::new("id").arg("-un").output().expect("id").stdout;
+    let out = kubaos_core::sandbox::output("id", ["-un"]).stdout;
     String::from_utf8(out).expect("a name").trim().to_owned()
 }
 

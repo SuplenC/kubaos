@@ -1,25 +1,11 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use super::GitSync;
 use crate::state::StateDir;
 
 fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .env("GIT_CONFIG_NOSYSTEM", "1")
-        .output()
-        .expect("run git");
-    assert!(
-        out.status.success(),
-        "git {args:?}: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8(out.stdout).unwrap()
+    crate::sandbox::git(dir, args)
 }
 
 /// A user flake under git, with `kubaos.d/packages.toml` committed.
@@ -31,19 +17,7 @@ fn repo() -> (tempfile::TempDir, StateDir) {
     fs::write(flake.join("kubaos.d/packages.toml"), "packages = [\"hello\"]\n").unwrap();
     git(&flake, &["init", "-q"]);
     git(&flake, &["add", "-A"]);
-    git(
-        &flake,
-        &[
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "commit",
-            "-q",
-            "-m",
-            "init",
-        ],
-    );
+    git(&flake, &["commit", "-q", "-m", "init"]);
     (tmp, StateDir::new(flake.join("kubaos.d")))
 }
 

@@ -470,23 +470,15 @@ fn the_state_directory_is_not_a_mention() {
 #[test]
 fn a_suite_file_is_visible_to_git_when_the_flake_is_a_repo() {
     let h = home();
-    let git = |args: &[&str]| {
-        std::process::Command::new("git")
-            .arg("-C")
-            .arg(h.paths.flake())
-            .args(args)
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .output()
-            .unwrap()
-    };
-    assert!(git(&["init", "-q"]).status.success());
+    let git = |args: &[&str]| crate::sandbox::git(h.paths.flake(), args);
+    git(&["init", "-q"]);
 
     h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
-    let after_add = String::from_utf8(git(&["ls-files"]).stdout).unwrap();
+    let after_add = git(&["ls-files"]);
     h.suites.remove(&DEMO, CachePolicy::Keep).unwrap();
-    let after_remove = String::from_utf8(git(&["ls-files"]).stdout).unwrap();
+    let after_remove = git(&["ls-files"]);
 
-    assert_eq!(after_add, "kubaos.d/suites/demo.toml\n");
+    assert_eq!(after_add, "kubaos.d/suites/demo.toml");
     assert_eq!(after_remove, "");
 }
 
@@ -499,6 +491,61 @@ fn scaffolding_creates_the_project_in_the_projects_root() {
 
     assert_eq!(path, h.paths.projects_root().join("hello-demo"));
     assert_eq!(fs::read_to_string(path.join("NAME")).unwrap(), "hello-demo\n");
+}
+
+#[test]
+fn a_scaffolders_git_init_makes_the_projects_repository_and_not_the_one_the_environment_names() {
+    const GIT: Suite = Suite {
+        scaffolders: &[Scaffolder {
+            id: "app",
+            label: "New Demo project",
+            argv: &["sh", "-c", "mkdir \"$1\" && git -C \"$1\" init -q", "sh", "{path}"],
+        }],
+        ..DEMO
+    };
+    let h = home();
+    h.suites.add(&GIT, &OptionsChange::default()).unwrap();
+    let decoy = h.paths.home().join("decoy");
+    fs::create_dir_all(&decoy).unwrap();
+    crate::sandbox::git(&decoy, &["init", "-q"]);
+    let before = crate::sandbox::git(&decoy, &["config", "--list", "--local"]);
+    crate::started::testing::pass("GIT_DIR", decoy.join(".git"));
+    crate::started::testing::pass("GIT_WORK_TREE", &decoy);
+
+    let path = h.suites.scaffold(&GIT, &GIT.scaffolders[0], "hello-git").unwrap();
+
+    assert!(
+        path.join(".git/HEAD").is_file(),
+        "the project has no repository of its own"
+    );
+    assert_eq!(crate::sandbox::git(&decoy, &["config", "--list", "--local"]), before);
+}
+
+#[test]
+fn a_scaffolder_runs_in_the_tests_sandbox() {
+    const SHOWS: Suite = Suite {
+        scaffolders: &[Scaffolder {
+            id: "app",
+            label: "New Demo project",
+            argv: &[
+                "sh",
+                "-c",
+                "mkdir \"$1\" && printf '%s\\n' \"$PATH\" \"$DBUS_SESSION_BUS_ADDRESS\" >\"$1/ENV\"",
+                "sh",
+                "{path}",
+            ],
+        }],
+        ..DEMO
+    };
+    let h = home();
+    h.suites.add(&SHOWS, &OptionsChange::default()).unwrap();
+
+    let path = h.suites.scaffold(&SHOWS, &SHOWS.scaffolders[0], "hello-env").unwrap();
+
+    let shown = fs::read_to_string(path.join("ENV")).unwrap();
+    let lines: Vec<&str> = shown.lines().collect();
+    assert!(lines[0].ends_with("/sandbox/bin"), "{shown}");
+    assert_eq!(lines[1], crate::sandbox::NOWHERE);
 }
 
 #[test]

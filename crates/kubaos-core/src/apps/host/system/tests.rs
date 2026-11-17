@@ -8,6 +8,10 @@ use crate::apps::host::Host;
 
 /// What a script run by `host` sees of its environment: its `HOME`, and whether it inherited
 /// a variable of the process that ran it (cargo sets `CARGO_PKG_NAME` for every test).
+///
+/// Outside the sandbox: what is checked is the environment the real host passes on, which a
+/// sandbox would replace. The script is the test's own, by its path, and runs only `printf`, a
+/// shell builtin, so it reaches nothing.
 fn environment(host: &mut SystemHost) -> String {
     let dir = tempfile::tempdir().unwrap();
     let script = dir.path().join("env");

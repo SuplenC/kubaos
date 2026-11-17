@@ -4,32 +4,10 @@
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
-/// Runs git in `dir` with a test identity, and returns its trimmed output.
+/// Runs git in `dir`, in a sandbox, with a test identity, and returns its trimmed output.
 pub fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@kubaos",
-            "-c",
-            "commit.gpgsign=false",
-        ])
-        .args(["-c", "tag.gpgsign=false", "-c", "init.defaultBranch=main"])
-        .args(args)
-        .output()
-        .expect("run git");
-    assert!(
-        out.status.success(),
-        "git {args:?} in {}: {}",
-        dir.display(),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    String::from_utf8_lossy(&out.stdout).trim().to_owned()
+    crate::sandbox::git(dir, args)
 }
 
 /// A throwaway SSH key and an `allowed_signers` that trusts it.
@@ -42,11 +20,11 @@ pub struct Key {
 pub fn key(dir: &Path) -> Key {
     fs::create_dir_all(dir).expect("make the key folder");
     let private = dir.join("key");
-    let out = Command::new("ssh-keygen")
-        .args(["-q", "-t", "ed25519", "-N", "", "-C", "test", "-f"])
-        .arg(&private)
-        .output()
-        .expect("run ssh-keygen");
+    let mut args: Vec<&std::ffi::OsStr> = ["-q", "-t", "ed25519", "-N", "", "-C", "test", "-f"]
+        .map(std::ffi::OsStr::new)
+        .to_vec();
+    args.push(private.as_os_str());
+    let out = crate::sandbox::output("ssh-keygen", args);
     assert!(
         out.status.success(),
         "ssh-keygen: {}",

@@ -18,6 +18,7 @@ pub mod probe;
 #[cfg(any(test, feature = "sandbox"))]
 pub mod sandbox;
 pub mod setup;
+mod started;
 pub mod state;
 pub mod step;
 pub mod suites;

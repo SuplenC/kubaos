@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 
+use kubaos_core::sandbox::Sandbox;
 use tempfile::TempDir;
 
 const PROXY: &str = "http://proxy.corp.example.com:3128";
@@ -19,6 +20,9 @@ const PAC: &str = "http://wpad.corp.example.com/proxy.pac?v=2";
 struct Root {
     dir: TempDir,
     bin: TempDir,
+    /// The helper runs in it, with the stubs in `bin` ahead of its `PATH`.
+    sandbox: Sandbox,
+    _sandbox_dir: TempDir,
 }
 
 /// What a run of the helper did.
@@ -42,8 +46,17 @@ impl Root {
     /// A machine with Docker and Nix's daemons installed, nothing of the Proxy, and the proxy,
     /// its `no_proxy` and the PAC file pinned, but no CA.
     fn new() -> Root {
+        let sandbox_dir = tempfile::tempdir().expect("a temp dir");
+        let sandbox = Sandbox::new(
+            &sandbox_dir.path().join("sandbox"),
+            &sandbox_dir.path().join("home"),
+            "root",
+        );
+        sandbox.link("openssl");
         let root = Root {
             dir: tempfile::tempdir().expect("a temp dir"),
+            sandbox,
+            _sandbox_dir: sandbox_dir,
             bin: tempfile::tempdir().expect("a temp dir"),
         };
         let log = root.log_path();
@@ -143,12 +156,8 @@ impl Root {
     }
 
     fn command(&self, program: &Path, args: &[&str]) -> Command {
-        let path = format!(
-            "{}:{}",
-            self.bin.path().display(),
-            std::env::var("PATH").unwrap_or_default()
-        );
-        let mut command = Command::new("bash");
+        let path = format!("{}:{}", self.bin.path().display(), self.sandbox.bin().display());
+        let mut command = self.sandbox.command("bash");
         command
             .arg(program)
             .args(args)
@@ -184,16 +193,15 @@ impl Root {
 
 /// A throwaway self-signed certificate, from the machine's openssl.
 fn certificate() -> String {
-    let out = Command::new("openssl")
-        .args([
+    let out = kubaos_core::sandbox::output(
+        "openssl",
+        [
             "req",
             "-x509",
             "-newkey",
             "ec",
             "-pkeyopt",
             "ec_paramgen_curve:prime256v1",
-        ])
-        .args([
             "-nodes",
             "-keyout",
             "/dev/null",
@@ -201,9 +209,8 @@ fn certificate() -> String {
             "/CN=KubaOS test CA",
             "-days",
             "1",
-        ])
-        .output()
-        .expect("run openssl");
+        ],
+    );
     assert!(
         out.status.success(),
         "openssl: {}",

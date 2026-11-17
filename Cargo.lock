@@ -2101,6 +2101,7 @@ dependencies = [
  "kubaos-core",
  "kubaos-counters",
  "kubaos-files",
+ "kubaos-git",
  "kubaos-idle",
  "kubaos-launches",
  "kubaos-phone",
@@ -2156,6 +2157,7 @@ version = "0.1.0"
 dependencies = [
  "flate2",
  "kubaos-core",
+ "kubaos-git",
  "serde_json",
  "sha2",
  "tempfile",
@@ -2198,6 +2200,7 @@ dependencies = [
  "clap",
  "kubaos-core",
  "kubaos-cursor",
+ "kubaos-git",
  "kubaos-user-layer",
  "rustix 1.1.5",
  "serde",
@@ -2227,6 +2230,7 @@ name = "kubaos-core"
 version = "0.1.0"
 dependencies = [
  "kubaos-core",
+ "kubaos-git",
  "kubaos-phone",
  "kubaos-user-layer",
  "serde",
@@ -2243,6 +2247,7 @@ version = "0.1.0"
 dependencies = [
  "jiff",
  "kubaos-clock",
+ "kubaos-core",
  "serde",
  "serde_json",
  "tempfile",
@@ -2282,7 +2287,9 @@ dependencies = [
 name = "kubaos-design"
 version = "0.1.0"
 dependencies = [
+ "kubaos-core",
  "kubaos-geometry",
+ "kubaos-git",
  "kubaos-tokens",
  "serde",
  "serde_json",
@@ -2307,6 +2314,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "kubaos-git"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]
@@ -2371,6 +2385,7 @@ name = "kubaos-power"
 version = "0.1.0"
 dependencies = [
  "jiff",
+ "kubaos-core",
  "kubaos-user-layer",
  "log",
  "rustix 1.1.5",
@@ -2416,6 +2431,7 @@ dependencies = [
 name = "kubaos-sysmon"
 version = "0.1.0"
 dependencies = [
+ "kubaos-core",
  "kubaos-user-layer",
  "rustix 1.1.5",
  "serde",

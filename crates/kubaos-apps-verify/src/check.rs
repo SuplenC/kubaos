@@ -381,7 +381,8 @@ fn nix(root: &Path, packages: &[String], row: &mut Report<'_>) {
     for package in packages {
         for (_, system) in ARCHES {
             let subject = format!("{package} ({system})");
-            let output = Command::new("nix")
+            // Nix reads the checkout's flake from git.
+            let output = kubaos_git::clear(&mut Command::new("nix"))
                 .args(["eval", "--json", "--impure", "--inputs-from"])
                 .arg(root)
                 .arg(format!("nixpkgs#legacyPackages.{system}.{package}"))

@@ -1,18 +1,10 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use kubaos_design::baseline;
 
 fn git(dir: &Path, args: &[&str]) {
-    let status = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(["-c", "user.name=test", "-c", "user.email=test@example.com"])
-        .args(args)
-        .status()
-        .expect("run git");
-    assert!(status.success(), "git {args:?}");
+    kubaos_core::sandbox::git(dir, args);
 }
 
 #[test]

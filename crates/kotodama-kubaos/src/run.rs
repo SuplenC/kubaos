@@ -99,86 +99,113 @@ pub struct Programs;
 
 impl Runner for Programs {
     fn output(&self, argv: &[String]) -> Result<String, RunError> {
-        let Some((program, rest)) = argv.split_first() else {
-            return Err(RunError::start("")(io::Error::from(io::ErrorKind::InvalidInput)));
-        };
-        let output = Command::new(program)
-            .args(rest)
-            .stdin(Stdio::null())
-            .output()
-            .map_err(RunError::start(program))?;
-        if output.status.success() {
-            return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
-        }
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let said = stderr.lines().rev().find(|line| !line.trim().is_empty());
-        Err(RunError::Failed {
-            program: program.clone(),
-            stderr: said.map_or_else(|| output.status.to_string(), |line| line.trim().to_owned()),
-        })
+        output(argv, |_| {})
     }
 
     fn launch(&self, argv: &[String], delay: Duration) -> Result<(), RunError> {
         if delay.is_zero() {
             return launch::launch(argv, None).map_err(RunError::Launch);
         }
-        let argv = argv.to_vec();
-        let program = argv.first().cloned().unwrap_or_default();
-        thread::Builder::new()
-            .name("delayed".into())
-            .stack_size(DELAY_STACK)
-            .spawn(move || {
-                thread::sleep(delay);
-                if let Err(err) = launch::launch(&argv, None) {
-                    log!("{}", Chain(&err));
-                }
-            })
-            .map(drop)
-            .map_err(RunError::start(&program))
+        launch_after(argv, delay, |argv| launch::launch(argv, None))
     }
 
     fn background(&self, argv: &[String], line: OnLine, ended: OnEnd) -> Result<(), RunError> {
-        let Some((program, rest)) = argv.split_first() else {
-            return Err(RunError::start("")(io::Error::from(io::ErrorKind::InvalidInput)));
-        };
-        let start = RunError::start(program);
-        let (reader, writer) = io::pipe().map_err(RunError::start(program))?;
-        let stderr = writer.try_clone().map_err(RunError::start(program))?;
-        let mut mark = writer.try_clone().map_err(RunError::start(program))?;
-        // A group of its own, so a signal to the Extension's group, such as Ctrl+C in the
-        // terminal a Daemon runs in, doesn't stop an install halfway. The Daemon itself kills
-        // only the Extension's own process, so the install outlives it: its writes to the closed
-        // output then fail, which `kubaos app --json` ignores, and the run goes on to its end.
-        let mut child = Command::new(program)
-            .args(rest)
-            .stdin(Stdio::null())
-            .stdout(writer)
-            .stderr(stderr)
-            .process_group(0)
-            .spawn()
-            .map_err(start)?;
-        let (exited, exit) = mpsc::channel();
-        thread::Builder::new()
-            .name("background-output".into())
-            .stack_size(DELAY_STACK)
-            .spawn(move || {
-                follow(reader, line);
-                ended(exit.recv().unwrap_or(false));
-            })
-            .map_err(RunError::start(program))?;
-        thread::Builder::new()
-            .name("background".into())
-            .stack_size(DELAY_STACK)
-            .spawn(move || {
-                let succeeded = child.wait().is_ok_and(|status| status.success());
-                let _ = exited.send(succeeded);
-                // Behind everything the program wrote, as a pipe keeps its order. Once the
-                // output thread stopped, it is closed and the write fails, harmlessly.
-                let _ = mark.write_all(END_MARK);
-            })
-            .map(drop)
-            .map_err(RunError::start(program))
+        background(argv, line, ended, |_| {})
     }
+}
+
+/// Runs `argv`, as `prepare` leaves its command, until it exits: [`Runner::output`].
+fn output(argv: &[String], prepare: impl FnOnce(&mut Command)) -> Result<String, RunError> {
+    let Some((program, rest)) = argv.split_first() else {
+        return Err(RunError::start("")(io::Error::from(io::ErrorKind::InvalidInput)));
+    };
+    let mut command = Command::new(program);
+    // What it starts (`kubaos`, a Suite's scaffolder) may run git.
+    kubaos_git::clear(&mut command);
+    prepare(&mut command);
+    let output = command
+        .args(rest)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(RunError::start(program))?;
+    if output.status.success() {
+        return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let said = stderr.lines().rev().find(|line| !line.trim().is_empty());
+    Err(RunError::Failed {
+        program: program.clone(),
+        stderr: said.map_or_else(|| output.status.to_string(), |line| line.trim().to_owned()),
+    })
+}
+
+/// Starts `argv` with `start` once `delay` has passed, on a thread of its own: [`Runner::launch`]
+/// with a delay.
+fn launch_after(
+    argv: &[String],
+    delay: Duration,
+    start: impl FnOnce(&[String]) -> io::Result<()> + Send + 'static,
+) -> Result<(), RunError> {
+    let argv = argv.to_vec();
+    let program = argv.first().cloned().unwrap_or_default();
+    thread::Builder::new()
+        .name("delayed".into())
+        .stack_size(DELAY_STACK)
+        .spawn(move || {
+            thread::sleep(delay);
+            if let Err(err) = start(&argv) {
+                log!("{}", Chain(&err));
+            }
+        })
+        .map(drop)
+        .map_err(RunError::start(&program))
+}
+
+/// Starts `argv`, as `prepare` leaves its command, and follows it: [`Runner::background`].
+fn background(argv: &[String], line: OnLine, ended: OnEnd, prepare: impl FnOnce(&mut Command)) -> Result<(), RunError> {
+    let Some((program, rest)) = argv.split_first() else {
+        return Err(RunError::start("")(io::Error::from(io::ErrorKind::InvalidInput)));
+    };
+    let start = RunError::start(program);
+    let (reader, writer) = io::pipe().map_err(RunError::start(program))?;
+    let stderr = writer.try_clone().map_err(RunError::start(program))?;
+    let mut mark = writer.try_clone().map_err(RunError::start(program))?;
+    let mut command = Command::new(program);
+    kubaos_git::clear(&mut command);
+    prepare(&mut command);
+    // A group of its own, so a signal to the Extension's group, such as Ctrl+C in the
+    // terminal a Daemon runs in, doesn't stop an install halfway. The Daemon itself kills
+    // only the Extension's own process, so the install outlives it: its writes to the closed
+    // output then fail, which `kubaos app --json` ignores, and the run goes on to its end.
+    let mut child = command
+        .args(rest)
+        .stdin(Stdio::null())
+        .stdout(writer)
+        .stderr(stderr)
+        .process_group(0)
+        .spawn()
+        .map_err(start)?;
+    let (exited, exit) = mpsc::channel();
+    thread::Builder::new()
+        .name("background-output".into())
+        .stack_size(DELAY_STACK)
+        .spawn(move || {
+            follow(reader, line);
+            ended(exit.recv().unwrap_or(false));
+        })
+        .map_err(RunError::start(program))?;
+    thread::Builder::new()
+        .name("background".into())
+        .stack_size(DELAY_STACK)
+        .spawn(move || {
+            let succeeded = child.wait().is_ok_and(|status| status.success());
+            let _ = exited.send(succeeded);
+            // Behind everything the program wrote, as a pipe keeps its order. Once the
+            // output thread stopped, it is closed and the write fails, harmlessly.
+            let _ = mark.write_all(END_MARK);
+        })
+        .map(drop)
+        .map_err(RunError::start(program))
 }
 
 /// Passes each line of `output` that isn't blank to `line`, decoded lossily and cut to

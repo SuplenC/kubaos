@@ -25,7 +25,6 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::process::Stdio;
 
 use serde::Deserialize;
@@ -377,7 +376,8 @@ impl LicenseCheck {
         }
         let argv = self.argv(&asked);
         let program = self.program.to_string_lossy().into_owned();
-        let out = Command::new(&argv[0])
+        // Nix reads the user flake, which may be a git checkout.
+        let out = crate::started::command(&argv[0])
             .args(&argv[1..])
             .stdin(Stdio::null())
             .output()

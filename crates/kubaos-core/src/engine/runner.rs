@@ -190,6 +190,8 @@ impl SystemRunner {
 
     fn command(cmd: &Cmd) -> Command {
         let mut c = Command::new(&cmd.program);
+        // git among them, in the target too, which must find the repository it is given.
+        kubaos_git::clear(&mut c);
         c.args(&cmd.args);
         for (k, v) in &cmd.env {
             c.env(k, v);

@@ -33,7 +33,6 @@ use std::collections::BTreeSet;
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::process::ExitCode;
 use std::thread;
 
@@ -166,9 +165,7 @@ fn run(args: &Args) -> Result<Vec<Row>, Usage> {
 /// The apps whose folder changed since the merge base with `base`, and those taking packages from
 /// a vendor repository whose pin or sources file changed.
 fn changed<'a>(root: &Path, base: &str, catalog: &'a Catalog) -> Result<Vec<&'a Folder>, Usage> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
+    let output = kubaos_git::at(root)
         .args(["diff", "--name-only", &format!("{base}...HEAD"), "--"])
         .output()
         .map_err(|e| Usage(format!("running git: {e}")))?;

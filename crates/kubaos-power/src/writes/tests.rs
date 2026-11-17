@@ -121,15 +121,9 @@ fn panel_power_saving_off_writes_zero_in_the_savers() {
 /// Runs the root helper on `root`'s fake `/sys`, as the service runs it under pkexec; its exit
 /// status and what it said on stderr.
 fn helper(root: &FakeRoot, args: &[String]) -> (bool, String) {
-    let script = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../system/files/power/kubaos-power-write"
-    );
-    let output = std::process::Command::new("bash")
-        .arg(script)
+    let output = root
+        .helper(&root.sandbox())
         .args(args)
-        .env("KUBAOS_POWER_ROOT", root.dir.path())
-        .env_remove("PKEXEC_UID")
         .output()
         .expect("run the helper");
     (
@@ -242,17 +236,8 @@ fn the_helper_refuses_what_isnt_a_knob_or_a_value_and_still_writes_the_rest() {
 #[test]
 fn the_helper_without_arguments_is_a_usage_error() {
     let root = FakeRoot::laptop();
-    let script = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../system/files/power/kubaos-power-write"
-    );
 
-    let status = std::process::Command::new("bash")
-        .arg(script)
-        .env("KUBAOS_POWER_ROOT", root.dir.path())
-        .output()
-        .expect("run the helper")
-        .status;
+    let status = root.helper(&root.sandbox()).output().expect("run the helper").status;
 
     assert_eq!(status.code(), Some(2));
 }
@@ -327,15 +312,10 @@ fn a_knob_the_helper_cant_read_fails_alone_and_the_rest_are_written() {
 #[test]
 fn the_helper_names_the_knobs_it_couldnt_set_on_stdout() {
     let root = FakeRoot::laptop();
-    let script = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../system/files/power/kubaos-power-write"
-    );
 
-    let output = std::process::Command::new("bash")
-        .arg(script)
+    let output = root
+        .helper(&root.sandbox())
         .args(["aspm=turbo", "gpu-dpm=card1:low", "fans=max"])
-        .env("KUBAOS_POWER_ROOT", root.dir.path())
         .output()
         .expect("run the helper");
 
@@ -368,14 +348,9 @@ fn a_refused_knob_is_left_alone_until_the_stop_changes() {
 /// Runs the root helper's `--sleep-safe` on `root`'s fake `/sys`, as systemd-sleep's hook does
 /// before a suspend; whether it exited 0, and its stdout.
 fn sleep_safe(root: &FakeRoot) -> (bool, String) {
-    let script = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../system/files/power/kubaos-power-write"
-    );
-    let output = std::process::Command::new("bash")
-        .arg(script)
+    let output = root
+        .helper(&root.sandbox())
         .arg("--sleep-safe")
-        .env("KUBAOS_POWER_ROOT", root.dir.path())
         .output()
         .expect("run the helper");
     (

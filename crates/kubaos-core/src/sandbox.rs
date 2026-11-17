@@ -10,11 +10,15 @@
 //! reaches for one fails, loudly, rather than run the real one. The session and system buses
 //! point at a socket that isn't there, and `XDG_RUNTIME_DIR` is a folder of the sandbox's own,
 //! so even a program called by its full path finds no user manager, logind or polkit to talk to.
-//! `HOME` and the `XDG_*` folders are the test's.
+//! `HOME` and the `XDG_*` folders are the test's. None of git's variables gets in, so a git a
+//! test runs, there or from the code it tests, finds the repository it is given and never the
+//! one the tests run in (`git rebase --exec` sets `GIT_DIR` for its command, and a test's
+//! `git init` once re-initialised the developer's checkout as a bare repository).
 //!
 //! # Owns
 //!
-//! - [`Sandbox`], the stand-ins ([`STUBBED`]) and the tools ([`TOOLS`]).
+//! - [`Sandbox`], the stand-ins ([`STUBBED`]) and the tools ([`TOOLS`]), and [`output`] and
+//!   [`git`], a one-off command in a sandbox of its own.
 //!
 //! # Not here
 //!
@@ -28,6 +32,7 @@ use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::process::Output;
 use std::process::Stdio;
 
 /// A D-Bus address with no bus behind it, for the session's and the system's.
@@ -183,9 +188,8 @@ impl Sandbox {
         fs::set_permissions(sandbox.runtime(), fs::Permissions::from_mode(0o700))
             .expect("make the runtime folder its owner's");
         fs::write(sandbox.log(), "").expect("start the stand-ins' log");
-        let real = env::var_os("PATH").unwrap_or_default();
         for tool in TOOLS {
-            if let Some(found) = env::split_paths(&real).map(|dir| dir.join(tool)).find(|p| p.is_file()) {
+            if let Some(found) = real_tool(tool) {
                 symlink(found, sandbox.bin().join(tool)).expect("link a tool into the sandbox");
             }
         }
@@ -237,6 +241,45 @@ impl Sandbox {
         )
         .expect("write a stand-in");
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("make a stand-in run");
+    }
+
+    /// `name`, the real program on this process's `PATH`, linked into the sandbox in place of any
+    /// stand-in, for a test that needs a tool beyond [`TOOLS`]: `git` for a fixture repository,
+    /// `ssh-keygen` for a signing key, `openssl` for a certificate.
+    ///
+    /// # Panics
+    ///
+    /// When there's no such program, or it can't be linked.
+    pub fn link(&self, name: &str) {
+        let real = env::var_os("PATH").unwrap_or_default();
+        let found = env::split_paths(&real)
+            .map(|dir| dir.join(name))
+            .find(|p| p.is_file())
+            .unwrap_or_else(|| panic!("{name} isn't on PATH"));
+        let path = self.bin().join(name);
+        if fs::read_link(&path).is_ok_and(|to| to == found) {
+            return;
+        }
+        let _ = fs::remove_file(&path);
+        symlink(found, path).expect("link a program into the sandbox");
+    }
+
+    /// `git -C dir` in the sandbox, as a test's fixture repository wants it: a test identity, no
+    /// signing unless the test asks, `main` for the first branch and no system-wide
+    /// configuration. git and `ssh-keygen`, which makes and checks SSH signatures, are linked in.
+    #[must_use]
+    pub fn git(&self, dir: &Path) -> Command {
+        self.link("git");
+        self.link("ssh-keygen");
+        let mut command = self.command("git");
+        command
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .arg("-C")
+            .arg(dir)
+            .args(["-c", "user.name=t", "-c", "user.email=t@kubaos"])
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
+            .args(["-c", "init.defaultBranch=main"]);
+        command
     }
 
     /// `name` taken out of the sandbox, not found, as on a machine without it.
@@ -292,6 +335,67 @@ impl Sandbox {
             .env("DBUS_SYSTEM_BUS_ADDRESS", NOWHERE)
             .stdin(Stdio::null())
     }
+}
+
+/// The shell a script's `#!/bin/sh` runs, which the sandbox's `sh` is too: Ubuntu's is dash,
+/// a dev shell's `PATH` puts bash first, and the two differ (a `command -v` that finds nothing
+/// exits 127 in dash, 1 in bash), so a test's `sh -c` would depend on the shell it ran from.
+const SYSTEM_SHELL: &str = "/bin/sh";
+
+/// `tool` as the real `PATH` finds it; `sh` is [`SYSTEM_SHELL`] where the machine has one.
+fn real_tool(tool: &str) -> Option<PathBuf> {
+    if tool == "sh" && Path::new(SYSTEM_SHELL).is_file() {
+        return Some(PathBuf::from(SYSTEM_SHELL));
+    }
+    let real = env::var_os("PATH").unwrap_or_default();
+    env::split_paths(&real).map(|dir| dir.join(tool)).find(|p| p.is_file())
+}
+
+/// `program` with `args`, run to its end in a sandbox of its own that lasts the call, for a test's
+/// one-off command: `tar` to pack an archive, `id` for the user's name. A `program` beyond
+/// [`TOOLS`] is linked in ([`Sandbox::link`]).
+///
+/// # Panics
+///
+/// When the sandbox can't be made, or `program` can't start.
+pub fn output<I, S>(program: &str, args: I) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let dir = tempfile::tempdir().expect("a folder for the sandbox");
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+    if !program.contains('/') && !sandbox.bin().join(program).exists() {
+        sandbox.link(program);
+    }
+    sandbox
+        .command(program)
+        .args(args)
+        .output()
+        .unwrap_or_else(|e| panic!("run {program}: {e}"))
+}
+
+/// `git -C dir` with `args` ([`Sandbox::git`]), run to its end in a sandbox of its own that lasts
+/// the call: the trimmed stdout.
+///
+/// # Panics
+///
+/// When git can't start or fails.
+pub fn git(dir: &Path, args: &[&str]) -> String {
+    let sandbox_dir = tempfile::tempdir().expect("a folder for the sandbox");
+    let sandbox = Sandbox::new(
+        &sandbox_dir.path().join("sandbox"),
+        &sandbox_dir.path().join("home"),
+        "tester",
+    );
+    let out = sandbox.git(dir).args(args).output().expect("run git");
+    assert!(
+        out.status.success(),
+        "git {args:?} in {}: {}",
+        dir.display(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8_lossy(&out.stdout).trim().to_owned()
 }
 
 #[cfg(test)]

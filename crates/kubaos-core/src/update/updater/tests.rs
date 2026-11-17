@@ -4,7 +4,6 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 
@@ -12,6 +11,7 @@ use super::Confirm;
 use super::UpdateError;
 use super::UpdateOptions;
 use super::Updater;
+use crate::sandbox::Sandbox;
 use crate::state::Paths;
 use crate::update::event;
 use crate::update::event::Outcome;
@@ -41,10 +41,13 @@ struct Ran {
     stderr: String,
 }
 
-/// Runs git, bash and sh for real, as this user even for root commands; answers the rest from
-/// `canned`, and records every command. A command whose line starts with one of `failing` fails.
-/// sudo's password is stale until the first `authenticate` when `password_stale` is set.
+/// Runs git, bash and sh for real in a sandbox, as this user even for root commands; answers the
+/// rest from `canned`, and records every command. A command whose line starts with one of `failing`
+/// fails. sudo's password is stale until the first `authenticate` when `password_stale` is set.
 struct Fake {
+    /// Where git, bash and sh run, with git and `ssh-keygen` linked in.
+    sandbox: Sandbox,
+    _sandbox_dir: tempfile::TempDir,
     ran: Vec<String>,
     canned: BTreeMap<&'static str, Result<String, ()>>,
     failing: Vec<&'static str>,
@@ -210,7 +213,13 @@ impl FakeDpkg {
 
 impl Fake {
     fn new() -> Self {
+        let dir = tempfile::tempdir().expect("a folder for the sandbox");
+        let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+        sandbox.link("git");
+        sandbox.link("ssh-keygen");
         Self {
+            sandbox,
+            _sandbox_dir: dir,
             ran: Vec::new(),
             canned: BTreeMap::from([
                 ("dpkg", Ok("amd64\n".to_owned())),
@@ -256,8 +265,8 @@ impl Fake {
         self.ran.iter().filter(|line| line.starts_with(prefix)).count()
     }
 
-    fn exec(cmd: &Cmd) -> Result<Ran, MachineError> {
-        let mut command = Command::new(&cmd.argv()[0]);
+    fn exec(&self, cmd: &Cmd) -> Result<Ran, MachineError> {
+        let mut command = self.sandbox.command(&cmd.argv()[0]);
         command.args(&cmd.argv()[1..]);
         command.envs(cmd.vars().iter().map(|(k, v)| (k, v)));
         if let Some(dir) = cmd.dir() {
@@ -324,7 +333,7 @@ impl Fake {
             return Ok(canned(out));
         }
         Ok(match cmd.program().as_str() {
-            "git" | "bash" | "sh" => Self::exec(cmd)?,
+            "git" | "bash" | "sh" => self.exec(cmd)?,
             program => match self.canned.get(program) {
                 Some(Ok(out)) => canned(out.clone()),
                 Some(Err(())) => Ran {

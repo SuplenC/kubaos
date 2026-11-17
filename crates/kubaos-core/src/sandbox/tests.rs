@@ -93,9 +93,21 @@ fn a_command_taken_out_is_not_found() {
     let (_dir, sandbox) = sandbox();
     sandbox.without("nix");
 
-    let (code, _, _) = sh(&sandbox, "command -v nix");
+    let (found, shown, _) = sh(&sandbox, "command -v nix");
+    let (ran, _, err) = sh(&sandbox, "nix --version");
 
-    assert_eq!(code, Some(1));
+    assert_ne!(found, Some(0));
+    assert_eq!(shown, "");
+    assert_eq!(ran, Some(127), "{err}");
+}
+
+#[test]
+fn the_sandboxs_shell_is_the_one_a_scripts_shebang_runs() {
+    let (_dir, sandbox) = sandbox();
+
+    let linked = fs::read_link(sandbox.bin().join("sh")).unwrap();
+
+    assert_eq!(linked, Path::new(SYSTEM_SHELL));
 }
 
 #[test]
@@ -136,4 +148,35 @@ fn a_program_called_by_its_full_path_finds_no_user_manager_and_no_logind() {
         assert!(!output.status.success(), "{name} reached its manager: {out}");
         assert!(out.trim().is_empty(), "{name} answered: {out}");
     }
+}
+
+#[test]
+fn none_of_gits_variables_gets_into_the_sandbox() {
+    let (_dir, sandbox) = sandbox();
+
+    let (_, shown, _) = sh(&sandbox, "env");
+
+    let git: Vec<&str> = shown.lines().filter(|l| l.starts_with("GIT_")).collect();
+    assert!(git.is_empty(), "{git:?}");
+}
+
+#[test]
+fn git_in_the_sandbox_works_on_the_repository_it_is_given() {
+    let (dir, sandbox) = sandbox();
+    let repo = dir.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+
+    let init = sandbox.git(&repo).args(["init", "-q"]).status().unwrap();
+    let top = git(&repo, &["rev-parse", "--show-toplevel"]);
+
+    assert!(init.success());
+    assert_eq!(PathBuf::from(top), repo.canonicalize().unwrap());
+}
+
+#[test]
+fn a_program_beyond_the_tools_is_linked_in_for_a_one_off_command() {
+    let out = output("git", ["--version"]);
+
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).starts_with("git version"));
 }
