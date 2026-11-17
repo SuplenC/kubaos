@@ -1,8 +1,11 @@
 # Ollama's server, as KubaOS runs it: a user of its own made as it starts (DynamicUser), its
 # models and keys in its state folder, /var/lib/ollama, and nothing else of the machine writable,
 # the homes hidden. It answers on this machine alone. The render and video groups open the GPUs
-# (/dev/dri, AMD's /dev/kfd); NVIDIA's devices are open to everyone. The program is the version's
-# own folder's, so a release rewrites this file, which restarts the server on the new version.
+# (/dev/dri, AMD's /dev/kfd); NVIDIA's devices are open to everyone. CUDA makes a missing
+# /dev/nvidia-uvm through the setuid nvidia-modprobe, which the server's user can't gain, so it is
+# made first, as root (`+`); without NVIDIA's driver it fails, and `-` lets the server start
+# anyway. The program is the version's own folder's, so a release rewrites this file, which
+# restarts the server on the new version.
 
 [Unit]
 Description=Ollama
@@ -10,6 +13,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+ExecStartPre=-+/usr/bin/nvidia-modprobe -u -c=0
 ExecStart=/opt/ollama/@VERSION@/bin/ollama serve
 DynamicUser=yes
 StateDirectory=ollama
