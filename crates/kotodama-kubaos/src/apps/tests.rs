@@ -1122,3 +1122,60 @@ fn no_install_or_remove_item_of_the_catalog_ranks_above_opening_ghostty() {
         );
     }
 }
+
+/// The shipped Tor Browser alone, on an amd64 machine, installed in `setup` when one is named.
+fn tor_browser(setup: Option<&str>) -> Apps {
+    let dir = tempfile::tempdir().unwrap();
+    let shipped = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/tor-browser");
+    let folder = dir.path().join("apps/tor-browser");
+    fs::create_dir_all(&folder).unwrap();
+    for entry in fs::read_dir(&shipped).unwrap() {
+        let entry = entry.unwrap();
+        fs::copy(entry.path(), folder.join(entry.file_name())).unwrap();
+    }
+    let catalog = Catalog::load(&dir.path().join("apps")).unwrap();
+    let journals = dir.path().join("journals");
+    let mut installed = Vec::new();
+    if let Some(setup) = setup {
+        installed_journal(&journals, "tor-browser", Some(setup));
+        installed.push("torbrowser-launcher=0.3.9");
+    }
+    let dpkg = Dpkg::parse(&dpkg_with(&installed));
+    Apps::new(
+        &Status::read(
+            &catalog,
+            &Picks::default(),
+            &journals,
+            &journals.join("root"),
+            Platform::new("amd64", Unfree::Allowed),
+            Some(&dpkg),
+        )
+        .unwrap(),
+    )
+}
+
+#[test]
+fn tor_browser_asks_x11_or_wayland_with_x11_first_and_switches_either_way() {
+    let fresh = tor_browser(None);
+    assert_eq!(
+        ids(&fresh),
+        ["app-install:tor-browser:anonymity", "app-install:tor-browser:wayland"]
+    );
+    assert_eq!(
+        item(&fresh, "app-install:tor-browser:anonymity").title,
+        "Install Tor Browser"
+    );
+    assert_eq!(
+        item(&fresh, "app-install:tor-browser:wayland").title,
+        "Install Tor Browser on Wayland"
+    );
+
+    assert_eq!(
+        ids(&tor_browser(Some("anonymity"))),
+        ["app-remove:tor-browser", "app-install:tor-browser:wayland"]
+    );
+    assert_eq!(
+        ids(&tor_browser(Some("wayland"))),
+        ["app-remove:tor-browser", "app-install:tor-browser:anonymity"]
+    );
+}

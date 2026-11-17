@@ -20,6 +20,8 @@ An app's icon is, in this order: Colloid's, the system's icon theme, named by th
 
 Every app with a Wayland backend comes up on it, never on XWayland (`docs/CONTRACTS.md`, "The Apps catalog", "Wayland"). The session's hints put almost all of them there. Spotify ignores them, so it gets a menu entry of KubaOS's, with the package's id, that starts it with `DISPLAY` unset. A removal takes the entry away. A menu entry of your own at `~/.local/share/applications/spotify.desktop` is never written over: Spotify's install stops and names it, and so does every update. Delete or rename your entry, then run `kubaos update`.
 
+Tor Browser asks which you want, X11 or Wayland: `kubaos app add tor-browser --setup anonymity` or `--setup wayland`, and an Install Item for each in the Command menu. The Tor Project keeps Tor Browser on X11 by default, because it hasn't yet worked out what Wayland gives away to a site fingerprinting you, and a privacy default is yours to set, so KubaOS doesn't set one. X11, "Tor Browser", is the Tor Project's pick: your Tor Browser looks like everyone else's, and it's soft when the screen is scaled. Wayland, "Tor Browser on Wayland", is sharp at any scale. The X11 setup writes the launcher's two menu entries, with the package's ids, to start it with `MOZ_ENABLE_WAYLAND=0`, which Tor Browser reads before `GDK_BACKEND`; switching to Wayland or removing Tor Browser takes them away. A menu entry of your own at either path stops the X11 setup, as Spotify's does. `torbrowser-launcher` started from a terminal takes the terminal's environment, which is the session's: Wayland, unless you set `MOZ_ENABLE_WAYLAND=0` yourself.
+
 These run on XWayland:
 
 | App | Why |

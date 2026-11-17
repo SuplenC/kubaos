@@ -1,0 +1,41 @@
+# torbrowser-launcher's own entry, MIT (Tor Project), word for word but for Exec, which starts
+# Tor Browser on X11 (app.toml).
+# https://gitlab.torproject.org/tpo/applications/torbrowser-launcher
+[Desktop Entry]
+Name=Tor Browser
+Name[ar]=متصفح تور
+Name[be]=Tor Browser
+Name[cs]=Prohlížeč Tor
+Name[da]=Tor Browser
+Name[es]=Navegador Tor
+Name[hr]=Tor preglednik
+Name[hu]=Tor-böngésző
+Name[pt_BR]=Navegador Tor
+Name[sv]=Tor Browser
+Name[tr]=Tor Browser
+GenericName=Tor Browser
+GenericName[ar]=متصفح تور
+GenericName[be]=Tor Browser
+GenericName[cs]=Prohlížeč Tor
+GenericName[da]=Tor Browser
+GenericName[es]=Navegador Tor
+GenericName[hr]=Tor preglednik
+GenericName[hu]=Tor böngésző indító
+GenericName[tr]=Tor Browser
+Comment=Launch Tor Browser
+Comment[ar]=شغّل متصفح تور
+Comment[be]=Запуск Tor Browser
+Comment[cs]=Spustit Prohlížeč Tor
+Comment[da]=Start Tor Browser
+Comment[es]=Iniciar Navegador Tor
+Comment[hr]=Pokreni Tor preglednika
+Comment[hu]=Tor böngésző indító
+Comment[pt_BR]=Navegador Tor
+Comment[sv]=Starta Tor Browser
+Comment[tr]=Tor Browser Başlat
+Exec=env MOZ_ENABLE_WAYLAND=0 torbrowser-launcher %u
+Terminal=false
+Type=Application
+Icon=org.torproject.torbrowser-launcher
+Categories=Network;WebBrowser;
+StartupWMClass=Tor Browser

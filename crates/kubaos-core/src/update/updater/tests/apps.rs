@@ -1326,19 +1326,20 @@ fn firefox_takes_the_place_of_ubuntus_snap_firefox_and_goes_whole() {
 #[test]
 fn tor_browser_brave_and_chromium_install_and_go_whole() {
     let w = world();
+    // Tor Browser asks which display server; the others come one way.
     let browsers = [
-        ("tor-browser", "torbrowser-launcher"),
-        ("brave", "brave"),
-        ("chromium", "chromium"),
+        ("tor-browser", "torbrowser-launcher", Some("anonymity")),
+        ("brave", "brave", None),
+        ("chromium", "chromium", None),
     ];
-    for (id, _) in browsers {
+    for (id, ..) in browsers {
         with_app(&w, id);
     }
     let mut m = fake(&w, &[]);
     let there = |m: &Fake, package: &str| has(m, package) || host(m).state.borrow().nix.contains(package);
 
-    for (id, package) in browsers {
-        w.updater(&mut m).add_apps(&names(&[id]), None).unwrap();
+    for (id, package, setup) in browsers {
+        w.updater(&mut m).add_apps(&names(&[id]), setup).unwrap();
 
         assert!(there(&m, package), "{id}");
         assert!(user_journal(&w, id).is_some_and(|j| j.complete), "{id}");
@@ -1352,12 +1353,78 @@ fn tor_browser_brave_and_chromium_install_and_go_whole() {
             .is_superset(&names(&["brave", "chromium"]).into_iter().collect())
     );
 
-    for (id, package) in browsers {
+    for (id, package, _) in browsers {
         w.updater(&mut m).remove_apps(&names(&[id])).unwrap();
 
         assert!(!there(&m, package), "{id}");
         assert!(user_journal(&w, id).is_none() && root_journal(&w, id).is_none(), "{id}");
     }
+}
+
+/// The release's user migration whose name ends in `-<slug>.sh`.
+fn user_migration(slug: &str) -> PathBuf {
+    fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations/user"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.to_string_lossy().ends_with(&format!("-{slug}.sh")))
+        .unwrap_or_else(|| panic!("no user migration {slug}"))
+}
+
+#[test]
+fn a_tor_browser_picked_before_its_setups_is_put_on_x11_by_its_migration_and_the_next_update() {
+    let w = world();
+    with_app(&w, "tor-browser");
+    let mut m = fake(&w, &[]);
+    // What an install from before the setups left: the launcher's package, a complete journal
+    // naming no setup and the app picked with none.
+    w.updater(&mut m)
+        .add_apps(&names(&["tor-browser"]), Some("wayland"))
+        .unwrap();
+    let journal = w.user.app_journals().join("tor-browser/journal.toml");
+    let text = fs::read_to_string(&journal).unwrap();
+    let mut unset: Vec<&str> = text.lines().filter(|l| !l.starts_with("setup = ")).collect();
+    unset.push("");
+    fs::write(&journal, unset.join("\n")).unwrap();
+    let mut picks = Picks::default();
+    picks.add("tor-browser");
+    picks.write(&w.user.app_picks()).unwrap();
+    assert!(user_journal(&w, "tor-browser").is_some_and(|j| j.complete && j.setup.is_none()));
+
+    let sandbox = sandbox::Sandbox::new(&w.tmp.path().join("sandbox"), w.user.home(), "kuba");
+    let out = sandbox
+        .command("bash")
+        .args(["-euo", "pipefail"])
+        .arg(user_migration("tor-browser-setup"))
+        .env("KUBAOS_DIR", Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("KUBAOS_BACKUPS", w.tmp.path().join("backups"))
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let mut events = Vec::new();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(
+        !warnings(&events).iter().any(|w| w.contains("tor-browser")),
+        "{:?}",
+        warnings(&events)
+    );
+    let home = host(&m).home().to_path_buf();
+    let entry = home.join(".local/share/applications/org.torproject.torbrowser-launcher.desktop");
+    let text = fs::read_to_string(&entry).unwrap();
+    assert!(
+        text.lines()
+            .any(|l| l == "Exec=env MOZ_ENABLE_WAYLAND=0 torbrowser-launcher %u"),
+        "{text}"
+    );
+    assert!(
+        home.join(".local/share/applications/org.torproject.torbrowser-launcher.settings.desktop")
+            .is_file()
+    );
+    assert_eq!(
+        user_journal(&w, "tor-browser").unwrap().setup.as_deref(),
+        Some("anonymity")
+    );
+    assert!(has(&m, "torbrowser-launcher"));
 }
 
 /// A sandbox where `curl` saves the URL it is given as the key it downloads, failing for a URL
