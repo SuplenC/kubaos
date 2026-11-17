@@ -66,6 +66,8 @@ in
           pkgs.qt6.qtsvg
         ];
         NIXPKGS_QT6_QML_IMPORT_PATH = "${pkgs.qt6.qtdeclarative}/lib/qt-6/qml";
+        # The IconTile test reads the initials kubaos-ui's tests share from the checkout.
+        QML_XHR_ALLOW_FILE_READ = "1";
       }
       ''
         export HOME=$(mktemp -d)

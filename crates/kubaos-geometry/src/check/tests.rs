@@ -256,6 +256,60 @@ fn a_label_lower_in_one_button_than_another_is_not_identical() {
     assert_eq!(rules_broken(&[frame("dark", 1.0, root)]), [Rule::Identical]);
 }
 
+/// The rules broken by two `name`s of `variant` 32 square, each with a label of `words`,
+/// `width` wide at `x`.
+fn two_labelled(name: &str, variant: &str, labels: [(&str, f32, f32); 2]) -> Vec<Rule> {
+    let tile = |y: f32, (words, x, width): (&str, f32, f32)| {
+        with(
+            Node::new(
+                Role::Component {
+                    name: name.to_owned(),
+                    variant: variant.to_owned(),
+                    fixed: Fixed::BOTH,
+                },
+                rect(0.0, y, 32.0, 32.0),
+            ),
+            vec![text(words, Size { width, height: 20.0 }, rect(x, y + 6.0, width, 20.0))],
+        )
+    };
+    let [first, second] = labels;
+    let root = stack(
+        8.0,
+        Align::Start,
+        rect(0.0, 0.0, 32.0, 72.0),
+        vec![tile(0.0, first), tile(40.0, second)],
+    );
+    rules_broken(&[frame("dark", 1.0, root)])
+}
+
+#[test]
+fn letters_of_two_widths_centred_on_one_tile_are_identical() {
+    let broken = two_labelled("IconTile", "Sm initials", [("B", 11.0, 10.0), ("L", 12.0, 9.0)]);
+
+    assert_eq!(broken, [] as [Rule; 0]);
+}
+
+#[test]
+fn a_letter_off_the_centre_of_one_tile_is_not_identical() {
+    let broken = two_labelled("IconTile", "Sm initials", [("B", 11.0, 10.0), ("L", 13.0, 9.0)]);
+
+    assert_eq!(broken, [Rule::Identical]);
+}
+
+#[test]
+fn a_left_aligned_label_that_drifts_a_pixel_with_its_width_is_not_identical() {
+    let broken = two_labelled("Dialog", "", [("B", 11.0, 10.0), ("L", 12.0, 9.0)]);
+
+    assert_eq!(broken, [Rule::Identical]);
+}
+
+#[test]
+fn an_initial_with_no_words_places_nothing_to_compare() {
+    let broken = two_labelled("IconTile", "Sm initials", [("B", 11.0, 10.0), ("", 0.0, 0.0)]);
+
+    assert_eq!(broken, [] as [Rule; 0]);
+}
+
 #[test]
 fn text_wider_than_its_box_is_clipped() {
     let root = text(

@@ -210,14 +210,17 @@ fn an_apps_tags_find_its_install_item_and_never_its_removal() {
 }
 
 #[test]
-fn the_icon_is_the_folders_or_a_generic_one() {
+fn the_icon_is_the_folders_or_the_app_s_initial() {
     let apps = apps(&[]);
 
     assert_eq!(
         item(&apps, "app-install:google-chrome").icon.as_deref(),
         Some("google-chrome")
     );
-    assert_eq!(item(&apps, "app-install:claude-code").icon.as_deref(), Some(ICON));
+    assert_eq!(
+        item(&apps, "app-install:claude-code").icon.as_deref(),
+        Some("initial:Claude Code")
+    );
 }
 
 #[test]

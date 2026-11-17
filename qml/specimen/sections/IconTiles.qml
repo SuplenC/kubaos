@@ -6,57 +6,90 @@ import "samples.js" as Samples
 // `crates/kubaos-specimen/src/pages/components/icon_tiles.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Icon tiles and badges"
-    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner, the accent's for something unread."
+    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner, the accent's for something unread. Last, the initial of an app that names no symbol, at each size."
 
-    K.Row {
-        gap: K.Tokens.space.s24
-        align: "centre"
+    K.Stack {
+        gap: K.Tokens.space.s16
 
-        K.IconTile {
-            icon: "terminal"
-            size: "Sm"
+        K.Row {
+            gap: K.Tokens.space.s24
+            align: "centre"
+
+            K.IconTile {
+                icon: "terminal"
+                size: "Sm"
+            }
+
+            K.IconTile {
+                icon: "terminal"
+            }
+
+            K.IconTile {
+                icon: "terminal"
+                size: "Lg"
+            }
+
+            K.IconTile {
+                photo: Samples.picture(K.Tokens.color.primary, K.Tokens.color.cold)
+            }
+
+            K.IconTile {
+                icon: "warning"
+                danger: true
+            }
+
+            K.Badge {
+                count: 3
+            }
+
+            K.Badge {
+                count: 128
+            }
+
+            K.Badge {
+            }
+
+            K.Badge {
+                accent: true
+            }
+
+            Badged {
+                icon: "notifications"
+                count: 3
+            }
+
+            Badged {
+                icon: "system_update_alt"
+            }
         }
 
-        K.IconTile {
-            icon: "terminal"
-        }
+        // The initial of an app that names no symbol, at each size: a round capital, a square
+        // one, a lowercase one and an ideograph, as the mockup's IconTile page names them.
+        K.Row {
+            gap: K.Tokens.space.s24
+            align: "centre"
 
-        K.IconTile {
-            icon: "terminal"
-            size: "Lg"
-        }
+            Repeater {
+                model: {
+                    const tiles = [];
+                    for (const size of ["Sm", "Md", "Lg"]) {
+                        for (const name of ["Blender", "LM Studio", "k9s", "日本語入力"])
+                            tiles.push({
+                                size,
+                                name
+                            });
+                    }
+                    return tiles;
+                }
 
-        K.IconTile {
-            photo: Samples.picture(K.Tokens.color.primary, K.Tokens.color.cold)
-        }
+                K.IconTile {
+                    required property var modelData
 
-        K.IconTile {
-            icon: "warning"
-            danger: true
-        }
-
-        K.Badge {
-            count: 3
-        }
-
-        K.Badge {
-            count: 128
-        }
-
-        K.Badge {
-        }
-
-        K.Badge {
-            accent: true
-        }
-
-        Badged {
-            icon: "notifications"
-            count: 3
-        }
-
-        Badged {
-            icon: "system_update_alt"
+                    icon: ""
+                    name: modelData.name
+                    size: modelData.size
+                }
+            }
         }
     }
 

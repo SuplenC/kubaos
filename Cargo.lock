@@ -2494,6 +2494,7 @@ dependencies = [
  "iced_test",
  "kubaos-geometry",
  "kubaos-tokens",
+ "unicode-segmentation",
 ]
 
 [[package]]

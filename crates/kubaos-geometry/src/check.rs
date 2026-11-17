@@ -69,6 +69,9 @@ struct Part {
     y: Option<i64>,
     width: Option<i64>,
     height: i64,
+    /// A text's middle from the component's left edge, doubled so a half pixel is whole, when the
+    /// component fixes its width: a text centred across sits there whatever its words' width.
+    middle: Option<i64>,
 }
 
 struct Walk<'a> {
@@ -486,8 +489,10 @@ fn parts(node: &Node, fixed: Fixed, scale: f32) -> Vec<Part> {
                 y: y_of(n.bounds),
                 width: Some(device(n.bounds.width)),
                 height: device(n.bounds.height),
+                middle: None,
             }),
-            Role::Text { .. } if !text_seen => {
+            // A text with no words (an initial of an empty name) draws nothing to place.
+            Role::Text { ref content, .. } if !text_seen && !content.is_empty() => {
                 text_seen = true;
                 found.push(Part {
                     what: "text",
@@ -495,6 +500,9 @@ fn parts(node: &Node, fixed: Fixed, scale: f32) -> Vec<Part> {
                     y: y_of(n.bounds),
                     width: None,
                     height: device(n.bounds.height),
+                    middle: fixed
+                        .width
+                        .then(|| 2 * device(n.bounds.x - b.x) + device(n.bounds.width)),
                 });
             }
             _ => {}
@@ -535,7 +543,7 @@ fn identical(instances: &[Instance], findings: &mut Vec<Finding>) {
                 .find(|other| same_scale(other.scale, instance.scale))
                 .unwrap_or(&first);
             // A card or a page holds whatever the app puts in it, so its parts are the content's.
-            if !first.fixed.holds && !same_parts(&instance.parts, &reference.parts) {
+            if !first.fixed.holds && !same_parts(&instance.parts, &reference.parts, centred_label(&first.variant)) {
                 differences.push(format!(
                     "places its parts at {}, where {} has {}",
                     describe(&instance.parts),
@@ -583,14 +591,28 @@ fn describe(parts: &[Part]) -> String {
     }
 }
 
+/// Whether a variant's label is centred across whatever its width: an icon tile's initial, the
+/// one such label, named by the variant word `initials`.
+fn centred_label(variant: &str) -> bool {
+    variant.split(' ').any(|word| word == "initials")
+}
+
+/// Whether two texts sit alike: at one x, or, in a component whose label is `centred` across, with
+/// their middles within half a device pixel, as an icon tile's initial is, whatever the letter.
+fn same_text(a: &Part, b: &Part, centred: bool) -> bool {
+    let middles = || centred && a.middle.zip(b.middle).is_some_and(|(m, n)| (m - n).abs() <= 1);
+    (a.x == b.x || middles()) && a.y == b.y && a.height == b.height
+}
+
 /// Whether two instances place their parts alike. What an instance shows is its content's to
 /// decide (a ticked checkbox has a tick, an empty one none), so labels are compared when both have
 /// one, and icons when both have as many.
-fn same_parts(a: &[Part], b: &[Part]) -> bool {
+fn same_parts(a: &[Part], b: &[Part], centred: bool) -> bool {
     let of = |parts: &[Part], what: &str| parts.iter().filter(|p| p.what == what).cloned().collect::<Vec<_>>();
     let (text_a, text_b) = (of(a, "text"), of(b, "text"));
     let (icons_a, icons_b) = (of(a, "icon"), of(b, "icon"));
-    let texts_alike = text_a.is_empty() || text_b.is_empty() || text_a == text_b;
+    let texts_alike =
+        text_a.is_empty() || text_b.is_empty() || text_a.iter().zip(&text_b).all(|(a, b)| same_text(a, b, centred));
     let icons_alike = icons_a.len() != icons_b.len() || icons_a == icons_b;
     texts_alike && icons_alike
 }

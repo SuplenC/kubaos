@@ -1,16 +1,30 @@
+use std::borrow::Cow;
+
 use iced::Element;
+use iced::Pixels;
 use iced::Rectangle;
+use iced::Renderer;
 use iced::Size;
+use iced::advanced::graphics::text::font_system;
+use iced::advanced::renderer::Headless;
 use iced::widget;
 use iced::widget::image;
+use iced_runtime::UserInterface;
+use iced_runtime::user_interface;
 use iced_test::selector;
 use iced_test::simulator::Simulator;
+use kubaos_geometry::Node;
+use kubaos_geometry::Role;
 
 use super::TileSize;
 use super::icon_tile;
+use super::initial::initial;
+use super::initial_tile;
 use crate::icon::Icon;
 use crate::look::Look;
+use crate::probe::Collect;
 use crate::scale::Scale;
+use crate::tokens;
 use crate::tokens::Mode;
 
 fn settings() -> iced::Settings {
@@ -52,6 +66,125 @@ fn a_tile_is_its_size_square_whatever_it_shows() {
             );
             assert_eq!(symbol, app, "{scale:?} {size:?}");
             assert_eq!(symbol, photo, "{scale:?} {size:?}");
+        }
+    }
+}
+
+/// `view`'s geometry tree, laid out headless.
+fn tree(view: Element<'_, ()>) -> Node {
+    {
+        let mut system = font_system().write().expect("font system lock poisoned");
+        for font in crate::text::FONTS {
+            system.load_font(Cow::Borrowed(*font));
+        }
+    }
+    let mut renderer = iced::futures::executor::block_on(<Renderer as Headless>::new(
+        crate::text::default_font(),
+        Pixels(f32::from(tokens::Type::Body.size())),
+        Some("tiny-skia"),
+    ))
+    .expect("the tiny-skia renderer");
+    let mut ui = UserInterface::build(
+        view,
+        Size::new(400.0, 400.0),
+        user_interface::Cache::default(),
+        &mut renderer,
+    );
+    let mut collect = Collect::new();
+    ui.operate(&renderer, &mut collect);
+    collect.into_tree().expect("the view reports boxes")
+}
+
+/// The first text in `node`, and the node it is in.
+fn letter(node: &Node) -> Option<&Node> {
+    if matches!(node.role, Role::Text { .. }) {
+        return Some(node);
+    }
+    node.children.iter().find_map(letter)
+}
+
+/// The names and initials both libraries' tests check, a line each: the name, a tab, the initial.
+const INITIALS: &str = include_str!("initials.tsv");
+
+#[test]
+fn an_initial_is_the_first_character_of_the_name_upper_cased() {
+    let cases: Vec<(&str, &str)> = INITIALS
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| line.split_once('\t').expect("a name and its initial"))
+        .collect();
+
+    assert!(cases.len() > 10, "{cases:?}");
+    for (name, expected) in cases {
+        assert_eq!(initial(name), expected, "{name:?}");
+    }
+}
+
+#[test]
+fn an_empty_name_still_shows_initials_with_no_letter() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+
+    let tile = tree(initial_tile("  ", TileSize::Sm).view(&look));
+
+    assert!(
+        matches!(&tile.role, Role::Component { variant, .. } if variant == "Sm initials"),
+        "{:?}",
+        tile.role
+    );
+    assert!(letter(&tile).is_none(), "{tile:?}");
+}
+
+#[test]
+fn a_kana_or_kanji_initial_is_drawn_in_the_japanese_family() {
+    assert!(super::initial::japanese("日"));
+    assert!(super::initial::japanese("ｶ"));
+    assert!(super::initial::japanese("\u{20b9f}"));
+    assert!(!super::initial::japanese("B"));
+    assert!(!super::initial::japanese("हि"));
+}
+
+#[test]
+fn an_initial_tile_says_it_shows_initials() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+
+    let tile = tree(initial_tile("Blender", TileSize::Md).view(&look));
+
+    assert!(
+        matches!(&tile.role, Role::Component { name, variant, .. } if name == "IconTile" && variant == "Md initials"),
+        "{:?}",
+        tile.role
+    );
+}
+
+#[test]
+fn an_initial_sits_centred_on_whole_device_pixels_its_line_tall() {
+    for scale in Scale::SUPPORTED {
+        let look = Look::new(Mode::Dark, scale);
+        for size in TileSize::ALL {
+            for name in ["Blender", "LM Studio", "k9s", "日本語入力"] {
+                let tile = tree(initial_tile(name, size).view(&look));
+                let found = letter(&tile).expect("the initial");
+                let (inside, at) = (found.bounds, tile.bounds);
+                let device = |v: f32| v * scale.factor();
+                let whole = |v: f32| (device(v) - device(v).round()).abs() < 1e-3;
+
+                assert!(
+                    whole(inside.x - at.x) && whole(inside.y - at.y),
+                    "{scale:?} {size:?} {name}: {inside:?}"
+                );
+                assert!(whole(inside.width), "{scale:?} {size:?} {name}: {inside:?}");
+                assert!(
+                    (inside.height - f32::from(size.initial().line())).abs() < 1e-3,
+                    "{scale:?} {size:?} {name}: {inside:?}"
+                );
+                let left = device(inside.x - at.x);
+                let right = device(at.x + at.width - inside.x - inside.width);
+                let odd = left - right;
+                assert!(
+                    odd.abs() < 1e-3 || (odd - 1.0).abs() < 1e-3,
+                    "{scale:?} {size:?} {name}: {left} {right}"
+                );
+            }
         }
     }
 }

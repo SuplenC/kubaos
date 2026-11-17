@@ -24,6 +24,8 @@ iced = { version = "0.14", default-features = false, features = [
   "image",
   "advanced",
 ] }
+# An app's initial on its icon tile is the first grapheme of its name, whatever its script.
+unicode-segmentation = "1"
 
 [dev-dependencies]
 # Lays views out headlessly, so the layout primitives' boxes can be measured.

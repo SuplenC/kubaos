@@ -359,7 +359,7 @@ Everything a person sees is built from a few levels, each made only from the one
 
 ### What the geometry check compares
 
-Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is row. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
+Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is row. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them; the one exception is the `initials` variant, whose letter is centred across whatever its width, so its middle, not its left edge, is held to within half a device pixel. A text with no words places nothing. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
 
 <!-- variants:start -->
 | Name | Variant words | Fixed | Corner |
@@ -367,7 +367,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Button` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg`; `leading-icon` or `trailing-icon` | height | control |
 | `IconButton` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg` | both | full |
 | `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`, `Warning`, `Filled`; `icon`; `removable` | height | control |
-| `IconTile` | size `Sm`, `Md`, `Lg` | both | control |
+| `IconTile` | size `Sm`, `Md`, `Lg`; `initials` | both | control |
 | `Badge` | `count` or `dot`; `accent` | height | full |
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |
 | `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | row, nested 8 in a content box |

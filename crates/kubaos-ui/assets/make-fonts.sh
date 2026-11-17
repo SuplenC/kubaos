@@ -22,7 +22,7 @@ geist_sha256=70f42c1452fb6df12ea183e20a65999157354f91d11dac18b4c713e383808ec2
 
 # Every Japanese character an app shows: Kōbō's accents, then the specimen's.
 jp="ようこそ言語と入力時間帯接続アカウントディスク署名確認インストール中完了失敗初期設定壁紙"
-jp+="書体間隔色部品動き記号見本"
+jp+="書体間隔色部品動き記号見本日"
 
 curl -fsSL -o "$tmp/geist.zip" "$geist_url"
 echo "$geist_sha256  $tmp/geist.zip" | sha256sum -c --quiet
