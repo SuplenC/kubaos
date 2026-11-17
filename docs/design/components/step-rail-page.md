@@ -26,4 +26,4 @@ A step rail beside a page with a footer band, and how it moves between its pages
 
 **Keys:** Enter is the page's `Filled` action; Esc goes back a page; ↑ ↓ (k j) move between the rail's pressable steps and Space opens one; Tab goes rail, page, Back, Skip, Continue. A page arriving puts the keyboard on its first thing to do, or where the page says it lands (Kōbō's Last look, on the hold). A page's body can go on as Continue does: Enter on the row of its list that is already its answer goes on, where the first Enter on another row picks it.
 
-*Not built yet: neither library has the template; Kōbō draws its rail, panel and footer by hand (`crates/kubaos-kobo/src/view.rs`), and the updater doesn't exist.*
+*Not built yet: neither library has the template; Kōbō draws its rail, panel and footer by hand (`crates/kubaos-kobo/src/view/chrome.rs`), and the updater doesn't exist.*

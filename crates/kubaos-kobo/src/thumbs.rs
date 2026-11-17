@@ -9,7 +9,8 @@
 //! # Not here
 //!
 //! Making the payload's thumbnails (`install/image/lib/assemble.sh`), running the decode off the
-//! UI thread (`app.rs`, `load_thumbs`), drawing them (`view.rs`, `wallpapers`).
+//! UI thread (`app/wallpapers.rs`, `load_thumbs`), drawing them (`view/wallpapers.rs`,
+//! `wallpapers`).
 
 use std::path::Path;
 use std::path::PathBuf;

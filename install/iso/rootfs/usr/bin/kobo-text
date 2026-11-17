@@ -33,7 +33,7 @@ toml_str() { # a TOML basic string
 }
 
 # done_line SECONDS: the Done line, its quip picked by the time the install took. The
-# same buckets as `done_line` in crates/kubaos-kobo/src/view.rs.
+# same buckets as `done_line` in crates/kubaos-kobo/src/view/done.rs.
 done_line() {
   local s=$1 quip
   if ((s < 120)); then
