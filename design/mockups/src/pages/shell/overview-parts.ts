@@ -777,8 +777,21 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (element.hasAttribute("data-lifted") || element.hasAttribute("data-landing")) return;
       setTile(element, rect, motion);
       element.toggleAttribute("data-focused", win === focused);
+      // A badge needs room round it: a miniature window narrower than four of its tiles, or shorter
+      // than three, shows its app by its contents alone.
+      const side = L("size-control_sm");
+      element.toggleAttribute("data-cramped", rect.w * slotScale(id) < 4 * side || rect.h * slotScale(id) < 3 * side);
     });
     if (landing.parentElement === made.desk && !(carry?.kind === "window" && carry.target?.kind === "space" && carry.target.space === id)) delete landing.dataset.shown;
+  }
+
+  /** The scale workspace `id`'s miniature is drawn at. */
+  function slotScale(id: string): number {
+    for (const each of views) {
+      const slot = each.layout.spaces.get(id);
+      if (slot) return slot.s;
+    }
+    return 1;
   }
 
   function setTile(element: HTMLElement, rect: model.Rect, motion: Motion): void {
@@ -1547,6 +1560,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const start = centreOf({ space: pin.space });
     liftSpace(pin.space, start);
     moveCarry(pointOf(pin.to));
+    // Drawn over the room it would take, a little short of it, as a hand holds it there.
+    const holder = views.find((each) => each.layout.room);
+    const slot = holder?.layout.room;
+    if (holder && slot && carry) {
+      const at = { x: holder.at.x + slot.x + slot.w / 2 - L("space-s24"), y: holder.at.y + slot.y + slot.h / 2 - L("space-s24") };
+      carry.element.style.setProperty("--ov-x", css(at.x - carry.grab.x));
+      carry.element.style.setProperty("--ov-y", css(at.y - carry.grab.y));
+    }
     settle();
   }
 

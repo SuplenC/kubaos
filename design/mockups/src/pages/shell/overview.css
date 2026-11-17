@@ -237,7 +237,7 @@
   box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
 }
 
-.ov-ws:is([data-lifted], [data-landing]) > .ov-ws-tag {
+.ov-ws:is([data-lifted], [data-landing], [data-gone]) > .ov-ws-tag {
   opacity: 0;
 }
 
@@ -329,6 +329,10 @@
   bottom: var(--space-s16);
   transform-origin: 0 100%;
   scale: var(--ov-badge, 1);
+}
+
+.ov-win[data-cramped] > .ov-badge {
+  display: none;
 }
 
 /* Where a carried window would tile on the workspace below it. */

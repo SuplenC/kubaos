@@ -227,17 +227,28 @@
   stroke-width: var(--thin);
 }
 
+/* The ring is the accent on a Text or Tonal button, as the tube it stands in for; on a fill it is the
+   label's colour, which keeps its contrast on the fill, so a Danger button's ring shows on its red. */
 .k-hold-track {
-  stroke: rgb(from var(--color-primary) r g b / var(--opacity-spinner_track));
+  stroke: rgb(from var(--hold-ink) r g b / var(--opacity-spinner_track));
+}
+
+.k-hold-ring {
+  --hold-ink: var(--label, var(--color-primary));
+}
+
+.k-button[data-kind="Text"] > .k-hold-ring,
+.k-button[data-kind="Tonal"] > .k-hold-ring {
+  --hold-ink: color-mix(in srgb, var(--color-primary), var(--color-primary_core) calc((1 - var(--day)) * 100%));
 }
 
 .k-hold-arc {
-  stroke: color-mix(in srgb, var(--color-primary), var(--color-primary_core) calc((1 - var(--day)) * 100%));
+  stroke: var(--hold-ink);
   stroke-linecap: round;
   stroke-dasharray: calc(360 * var(--hold, 0)) 360;
   transform-origin: 50% 50%;
   transform: rotate(-90deg);
-  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--hold-ink) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
 }
 
 .k-icon-slot {
