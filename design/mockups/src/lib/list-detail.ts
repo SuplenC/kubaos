@@ -1,7 +1,7 @@
 // The ListDetail template: a list beside the detail of its selected row
 // (`docs/design/components/list-detail.md`), as its two builds draw it today: the Command menu
 // (`config/quickshell/modules/menu/Menu.qml`), a panel of the shell sized by its screen, and Kōbō's
-// first-boot setup (`crates/kubaos-kobo/src/setup/view.rs`), an app's window. Its look is
+// first-boot setup (`crates/kubaos-kobo/src/setup/view/`), an app's window. Its look is
 // `list-detail.css`.
 
 import "./list-detail.css";
