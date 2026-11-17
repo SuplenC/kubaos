@@ -122,6 +122,9 @@ export function tabs(options: TabsOptions): HTMLElement {
     words.style.color = "var(--words)";
     const glyph = choice.icon ? iconInLine(choice.icon, "button_small", "var(--words)") : null;
     const content = row("s4", "start", ...(glyph ? [glyph, words] : [words]));
+    // What the stylesheet centres the words by: the text's advance, and the symbol with its gap.
+    each.style.setProperty("--words", words.style.getPropertyValue("--natural"));
+    if (glyph) each.style.setProperty("--glyph", "calc(var(--type-button_small-icon) + var(--space-s4))");
     content.classList.add("k-tab-words");
     each.append(content);
     if (choice.tip) {

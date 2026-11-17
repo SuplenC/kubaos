@@ -2305,12 +2305,19 @@
 
 /* The choices share the well equally, their words centred, so the last one ends at the well's own
    end. Each share is whole device pixels, the spare ones one each to the first choices, as
-   `kubaos-ui`'s grid splits a width (`grid::weighted`). */
+   `kubaos-ui`'s grid splits a width (`grid::weighted`). The words start on a whole device pixel,
+   the odd one after them, as `kubaos_ui::snap::centre` places a box: their width is the text's,
+   rounded up as `.k-text` draws it, and the symbol's with its gap (`--glyph`). */
 .k-tabs > .k-tab {
   --share: round(down, calc(100% / var(--count)), 1px);
   flex: none;
   width: calc(var(--share) + clamp(0px, 100% - var(--share) * var(--count) - var(--index) * 1px, 1px));
-  justify-content: center;
+  justify-content: flex-start;
+}
+
+.k-tabs > .k-tab > .k-tab-words {
+  --content: calc(round(up, calc(var(--words) * var(--px) - 0.001px), 1px) + var(--glyph, 0px));
+  margin-left: max(0px, round(down, calc((100% - var(--content)) / 2), 1px));
 }
 
 .k-tab[aria-selected="true"] {
