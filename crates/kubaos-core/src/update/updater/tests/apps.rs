@@ -1326,19 +1326,20 @@ fn firefox_takes_the_place_of_ubuntus_snap_firefox_and_goes_whole() {
 #[test]
 fn tor_browser_brave_and_chromium_install_and_go_whole() {
     let w = world();
+    // Tor Browser asks which display server; the others come one way.
     let browsers = [
-        ("tor-browser", "torbrowser-launcher"),
-        ("brave", "brave"),
-        ("chromium", "chromium"),
+        ("tor-browser", "torbrowser-launcher", Some("anonymity")),
+        ("brave", "brave", None),
+        ("chromium", "chromium", None),
     ];
-    for (id, _) in browsers {
+    for (id, ..) in browsers {
         with_app(&w, id);
     }
     let mut m = fake(&w, &[]);
     let there = |m: &Fake, package: &str| has(m, package) || host(m).state.borrow().nix.contains(package);
 
-    for (id, package) in browsers {
-        w.updater(&mut m).add_apps(&names(&[id]), None).unwrap();
+    for (id, package, setup) in browsers {
+        w.updater(&mut m).add_apps(&names(&[id]), setup).unwrap();
 
         assert!(there(&m, package), "{id}");
         assert!(user_journal(&w, id).is_some_and(|j| j.complete), "{id}");
@@ -1352,7 +1353,7 @@ fn tor_browser_brave_and_chromium_install_and_go_whole() {
             .is_superset(&names(&["brave", "chromium"]).into_iter().collect())
     );
 
-    for (id, package) in browsers {
+    for (id, package, _) in browsers {
         w.updater(&mut m).remove_apps(&names(&[id])).unwrap();
 
         assert!(!there(&m, package), "{id}");

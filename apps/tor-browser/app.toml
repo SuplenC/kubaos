@@ -3,6 +3,20 @@
 # Project wants it to be. The browser it downloads lives in the home, with its profile. The Tor
 # Project builds Tor Browser for x86-64 Linux alone, and Ubuntu builds the launcher for amd64 alone.
 # https://gitlab.torproject.org/tpo/applications/torbrowser-launcher
+#
+# Tor Browser draws on X11 by default, where Firefox would pick Wayland: the Tor Project hasn't
+# yet worked out what Wayland gives away to fingerprinting, so it is the user's pick, X11 or
+# Wayland, and neither is the default.
+# https://gitlab.torproject.org/tpo/applications/tor-browser/-/issues/43092
+#
+# With XWayland's DISPLAY set, its Firefox picks Wayland only when MOZ_ENABLE_WAYLAND says 1, or,
+# with that unset, when GDK_BACKEND starts with "wayland", as the session's does;
+# MOZ_ENABLE_WAYLAND=0 wins over both (IsWaylandEnabled in toolkit/xre/nsAppRunner.cpp). The launcher and start-tor-browser pass their
+# environment through to it, so the X11 setup's menu entries, with the ids of the package's own so
+# they take their place, start the launcher with MOZ_ENABLE_WAYLAND=0. The Wayland setup is the
+# session's MOZ_ENABLE_WAYLAND=1, and needs nothing more.
+# https://gitlab.torproject.org/tpo/applications/tor-browser/-/merge_requests/1144
+# https://gitlab.torproject.org/tpo/applications/tor-browser-build/-/blob/main/projects/browser/RelativeLink/start-browser
 name = "Tor Browser"
 category = "browsers"
 tags = ["browser", "web", "internet", "tor", "privacy", "anonymity"]
@@ -26,3 +40,23 @@ name = "Install Tor Browser's launcher"
 kind = "apt"
 arch = "amd64"
 packages = ["torbrowser-launcher"]
+
+[setup.anonymity]
+name = "Tor Browser"
+summary = "On X11, as the Tor Project ships it: soft when scaled, and one more face in the crowd"
+
+[[setup.anonymity.action]]
+name = "Start Tor Browser on X11"
+kind = "file"
+to = "~/.local/share/applications/org.torproject.torbrowser-launcher.desktop"
+from = "org.torproject.torbrowser-launcher.desktop"
+
+[[setup.anonymity.action]]
+name = "Start Tor Browser on X11 from the launcher's settings"
+kind = "file"
+to = "~/.local/share/applications/org.torproject.torbrowser-launcher.settings.desktop"
+from = "org.torproject.torbrowser-launcher.settings.desktop"
+
+[setup.wayland]
+name = "Tor Browser on Wayland"
+summary = "Sharp at any scale, but the Tor Project hasn't cleared Wayland against fingerprinting"
