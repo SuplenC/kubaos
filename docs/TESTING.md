@@ -283,6 +283,15 @@ It reads the network only: it never installs anything and reads no apt, dpkg or 
 
 `just shellcheck` (`test/shellcheck/check`) lints every shell script git tracks under `apps/`, `scripts/`, `system/`, `migrations/`, `test/`, `config/`, `home/suites/`, `crates/self-imports` and `.claude/hooks/` (a `.sh`, or a file with a bash or sh shebang), with `-x`. A warning or an error fails it; info and style notes are listed. The dev shell has shellcheck; `just check`, CI's `shellcheck` job and the e2e harness's `shellcheck` check run it.
 
+## Tests and the machine
+
+The workspace's tests run on the developer's machine, inside their session and inside the repository they work in, so no test may reach either. Every process a test starts runs in a sandbox (`kubaos_core::sandbox`; `docs/agents/code-quality.md`, Rust "Tests"): a `PATH` of stand-ins that log their calls for systemd, logind, apt, sudo, T3, Docker and the rest, and links to harmless tools; no session or system bus and a runtime folder of its own, so no user manager either; the test's home; and none of git's variables. A test makes no unit in the session's user manager, writes nothing in the real home, and runs git only on the fixture repositories it made.
+
+Two checks keep it so, both in `just nextest`:
+
+- **No unsandboxed process in test code.** `crates/kubaos-core/tests/sandboxed.rs` reads every `tests.rs`, file under a `tests/` folder, fake and fixture of the workspace, and fails on a `Command::new` without an `// Outside the sandbox: …` comment just above it saying why.
+- **A decoy repository.** `just nextest` runs nextest through `test/git-decoy`, which gives every test binary `GIT_DIR` pointing at a throwaway repository, as `git rebase --exec` gives its command the repository being rebased. A test's git that isn't sandboxed, or a git KubaOS runs without clearing git's variables (`kubaos_git`), acts on the decoy instead of the repository it was given; the run fails if anything in the decoy changed, and says what, even when every test passed. Only the test binaries get the variable, as cargo's target runner; cargo and the build scripts don't.
+
 ## Narrowing the tests
 
 `just nextest` passes its arguments to `cargo nextest run` and adds `--workspace` only when none names a package: `just nextest -p kubaos-core` builds and runs that crate alone, `just nextest -E 'test(apps)'` filters the whole workspace's.

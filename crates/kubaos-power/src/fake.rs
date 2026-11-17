@@ -2,7 +2,9 @@
 //! laptop's knobs in it, each of which a test can take away.
 
 use std::fs;
+use std::process::Command;
 
+use kubaos_core::sandbox::Sandbox;
 use tempfile::TempDir;
 
 use crate::machine::Machine;
@@ -114,6 +116,25 @@ impl FakeRoot {
 
     pub fn path(&self, relative: &str) -> std::path::PathBuf {
         self.dir.path().join(relative)
+    }
+
+    /// A sandbox for the root helper to run in, in a folder of this machine's own.
+    pub fn sandbox(&self) -> Sandbox {
+        let place = tempfile::tempdir_in(self.dir.path())
+            .expect("a folder for the sandbox")
+            .keep();
+        Sandbox::new(&place.join("sandbox"), &place.join("home"), "root")
+    }
+
+    /// The root helper, `kubaos-power-write` run by bash in `sandbox`, on this machine.
+    pub fn helper(&self, sandbox: &Sandbox) -> Command {
+        let script = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../system/files/power/kubaos-power-write"
+        );
+        let mut command = sandbox.command("bash");
+        command.arg(script).env("KUBAOS_POWER_ROOT", self.dir.path());
+        command
     }
 
     pub fn write(&self, relative: &str, text: &str) {

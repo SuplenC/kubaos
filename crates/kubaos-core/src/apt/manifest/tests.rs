@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
+use std::ffi::OsStr;
 use std::path::PathBuf;
-use std::process::Command;
 
 use super::Inactive;
 use super::MANIFEST;
@@ -217,12 +217,16 @@ fn rust_dump(manifest: &Manifest) -> BTreeSet<String> {
 /// The scripts' awk reader's dump of `path`.
 fn shell_dump(path: &std::path::Path) -> BTreeSet<String> {
     let lib = repo_root().join("system/manifest.sh");
-    let out = Command::new("bash")
-        .args(["-c", "source \"$1\"; manifest_dump \"$2\"", "bash"])
-        .arg(&lib)
-        .arg(path)
-        .output()
-        .expect("run bash");
+    let out = crate::sandbox::output(
+        "bash",
+        [
+            OsStr::new("-c"),
+            OsStr::new("source \"$1\"; manifest_dump \"$2\""),
+            OsStr::new("bash"),
+            lib.as_os_str(),
+            path.as_os_str(),
+        ],
+    );
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     String::from_utf8(out.stdout)
         .unwrap()

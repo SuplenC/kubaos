@@ -5,11 +5,11 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 
 use super::Choices;
 use super::Record;
 use super::Switch;
+use crate::sandbox::Sandbox;
 
 const MANIFEST: &str = r#"
 [repo.docker]
@@ -71,9 +71,11 @@ repo_setup() { echo "repo $*" >>"$FAKE/log"; }
 sudo_run() { if [[ $1 == apt-mark ]]; then "$@"; else run "$@" >/dev/null; fi; }
 "#;
 
-/// A folder with the fixture manifest, the fakes' state, and the choices and record files.
+/// A folder with the fixture manifest, the fakes' state, and the choices and record files, and
+/// the sandbox the scripts run in.
 struct Machine {
     dir: tempfile::TempDir,
+    sandbox: Sandbox,
 }
 
 impl Machine {
@@ -85,7 +87,8 @@ impl Machine {
             installed.iter().flat_map(|p| [*p, "\n"]).collect::<String>(),
         )
         .unwrap();
-        Self { dir }
+        let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+        Self { dir, sandbox }
     }
 
     fn path(&self, name: &str) -> PathBuf {
@@ -95,7 +98,9 @@ impl Machine {
     /// Runs `script` after `system/lib.sh` and the fakes, on `arch`.
     fn bash(&self, arch: &str, script: &str) -> String {
         let system = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../system");
-        let out = Command::new("bash")
+        let out = self
+            .sandbox
+            .command("bash")
             .args(["-c", &format!("source \"$SYSTEM/lib.sh\"\n{FAKES}\n{script}")])
             .env("SYSTEM", &system)
             .env("FAKE", self.dir.path())
@@ -252,9 +257,11 @@ fn the_bridge_migration_keeps_what_the_install_left_out_and_installs_the_rest() 
         .map(|e| e.unwrap().path())
         .find(|p| p.to_string_lossy().ends_with("-package-manifest.sh"))
         .expect("the package-manifest migration");
-    let path = format!("{}:{}", bin.display(), std::env::var("PATH").unwrap());
+    let path = format!("{}:{}", bin.display(), m.sandbox.bin().display());
 
-    let out = Command::new("bash")
+    let out = m
+        .sandbox
+        .command("bash")
         .args(["-euo", "pipefail"])
         .arg(&migration)
         .env("PATH", path)

@@ -470,23 +470,15 @@ fn the_state_directory_is_not_a_mention() {
 #[test]
 fn a_suite_file_is_visible_to_git_when_the_flake_is_a_repo() {
     let h = home();
-    let git = |args: &[&str]| {
-        std::process::Command::new("git")
-            .arg("-C")
-            .arg(h.paths.flake())
-            .args(args)
-            .env("GIT_CONFIG_GLOBAL", "/dev/null")
-            .output()
-            .unwrap()
-    };
-    assert!(git(&["init", "-q"]).status.success());
+    let git = |args: &[&str]| crate::sandbox::git(h.paths.flake(), args);
+    git(&["init", "-q"]);
 
     h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
-    let after_add = String::from_utf8(git(&["ls-files"]).stdout).unwrap();
+    let after_add = git(&["ls-files"]);
     h.suites.remove(&DEMO, CachePolicy::Keep).unwrap();
-    let after_remove = String::from_utf8(git(&["ls-files"]).stdout).unwrap();
+    let after_remove = git(&["ls-files"]);
 
-    assert_eq!(after_add, "kubaos.d/suites/demo.toml\n");
+    assert_eq!(after_add, "kubaos.d/suites/demo.toml");
     assert_eq!(after_remove, "");
 }
 

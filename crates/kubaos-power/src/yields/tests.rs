@@ -1,5 +1,7 @@
 use std::fs;
 
+use kubaos_core::sandbox::Sandbox;
+
 use super::*;
 use crate::fake::FakeRoot;
 use crate::machine::NIX_DROP_IN;
@@ -210,10 +212,9 @@ fn sorted(mut pids: Vec<u32>) -> Vec<u32> {
 #[test]
 fn demoting_a_process_puts_it_at_nice_19() {
     let proc = Path::new("/proc");
-    let mut child = std::process::Command::new("sleep")
-        .arg("5")
-        .spawn()
-        .expect("start sleep");
+    let dir = tempfile::tempdir().expect("a folder for the sandbox");
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+    let mut child = sandbox.command("sleep").arg("5").spawn().expect("start sleep");
 
     demote(proc, child.id());
     let after = fs::read_to_string(proc.join(child.id().to_string()).join("stat")).expect("its stat");

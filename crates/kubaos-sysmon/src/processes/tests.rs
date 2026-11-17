@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::Path;
 
+use kubaos_core::sandbox::Sandbox;
+
 use super::Order;
 use super::ProcStat;
 use super::Signal;
@@ -167,10 +169,9 @@ fn init_and_the_monitor_itself_are_never_signalled() {
 
 #[test]
 fn signalling_a_process_ends_it() {
-    let mut child = std::process::Command::new("sleep")
-        .arg("30")
-        .spawn()
-        .expect("start sleep");
+    let dir = tempfile::tempdir().expect("a folder for the sandbox");
+    let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+    let mut child = sandbox.command("sleep").arg("30").spawn().expect("start sleep");
 
     signal(child.id() as i32, Signal::End).expect("end it");
 

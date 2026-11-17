@@ -2245,6 +2245,7 @@ version = "0.1.0"
 dependencies = [
  "jiff",
  "kubaos-clock",
+ "kubaos-core",
  "serde",
  "serde_json",
  "tempfile",
@@ -2284,6 +2285,7 @@ dependencies = [
 name = "kubaos-design"
 version = "0.1.0"
 dependencies = [
+ "kubaos-core",
  "kubaos-geometry",
  "kubaos-git",
  "kubaos-tokens",
@@ -2381,6 +2383,7 @@ name = "kubaos-power"
 version = "0.1.0"
 dependencies = [
  "jiff",
+ "kubaos-core",
  "kubaos-user-layer",
  "log",
  "rustix 1.1.5",
@@ -2426,6 +2429,7 @@ dependencies = [
 name = "kubaos-sysmon"
 version = "0.1.0"
 dependencies = [
+ "kubaos-core",
  "kubaos-user-layer",
  "rustix 1.1.5",
  "serde",

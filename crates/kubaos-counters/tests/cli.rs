@@ -4,13 +4,14 @@
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::Command;
 use std::process::Output;
 
+use kubaos_core::sandbox::Sandbox;
 use tempfile::TempDir;
 
 struct Session {
     dir: TempDir,
+    sandbox: Sandbox,
 }
 
 impl Session {
@@ -28,16 +29,18 @@ impl Session {
             fs::write(&path, script).expect("write a stand-in");
             fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("make it runnable");
         }
-        Session { dir }
+        let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+        Session { dir, sandbox }
     }
 
     fn run(&self, args: &[&str]) -> Output {
         let path = format!(
             "{}:{}",
             self.dir.path().join("bin").display(),
-            std::env::var("PATH").unwrap_or_default()
+            self.sandbox.bin().display()
         );
-        Command::new(env!("CARGO_BIN_EXE_kubaos-counters"))
+        self.sandbox
+            .command(env!("CARGO_BIN_EXE_kubaos-counters"))
             .args(args)
             .env("PATH", path)
             .env("XDG_STATE_HOME", self.dir.path().join("state"))

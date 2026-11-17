@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# test/git-decoy: run the workspace's tests with every test process pointed at
+# a decoy git repository, and fail if anything in the decoy changed.
+# See docs/TESTING.md, "Tests and the machine".
+#
+#   test/git-decoy COMMAND...   run COMMAND (`cargo nextest run …`) so
+#                               that each test binary it starts has GIT_DIR
+#                               set to the decoy's, as `git rebase --exec`
+#                               sets it for its command
+#
+# A test that runs git outside the sandbox (kubaos_core::sandbox), or a git
+# KubaOS runs without clearing git's variables (kubaos_git), acts on the decoy
+# instead of the repository it was given: a `git init` re-initialises it, a
+# `git add` stages into its index. Either changes the decoy, and the run fails
+# naming what changed, even when every test passed.
+#
+# The variables reach the test binaries alone, through cargo's target runner
+# (this script again, with --exec): cargo itself and the build scripts never
+# see them. The script clears any git variables it was started with first.
+set -euo pipefail
+
+die() { printf 'git-decoy: %s\n' "$*" >&2; exit 1; }
+
+if [[ ${1:-} == --exec ]]; then
+  shift
+  [[ -n ${KUBAOS_GIT_DECOY:-} ]] || die "--exec without KUBAOS_GIT_DECOY"
+  touch "$KUBAOS_GIT_DECOY.ran"
+  export GIT_DIR="$KUBAOS_GIT_DECOY/.git"
+  exec "$@"
+fi
+
+(($# > 0)) || die "usage: test/git-decoy COMMAND..."
+
+for name in "${!GIT_@}"; do
+  unset "$name"
+done
+
+parent="$(mktemp -d "${TMPDIR:-/tmp}/kubaos-git-decoy.XXXXXX")"
+trap 'rm -rf "$parent"' EXIT
+decoy="$parent/decoy"
+mkdir "$decoy"
+printf 'decoy\n' >"$decoy/README"
+git -C "$decoy" init -q
+git -C "$decoy" add README
+git -C "$decoy" -c user.name=decoy -c user.email=decoy@kubaos commit -q -m decoy
+
+# Every file and folder with its mode and size, and every file's content.
+snapshot() {
+  (
+    cd "$decoy"
+    find . -printf '%y %m %s %p\n' | LC_ALL=C sort
+    find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
+  )
+}
+before="$(snapshot)"
+
+triple="$(rustc -vV | sed -n 's/^host: //p')"
+[[ -n $triple ]] || die "rustc names no host triple"
+runner="CARGO_TARGET_$(tr 'a-z-' 'A-Z_' <<<"$triple")_RUNNER"
+script="$(realpath "$0")"
+[[ $script != *[[:space:]]* ]] || die "$script has a space in its path, which cargo's runner can't take"
+export "$runner=$script --exec" KUBAOS_GIT_DECOY="$decoy"
+
+status=0
+"$@" || status=$?
+
+[[ -e $decoy.ran ]] || die "no test binary ran through the decoy runner ($runner)"
+after="$(snapshot)"
+if [[ $after != "$before" ]]; then
+  printf 'git-decoy: a test ran git on the repository its environment named (GIT_DIR), not the one it was given. What changed in the decoy:\n' >&2
+  diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") >&2 || true
+  exit 1
+fi
+exit "$status"

@@ -1177,7 +1177,10 @@ fn a_tarball_unpacks_owned_by_whoever_unpacks_it_and_writable_by_no_one_else() {
     const UNDER_UMASK: &str = "KUBAOS_TEST_UNDER_UMASK_002";
     if std::env::var_os(UNDER_UMASK).is_none() {
         let name = module_path!().split_once("::").map_or("", |(_, rest)| rest);
-        let ran = std::process::Command::new("sh")
+        let dir = tempfile::tempdir().unwrap();
+        let sandbox = crate::sandbox::Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
+        let ran = sandbox
+            .command("sh")
             .args(["-c", "umask 002 && exec \"$0\" \"$@\""])
             .arg(std::env::current_exe().unwrap())
             .arg(format!(
@@ -1213,15 +1216,17 @@ amd64 = { url = "https://example.com/runtime.tar.gz", sha256 = "4444444444444444
         fs::set_permissions(src.path().join(path), fs::Permissions::from_mode(mode)).unwrap();
     }
     let archive = src.path().join("runtime.tar.gz");
-    let made = std::process::Command::new("tar")
-        .arg("-czf")
-        .arg(&archive)
-        .arg("-C")
-        .arg(src.path())
-        .arg("pkg")
-        .status()
-        .unwrap();
-    assert!(made.success());
+    let made = crate::sandbox::output(
+        "tar",
+        [
+            std::ffi::OsStr::new("-czf"),
+            archive.as_os_str(),
+            std::ffi::OsStr::new("-C"),
+            src.path().as_os_str(),
+            std::ffi::OsStr::new("pkg"),
+        ],
+    );
+    assert!(made.status.success());
     world.host.state.borrow_mut().downloads.insert(
         "https://example.com/runtime.tar.gz".to_owned(),
         ("4".repeat(64), fs::read(&archive).unwrap()),
@@ -1653,15 +1658,17 @@ fn tarball(text: &str) -> Vec<u8> {
     fs::create_dir_all(src.path().join("bin")).unwrap();
     fs::write(src.path().join("bin/tool"), text).unwrap();
     let archive = src.path().join("tool.tar.gz");
-    let made = std::process::Command::new("tar")
-        .arg("-czf")
-        .arg(&archive)
-        .arg("-C")
-        .arg(src.path())
-        .arg("bin")
-        .status()
-        .unwrap();
-    assert!(made.success());
+    let made = crate::sandbox::output(
+        "tar",
+        [
+            std::ffi::OsStr::new("-czf"),
+            archive.as_os_str(),
+            std::ffi::OsStr::new("-C"),
+            src.path().as_os_str(),
+            std::ffi::OsStr::new("bin"),
+        ],
+    );
+    assert!(made.status.success());
     fs::read(archive).unwrap()
 }
 

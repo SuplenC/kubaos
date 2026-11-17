@@ -1,7 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 use std::sync::Barrier;
 use std::thread;
@@ -190,22 +189,10 @@ fn trying_an_invalid_name_runs_nothing() {
 #[test]
 fn an_added_package_file_is_visible_to_git_when_the_flake_is_a_repo() {
     let tmp = tempfile::tempdir().unwrap();
-    let status = Command::new("git")
-        .args(["init", "-q"])
-        .arg(tmp.path())
-        .env("GIT_CONFIG_GLOBAL", "/dev/null")
-        .status()
-        .unwrap();
-    assert!(status.success());
+    crate::sandbox::git(tmp.path(), &["init", "-q"]);
     let p = packages(tmp.path());
 
     p.add(&["ripgrep"]).unwrap();
 
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(tmp.path())
-        .arg("ls-files")
-        .output()
-        .unwrap();
-    assert_eq!(String::from_utf8(out.stdout).unwrap(), "kubaos.d/packages.toml\n");
+    assert_eq!(crate::sandbox::git(tmp.path(), &["ls-files"]), "kubaos.d/packages.toml");
 }
