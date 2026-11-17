@@ -23,10 +23,13 @@ function glyph(extension) {
 // Extension gives an app with no logo.
 const symbolPrefix = "symbol:";
 
-// The symbol an Item's tile draws: the one its icon names, else its Extension's.
+// The symbol an Item's tile draws: the one its icon names, else its Extension's. A desktop app
+// names none, and its tile shows its initial in a symbol's place, so its symbol is empty.
 function itemGlyph(icon, extension) {
     const named = icon.startsWith(symbolPrefix) ? icon.slice(symbolPrefix.length) : "";
-    return named !== "" ? named : glyph(extension);
+    if (named !== "")
+        return named;
+    return extension === "apps" ? "" : glyph(extension);
 }
 
 // Where an Item's picture is: a path as a file URL, an icon theme's name looked up; none for no

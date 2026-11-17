@@ -6,6 +6,7 @@
 //!   bundled font files ([`FONTS`]).
 //! - [`line`]: one line that ends in an ellipsis where it doesn't fit, for boxes whose height is
 //!   fixed (a list row, a card's name).
+//! - Where text draws its ink ([`ink`]).
 //!
 //! # Not here
 //!
@@ -43,6 +44,8 @@ use crate::probe::probe;
 use crate::tokens::Family;
 use crate::tokens::Type;
 use crate::tokens::Weight;
+
+pub(crate) mod ink;
 
 /// Every font the type styles use, for `iced::Settings::fonts`. An app loads them at
 /// start, so it draws the same on a machine with none installed.

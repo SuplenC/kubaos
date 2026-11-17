@@ -47,11 +47,13 @@ Item {
     height: K.Tokens.size.row_two_line
 
     // Items without a picture of their own show the symbol their icon names, as an app with no
-    // logo does, else their Extension's, as a sum or a bind does.
+    // logo does, else their Extension's, as a sum or a bind does. An app that names no symbol
+    // shows its initial instead, while its picture loads too.
     K.IconTile {
         x: K.Tokens.space.s12
         y: (row.height - K.Tokens.size.control_md) / 2
         icon: Words.itemGlyph(row.icon, row.extension)
+        name: row.title
         source: row.iconSource
         opacity: row.dim
     }

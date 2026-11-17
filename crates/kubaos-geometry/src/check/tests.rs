@@ -256,6 +256,41 @@ fn a_label_lower_in_one_button_than_another_is_not_identical() {
     assert_eq!(rules_broken(&[frame("dark", 1.0, root)]), [Rule::Identical]);
 }
 
+/// The rules broken by two tiles 32 square, each with a letter `width` wide at `x` in it.
+fn two_initials(letters: [(f32, f32); 2]) -> Vec<Rule> {
+    let tile = |y: f32, (x, width): (f32, f32)| {
+        with(
+            Node::new(
+                Role::Component {
+                    name: "IconTile".to_owned(),
+                    variant: "Sm initials".to_owned(),
+                    fixed: Fixed::BOTH,
+                },
+                rect(0.0, y, 32.0, 32.0),
+            ),
+            vec![text("B", Size { width, height: 20.0 }, rect(x, y + 6.0, width, 20.0))],
+        )
+    };
+    let [first, second] = letters;
+    let root = stack(
+        8.0,
+        Align::Start,
+        rect(0.0, 0.0, 32.0, 72.0),
+        vec![tile(0.0, first), tile(40.0, second)],
+    );
+    rules_broken(&[frame("dark", 1.0, root)])
+}
+
+#[test]
+fn letters_of_two_widths_centred_on_one_tile_are_identical() {
+    assert_eq!(two_initials([(11.0, 10.0), (12.0, 9.0)]), [] as [Rule; 0]);
+}
+
+#[test]
+fn a_letter_off_the_centre_of_one_tile_is_not_identical() {
+    assert_eq!(two_initials([(11.0, 10.0), (13.0, 9.0)]), [Rule::Identical]);
+}
+
 #[test]
 fn text_wider_than_its_box_is_clipped() {
     let root = text(

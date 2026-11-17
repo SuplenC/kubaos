@@ -69,6 +69,9 @@ struct Part {
     y: Option<i64>,
     width: Option<i64>,
     height: i64,
+    /// A text's middle from the component's left edge, doubled so a half pixel is whole, when the
+    /// component fixes its width: a text centred across sits there whatever its words' width.
+    middle: Option<i64>,
 }
 
 struct Walk<'a> {
@@ -486,6 +489,7 @@ fn parts(node: &Node, fixed: Fixed, scale: f32) -> Vec<Part> {
                 y: y_of(n.bounds),
                 width: Some(device(n.bounds.width)),
                 height: device(n.bounds.height),
+                middle: None,
             }),
             Role::Text { .. } if !text_seen => {
                 text_seen = true;
@@ -495,6 +499,9 @@ fn parts(node: &Node, fixed: Fixed, scale: f32) -> Vec<Part> {
                     y: y_of(n.bounds),
                     width: None,
                     height: device(n.bounds.height),
+                    middle: fixed
+                        .width
+                        .then(|| 2 * device(n.bounds.x - b.x) + device(n.bounds.width)),
                 });
             }
             _ => {}
@@ -586,11 +593,19 @@ fn describe(parts: &[Part]) -> String {
 /// Whether two instances place their parts alike. What an instance shows is its content's to
 /// decide (a ticked checkbox has a tick, an empty one none), so labels are compared when both have
 /// one, and icons when both have as many.
+/// Whether two texts sit alike: at one x, or, for words of another width, centred across within
+/// half a device pixel, as an icon tile's initial is, whatever the letter.
+fn same_text(a: &Part, b: &Part) -> bool {
+    let across = a.x == b.x || a.middle.zip(b.middle).is_some_and(|(m, n)| (m - n).abs() <= 1);
+    across && a.y == b.y && a.height == b.height
+}
+
 fn same_parts(a: &[Part], b: &[Part]) -> bool {
     let of = |parts: &[Part], what: &str| parts.iter().filter(|p| p.what == what).cloned().collect::<Vec<_>>();
     let (text_a, text_b) = (of(a, "text"), of(b, "text"));
     let (icons_a, icons_b) = (of(a, "icon"), of(b, "icon"));
-    let texts_alike = text_a.is_empty() || text_b.is_empty() || text_a == text_b;
+    let texts_alike =
+        text_a.is_empty() || text_b.is_empty() || text_a.iter().zip(&text_b).all(|(a, b)| same_text(a, b));
     let icons_alike = icons_a.len() != icons_b.len() || icons_a == icons_b;
     texts_alike && icons_alike
 }

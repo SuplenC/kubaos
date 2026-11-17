@@ -1,12 +1,12 @@
 //! Icon tiles: what an app or a sender looks like in a row.
 //!
-//! An icon tile is a symbol or a picture on a tinted rounded square of one size, so a list of
-//! apps reads as one set whatever each vendor drew, and a row with no picture keeps the room a
-//! picture would take.
+//! An icon tile is a symbol, an app's initial or a picture on a tinted rounded square of one size,
+//! so a list of apps reads as one set whatever each vendor drew, and a row with no picture keeps
+//! the room a picture would take.
 //!
 //! # Owns
 //!
-//! - [`icon_tile`], built up with [`IconTile`], and its [`TileSize`].
+//! - [`icon_tile`] and [`initial_tile`], built up with [`IconTile`], and its [`TileSize`].
 //!
 //! # Not here
 //!
@@ -34,6 +34,8 @@ use crate::tokens::IconSize;
 use crate::tokens::Radius;
 use crate::tokens::Size;
 use crate::tokens::Type;
+
+mod initial;
 
 /// An icon tile's corner: the control's, the shape of what it sits in.
 const CORNER: Radius = Radius::Control;
@@ -79,6 +81,26 @@ impl TileSize {
             TileSize::Lg => Type::Headline.icon(),
         }
     }
+
+    /// The style an initial takes in the symbol's place: the one whose icon is the symbol's box,
+    /// so its line is that box.
+    pub fn initial(self) -> Type {
+        match self {
+            TileSize::Sm => Type::BodyStrong,
+            TileSize::Md => Type::Subheading,
+            TileSize::Lg => Type::Headline,
+        }
+    }
+}
+
+/// What a tile shows while it has no picture.
+#[derive(Debug, Clone)]
+enum Mark {
+    /// A symbol: an Item's, or the one an app names.
+    Symbol(Icon),
+    /// An app's initial, for an app that names no symbol: the first character of its name,
+    /// upper-cased.
+    Initial(String),
 }
 
 /// What a tile shows.
@@ -90,11 +112,11 @@ enum Face {
     Photo(image::Handle),
 }
 
-/// An icon tile showing `glyph` until it has a picture, built up then drawn with
+/// An icon tile showing a symbol or an initial until it has a picture, built up then drawn with
 /// [`IconTile::view`].
 #[derive(Debug, Clone)]
 pub struct IconTile {
-    glyph: Icon,
+    mark: Mark,
     size: TileSize,
     face: Option<Face>,
     danger: bool,
@@ -107,7 +129,20 @@ pub struct IconTile {
 #[must_use]
 pub fn icon_tile(glyph: Icon, size: TileSize) -> IconTile {
     IconTile {
-        glyph,
+        mark: Mark::Symbol(glyph),
+        size,
+        face: None,
+        danger: false,
+        accent: false,
+    }
+}
+
+/// A `size` tile showing the initial of `name`, an app that names no symbol, until it has a
+/// picture: the first character of the name, upper-cased, in the symbol's place and colour.
+#[must_use]
+pub fn initial_tile(name: impl AsRef<str>, size: TileSize) -> IconTile {
+    IconTile {
+        mark: Mark::Initial(initial::initial(name.as_ref())),
         size,
         face: None,
         danger: false,
@@ -116,8 +151,8 @@ pub fn icon_tile(glyph: Icon, size: TileSize) -> IconTile {
 }
 
 impl IconTile {
-    /// An app's icon in place of the symbol, inset to the icon size; the symbol stays while there
-    /// is none.
+    /// An app's icon in place of the symbol or the initial, inset to the icon size; either stays
+    /// while there is none.
     #[must_use]
     pub fn picture(self, picture: Option<image::Handle>) -> Self {
         IconTile {
@@ -126,7 +161,8 @@ impl IconTile {
         }
     }
 
-    /// A photo in place of the symbol, covering the tile; the symbol stays while there is none.
+    /// A photo in place of the symbol or the initial, covering the tile; either stays while there
+    /// is none.
     #[must_use]
     pub fn photo(self, photo: Option<image::Handle>) -> Self {
         IconTile {
@@ -160,16 +196,18 @@ impl IconTile {
         let side = f32::from(self.size.side().px());
         let glyph = f32::from(self.size.icon().px());
         let corner = radius(CORNER);
-        let inside: Element<'a, M> = match self.face {
-            None => centre(look.scale, icon(look, self.glyph, self.size.icon(), ink)),
-            Some(Face::Icon(handle)) => centre(
+        let initials = matches!(self.mark, Mark::Initial(_));
+        let inside: Element<'a, M> = match (self.face, self.mark) {
+            (None, Mark::Symbol(glyph)) => centre(look.scale, icon(look, glyph, self.size.icon(), ink)),
+            (None, Mark::Initial(letter)) => initial::letter(letter, self.size.initial(), ink, look.scale),
+            (Some(Face::Icon(handle)), _) => centre(
                 look.scale,
                 widget::image(handle)
                     .width(glyph)
                     .height(glyph)
                     .content_fit(ContentFit::Contain),
             ),
-            Some(Face::Photo(handle)) => widget::image(handle)
+            (Some(Face::Photo(handle)), _) => widget::image(handle)
                 .content_fit(ContentFit::Cover)
                 .width(Length::Fill)
                 .height(Length::Fill)
@@ -184,7 +222,8 @@ impl IconTile {
                 border: Border::default().rounded(corner),
                 ..container::Style::default()
             });
-        probe::component("IconTile", [self.size.name(), "", ""], Fixed::BOTH, tile)
+        let variant = if initials { "initials" } else { "" };
+        probe::component("IconTile", [self.size.name(), variant, ""], Fixed::BOTH, tile)
     }
 }
 
