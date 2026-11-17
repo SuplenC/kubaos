@@ -1,9 +1,10 @@
 # Blender from the official tarball of its release, pinned to the sha256 Blender publishes beside it
-# (blender-<version>.sha256). Blender keeps no apt repository; Ubuntu 26.04 has 5.0.1, and nixpkgs'
-# 5.1.1 builds Cycles without CUDA, OptiX or HIP, so it renders on the CPU alone. The tarball is
-# the current release with every GPU backend. Blender builds it for amd64 alone: there is no arm64
-# Linux build. Each version lands in a folder of its own, which the links name: the program on
-# PATH, and the desktop entry and icons the tarball carries, whose entry runs `blender` by name.
+# (blender-<version>.sha256). Blender keeps no apt repository; Ubuntu's archive is releases behind,
+# and nixpkgs builds Cycles without CUDA, OptiX or HIP, so it renders on the CPU alone. The tarball
+# is the current release with every GPU backend. Blender builds it for amd64 alone: there is no
+# arm64 Linux build. Each version lands in a folder of its own, which the links name: Blender's
+# launcher on PATH, and the desktop entry and icons the tarball carries, whose entry runs `blender`
+# by name.
 # https://www.blender.org/download/
 name = "Blender"
 category = "graphics"
@@ -38,11 +39,13 @@ unpack = "tar-xz"
 strip = 1
 amd64 = { url = "https://download.blender.org/release/Blender5.3/blender-5.3.0-linux-x64.tar.xz", sha256 = "dacb8264197a3f7fda6001285a5a506fc97ee943881261c2c3bd63c882f22e05" }
 
+# The launcher, not the program: it puts Blender's own libraries first on LD_LIBRARY_PATH, so one
+# set by a shell (a Nix dev shell, Steam) can't load incompatible ones into it.
 [[action]]
 name = "Put blender on your PATH"
 kind = "symlink"
 to = "~/.local/bin/blender"
-target = "@HOME@/.local/opt/blender/@VERSION@/blender"
+target = "@HOME@/.local/opt/blender/@VERSION@/blender-launcher"
 
 [[action]]
 name = "Put Blender in the Command menu"

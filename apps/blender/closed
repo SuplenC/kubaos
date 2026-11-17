@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Ready: no process of the user's runs a program from Blender's folder. Blender starts by name, on
-# PATH, so its command line doesn't say where it runs from; the program each process runs does.
+# PATH, so its command line doesn't say where it runs from; the program each process runs does,
+# with " (deleted)" after it once a new version's download has replaced its folder.
 # Usage: ./closed
 set -euo pipefail
-for exe in /proc/[0-9]*/exe; do
-  program=$(readlink "$exe" 2>/dev/null) || continue
-  [[ $program != "$HOME/.local/opt/blender/"* ]] || exit 1
-done
+# HAZARD: find fails on the links of other users' processes, which it may not read: its status says
+# nothing, so the test is on what it prints, never through a pipe under pipefail.
+[[ -z $(find /proc/[0-9]*/exe -maxdepth 0 -lname "$HOME/.local/opt/blender/*" -print -quit 2>/dev/null) ]]

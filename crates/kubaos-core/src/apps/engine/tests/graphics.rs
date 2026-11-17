@@ -191,6 +191,7 @@ fn blender_tarball(world: &World) -> Vec<u8> {
     fs::create_dir_all(&folder).unwrap();
     for (name, text) in [
         ("blender", "#!/bin/sh\n"),
+        ("blender-launcher", "#!/bin/sh\n"),
         ("blender.desktop", "[Desktop Entry]\nExec=blender %f\nIcon=blender\n"),
         ("blender.svg", "<svg/>"),
         ("blender-symbolic.svg", "<svg/>"),
@@ -238,7 +239,7 @@ fn blender_links_its_program_entry_and_icons_from_its_version_and_its_removal_ke
 
     let version = home.join(".local/opt/blender/5.3.0");
     for (link, target) in [
-        (".local/bin/blender", "blender"),
+        (".local/bin/blender", "blender-launcher"),
         (".local/share/applications/blender.desktop", "blender.desktop"),
         (".local/share/icons/hicolor/scalable/apps/blender.svg", "blender.svg"),
         (
@@ -277,6 +278,7 @@ fn blender_running_from_its_folder_is_left_alone_until_it_is_quit() {
     // waiting on its input.
     let program = world.host_home().join(".local/opt/blender/5.3.0/blender");
     fs::copy(world.host.sandbox().bin().join("bash"), &program).unwrap();
+    crate::sandbox::settle(&program);
     let mut blender = world
         .host
         .sandbox()
