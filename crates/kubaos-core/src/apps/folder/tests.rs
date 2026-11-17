@@ -416,3 +416,29 @@ fn a_picture_icon_that_isnt_square_or_a_png_of_a_size_the_theme_lacks_is_refused
         "{not_png:?}"
     );
 }
+
+#[test]
+fn a_symbol_names_a_tabler_icon_of_kubaos_symbols_and_installs_nothing() {
+    let folder = parse(&format!("{ABOUT}symbol = \"aspect-ratio\"\n")).unwrap();
+
+    assert_eq!(folder.steps(None).unwrap().len(), 1, "a symbol is drawn, not installed");
+    assert_eq!(folder.symbol_shown(), Some("aspect_ratio"));
+    assert_eq!(folder.icon_shown(), None);
+}
+
+#[test]
+fn a_symbol_kubaos_symbols_dont_ship_or_beside_an_icon_is_refused() {
+    let unknown = parse(&format!("{ABOUT}symbol = \"rocket-off\"\n"));
+    let kubaos_name = parse(&format!("{ABOUT}symbol = \"aspect_ratio\"\n"));
+    let both = parse(&format!("{ABOUT}icon = \"sketch\"\nsymbol = \"gauge\"\n"));
+
+    assert!(
+        matches!(&unknown, Err(FolderError::UnknownSymbol(s)) if s == "rocket-off"),
+        "{unknown:?}"
+    );
+    assert!(
+        matches!(kubaos_name, Err(FolderError::UnknownSymbol(_))),
+        "{kubaos_name:?}"
+    );
+    assert!(matches!(both, Err(FolderError::IconAndSymbol)), "{both:?}");
+}

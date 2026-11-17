@@ -89,6 +89,10 @@ const JOB_PREFIX: &str = "app-";
 /// The icon of an app whose folder names none.
 const ICON: &str = "system-software-install";
 
+/// What starts an Item's icon that is a KubaOS Symbol, not an icon theme's name or a path: the
+/// menu's row draws the rest as its tile's symbol.
+const SYMBOL_PREFIX: &str = "symbol:";
+
 /// Where the apps' status is read from.
 #[derive(Clone, Debug)]
 pub struct AppFiles {
@@ -828,6 +832,16 @@ fn share(n: usize, of: usize) -> f32 {
     if of == 0 { 0.0 } else { n as f32 / of as f32 }
 }
 
+/// An app's Item's icon: its picture, else its symbol as `symbol:<name>`, which the menu's row
+/// draws as a KubaOS Symbol, else the Extension's own.
+fn item_icon(app: &AppStatus) -> String {
+    match (&app.icon, &app.symbol) {
+        (Some(icon), _) => icon.clone(),
+        (None, Some(symbol)) => format!("{SYMBOL_PREFIX}{symbol}"),
+        (None, None) => ICON.to_owned(),
+    }
+}
+
 /// An app's Item, found by its id and each word of it as well as its name, "app" and `words`.
 fn item(id: String, title: String, subtitle: String, app: &AppStatus, words: &[&str], action: Action) -> Item {
     let keywords = std::iter::once(app.id.as_str())
@@ -842,7 +856,7 @@ fn item(id: String, title: String, subtitle: String, app: &AppStatus, words: &[&
         identity: None,
         title,
         subtitle: Some(subtitle),
-        icon: Some(app.icon.clone().unwrap_or_else(|| ICON.to_owned())),
+        icon: Some(item_icon(app)),
         names: Vec::new(),
         keywords,
         hidden: false,

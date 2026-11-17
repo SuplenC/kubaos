@@ -15,10 +15,7 @@ Item {
 
     property var entry: null
     readonly property bool runs: (entry?.unavailable ?? "") === ""
-    readonly property string iconSource: {
-        const icon = entry?.icon ?? "";
-        return icon === "" ? "" : icon.startsWith("/") ? `file://${icon}` : Quickshell.iconPath(icon, true);
-    }
+    readonly property string iconSource: Words.iconSource(entry?.icon ?? "", name => Quickshell.iconPath(name, true))
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property real dim: content.runs ? 1 : K.Tokens.opacity.disabled_content
 
@@ -27,7 +24,8 @@ Item {
 
         width: content.width
 
-        // A page's one big symbol: the app's icon, or its Extension's.
+        // A page's one big symbol: the app's icon, else the symbol its icon names, else its
+        // Extension's.
         Item {
             width: K.Tokens.icon.s48
             height: K.Tokens.icon.s48
@@ -45,7 +43,7 @@ Item {
 
             K.Icon {
                 visible: !image.visible
-                name: Words.glyph(content.entry?.extension ?? "")
+                name: Words.itemGlyph(content.entry?.icon ?? "", content.entry?.extension ?? "")
                 size: K.Tokens.icon.s48
                 color: K.Look.alpha(K.Tokens.color.primary, content.dim)
             }

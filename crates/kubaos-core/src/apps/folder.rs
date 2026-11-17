@@ -32,6 +32,7 @@ use super::action::Unpack;
 use super::action::is_argv;
 use super::action::is_icon_name;
 use super::action::is_theme_icon;
+use super::symbols;
 use crate::apps::Platform;
 use crate::unfree::Unfree;
 
@@ -116,6 +117,10 @@ pub enum FolderError {
         "{icon:?} is {size}×{size}, which no folder of the icon theme holds: a PNG icon is 16, 22, 24, 32, 36, 48, 64, 72, 96, 128, 192, 256 or 512 pixels square"
     )]
     IconSize { icon: String, size: u32 },
+    #[error("an app has an icon or a symbol, not both")]
+    IconAndSymbol,
+    #[error("{0:?} is not a symbol: the Tabler name of one of KubaOS Symbols (design/tokens.toml, [symbols])")]
+    UnknownSymbol(String),
     #[error("{0:?} is not an app this one can require: an app id, other than its own, named once")]
     InvalidRequirement(String),
     #[error("{0:?} is not a version: digits, letters and `.+~-:`, starting with a digit")]
@@ -299,6 +304,9 @@ pub struct Folder {
     /// Where `description` came from: an https:// URL, or [`WRITTEN_BY_KUBAOS`] for KubaOS's own.
     pub description_from: String,
     pub icon: Option<String>,
+    /// A KubaOS Symbol drawn in place of a picture, for an app with no logo: the Tabler name
+    /// `app.toml` gives, never beside an `icon`.
+    pub symbol: Option<String>,
     pub ready: Vec<Ready>,
     /// The apps every setup's install installs first, in order.
     pub requires: Vec<Requirement>,
@@ -335,6 +343,7 @@ struct File {
     description: String,
     description_from: String,
     icon: Option<String>,
+    symbol: Option<String>,
     #[serde(default)]
     ready: Vec<Ready>,
     #[serde(default)]
@@ -415,6 +424,7 @@ impl Folder {
             description: file.description,
             description_from: file.description_from,
             icon: file.icon,
+            symbol: file.symbol,
             ready: file.ready,
             requires: file.requires,
             keeps: file.keeps,
@@ -487,6 +497,12 @@ impl Folder {
         Ok(())
     }
 
+    /// The KubaOS Symbol a menu or a row draws for the app, by the name `kubaos-ui` and the shell
+    /// give it: its `symbol`'s.
+    pub fn symbol_shown(&self) -> Option<&'static str> {
+        self.symbol.as_deref().and_then(symbols::by_tabler)
+    }
+
     /// The icon as a menu shows it: a picture of the folder by its path, which is there whether
     /// or not the app is, else the icon theme's name.
     pub fn icon_shown(&self) -> Option<String> {
@@ -519,6 +535,14 @@ impl Folder {
             if !is_tag(tag) || self.tags[..i].contains(tag) {
                 return Err(FolderError::InvalidTag(tag.clone()));
             }
+        }
+        if self.icon.is_some() && self.symbol.is_some() {
+            return Err(FolderError::IconAndSymbol);
+        }
+        if let Some(symbol) = &self.symbol
+            && symbols::by_tabler(symbol).is_none()
+        {
+            return Err(FolderError::UnknownSymbol(symbol.clone()));
         }
         if let Some(icon) = &self.icon
             && !is_theme_icon(icon)

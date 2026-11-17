@@ -19,6 +19,23 @@ function glyph(extension) {
     return glyphs[extension] ?? "bolt";
 }
 
+// An Item's icon that is a KubaOS Symbol rather than a picture: `symbol:<name>`, as the KubaOS
+// Extension gives an app with no logo.
+const symbolPrefix = "symbol:";
+
+// The symbol an Item's tile draws: the one its icon names, else its Extension's.
+function itemGlyph(icon, extension) {
+    return icon.startsWith(symbolPrefix) ? icon.slice(symbolPrefix.length) : glyph(extension);
+}
+
+// Where an Item's picture is: a path as a file URL, an icon theme's name looked up; none for no
+// icon or a symbol.
+function iconSource(icon, lookUp) {
+    if (icon === "" || icon.startsWith(symbolPrefix))
+        return "";
+    return icon.startsWith("/") ? `file://${icon}` : lookUp(icon);
+}
+
 // An Extension's name as a label: `web-search` reads "Web search".
 function kindLabel(extension) {
     const words = extension.replace(/[-_.]/g, " ");

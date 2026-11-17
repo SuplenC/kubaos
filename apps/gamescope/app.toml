@@ -15,7 +15,8 @@ Gamescope is the micro-compositor of Valve's Steam Deck, here as a window of the
 it runs draws at the resolution you give it and is scaled to the window, with AMD's FSR or \
 NVIDIA's NIS; it caps the frame rate and passes HDR through."""
 description_from = "kubaos"
-# No icon: Colloid draws none for Gamescope, and Valve publishes no logo for it.
+# A symbol, Tabler's: Colloid draws no icon for Gamescope, and Valve publishes no logo for it.
+symbol = "aspect-ratio"
 
 [[action]]
 name = "Install Gamescope"

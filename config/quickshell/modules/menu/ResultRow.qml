@@ -29,7 +29,7 @@ Item {
 
     readonly property bool selected: ListView.isCurrentItem
     readonly property bool runs: unavailable === ""
-    readonly property string iconSource: icon === "" ? "" : icon.startsWith("/") ? `file://${icon}` : Quickshell.iconPath(icon, true)
+    readonly property string iconSource: Words.iconSource(icon, name => Quickshell.iconPath(name, true))
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property color main: row.selected ? K.Tokens.color.on_secondary_container : K.Tokens.color.on_surface
     readonly property color muted: row.selected ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
@@ -46,11 +46,12 @@ Item {
     width: ListView.view.width
     height: K.Tokens.size.row_two_line
 
-    // Items without an icon of their own, such as a sum or a bind, show their Extension's symbol.
+    // Items without a picture of their own show the symbol their icon names, as an app with no
+    // logo does, else their Extension's, as a sum or a bind does.
     K.IconTile {
         x: K.Tokens.space.s12
         y: (row.height - K.Tokens.size.control_md) / 2
-        icon: Words.glyph(row.extension)
+        icon: Words.itemGlyph(row.icon, row.extension)
         source: row.iconSource
         opacity: row.dim
     }
