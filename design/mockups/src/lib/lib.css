@@ -45,6 +45,22 @@
   overflow-wrap: break-word;
 }
 
+/* Pango's markup in a text (`markup` in `text.ts`): bold in `body_strong`'s weight and the text's
+   own colour, italic the font's slant, a link in the cold accent, underlined. */
+.k-markup-b {
+  font-weight: var(--type-body_strong-weight);
+  color: var(--color-on_surface);
+}
+
+.k-markup-i {
+  font-style: italic;
+}
+
+.k-markup-a {
+  color: var(--color-cold);
+  text-decoration: underline;
+}
+
 .k-text[data-shaped] {
   font-kerning: normal;
   font-variant-ligatures: normal;
@@ -708,6 +724,7 @@
    it; an app's picture placed by its measured drawing; a photo covering the tile. The symbol shows
    until the picture has loaded. */
 .k-icon-tile {
+  --tint: var(--color-surface_container_highest);
   position: relative;
   display: block;
   flex: none;
@@ -716,6 +733,12 @@
   border-radius: var(--radius-control);
   background: var(--tint);
   overflow: hidden;
+}
+
+/* On a dialog, which is `surface_container_highest` itself at night, the tile steps down to
+   `surface_container` there, so it shows; by day the dialog is `…_high` and the tile keeps its own. */
+.k-dialog .k-icon-tile {
+  --tint: color-mix(in srgb, var(--color-surface_container_highest), var(--color-surface_container) calc(var(--elevation-lighter) * 100%));
 }
 
 /* What a tile holds is centred both ways on the nearest whole device pixel, an odd one before it,
@@ -3156,10 +3179,26 @@
   align-self: stretch;
 }
 
+/* Under a button bar whose ends hang (`lib/button-bar.ts`), the dialog's padding at its foot is
+   the distance its end buttons' boxes keep from its sides, `space.s12`, so the buttons sit alike on
+   three sides. A stacked bar, or one with no Cancel, keeps the whole `space.s24`. */
+.k-dialog:has(> .k-dialog-column > .k-button-bar:not([data-stacked]) > [data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):first-child) {
+  padding-bottom: var(--space-s12);
+}
+
 /* The room the dialog's least height leaves over, above the buttons and under the middle's own
    `space.s24`. */
 .k-dialog-column > .k-dialog-spare {
   flex: 1 0 0;
+}
+
+/* A body that keeps its caller's lines (`noWrap`): in `mono`, so a table of them lines up; a line
+   longer than the dialog still breaks. */
+.k-dialog .k-text[data-no-wrap] {
+  white-space: pre-wrap;
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
 }
 
 /* A divider at the middle's top or bottom edge, across the dialog's padding, the middle scrolling
@@ -3195,8 +3234,10 @@
 
 /* A row of buttons that ends a surface (`hangs` in `lib/button-bar.ts`): a Text button at its start
    or end hangs its own padding outside it, so its label, or its leading symbol, is on the content's
-   edge, and its tube and press fill reach into the surface's padding. A surface whose padding has
-   no room for it sets `--hang` to 0, and the button's box stays on the edge. */
+   edge, and its tube and press fill reach into the surface's padding. An end hangs only into
+   padding at least twice its reach, so its box keeps as much room to the edge as it hangs; a
+   surface with less sets `--hang` to 0 (both ends) or `--hang-end` (the last), and the box stays on
+   the edge. */
 [data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):first-child {
   margin-inline-start: calc(-1 * var(--hang, 1) * var(--padding));
 }
@@ -3204,6 +3245,15 @@
 [data-hangs] > .k-button[data-kind="Text"]:not([data-icon-only]):last-child {
   margin-inline-end: calc(-1 * var(--hang, 1) * var(--padding));
 }
+
+/* In a button bar (`lib/button-bar.ts`) whose dismiss button hangs, the last action of another kind
+   hangs as far at the end, the Text button's own padding (`--text-padding`), so the two end boxes
+   sit the same distance in from the surface's edges. Only the bar: a row that holds more than
+   buttons (Kōbō's footer band) keeps its last button's box on the edge. */
+.k-button-bar:not([data-stacked]) > [data-hangs]:has(> .k-button[data-kind="Text"]:not([data-icon-only]):first-child) > .k-button:not([data-kind="Text"]):last-child {
+  margin-inline-end: calc(-1 * var(--hang-end, var(--hang, 1)) * var(--text-padding));
+}
+
 
 /* A Collapsible on a page or in a card (`hangs` on it) hangs its header's `space.s12` the same
    way, so its chevron is on the content's edge, in line with the fields round it, and its
@@ -3225,7 +3275,7 @@
   align-items: stretch;
 }
 
-.k-button-bar[data-stacked] > .k-row > .k-button {
+.k-button-bar[data-stacked] > .k-row[data-hangs] > .k-button[data-kind] {
   margin-inline: 0;
 }
 

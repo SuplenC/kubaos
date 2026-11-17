@@ -4,6 +4,7 @@
 import appIcon from "../../../../../branding/png/kubaos-icon-128.png?url";
 import photo from "../../../../../branding/photo/neon-sign-lit.jpg?url";
 import type { Words } from "../../lib/content.ts";
+import { dialog } from "../../lib/dialog.ts";
 import { declare } from "../../lib/probe.ts";
 import { iconTile, measure, TILE_MEASURES, TILE_SIZES, type TileOptions, type TileSize } from "../../lib/icon-tile.ts";
 import { filling, row, stack, within } from "../../lib/layout.ts";
@@ -69,6 +70,11 @@ function measured(picture: string): HTMLElement {
 }
 
 /** Names with no picture and no symbol: one word, several, a lowercase start and another script. */
+/** A dialog another program opens, its caller's tile over the title on the dialog's own fill. */
+function onDialog(): HTMLElement {
+  return dialog({ title: "Restart", body: "Updates are installed. Restart now?", caller: { name: "KubaOS", picture: appIcon }, dismiss: "Cancel", actions: [{ label: "Restart" }] }).element;
+}
+
 const NAMES = ["Blender", "LM Studio", "k9s", "日本語入力"] as const;
 
 /** A tile of `size` with a picture, one with a symbol and one per name with its initial, each over its name. */
@@ -108,6 +114,7 @@ export default page({
     { name: "Danger", for: "a critical notification", sample: () => iconTile({ glyph: "warning", size: "Md", danger: true }) },
     ...APP_ICONS.map((app) => ({ name: app.name, for: app.for, sample: () => measured(app.picture) })),
     { name: "A photo", for: "covers the tile", sample: () => iconTile({ glyph: "notifications", size: "Md", photo }) },
+    { name: "On a dialog", for: "a caller's tile: `surface_container` at night, to show", sample: onDialog },
     ...TILE_SIZES.map((size) => ({ name: `Initials, ${size.toLowerCase()}`, for: "no picture and no symbol", sample: () => initials(size) })),
   ],
   sizes: nonEmpty(TILE_SIZES.map((size) => ({ name: size.toLowerCase(), for: BESIDE[size], sample: () => besideWords(size) }))),

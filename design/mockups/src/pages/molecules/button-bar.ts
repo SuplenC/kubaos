@@ -56,7 +56,7 @@ export default page({
     daylight: true,
   },
   variants: [
-    { name: "Dismiss and one action", for: "Cancel and what the surface asks", sample: () => inRoom(ONE) },
+    { name: "Dismiss and one action", for: "both ends and the foot hang alike", sample: () => inRoom(ONE) },
     { name: "Dismiss and two actions", for: "another way out, Tonal, before the Enter one", sample: () => inRoom(TWO) },
     { name: "One action alone", for: "nothing to back out of", sample: () => inRoom(ALONE) },
     { name: "Danger", for: "a Danger button naming what it destroys", sample: () => inRoom(DANGER) },
@@ -93,7 +93,7 @@ export default page({
       { name: "One", for: "alone, at the end", sample: () => inRoom(ALONE) },
       { name: "Two", for: "Cancel and the action", sample: () => inRoom(ONE) },
       { name: "Three", for: "Cancel and two actions", sample: () => inRoom(TWO) },
-      { name: "Three in a small room", for: "stacked, Enter's on top, each full width", sample: () => inRoom({ ...TWO, actions: [TWO.actions[0]!, { label: shown(ACTION), icon: "restart_alt" }] }, PANEL) },
+      { name: "Three in a small room", for: "stacked, Enter's on top, each full width", sample: () => inRoom({ ...TWO, actions: [TWO.actions[0]!, { label: ACTION.long, icon: "restart_alt" }] }, PANEL) },
     ],
   },
   motion: {
@@ -117,6 +117,7 @@ export default page({
     measures: [
       { part: "Between buttons", token: "space-s8" },
       { part: "Text button's hang, sm and md", token: "space-s12" },
+      { part: "Last action's and foot's hang", token: "space-s12" },
       { part: "Button, md", token: "size-control_md" },
       { part: "Button, sm", token: "size-control_sm" },
     ],
