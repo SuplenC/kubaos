@@ -499,15 +499,29 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
         }
         Kind::Setting { file, key, value } => look_setting(host, file, key, value),
         Kind::Unit { .. } | Kind::Group { .. } | Kind::Linger {} => look_machine(action, host, &user),
-        Kind::Run { check, .. } => {
-            let done = ran(run_recorded(host, action, check)?)?;
-            Ok(Look {
-                done,
-                claims: vec![Claim::new("run", !done)],
-                prior: Prior::default(),
-            })
-        }
+        Kind::Run { .. } => look_run(action, host, recorded),
     }
+}
+
+/// A `run`'s check: its `check` exits 0; for one with `undo` alone, its own settled entry, as the
+/// step is the app's once recorded.
+fn look_run(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Result<Look, PerformError> {
+    let Kind::Run { check, .. } = &action.kind else {
+        return Ok(Look::default());
+    };
+    if action.removal_only() {
+        return Ok(Look {
+            done: matches!(recorded, Recorded::Done(_)),
+            claims: vec![Claim::new("run", true)],
+            prior: Prior::default(),
+        });
+    }
+    let done = ran(run_recorded(host, action, check)?)?;
+    Ok(Look {
+        done,
+        claims: vec![Claim::new("run", !done)],
+        prior: Prior::default(),
+    })
 }
 
 /// Which of `packages` dpkg has, at a version of `versions` when it is given: a package of
@@ -648,6 +662,7 @@ pub fn apply(
             host.set_member(group, true).map_err(PerformError::Host)
         }
         Kind::Linger {} => host.set_linger(true).map_err(PerformError::Host),
+        Kind::Run { .. } if action.removal_only() => Ok(()),
         Kind::Run { run, .. } => run_recorded(host, action, run)?.map_err(PerformError::Host),
     }
 }

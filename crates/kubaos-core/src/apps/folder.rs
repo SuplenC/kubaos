@@ -722,7 +722,7 @@ impl Folder {
             .actions
             .iter()
             .chain(setup.into_iter().flat_map(|s| &s.actions))
-            .any(|a| a.stage == Stage::Install && matches!(a.kind, Kind::Run { .. }));
+            .any(|a| a.stage == Stage::Install && matches!(a.kind, Kind::Run { .. }) && !a.removal_only());
         runs && self.sources(setup).is_empty()
     }
 

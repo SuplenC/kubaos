@@ -113,6 +113,10 @@ pub enum ActionError {
     InvalidGroup { value: String },
     #[error("a run's {key} is an argv: a program on PATH or ./<script> in the app's folder, then its arguments")]
     InvalidArgv { key: &'static str },
+    #[error("a run has both `do` and `check`, or neither, for one that only undoes")]
+    RunHalf,
+    #[error("a run that only undoes does nothing in a window, and installs no source")]
+    RemovalOnlyExtra,
     #[error("{value:?} is not a web app's id: lowercase letters, digits and dashes")]
     InvalidWebApp { value: String },
     #[error(
@@ -301,10 +305,12 @@ pub enum Kind {
     Output {
         path: String,
     },
-    /// A vendor tool's own command, with how to check it and undo it.
+    /// A vendor tool's own command, with how to check it and undo it; or, with neither `do` nor
+    /// `check`, an `undo` alone, which a removal runs and an install never does.
     Run {
-        #[serde(rename = "do")]
+        #[serde(rename = "do", default, skip_serializing_if = "Vec::is_empty")]
         run: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         check: Vec<String>,
         undo: Vec<String>,
         #[serde(default)]
@@ -437,6 +443,9 @@ impl Action {
                 run, check, undo, root, ..
             } => {
                 for (key, argv) in [("do", run), ("check", check), ("undo", undo)] {
+                    if argv.is_empty() && key != "undo" {
+                        continue;
+                    }
                     // HAZARD: root never runs a program from the home: the user could change it.
                     let from_home = argv.first().is_some_and(|p| p.starts_with("@HOME@/"));
                     if !is_argv(argv) || (*root && from_home) {
@@ -509,12 +518,20 @@ impl Action {
         }
     }
 
+    /// Whether it is a `run` with an `undo` alone: nothing to do or check, its step the app's from
+    /// the run that records it, so a removal runs its `undo`.
+    #[must_use]
+    pub fn removal_only(&self) -> bool {
+        matches!(&self.kind, Kind::Run { run, check, .. } if run.is_empty() && check.is_empty())
+    }
+
     /// Whether `other` acts on the same thing, so that a release changing one into the other
     /// changes the step, which is then updated in place: the same kind on the same side and, for
     /// a kind whose thing has a name, the same name. That is a `deb`'s package, a `file`'s,
     /// `symlink`'s or `output`'s path, a `setting`'s file and key, a `unit`'s unit and scope and a
     /// `group`'s group; an `apt` or `nix` action (whose list may change), a `download` (whose path
-    /// may carry its version), `linger` and a `run` are the same thing as any of their kind.
+    /// may carry its version), `linger` and a `run` are the same thing as any of their kind, and a
+    /// `run` that only undoes as any other that only undoes.
     pub fn same_thing(&self, other: &Self) -> bool {
         if self.side() != other.side() {
             return false;
@@ -523,8 +540,8 @@ impl Action {
             (Kind::Apt { .. }, Kind::Apt { .. })
             | (Kind::Nix { .. }, Kind::Nix { .. })
             | (Kind::Download { .. }, Kind::Download { .. })
-            | (Kind::Linger {}, Kind::Linger {})
-            | (Kind::Run { .. }, Kind::Run { .. }) => true,
+            | (Kind::Linger {}, Kind::Linger {}) => true,
+            (Kind::Run { .. }, Kind::Run { .. }) => self.removal_only() == other.removal_only(),
             (Kind::Deb { package: a, .. }, Kind::Deb { package: b, .. })
             | (Kind::Group { group: a }, Kind::Group { group: b })
             | (Kind::WebApp { id: a, .. }, Kind::WebApp { id: b, .. })
@@ -756,13 +773,14 @@ impl Action {
                 id, title, url, icon, ..
             } => check_web_app(id, title, url, icon)?,
             Kind::Output { path } => check_path(path)?,
-            Kind::Run { run, check, undo, .. } => {
-                for (key, argv) in [("do", run), ("check", check), ("undo", undo)] {
-                    if !is_resolved_argv(argv) {
-                        return Err(ActionError::InvalidArgv { key });
-                    }
-                }
-            }
+            Kind::Run {
+                run,
+                check,
+                undo,
+                window,
+                source,
+                ..
+            } => check_run(run, check, undo, window.is_some() || source.is_some())?,
         }
         Ok(())
     }
@@ -898,6 +916,24 @@ fn check_apt(
     }
     if let Some(arch) = arch {
         check_arch(arch)?;
+    }
+    Ok(())
+}
+
+/// A `run`'s argvs as a journal records them: `do`, `check` and `undo`, or `undo` alone, which
+/// takes neither a window nor a source (`extra`).
+fn check_run(run: &[String], check: &[String], undo: &[String], extra: bool) -> Result<(), ActionError> {
+    if run.is_empty() != check.is_empty() {
+        return Err(ActionError::RunHalf);
+    }
+    if run.is_empty() && extra {
+        return Err(ActionError::RemovalOnlyExtra);
+    }
+    for (key, argv) in [("do", run), ("check", check), ("undo", undo)] {
+        let absent = argv.is_empty() && key != "undo";
+        if !absent && !is_resolved_argv(argv) {
+            return Err(ActionError::InvalidArgv { key });
+        }
     }
     Ok(())
 }
