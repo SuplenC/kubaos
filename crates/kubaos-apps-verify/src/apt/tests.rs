@@ -83,6 +83,27 @@ fn a_release_file_lists_the_sha256_section_only() {
     assert_eq!(release.sha256.len(), 2);
     assert_eq!(release.sha256["main/binary-amd64/Packages"], "abcd");
     assert_eq!(release.sha256["main/binary-amd64/Packages.gz"], "eeff");
+    assert!(release.by_hash);
+}
+
+#[test]
+fn an_index_is_fetched_by_its_hash_where_the_suite_serves_indexes_so() {
+    let by_hash =
+        Release::parse("Acquire-By-Hash: yes\nSHA256:\n eeff 5 main/binary-amd64/Packages.gz\n ab 1 Packages\n");
+    let by_name = Release::parse("SHA256:\n eeff 5 main/binary-amd64/Packages.gz\n");
+
+    assert_eq!(
+        by_hash.url("https://x/dists/s", "main/binary-amd64/Packages.gz"),
+        "https://x/dists/s/main/binary-amd64/by-hash/SHA256/eeff"
+    );
+    assert_eq!(
+        by_hash.url("https://x/dists/s", "Packages"),
+        "https://x/dists/s/by-hash/SHA256/ab"
+    );
+    assert_eq!(
+        by_name.url("https://x/dists/s", "main/binary-amd64/Packages.gz"),
+        "https://x/dists/s/main/binary-amd64/Packages.gz"
+    );
 }
 
 #[test]
