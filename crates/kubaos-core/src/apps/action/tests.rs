@@ -35,7 +35,7 @@ fn a_journaled_run_of_a_program_under_the_home_reads_back() {
 }
 
 #[test]
-fn a_self_updating_download_needs_a_folder_named_for_its_version() {
+fn a_self_updating_download_goes_to_a_folder_named_for_its_version_or_one_its_updater_rewrites() {
     let download = |to: &str| {
         action(&format!(
             "name = \"Get\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"1.0\"\nunpack = \"tar-gz\"\nself_updates = true\n\
@@ -45,10 +45,7 @@ fn a_self_updating_download_needs_a_folder_named_for_its_version() {
     };
 
     assert!(download("~/.vendor/versions/@VERSION@").is_ok());
-    assert!(matches!(
-        download("~/.vendor/tool"),
-        Err(ActionError::SelfUpdatesUnversioned { .. })
-    ));
+    assert!(download("~/.local/share/vendor/bin").is_ok());
 }
 
 #[test]
