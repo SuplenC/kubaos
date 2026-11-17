@@ -137,3 +137,34 @@ fn a_program_called_by_its_full_path_finds_no_user_manager_and_no_logind() {
         assert!(out.trim().is_empty(), "{name} answered: {out}");
     }
 }
+
+#[test]
+fn none_of_gits_variables_gets_into_the_sandbox() {
+    let (_dir, sandbox) = sandbox();
+
+    let (_, shown, _) = sh(&sandbox, "env");
+
+    let git: Vec<&str> = shown.lines().filter(|l| l.starts_with("GIT_")).collect();
+    assert!(git.is_empty(), "{git:?}");
+}
+
+#[test]
+fn git_in_the_sandbox_works_on_the_repository_it_is_given() {
+    let (dir, sandbox) = sandbox();
+    let repo = dir.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+
+    let init = sandbox.git(&repo).args(["init", "-q"]).status().unwrap();
+    let top = git(&repo, &["rev-parse", "--show-toplevel"]);
+
+    assert!(init.success());
+    assert_eq!(PathBuf::from(top), repo.canonicalize().unwrap());
+}
+
+#[test]
+fn a_program_beyond_the_tools_is_linked_in_for_a_one_off_command() {
+    let out = output("git", ["--version"]);
+
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).starts_with("git version"));
+}

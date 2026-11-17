@@ -125,6 +125,10 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **Shared mutable state is a `std::sync::Mutex` behind a struct with methods**, so no caller holds the lock longer than one method. A thread owning the state behind channels when the state has its own lifecycle (a job queue, a watcher). Source: kubaos.
 - **Lock order lives on the field's `///`**, with a one-line pointer at each site that takes more than one lock.
 
+### Processes
+
+- **Git runs through `kubaos_git`**: `kubaos_git::at(dir)` for `git -C dir`, `kubaos_git::anywhere()` for a command with no repository (`ls-remote`, `config`), never `Command::new("git")`. Both start without git's variables, so git finds the repository it is given: git obeys `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and the rest over `-C`, and a git hook, `git rebase --exec` or an editor a commit opened sets them for everything it starts. A runner that starts programs that may run git themselves (a migration, an app's script, Nix reading a flake from its checkout) clears them too, with `kubaos_git::clear`. Source: kubaos.
+
 ### Signatures and types
 
 - **Generic spelling by shape**: `impl Trait` for a simple, single-use bound; a named parameter when a caller may turbofish it or it repeats; a `where` clause once bounds no longer fit on the line.

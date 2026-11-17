@@ -176,6 +176,9 @@ impl Cmd {
         argv.extend(self.argv.iter().cloned());
         let mut command = Command::new(&argv[0]);
         command.args(&argv[1..]);
+        // git, a migration and Nix run git on the checkout and the User flake, never on a
+        // repository the caller's environment names.
+        kubaos_git::clear(&mut command);
         if !self.root {
             command.envs(self.env.iter().map(|(k, v)| (k, v)));
             if let Some(path) = path {

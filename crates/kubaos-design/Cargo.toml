@@ -10,6 +10,7 @@ name = "kubaos-design"
 path = "src/main.rs"
 
 [dependencies]
+kubaos-git.workspace = true
 kubaos-geometry.workspace = true
 kubaos-tokens.workspace = true
 serde.workspace = true

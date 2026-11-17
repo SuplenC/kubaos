@@ -1,14 +1,17 @@
-//! `kubaos package` and unfree packages, through the binary with a fake `nix` on `PATH` and a
-//! user flake in a temporary home. Nothing here switches: every change runs with `--no-switch`.
+//! `kubaos package`, through the binary in a sandbox with a fake `nix` and a user flake in a
+//! temporary home: unfree packages, and the flake's git index. Nothing here switches: every
+//! change runs with `--no-switch`.
 
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
 use std::sync::OnceLock;
 
+use kubaos_core::sandbox::Sandbox;
 use tempfile::TempDir;
 
 /// The one fake `nix` every test runs, made before the first `kubaos` starts. It answers with
@@ -33,17 +36,22 @@ fn fake_nix() -> &'static Path {
     .path()
 }
 
-/// A home with a user flake wired to its state directory, and a fake `nix` that answers every
-/// `nix eval` with one fixed answer.
+/// A home with a user flake wired to its state directory, and a sandbox to run `kubaos` in, with
+/// the fake `nix`.
 struct Home {
     dir: TempDir,
+    sandbox: Sandbox,
 }
 
 impl Home {
     fn new() -> Self {
-        let home = Home {
-            dir: tempfile::tempdir().expect("a temporary home"),
-        };
+        let dir = tempfile::tempdir().expect("a temporary home");
+        let home = dir.path().join("home");
+        fs::create_dir_all(&home).expect("make the home");
+        let sandbox = Sandbox::new(&dir.path().join("sandbox"), &home, "tester");
+        sandbox.without("nix");
+        symlink(fake_nix().join("nix"), sandbox.bin().join("nix")).expect("put the fake nix in");
+        let home = Home { dir, sandbox };
         home.write(
             ".config/kubaos/home/home.nix",
             "{ pkgs, ... }:\n{\n  kubaos.stateDir = ./kubaos.d;\n}\n",
@@ -52,11 +60,16 @@ impl Home {
     }
 
     fn path(&self, path: &str) -> PathBuf {
-        self.dir.path().join(path)
+        self.dir.path().join("home").join(path)
+    }
+
+    /// The user flake.
+    fn flake(&self) -> PathBuf {
+        self.path(".config/kubaos/home")
     }
 
     fn state(&self, file: &str) -> PathBuf {
-        self.path(".config/kubaos/home/kubaos.d").join(file)
+        self.flake().join("kubaos.d").join(file)
     }
 
     fn write(&self, path: &str, text: &str) {
@@ -75,16 +88,20 @@ impl Home {
         self.path("nix-ran").exists()
     }
 
+    /// `kubaos` with `args`, in the sandbox, to be given more of its environment.
+    fn command(&self, args: &[&str]) -> Command {
+        let mut command = self.sandbox.command(env!("CARGO_BIN_EXE_kubaos"));
+        command.args(args);
+        command
+    }
+
     fn kubaos(&self, args: &[&str]) -> Output {
-        let path = format!("{}:{}", fake_nix().display(), std::env::var("PATH").unwrap_or_default());
-        Command::new(env!("CARGO_BIN_EXE_kubaos"))
-            .args(args)
-            .env("HOME", self.dir.path())
-            .env("XDG_CONFIG_HOME", self.path(".config"))
-            .env("XDG_STATE_HOME", self.path(".local/state"))
-            .env("PATH", path)
-            .output()
-            .expect("run kubaos")
+        self.command(args).output().expect("run kubaos")
+    }
+
+    /// `git -C dir` in the sandbox, with a test identity.
+    fn git(&self, dir: &Path) -> Command {
+        self.sandbox.git(dir)
     }
 }
 
@@ -227,4 +244,56 @@ fn turning_unfree_packages_off_and_on_prints_and_writes_the_setting() {
     assert_eq!(stdout(&status), "off\n");
     assert_eq!(stdout(&on), "unfree packages: on\n");
     assert!(read(&home.state("nixpkgs.toml")).contains("allow_unfree = true"));
+}
+
+/// Every file under `dir` with its content, to tell whether anything in it changed.
+fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let mut files = Vec::new();
+    let mut todo = vec![dir.to_path_buf()];
+    while let Some(next) = todo.pop() {
+        for entry in fs::read_dir(&next).expect("read a folder") {
+            let path = entry.expect("a folder entry").path();
+            if path.is_dir() {
+                todo.push(path);
+            } else {
+                let bytes = fs::read(&path).expect("read a file");
+                files.push((path, bytes));
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+#[test]
+fn adding_a_package_stages_it_in_the_flakes_repository_and_not_in_one_the_environment_names() {
+    let home = Home::new();
+    home.nix("[false]", 0);
+    let git = |dir: &Path, args: &[&str]| {
+        let out = home.git(dir).args(args).output().expect("run git");
+        assert!(out.status.success(), "git {args:?}: {}", stderr(&out));
+        stdout(&out)
+    };
+    fs::create_dir_all(home.flake()).expect("make the flake");
+    git(&home.flake(), &["init", "-q"]);
+    let decoy = home.path("decoy");
+    fs::create_dir_all(&decoy).expect("make the decoy");
+    git(&decoy, &["init", "-q"]);
+    fs::write(decoy.join("README"), "decoy\n").expect("write a decoy file");
+    git(&decoy, &["add", "README"]);
+    git(&decoy, &["commit", "-q", "-m", "decoy"]);
+    let before = snapshot(&decoy);
+
+    // As a git hook or `git rebase --exec` runs it: inside another repository's command.
+    let out = home
+        .command(&["package", "add", "hello", "--no-switch"])
+        .env("GIT_DIR", decoy.join(".git"))
+        .env("GIT_WORK_TREE", &decoy)
+        .env("GIT_INDEX_FILE", decoy.join(".git/index"))
+        .output()
+        .expect("run kubaos");
+
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(git(&home.flake(), &["ls-files"]), "kubaos.d/packages.toml\n");
+    assert!(snapshot(&decoy) == before, "kubaos changed the decoy repository");
 }

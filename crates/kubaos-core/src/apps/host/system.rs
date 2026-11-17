@@ -105,6 +105,8 @@ impl SystemHost {
 
     fn command(&self, program: impl AsRef<OsStr>) -> Command {
         let mut command = Command::new(program);
+        // An app's script may run git, which must find the repository it is given.
+        kubaos_git::clear(&mut command);
         if self.root {
             command
                 .env_clear()

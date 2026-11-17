@@ -2156,6 +2156,7 @@ version = "0.1.0"
 dependencies = [
  "flate2",
  "kubaos-core",
+ "kubaos-git",
  "serde_json",
  "sha2",
  "tempfile",
@@ -2227,6 +2228,7 @@ name = "kubaos-core"
 version = "0.1.0"
 dependencies = [
  "kubaos-core",
+ "kubaos-git",
  "kubaos-phone",
  "kubaos-user-layer",
  "serde",
@@ -2283,6 +2285,7 @@ name = "kubaos-design"
 version = "0.1.0"
 dependencies = [
  "kubaos-geometry",
+ "kubaos-git",
  "kubaos-tokens",
  "serde",
  "serde_json",
@@ -2307,6 +2310,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "kubaos-git"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
 ]
 
 [[package]]

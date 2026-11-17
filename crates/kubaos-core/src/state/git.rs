@@ -12,6 +12,7 @@
 //!
 //! # Not here
 //!
+//! - Keeping git off any repository but the flake's: `kubaos_git`.
 //! - Writing the state directory: `packages.rs`, `suites.rs` and `state.rs`.
 
 use std::ffi::OsStr;
@@ -19,7 +20,6 @@ use std::ffi::OsString;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::process::Output;
 use std::process::Stdio;
 
@@ -92,22 +92,16 @@ fn is_work_tree(flake: &Path) -> bool {
     if !flake.is_dir() {
         return false;
     }
-    Command::new("git")
-        .arg("-C")
-        .arg(flake)
+    kubaos_git::at(flake)
         .args(["rev-parse", "--is-inside-work-tree"])
-        .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()
         .is_ok_and(|out| out.status.success() && out.stdout.starts_with(b"true"))
 }
 
 fn git(flake: &Path, args: &[&OsStr]) -> Result<Output, GitError> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(flake)
+    let out = kubaos_git::at(flake)
         .args(args)
-        .stdin(Stdio::null())
         .output()
         .map_err(|source| GitError::Spawn {
             flake: flake.to_path_buf(),

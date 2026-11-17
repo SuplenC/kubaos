@@ -20,7 +20,6 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::Path;
-use std::process::Command;
 
 use crate::Error;
 use crate::lint::Rule;
@@ -261,9 +260,7 @@ pub fn shrink(scan: &Scan, baseline: &Baseline) -> Result<Baseline, Error> {
 /// [`Error::History`] when git can't be run or `root` isn't a git checkout, so the history is
 /// unknown.
 pub fn in_history(root: &Path) -> Result<bool, Error> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
+    let output = kubaos_git::at(root)
         .args(["log", "--all", "--format=%H", "-1", "--", BASELINE_PATH])
         .output()
         .map_err(|source| Error::History(Some(source)))?;
