@@ -35,9 +35,10 @@ import { paint, palette } from "../../site/recolour.ts";
 import { settings } from "../../site/settings.ts";
 import { RELEASE } from "./kobo-data.ts";
 import { TURNING_REDUCED, turning } from "./kobo-pages.ts";
-import { after, arrival, column, ENTERING, endingColumn, GOING, keys, LEAVING, neonSign, OPENING, part, play } from "./kobo-room.ts";
+import { after, arrival, column, ENTERING, ROOM, endingColumn, GOING, keys, LEAVING, neonSign, OPENING, part, play } from "./kobo-room.ts";
 import { CARD_IDS, type CardId, CARDS, firstViews, open, running, type Views } from "./setup-cards.ts";
 import { cardBody, cardPage } from "./setup-parts.ts";
+import { kotodamaCard } from "./setup-kotodama-card.ts";
 import { apps, installing, yoursCard } from "./setup-yours-card.ts";
 
 /** What the arrival waits on or finds: detection running, no network, nothing left, a reboot behind it. */
@@ -120,7 +121,7 @@ function promise(glyph: string, words: string, tone = "on_surface_variant"): HTM
 /** How many cards want the person, said as a count. */
 function wanted(views: Views): string {
   const left = CARD_IDS.filter((id) => open(CARDS[id].views[views[id]]!)).length;
-  const words = ["None", "One", "Two", "Three", "Four", "Five", "Six"];
+  const words = ["None", "One", "Two", "Three", "Four", "Five", "Six", "Seven"];
   return `${words[left] ?? left} ${left === 1 ? "thing" : "things"}`;
 }
 
@@ -134,7 +135,7 @@ function arrivalWords(moment: Moment, views: Views): { hero?: string; lede: stri
     case "detecting":
       return { lede: "KubaOS is on the disk and running. Checking what this machine has: the maker, the reader, the keys." };
     default:
-      return { lede: `KubaOS is on the disk and running. ${wanted(views)} to go: what you use it for, your name for Git, then what needs your hardware, your fingers or your phone. A minute each; skip any, it'll wait.` };
+      return { lede: `KubaOS is on the disk and running. ${wanted(views)} to go: what you use it for, the one key to find it all, your name for Git, then what needs your hardware, your fingers or your phone. A minute each; skip any, it'll wait.` };
   }
 }
 
@@ -284,10 +285,12 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     void play(element, tracksNow(failed ? FAILS : finishing(CARD_IDS.indexOf("yours"))));
   };
 
+  const kotodama = kotodamaCard(views.kotodama);
+
   const drawCard = (id: CardId) => {
     const holder = holders.get(id) ?? document.createElement("span");
     holder.className = "setup-card";
-    holder.replaceChildren(id === "yours" ? yours.body() : cardBody(id, views[id], opened.has(id)));
+    holder.replaceChildren(id === "yours" ? yours.body() : id === "kotodama" ? kotodama.body() : cardBody(id, views[id], opened.has(id)));
     holders.set(id, holder);
     return holder;
   };
@@ -334,9 +337,10 @@ export function setupRoom(options: SetupOptions): HTMLElement {
   const rail = (id: CardId): HTMLElement => {
     const shown = options.alone ? [id] : CARD_IDS;
     const pages = shown.map((each) => {
-      const page = each === "yours" ? yours.page(act(each), () => skipped.has(each)) : cardPage(each, () => views, () => drawCard(each), act(each), () => skipped.has(each));
-      // Alone, Back closes the window, but for Make it yours's later steps, where it goes back a step.
-      const closes = each === "yours" ? () => yours.state.step === 0 || yours.state.phase !== "choosing" : true;
+      const page = each === "yours" ? yours.page(act(each), () => skipped.has(each)) : each === "kotodama" ? kotodama.page(() => skipped.has(each)) : cardPage(each, () => views, () => drawCard(each), act(each), () => skipped.has(each));
+      // Alone, Back closes the window, but for the later steps of a card with steps of its own, where
+      // it goes back a step.
+      const closes = each === "yours" ? () => yours.state.step === 0 || yours.state.phase !== "choosing" : each === "kotodama" ? () => kotodama.state.step === 0 : true;
       return { ...page, body: () => drawCard(each), skipped: () => skipped.add(each), ...(options.alone ? { closes } : {}) };
     });
     return stepRailPage({
@@ -345,8 +349,8 @@ export function setupRoom(options: SetupOptions): HTMLElement {
       pages,
       current: shown.indexOf(id),
       free: true,
-      // Make it yours says what its keys do on the step it shows; the other cards share the rail's.
-      hints: (page) => (shown[page] === "yours" ? yours.hints() : options.alone ? HINTS.slice(2) : HINTS),
+      // Make it yours and Kotodama say what their keys do on the step shown; the rest share the rail's.
+      hints: (page) => (shown[page] === "yours" ? yours.hints() : shown[page] === "kotodama" ? kotodama.hints() : options.alone ? HINTS.slice(2) : HINTS),
       ...(options.turnedFrom && !options.alone ? { leaving: CARD_IDS.indexOf(options.turnedFrom) } : {}),
       ...(options.live ? { onExit: (forward: boolean) => go(options.alone ? { at: "desktop" } : forward ? { at: "ending" } : { at: "arrival" }), drawsAhead: true } : {}),
     });
@@ -355,14 +359,14 @@ export function setupRoom(options: SetupOptions): HTMLElement {
   /** A place's layer: words over the wallpaper, or the cards on glass over it out of focus. */
   const layerOf = (at: Place): HTMLElement => {
     if (at.at === "card") {
-      const layer = backdrop({ width, height, picture: blurred, scrim: "glass", content: rail(at.card) });
+      const layer = backdrop({ ...ROOM, picture: blurred, scrim: "glass", content: rail(at.card) });
       layer.classList.add("kobo-panel");
       return layer;
     }
     const content = at.at === "arrival" ? arrivalColumn(views, at.moment ?? "rest", options.hero) : at.at === "ending" ? endingScene(views, skipped, at.going ?? false) : document.createElement("span");
     // The ending's desktop has come close; handed over, it is the desktop as it is.
     const push = at.at === "ending" ? 1 : 0;
-    const layer = backdrop({ width, height, picture: wallpaper, scrim: "band", content, push, dark: at.at === "ending" && at.going ? 1 : 0 });
+    const layer = backdrop({ ...ROOM, picture: wallpaper, scrim: "band", content, push, dark: at.at === "ending" && at.going ? 1 : 0 });
     layer.classList.add("kobo-scene");
     layer.dataset.scene = at.at;
     return layer;
@@ -427,7 +431,7 @@ export function setupRoom(options: SetupOptions): HTMLElement {
     const layer = rail(options.place.at === "card" ? options.place.card : "yours");
     layer.classList.add("setup-layer");
     body.append(layer);
-    const desk = backdrop({ width, height, picture: wallpaper, scrim: "band", content: win });
+    const desk = backdrop({ ...ROOM, picture: wallpaper, scrim: "band", content: win });
     desk.classList.add("kobo-scene", "setup-desk");
     element.append(desk);
   } else draw(place, options.leaving);
@@ -527,11 +531,10 @@ export function onward(sample: () => HTMLElement): Move {
 export function finishing(index: number, sample: () => HTMLElement = () => setupRoom({ place: { at: "card", card: CARD_IDS[index]! }, views: { [CARD_IDS[index]!]: "done", [CARD_IDS[index === 0 ? 1 : index - 1]!]: "done" } })): Move {
   return {
     name: "Done: the card settles",
-    what: "The prompt gives way at once; the status, the rail's check and the wire it joins fade in over `short`.",
+    what: "The prompt gives way at once; the status and the rail's check fade in over `short`.",
     tracks: [
       fading(".k-step-room:not([data-kept]) .setup-status", "the status", "the card"),
       fading(`.k-rail-steps > .k-step:nth-child(${index + 1}) > * > :last-child`, "the check", "the rail"),
-      fading(`.k-rail-wire-lit[data-steps~="${index}"]`, "the wire's light", "the rail"),
     ],
     reduced: "same",
     back: "cuts",

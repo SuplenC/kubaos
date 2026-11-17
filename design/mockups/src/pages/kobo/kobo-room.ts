@@ -99,6 +99,9 @@ export interface RoomOptions {
 /** The room's whole-screen size: the toolbar's window, or a laptop's screen. */
 export const SCREEN = { width: "calc(1280 * var(--px))", height: "calc(800 * var(--px))" };
 
+/** A room's layer's size: the room's own, whatever it is set to. */
+export const ROOM = { width: "var(--kobo-width)", height: "var(--kobo-height)" };
+
 // ---------------------------------------------------------------- Playing --
 
 /** A duration token in milliseconds at the speed picked. */
@@ -667,7 +670,9 @@ export function room(options: RoomOptions): HTMLElement {
   /** The questions under any scene, a scene over the questions. */
   const orderLayers = (layers: Element[]) => [...layers].sort((a, b) => Number(a.classList.contains("kobo-scene")) - Number(b.classList.contains("kobo-scene")));
 
-  const layerOf = (at: At): HTMLElement => ("panel" in at ? panelLayer(flow, at.panel, width, height) : sceneLayer(at, options, width, height));
+  // Its layers take the room's size, so a room made a whole screen (the site's full screen) takes
+  // them with it.
+  const layerOf = (at: At): HTMLElement => ("panel" in at ? panelLayer(flow, at.panel, ROOM.width, ROOM.height) : sceneLayer(at, options, ROOM.width, ROOM.height));
 
   const setPower = (next: Power | undefined) => {
     power = next;
@@ -882,7 +887,7 @@ export const OPENING: Move = {
 /** Let's go: the welcome lifts off, the street goes out of focus, the questions rise in. */
 export const ENTERING: Move = {
   name: "Let's go: into the questions",
-  what: "The welcome's words rise off; the street goes out of focus behind glass; the questions rise in; the wire strikes on.",
+  what: "The welcome's words rise off; the street goes out of focus behind glass; the questions rise in.",
   tracks: [
     { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the words' rise", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "--backdrop-rise", from: 0, to: -1, duration: "medium", curve: "emphasized_accel" },
@@ -890,7 +895,6 @@ export const ENTERING: Move = {
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
     { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
     { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the wire", on: "the rail", target: ".k-rail-wire", property: "opacity", from: 0, to: 1, duration: "medium", cue: ["micro", "long"], curve: "neon.strike" },
   ],
   unflickered: [
     { part: "the welcome's words", on: WELCOME, target: ".kobo-scene > .k-backdrop-thing", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
@@ -899,7 +903,6 @@ export const ENTERING: Move = {
     { part: "the scene's foot", on: WELCOME, target: ".kobo-foot", property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
     { part: "the questions", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "opacity", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
     { part: "their rise", on: "the questions", target: ".kobo-panel > .k-backdrop-thing", property: "--backdrop-rise", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
-    { part: "the wire", on: "the rail", target: ".k-rail-wire", property: "opacity", from: 0, to: 1, duration: "medium", cue: ["micro", "long"], curve: "standard" },
   ],
   reduced: [
     { part: "the welcome", on: WELCOME, target: ".kobo-scene", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },

@@ -60,6 +60,7 @@ export default page<"rest" | "selected">({
     { name: "At the first", for: "nothing done", sample: () => still(0) },
     { name: "Along the way", for: "one done, one current", sample: () => still(1) },
     { name: "At the last", for: "all before it done", sample: () => still(2) },
+    { name: "Four steps", for: "its fourth bead's 4: Kotodama's", sample: () => still(3, ["What", "Why", "Yours", "Try it"]) },
   ],
   sizes: doesntApply("one size: its beads are `type.body`'s symbol, its labels `label`."),
   states: {

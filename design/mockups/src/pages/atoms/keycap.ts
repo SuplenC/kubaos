@@ -1,9 +1,9 @@
-// The Keycap page, with KeyHints: `docs/design/components/keycap.md`. A key drawn as a key, and a
-// line of keys with what each does. A keycap is a picture of a key, not a control: it rests, by
+// The Keycap page, with KeyHints and KeyPrompt: `docs/design/components/keycap.md`. A key drawn as
+// a key, a line of keys with what each does, and the keys to press now, large. A keycap is a picture of a key, not a control: it rests, by
 // night and by day, and never lights.
 
 import type { Words } from "../../lib/content.ts";
-import { inline, type KeyHint, keycap, keyHints } from "../../lib/keycap.ts";
+import { inline, type KeyHint, keycap, keyHints, keyPrompt } from "../../lib/keycap.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
@@ -39,7 +39,7 @@ function caps(): HTMLElement {
 export default page({
   level: "atoms",
   slug: "keycap",
-  title: "Keycap and KeyHints",
+  title: "Keycap, KeyHints and KeyPrompt",
   lede: "A key drawn as a key, and keys side by side with what each does.",
   code: { rust: "keycap::keycap(look, key), keycap::key_hints(look, hints)", qml: "Keycap, KeyHints" },
   stage: {
@@ -56,6 +56,7 @@ export default page({
       for: "a hint that would pass it goes, with all after it",
       sample: () => stack("s8", "start", keyHints(MENU, { room: "calc(180 * var(--px))" }), keyHints(MENU)),
     },
+    { name: "Key prompt", for: "the keys to press now, large and lit", sample: () => row("s32", "centre", keyPrompt("Super+Space"), keyPrompt("Esc")) },
   ],
   sizes: doesntApply("one size: `size.keycap` tall, a line of body text."),
   states: {
@@ -105,6 +106,7 @@ export default page({
       { name: "A letter", for: "square: never narrower than tall", sample: () => keycap("K") },
       { name: "A word", for: "the key and its padding", sample: () => keycap("Ctrl") },
       { name: "Key hints", for: "the gaps", sample: () => keyHints([["Ctrl+K", "Actions"], ["Esc", "back"]]) },
+      { name: "Key prompt", for: "its keys, the plus between", sample: () => keyPrompt("Super+Space") },
     ]),
     measures: [
       { part: "Height, narrowest width", token: "size-keycap" },
@@ -115,6 +117,11 @@ export default page({
       { part: "Keys → words", token: "space-s8" },
       { part: "Between hints", token: "space-s16" },
       { part: "Words' line", token: "type-caption-line" },
+      { part: "A prompt's key, its narrowest", token: "size-control_lg" },
+      { part: "A prompt's key's sides", token: "space-s20" },
+      { part: "A prompt's key's corner", token: "radius-control" },
+      { part: "A prompt's key → plus", token: "space-s12" },
+      { part: "A prompt's tube", token: "focus-tube" },
     ],
     reflow: {
       note: "As the window narrows, the hint that would pass it goes whole, with every one after it.",

@@ -7,7 +7,7 @@ import { type CardId, CARD_IDS, type Views } from "./setup-cards.ts";
 import { finishing, onward, setupRoom, type SetupOptions } from "./setup-room.ts";
 
 /** Where each card ends when it is gone through in order: the apps in, the drivers' key queued. */
-const WALKED: Views = { yours: "done", git: "done", drivers: "queued", fingerprint: "done", yubikey: "done", phone: "done" };
+const WALKED: Views = { yours: "done", kotodama: "done", git: "done", drivers: "queued", fingerprint: "done", yubikey: "done", phone: "done" };
 
 /** The way to `card` taken in order: the cards before it gone through, the ones after it untouched. */
 function walk(card: CardId): Partial<Views> {
@@ -40,7 +40,7 @@ export function fullHd(card: CardId, view: string): () => HTMLElement {
   return atCard(card, view, { width: "calc(1920 * var(--px))", height: "calc(1080 * var(--px))" });
 }
 
-/** `card`'s work finishing at `view`, beside a card done already, so the wire has a run to light. */
+/** `card`'s work finishing at `view`, beside a card done already. */
 export function finishesAt(card: CardId, view: string): Move {
   const index = CARD_IDS.indexOf(card);
   const neighbour = CARD_IDS[index === 0 ? 1 : index - 1]!;

@@ -1235,6 +1235,10 @@
   left: 0;
 }
 
+.k-field-placeholder {
+  right: 0;
+}
+
 .k-field-line {
   left: var(--shift);
   height: 100%;
@@ -1359,6 +1363,24 @@
   position: relative;
   padding: 0 var(--space-s4);
   margin-left: round(nearest, calc((max(var(--size-keycap), var(--inner)) - var(--inner)) / 2), 1px);
+}
+
+/* A KeyPrompt's key (`keyPrompt` in `lib/keycap.ts`): the keys to press now, each a large key in
+   the primary's tube, glowing at night as a lit control does and not by day. */
+.k-key-prompt-cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: var(--size-control_lg);
+  min-width: var(--size-control_lg);
+  padding: 0 var(--space-s20);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+  box-shadow:
+    inset 0 0 0 var(--focus-tube) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day))));
 }
 
 /* Key hints given a room: a hint past it wraps onto a line of its own, which is cut away, and so
@@ -1534,8 +1556,42 @@
   right: 0;
 }
 
-.k-tip-anchor:has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
+.k-tip-anchor:not([data-shows="pressed"]):has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
 .k-tip-anchor > .k-tooltip[data-shown] {
+  opacity: 1;
+}
+
+/* A term's card (`termed` in `lib/tooltip.ts`): beside its sentence in the layout, drawn over the
+   word by the word's anchor, `space.s8` above it and from its start, as a floating card is. */
+.k-term-room {
+  position: relative;
+  display: block;
+}
+
+.k-term {
+  cursor: help;
+  outline: none;
+  text-decoration: underline dotted;
+  text-underline-offset: var(--stroke-thin);
+}
+
+.k-term:focus-visible {
+  border-radius: var(--radius-small);
+  box-shadow: 0 0 0 var(--focus-tube) var(--color-cold);
+}
+
+.k-term-room > .k-tooltip {
+  position: absolute;
+  z-index: 3;
+  bottom: round(nearest, calc(anchor(top) + var(--space-s8)), 1px);
+  left: round(nearest, anchor(left), 1px);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.k-term-room:has(.k-term:is(:hover, :focus-visible)) > .k-tooltip,
+.k-term-room > .k-tooltip[data-shown] {
   opacity: 1;
 }
 
@@ -3553,9 +3609,10 @@
 }
 
 .k-stepper-bead {
-  display: grid;
+  display: flex;
   flex: none;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
   width: var(--type-body-icon);
   height: var(--type-body-icon);
@@ -3567,7 +3624,19 @@
   transition: background var(--motion-short) var(--easing-standard), box-shadow var(--motion-short) var(--easing-standard);
 }
 
-.k-stepper-bead > .k-text {
+/* The number: a plain line one em tall, its box trimmed to its figures' height (the cap height
+   down to the baseline), so the bead, centring it both ways, centres the ink (`number` in
+   `lib/stepper.ts`). */
+.k-stepper-number {
+  margin: 0;
+  padding: 0;
+  text-box: trim-both cap alphabetic;
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  font-feature-settings: var(--t-features);
+  line-height: 1;
+  white-space: pre;
   color: var(--number);
   transition: color var(--motion-short) var(--easing-standard);
 }
@@ -3588,6 +3657,6 @@
 
 [data-reduced] .k-stepper-step,
 [data-reduced] .k-stepper-bead,
-[data-reduced] .k-stepper-bead > .k-text {
+[data-reduced] .k-stepper-number {
   transition-duration: 0s;
 }

@@ -155,20 +155,17 @@ function arriving(on: string): readonly [Track<"emphasized_decel">, Track<"empha
   ];
 }
 
-/** The wire's light moving from step `from` to `to`, then the symbol it reaches lighting as it arrives. */
-function travelling(from: number, to: number): readonly [Track<"emphasized_decel">, Track<"standard">] {
-  return [
-    { part: "wire", on: "the rail", target: ".k-rail-wire-lit", property: "--wire-lit", from, to, duration: "long", curve: "emphasized_decel" },
-    { part: "symbol", on: "the step arrived at", target: `.k-rail-steps > .k-step:nth-child(${to + 1}) .k-step-bead`, property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
-  ];
+/** The rail arriving at step `to`: its symbol lights, `medium` in. */
+function travelling(to: number): readonly [Track<"standard">] {
+  return [{ part: "symbol", on: "the step arrived at", target: `.k-rail-steps > .k-step:nth-child(${to + 1}) .k-step-bead`, property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" }];
 }
 
 const FADE_ONLY = (on: string): Track<"emphasized_decel"> => ({ part: "fade", on, target: ROOM, property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" });
 
 const ON: Move = {
   name: "Continue: the next page arrives",
-  what: "Continue or Enter: the new page slides in from the right, the wire's light growing to the next symbol.",
-  tracks: [...arriving("the page"), ...travelling(1, 2)],
+  what: "Continue or Enter: the new page slides in from the right; the next step's symbol lights.",
+  tracks: [...arriving("the page"), ...travelling(2)],
   reduced: [FADE_ONLY("the page")],
   back: "cuts",
   sample: () => framed(updater({ current: 2, arriving: { forward: true, shown: 1 } }), undefined, SAMPLE_HEIGHT),
@@ -179,7 +176,7 @@ const SHOWN = ".k-step-room:not([data-kept])";
 
 const KOBO_ON: Move = {
   name: "In Kōbō: the next question",
-  what: "The page left slides off and fades over `short`; the next slides in from the right, its band a `micro` after it.",
+  what: "The page left slides off; the next slides in from the right, its band a `micro` after; its step lights.",
   tracks: [
     { part: "the page left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
     { part: "its slide off", on: "the page", target: ".k-step-room[data-leaving]", property: "--step-slide", from: 0, to: 1, duration: "short", curve: "emphasized_accel" },
@@ -187,7 +184,7 @@ const KOBO_ON: Move = {
     { part: "its slide in", on: "the page", target: SHOWN, property: "--step-slide", from: 1, to: 0, duration: "long", cue: "short", curve: "emphasized_decel" },
     { part: "the band", on: "the page", target: `${SHOWN} .k-step-footer`, property: "opacity", from: 0, to: 1, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
     { part: "the band's rise", on: "the page", target: `${SHOWN} .k-step-footer`, property: "--step-rise", from: 1, to: 0, duration: "long", cue: ["short", "micro"], curve: "emphasized_decel" },
-    ...travelling(1, 2),
+    { part: "symbol", on: "the step arrived at", target: ".k-rail-steps > .k-step:nth-child(3) .k-step-bead", property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the page left", on: "the page", target: ".k-step-room[data-leaving]", property: "opacity", from: 1, to: 0, duration: "instant", curve: "standard" },
@@ -199,8 +196,8 @@ const KOBO_ON: Move = {
 
 const BACK: Move = {
   name: "Back: the page before arrives",
-  what: "Back, Esc or a done step: the same from the left, the wire retracting.",
-  tracks: [...arriving("the page"), ...travelling(2, 1)],
+  what: "Back, Esc or a done step: the same from the left; the symbol left goes out.",
+  tracks: [...arriving("the page"), ...travelling(1)],
   reduced: [FADE_ONLY("the page")],
   back: "cuts",
   sample: () => framed(updater({ current: 1, arriving: { forward: false, shown: 1 } }), undefined, SAMPLE_HEIGHT),
@@ -345,8 +342,6 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
       { part: "Brand → steps", token: "space-s20" },
       { part: "Key → its words", token: "space-s8" },
       { part: "Between hints; under the lockup", token: "space-s4" },
-      { part: "Wire's thickness", token: "step_rail-wire" },
-      { part: "Wire short of a symbol", token: "step_rail-bead" },
       { part: "Page's top, its slide; Kōbō's inset", token: "space-s32" },
       { part: "Page's foot", token: "space-s24" },
       { part: "Band's buttons", token: "size-control_md" },

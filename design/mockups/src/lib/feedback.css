@@ -412,11 +412,9 @@
   --step-muted: var(--color-on_surface_variant);
 }
 
-/* A rail step's symbol, a bead on the rail's progress wire (`lib/step-rail.css`): the tube runs
-   into it, so it is lit as the tube is. Not reached, it is unlit, in the muted ink beside the unlit
-   tube; once its step is reached (done or current) it is `primary`, glowing at night with the
-   tube's glow, near and far, while the signs are on, and by day with none. A step that failed
-   keeps its `error` symbol, with no glow. */
+/* A rail step's symbol (`lib/step-rail.css`). Not reached, it is unlit, in the muted ink; once its
+   step is reached (done or current) it is `primary`, glowing at night near and far while the signs
+   are on, and by day with none. A step that failed keeps its `error` symbol, with no glow. */
 .k-step-bead {
   display: flex;
   flex: none;
@@ -455,4 +453,55 @@
   flex: none;
   width: var(--type-body_strong-icon);
   height: var(--type-body_strong-icon);
+}
+
+/* The Task (`lib/task.ts`): a card with a round tick and its words; done, it lights as a picked
+   card does and its tick fills. */
+.k-task {
+  box-sizing: border-box;
+  min-height: var(--size-row_two_line);
+  padding: var(--space-s12) var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+  transition: box-shadow var(--motion-medium) var(--easing-standard), background var(--motion-medium) var(--easing-standard);
+}
+
+.k-task[data-pressable] {
+  cursor: pointer;
+}
+
+.k-task[data-done] {
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+  box-shadow:
+    inset 0 0 0 var(--focus-tube) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day))));
+}
+
+.k-task-tick {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--size-check);
+  height: var(--size-check);
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 var(--stroke-thin) var(--color-outline);
+  color: transparent;
+}
+
+/* The tick: `icon.s16` centred in the disc on a whole device pixel, as a checkbox's is. */
+.k-task-tick > .k-icon {
+  position: absolute;
+  left: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
+  top: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
+}
+
+.k-task[data-done] .k-task-tick {
+  background: var(--color-primary_fill);
+  box-shadow: none;
+  color: var(--color-on_primary_fill);
+}
+
+[data-reduced] .k-task {
+  transition-duration: 0s;
 }

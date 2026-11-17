@@ -20,8 +20,12 @@ import { paint, palette } from "./recolour.ts";
 import { ALL, apply, CHROME, type Mode, settings } from "./settings.ts";
 import { settle } from "./settle.ts";
 
-/** The properties a screen's size is set by, width then height. */
+/**
+ * The properties a screen's size is set by, width then height. A Kōbō room is a whole screen whose
+ * layers follow its size, so the room's is the one set.
+ */
 const SIZES = [
+  ["--kobo-width", "--kobo-height"],
   ["--screen-width", "--screen-height"],
   ["--backdrop-width", "--backdrop-height"],
 ] as const;

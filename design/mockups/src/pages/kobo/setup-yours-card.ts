@@ -258,7 +258,7 @@ export function yoursCard(view: string, options: { readonly hood?: boolean } = {
       // The first apps only it brings, then a count of the rest: what the pick means, at a glance.
       const own = brings.filter((each) => each.profiles.length < PROFILES.length).slice(0, 4);
       const foot = [...own.map((each) => ({ glyph: each.icon, label: each.name })), { glyph: "add", label: `and ${brings.length - own.length} more` }];
-      return choiceCard({ glyph: profile.icon, title: profile.title, subtitle: profile.line, size: "Lg", picks: "many", picked: state.picked.has(profile.id), foot });
+      return choiceCard({ glyph: profile.icon, title: profile.title, subtitle: profile.line, size: "Lg", picks: "many", mark: false, picked: state.picked.has(profile.id), foot });
     });
     const group = choiceGroup("many", 3, cards);
     group.classList.add("setup-yours-profiles");

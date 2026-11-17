@@ -139,3 +139,310 @@
 .setup-yours-figure {
   text-shadow: 0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * (1 - var(--day))));
 }
+
+/* Kotodama's steps (`setup-kotodama-card.ts`) turn as Make it yours's do: the step left laid over
+   the one arriving until it has gone, each sliding `space.s24`, `--kotodama-slide` the share of it
+   still to go. */
+@property --kotodama-slide {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.setup-kotodama-room {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.setup-kotodama-step {
+  display: flex;
+  flex-direction: column;
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 0;
+  translate: round(nearest, calc(var(--kotodama-slide) * var(--space-s24)), 1px) 0;
+}
+
+.setup-kotodama-step > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.setup-kotodama-step[data-leaving] {
+  pointer-events: none;
+}
+
+/* The stand-in menu fills its room; the panel keeps its own measures in it, at its top, and its
+   Toasts rise over the panel's footer as the menu's do. */
+.setup-kotodama-menu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-toasts {
+  bottom: calc(var(--size-control_sm) + 3 * var(--space-s12));
+}
+
+/* What's left column stands in the middle of its room's height, as the menu beside it is tall. */
+.setup-kotodama-what {
+  justify-content: center;
+  height: 100%;
+}
+
+/* An example on What, lit while the menu beside it plays it (its tile takes the accent); the
+   others recede. */
+.setup-kotodama-example {
+  height: var(--size-row);
+  opacity: var(--opacity-subdued);
+  transition: opacity var(--motion-medium) var(--easing-standard);
+}
+
+.setup-kotodama-example[data-lit] {
+  opacity: 1;
+}
+
+/* The race's room: the grid takes the height under the header. */
+.setup-kotodama-lanes {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-race {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* Kotodama's lane, the menu itself in the primary's lit tube, filling the lane. */
+.setup-kotodama-ours {
+  display: flex;
+  min-height: 0;
+  border-radius: var(--radius-surface);
+  box-shadow:
+    0 0 0 var(--focus-tube) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day))));
+}
+
+.setup-kotodama-ours > .setup-kotodama-menu {
+  flex: 1 1 0;
+}
+
+/* The other menus, drained of colour, their answers cut where the panel ends; Start's
+   ad over them in every loud colour there is. */
+.setup-kotodama-other {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+.setup-kotodama-sad {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: var(--space-s12);
+}
+
+/* Everything but the ad is drained of colour; the ad keeps all of its. */
+.setup-kotodama-sad > :not(.setup-kotodama-answers),
+.setup-kotodama-answers > :not(.setup-kotodama-under),
+.setup-kotodama-under > :not(.setup-kotodama-ad) {
+  filter: grayscale(1);
+}
+
+.setup-kotodama-answers {
+  overflow: hidden;
+}
+
+/* Each answer keeps its height: one that doesn't fit shows as the lane running short, which drops
+   a beat (`otherMenu`), never as a squashed row. */
+.setup-kotodama-answers > * {
+  flex-shrink: 0;
+}
+
+/* A lane short of room leaves beats out, fullest first (`otherMenu`): the news; then the game and
+   the groups' labels. The ad stays whole. */
+.setup-kotodama-other:not([data-fit="tall"]) [data-extra="stories"],
+.setup-kotodama-other[data-fit="short"] :is([data-extra], .setup-kotodama-plabel) {
+  display: none;
+}
+
+/* The ad and the groups it covers in one cell, the ad over them. */
+.setup-kotodama-under {
+  display: grid;
+}
+
+.setup-kotodama-under > * {
+  grid-area: 1 / 1;
+}
+
+/* The other menu's flat rows and the labels over their groups. */
+.setup-kotodama-prow {
+  box-sizing: border-box;
+  min-height: var(--size-control_sm);
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-row);
+}
+
+.setup-kotodama-prow[data-best] {
+  background: var(--color-surface_container_highest);
+}
+
+.setup-kotodama-plabel {
+  padding: var(--space-s4) var(--space-s8) 0;
+}
+
+/* A search's bar crawling under the field while the other menu thinks. */
+.setup-kotodama-crawl {
+  display: block;
+  transition: opacity var(--motion-medium) var(--easing-standard);
+  /* A thin stroke on whole device pixels, so what is under it is on them too. */
+  height: max(1px, round(nearest, var(--stroke-thin), 1px));
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, transparent, var(--color-cold), transparent) no-repeat;
+  background-size: 40% 100%;
+  animation: setup-kotodama-crawl var(--motion-scene) var(--easing-linear) infinite;
+}
+
+.setup-kotodama-crawl[data-done] {
+  opacity: 0;
+  animation: none;
+}
+
+[data-reduced] .setup-kotodama-crawl {
+  animation: none;
+  background-position: 0 0;
+}
+
+@keyframes setup-kotodama-crawl {
+  from {
+    background-position: -40% 0;
+  }
+
+  to {
+    background-position: 140% 0;
+  }
+}
+
+.setup-kotodama-ad {
+  position: relative;
+  z-index: 1;
+  align-self: start;
+  box-sizing: border-box;
+  padding: var(--space-s12);
+  border-radius: var(--radius-content);
+  background: var(--color-burn_warning);
+  box-shadow: 0 var(--space-s8) var(--space-s24) rgb(from var(--color-surface_container_lowest) r g b / var(--opacity-scrim));
+}
+
+/* The fine print's unknown word asks to be asked about: marked as a term is (a dotted underline,
+   the help pointer), its answer shown while the pointer is on it. The anchor stays a run of the
+   sentence, so the words around it keep their spacing and the line wraps as text does. */
+.setup-kotodama-ad-tag {
+  display: inline-flex;
+  flex: none;
+  padding: 0 var(--space-s4);
+  border-radius: var(--radius-small);
+  background: var(--color-on_burn_warning);
+}
+
+.setup-kotodama-ad-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+  border-radius: var(--radius-control);
+  background: var(--color-error);
+}
+
+/* Try it's room: the menu, or before it opens, its keys in an outlined room the menu's size. */
+.setup-kotodama-try {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.setup-kotodama-try > .setup-kotodama-invitation {
+  flex: 1 1 0;
+  justify-content: center;
+  border-radius: var(--radius-surface);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+  cursor: pointer;
+}
+
+
+/* Key cards: each title on one line; three across while they fit, fewer under it. */
+/* Opens with's cards, side by side across the body; where three don't fit with their titles on
+   one line, they wrap. */
+.setup-kotodama-keycards {
+  --tracks: repeat(auto-fit, minmax(calc(var(--size-rail) - var(--space-s20)), 1fr));
+}
+
+.setup-kotodama-keycards .k-card-title {
+  white-space: nowrap;
+}
+
+.setup-kotodama-keycards .k-card-title {
+  white-space: nowrap;
+}
+
+/* A setting's words and its choice: side by side, the choice wrapping under them when short. */
+.setup-kotodama-choice {
+  flex-wrap: wrap;
+  row-gap: var(--space-s8);
+}
+
+.setup-kotodama-choice > :first-child {
+  flex: 1 0 auto;
+}
+
+.setup-kotodama-choice > :last-child {
+  flex: none;
+}
+
+/* The ad's button answers back: its card shows only once pressed (`fakeAd`), never on hover. It
+   stretches across the ad as the button did. */
+.setup-kotodama-ad-reply {
+  display: flex;
+}
+
+.setup-kotodama-ad-reply > .k-button {
+  flex: 1 1 0;
+}
+
+/* Yours: what it finds on the left, the options on the right, in the step's one scroll; stacked,
+   the list first, where the room is too narrow for both. The columns split the room in whole
+   device pixels, an odd spare one to the first, as the library's grid does. */
+.setup-kotodama-yours {
+  display: grid;
+  grid-template-columns: round(up, calc((100% - var(--space-s24)) / 2), 1px) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-s24);
+}
+
+.setup-kotodama-yours[data-stacked] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* An option row with a control of its own: its clicks are the control's, and it takes no
+   pointer of its own. */
+.k-list-row[data-control] {
+  cursor: default;
+}
+

@@ -22,7 +22,7 @@ import { focusRing, glowMask } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
-import { advance, text, wrapped } from "./text.ts";
+import { advance, clamped, text, wrapped } from "./text.ts";
 import { length, number, raw } from "./tokens.ts";
 
 /** How a field shows its value: editable, wrong, read-only, or not usable now. */
@@ -250,7 +250,8 @@ export function field(options: FieldOptions = {}): HTMLElement {
     element.toggleAttribute("data-selecting", from !== to);
     element.style.setProperty("--caret-at", String(upTo(shown, caret.pos)));
     if (shown === "") {
-      const placeholder = text(options.placeholder ?? "", "body_large");
+      // One line across the room, ending in an ellipsis where the field is narrower than it.
+      const placeholder = clamped(options.placeholder ?? "", "body_large");
       placeholder.style.color = "var(--placeholder)";
       placeholder.classList.add("k-field-placeholder");
       room.replaceChildren(...(options.placeholder ? [placeholder] : []));

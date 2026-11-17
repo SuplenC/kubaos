@@ -8,9 +8,9 @@
 //
 // To do is a Neutral chip, done an Accent chip with a check (a Neutral one on the selected row,
 // where the accent's tint leaves its label under 4.5:1), an action a Filled chip with its symbol;
-// the current step is the selected row, on `secondary_container`. In a rail the symbol is a bead on
-// the rail's progress wire: lit in `primary` once its step is reached, the current one glowing at
-// night and humming while it runs, and the current row is a quiet fill. A pressable step is a
+// the current step is the selected row, on `secondary_container`. In a rail the symbol is lit in
+// `primary` once its step is reached, glowing at night, the current one humming while it runs, and
+// the current row is a quiet fill. A pressable step is a
 // control: lit, the accent's tube inside its edge with the glow outside at night; pressed, the
 // tube runs white-hot by night and the tone tints its fill by day.
 //
@@ -93,7 +93,7 @@ function stateMark(state: StepState, words?: StepOptions["words"]): Element {
   return room;
 }
 
-/** A rail step's symbol, as a bead on the rail's progress wire: what lights and hums. */
+/** A rail step's symbol: what lights and hums. */
 function bead(symbol: Element): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-step-bead";

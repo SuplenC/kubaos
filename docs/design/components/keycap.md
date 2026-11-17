@@ -1,4 +1,4 @@
-# Keycap and KeyHints
+# Keycap, KeyHints and KeyPrompt
 
 Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#components) has the rules every component keeps, its variant words and the fixed measures the geometry check holds it to.
 
@@ -16,3 +16,9 @@ Keys and what each does, side by side, 16 apart: a combination's keys as keycaps
 
 - **A key hint is never text on text.** Every key named on screen is a `Keycap`: the Command menu's footer, its Action panel and its detail pane, Kōbō's rail, footers and screens, the control center's Bluetooth and keyboard sections, the wallpaper picker, the clock. The one exception is a `Hint` bubble, a single line of `label` text, which names a key in words (the keyboard layout pill's "SUPER+SHIFT+Space"). The key stands out as a key, so the eye finds it first and reads what it does after.
 - **Inline with text**: a keycap in a sentence ("Press `Space` to pick") sits in a row centred on the line, 4 from the words.
+
+## `KeyPrompt`
+
+The mockups' `keyPrompt(combination)`. *Not built yet: neither library has it.*
+
+The keys a surface asks to be pressed now, drawn large: each key 48 tall (`control_lg`) and never narrower than tall, its name in `button_large`, 20 either side (`s20`), on `surface_container_high` at the control radius (12), in the primary's tube (`focus.tube`), glowing at night with the focus family's near and far glow and not by day, as a lit control does. A `+` in `subheading` and `on_surface_variant` stands between each two keys, 12 apart (`s12`). It is the one key a step is about, alone on its screen: first boot's Kotodama card shows the key that opens the Command menu with it, and its Try it step waits on those keys. It is still a picture, not a control: it takes no focus, nothing presses it, and it has no states of its own. A line of keys among words is a `Keycap` or `KeyHints`, never a prompt.

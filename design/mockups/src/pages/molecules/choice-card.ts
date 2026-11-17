@@ -94,6 +94,7 @@ export default page({
   sizes: [
     { name: "md", for: "a set of options", sample: () => boxed(SHELL) },
     { name: "lg", for: "a page's whole question", sample: () => within(HALF, choiceCard({ ...SHELL, size: "Lg", picks: "many", picked: true })) },
+    { name: "lg without its mark", for: "picked said by its light alone", sample: () => within(HALF, choiceCard({ ...SHELL, size: "Lg", picks: "many", picked: true, mark: false })) },
   ],
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],

@@ -10,7 +10,7 @@
 // flow are a StepRailPage's rail, never a Stepper.
 
 import { probe, variant } from "./probe.ts";
-import { text } from "./text.ts";
+import { text, typeset } from "./text.ts";
 
 export interface StepperOptions {
   readonly steps: readonly string[];
@@ -32,6 +32,20 @@ function setState(step: HTMLButtonElement, state: State, onBack?: (index: number
   if (state === "current") step.setAttribute("aria-current", "step");
 }
 
+/**
+ * A bead's number: a plain line of `label` (one figure in a fixed bead needs no tabular width, and
+ * the proportional figures sit nearer the middle), its line height one em and its box trimmed to the
+ * figures' height, which the bead centres both ways as a flex box does. It is no probed text, so the site's
+ * centring pass (`lib/centre.ts`) leaves it where the browser puts it.
+ */
+function number(words: string): HTMLElement {
+  const figure = document.createElement("span");
+  figure.className = "k-stepper-number";
+  typeset(figure, "label");
+  figure.textContent = words;
+  return figure;
+}
+
 /** One step: its bead with its number, then its label, a button only while it is done. */
 function bead(label: string, index: number, state: State, onBack?: (index: number) => void): HTMLButtonElement {
   const step = document.createElement("button");
@@ -44,7 +58,7 @@ function bead(label: string, index: number, state: State, onBack?: (index: numbe
   });
   const disc = document.createElement("span");
   disc.className = "k-stepper-bead";
-  disc.append(text(String(index + 1), "label_number"));
+  disc.append(number(String(index + 1)));
   step.append(disc, text(label, "label"));
   setState(step, state, onBack);
   return step;

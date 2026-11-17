@@ -197,6 +197,8 @@ export interface MenuOptions {
   readonly hints?: readonly KeyHint[];
   /** Over the body's foot, `space.s12` clear of the footer's hairline: the Action panel, a Toast. */
   readonly over?: readonly HTMLElement[];
+  /** What taking a Result does, by its index: Enter or a click runs its first Action. */
+  readonly onTake?: (index: number) => void;
 }
 
 /**
@@ -216,7 +218,7 @@ export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLE
   const above = options.above ? [filling(options.above), gap("s12")] : [];
   const list = scrollingList(
     options.results.map((each) => each.row),
-    { height: options.above ? "100%" : px(body), slides: true, current: options.current ?? 0, fieldKeys: true, vimKeys: false },
+    { height: options.above ? "100%" : px(body), slides: true, current: options.current ?? 0, fieldKeys: true, vimKeys: false, ...(options.onTake ? { onTake: options.onTake } : {}) },
   );
   const shown = options.results.length > 0 ? list : noResults(body, options.query ?? "");
   const results = stack(0, "start", ...above, options.above ? fillingHeight(filling(shown)) : filling(shown));

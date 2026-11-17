@@ -1,5 +1,5 @@
 // What the pages of Kōbō's questions share: the room drawn at a question, the moves between them
-// (the question left sliding off, the next one in as the rail's wire runs on to it, the blocker's
+// (the question left sliding off, the next one in as its step on the rail lights, the blocker's
 // flash), and their measures.
 
 import { type Measure, type Move, type NonEmpty, screen, type Track } from "../../site/page.ts";
@@ -30,7 +30,7 @@ export function live(panel: Panel, answers: (machine: Machine) => Partial<Answer
 /**
  * Continue onto `panel`: the question left slides off to the left and fades over `short`; as it
  * goes, `panel` slides in from the right and fades in over `long`, its footer band rising a `micro`
- * after it; the wire's light runs on to its step, whose symbol lights as it arrives.
+ * after it; its step's symbol lights as it arrives.
  */
 /**
  * The page turning in Kōbō: the page left slides off and fades over `short`; as it goes, the next
@@ -64,13 +64,12 @@ export function onward(panel: Panel, answers: (machine: Machine) => Partial<Answ
   const tracks: NonEmpty<Track<"emphasized_accel"> | Track<"emphasized_decel"> | Track<"standard">> = [
     // Last look holds its action in its body: it has no band to follow it in.
     ...turning(panel !== "review"),
-    { part: "the wire", on: "the rail", target: ".k-rail-wire-lit", property: "--wire-lit", from: Math.max(0, index - 1), to: index, duration: "long", curve: "emphasized_decel" },
     { part: "the symbol lit", on: "the step arrived at", target: symbol, property: "--bead-lit", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
     { part: "the symbol's glow", on: "the step arrived at", target: symbol, property: "--bead-glow", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
   ];
   return {
     name: "Continue: the next question",
-    what: "The question left slides off and fades; the next slides in from the right, its band after it; the wire runs on.",
+    what: "The question left slides off and fades; the next slides in from the right, its band after it; its step lights.",
     tracks,
     reduced: TURNING_REDUCED,
     back: "cuts",

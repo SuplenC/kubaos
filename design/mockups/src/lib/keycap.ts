@@ -6,6 +6,11 @@
 //
 // A keycap is a picture of a key, not a control: it has no states of its own and takes no focus.
 // On a lit menu item its key and its edge take the item's light, in `primary`.
+//
+// A KeyPrompt is the one place keys are drawn to be pressed now: the keys a surface asks for, large,
+// each `size.control_lg` tall in `button_large` on the high container, in the primary's tube and
+// glowing at night as a lit control does, a `+` in `subheading` between them. It is still a picture:
+// it takes no focus and nothing presses it.
 
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
@@ -83,6 +88,19 @@ export function keyHints(hints: readonly KeyHint[], options: KeyHintsOptions = {
     line.style.setProperty("--room", options.room);
   }
   return probe(line, { role: "component", name: "KeyHints", variant: "", fixed: { width: false, height: false } });
+}
+
+/** The keys of `combination`, large and lit, a `+` between each two, `space.s12` apart. */
+export function keyPrompt(combination: string): HTMLElement {
+  const parts = keys(combination).flatMap((key, at) => {
+    const cap = document.createElement("span");
+    cap.className = "k-key-prompt-cap";
+    cap.append(text(key, "button_large"));
+    return at === 0 ? [cap] : [text("+", "subheading", "on_surface_variant"), cap];
+  });
+  const line = row("s12", "centre", ...parts);
+  line.classList.add("k-key-prompt");
+  return probe(line, { role: "component", name: "KeyPrompt", variant: "", fixed: { width: false, height: true } });
 }
 
 /** `parts` on one line, `space.s4` apart, centred down it: a keycap inline with words. */

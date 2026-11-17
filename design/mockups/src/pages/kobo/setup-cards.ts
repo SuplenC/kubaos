@@ -13,15 +13,16 @@ import type { LogLine } from "../../lib/log.ts";
 import type { Duration } from "../../site/page.ts";
 import { KNOWN, type Maker, MAKERS } from "./setup-data.ts";
 
-export type CardId = "yours" | "git" | "drivers" | "fingerprint" | "yubikey" | "phone";
+export type CardId = "yours" | "kotodama" | "git" | "drivers" | "fingerprint" | "yubikey" | "phone";
 
 /**
  * The order the rail keeps. Make it yours leads: it is the one card every machine has, and its
- * installs run in the background while the person goes through the rest. Git after it, while
+ * installs run in the background while the person goes through the rest. Kotodama next, so the one
+ * key that finds those apps, and everything else, is learnt while they land. Git after it, while
  * what the machine is for is in mind. Drivers next, so a reboot it needs is known before the
  * cards that only want a finger, a key or a phone.
  */
-export const CARD_IDS: readonly CardId[] = ["yours", "git", "drivers", "fingerprint", "yubikey", "phone"];
+export const CARD_IDS: readonly CardId[] = ["yours", "kotodama", "git", "drivers", "fingerprint", "yubikey", "phone"];
 
 /** `kubaos_core::setup::State`. */
 export type Engine = "done" | "needed" | "reboot" | "waiting" | "absent";
@@ -361,6 +362,44 @@ const yours: Card = {
   auto: {},
 };
 
+// ---------------------------------------------------------------- Kotodama --
+
+/**
+ * Kotodama, the Command menu, draws its own body, live (`setup-kotodama-card.ts`): what it is, why,
+ * its settings, then the menu itself to try. It installs nothing and needs nothing, so every view
+ * but the last is the same need: go through it, or skip it.
+ */
+const kotodama: Card = {
+  id: "kotodama",
+  title: "Kotodama",
+  icon: "search",
+  accent: "言霊",
+  why: "The Command menu: one key, type what you want, Enter. Everything on this machine is in it.",
+  skip: "Skip it and it works as it is: Super + Space, any time.",
+  later: "Set up the Command menu",
+  first: "what",
+  views: {
+    what: { state: "needed", summary: "Not seen yet." },
+    why: { state: "needed", summary: "Not seen yet." },
+    "why-mid": { state: "needed", summary: "Not seen yet." },
+    "why-tip": { state: "needed", summary: "Not seen yet." },
+    "why-reply": { state: "needed", summary: "Not seen yet." },
+    yours: { state: "needed", summary: "Not seen yet." },
+    "yours-changed": { state: "needed", summary: "Alt + Space, no web search." },
+    try: { state: "needed", summary: "Not tried yet." },
+    "try-open": { state: "needed", summary: "Opened." },
+    "try-typed": { state: "needed", summary: "Opened, wifi typed." },
+    "try-ticked": { state: "needed", summary: "Tried all three." },
+    done: { state: "done", summary: "Super + Space, everything in it." },
+  },
+  asks: () => [],
+  facts: () => [],
+  command: "kotodama config",
+  action: () => undefined,
+  act: {},
+  auto: {},
+};
+
 // ------------------------------------------------------------- Fingerprint --
 
 const READER = "Goodix MOC Fingerprint Sensor (27c6:609c)";
@@ -573,20 +612,20 @@ const phone: Card = {
   auto: { starting: ["waiting", "scene"], waiting: ["request", "slow"], pairing: ["done", "scene"] },
 };
 
-export const CARDS: Readonly<Record<CardId, Card>> = { yours, git, drivers, fingerprint, yubikey, phone };
+export const CARDS: Readonly<Record<CardId, Card>> = { yours, kotodama, git, drivers, fingerprint, yubikey, phone };
 
 /** The views a card is at: the sample laptop's first boot, with `more` on top. */
 export type Views = Readonly<Record<CardId, string>>;
 
 export function firstViews(more: Partial<Views> = {}): Views {
-  return { yours: yours.first, git: git.first, drivers: drivers.first, fingerprint: fingerprint.first, yubikey: yubikey.first, phone: phone.first, ...more };
+  return { yours: yours.first, kotodama: kotodama.first, git: git.first, drivers: drivers.first, fingerprint: fingerprint.first, yubikey: yubikey.first, phone: phone.first, ...more };
 }
 
 /** A desktop of a maker the Drivers card doesn't know, with no reader: one card not there. */
 export const TOWER: Partial<Views> = { drivers: "unknown", fingerprint: "absent" };
 
 /** What every card ends at once it was done, for the ending. */
-export const ALL_DONE: Views = { yours: "done", git: "done", drivers: "done", fingerprint: "done", yubikey: "done", phone: "done" };
+export const ALL_DONE: Views = { yours: "done", kotodama: "done", git: "done", drivers: "done", fingerprint: "done", yubikey: "done", phone: "done" };
 
 /** Whether the card wants attention: `State::open`. */
 export function open(view: View): boolean {

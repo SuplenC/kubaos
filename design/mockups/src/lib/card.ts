@@ -129,6 +129,12 @@ export interface ChoiceCardOptions {
   readonly picked?: boolean;
   /** One of a set picked as radios (a disc), or any as checkboxes (a box). */
   readonly picks?: Picks;
+  /**
+   * The disc or box at the end of its first line; true unless set. An lg card may go without it,
+   * picked said by its light alone (the tube, the glow, the lit tile and title): a few large
+   * choices that are a page's whole question, where the light is unmistakable.
+   */
+  readonly mark?: boolean;
   readonly disabled?: boolean;
   readonly pinned?: Pinned;
 }
@@ -217,7 +223,7 @@ function large(options: ChoiceCardOptions, picks: Picks): HTMLElement[] {
   // The tile and its symbol are lit with the card, so their colours are the card's to say.
   tile.style.setProperty("--tint", "var(--tile-tint)");
   tile.querySelector<SVGElement>(".k-icon")?.style.setProperty("color", "var(--tile-ink)");
-  const lead = row(0, "start", tile, fill(), mark(picks));
+  const lead = row(0, "start", tile, ...(options.mark === false ? [] : [fill(), mark(picks)]));
   const title = wrapped(options.title, "heading");
   title.classList.add("k-card-title");
   title.style.color = "var(--title-colour, var(--color-on_surface))";
