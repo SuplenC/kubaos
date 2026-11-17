@@ -1,0 +1,27 @@
+# calibre from nixpkgs, through the User flake: 9.14, where Ubuntu's archive has 9.2, a dozen
+# releases behind, as calibre ships every two weeks. calibre keeps no apt repository, and its own
+# installer is a script piped into Python.
+# https://calibre-ebook.com/download_linux
+name = "calibre"
+category = "office"
+tags = ["ebooks", "library", "epub", "kindle", "reader", "converter"]
+summary = "Your e-books, converted, tagged and sent to the reader. Looks like 2009 and couldn't care less."
+# The description calibre writes into its AppStream metainfo, CC0-1.0 (src/calibre/linux.py).
+description = """\
+calibre is the one stop solution to all your e-book needs. You can use calibre to catalog your \
+books, fetch metadata for them automatically, convert them from and to all the various e-book \
+formats, send them to your e-book reader devices, read the books on your computer, edit the \
+books in a dedicated e-book editor and even make them available over the network with the \
+built-in Content server. You can also download news and periodicals in e-book format from over a \
+thousand different news and magazine websites."""
+description_from = "https://github.com/kovidgoyal/calibre/blob/v9.14.0/src/calibre/linux.py"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "calibre-gui"
+keeps = """\
+Your libraries stay where you made them (~/Calibre Library unless you picked another), and \
+calibre's settings in ~/.config/calibre: install calibre again and it opens them."""
+
+[[action]]
+name = "Install calibre"
+kind = "nix"
+packages = ["calibre"]

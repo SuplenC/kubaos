@@ -1,0 +1,31 @@
+# Obsidian from nixpkgs, through the User flake, which marks it unfree. Obsidian keeps no apt
+# repository and Ubuntu doesn't package it. Obsidian updates its app itself, downloading each
+# release's app.asar into ~/.config/obsidian, so nixpkgs' package, a release or two behind, still
+# runs the newest Obsidian.
+# https://obsidian.md/download
+name = "Obsidian"
+category = "office"
+tags = ["notes", "markdown", "knowledge base", "wiki", "zettelkasten"]
+summary = "Markdown notes in a folder you own. Forty plugins later, it's a second brain with opinions."
+# The first paragraph of its AppStream metainfo, CC0-1.0 (flathub/md.obsidian.Obsidian).
+description = """\
+Obsidian is a powerful knowledge base that works on top of a local folder of plain text Markdown \
+files. In Obsidian, making and following connections is frictionless, and with the connections \
+in place, you can explore all of your knowledge in the interactive graph view. Obsidian supports \
+CommonMark and GitHub Flavored Markdown (GFM), along with other useful notetaking features such \
+as tags, LaTeX mathematical expressions, mermaid diagrams, footnotes, internal links and \
+embedding Obsidian notes or external files. Obsidian also has a plugin system with 20+ supported \
+plugins to expand its capabilities."""
+description_from = "https://github.com/flathub/md.obsidian.Obsidian/blob/master/md.obsidian.Obsidian.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "obsidian"
+keeps = """\
+Your vaults stay where you made them, folders of Markdown with their settings and plugins in \
+each one's .obsidian, and the app's own settings in ~/.config/obsidian: install Obsidian again \
+and it opens them."""
+
+[[action]]
+name = "Install Obsidian"
+kind = "nix"
+unfree = true
+packages = ["obsidian"]

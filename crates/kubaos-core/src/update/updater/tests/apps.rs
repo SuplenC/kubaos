@@ -1771,6 +1771,7 @@ fn an_update_lists_the_app_a_picked_setup_change_left_behind_as_removed() {
 mod ai;
 mod devtools;
 mod editors;
+mod office;
 
 #[test]
 fn vivaldi_rewriting_its_sources_file_with_its_one_key_leaves_the_next_update_nothing_to_do() {

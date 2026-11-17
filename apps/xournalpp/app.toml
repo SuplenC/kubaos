@@ -1,0 +1,25 @@
+# Xournal++ from Ubuntu's archive, 1.3.3; nixpkgs has 1.3.4 and upstream 1.3.8, patch releases of
+# the same series, so the archive, first in KubaOS's order, is as current as any package of it.
+# https://xournalpp.github.io/
+name = "Xournal++"
+category = "office"
+tags = ["handwriting", "notes", "pdf", "annotate", "stylus", "tablet"]
+summary = "Handwritten notes and PDF annotation, for a stylus. Reading your handwriting is still your problem."
+# The first paragraph of its AppStream metainfo, CC0-1.0 (xournalpp/xournalpp).
+description = """\
+Xournal++ is a hand note-taking software written in C++ with the target of flexibility, \
+functionality and speed. Stroke recognizer and other parts are based on Xournal Code, which you \
+can find at sourceforge. It supports GNU/Linux (e.g. Ubuntu, Debian, Arch, SUSE), macOS and \
+Windows. Supports pen input from devices such as Wacom Tablets."""
+description_from = "https://github.com/xournalpp/xournalpp/blob/v1.3.3/resources-templates/com.github.xournalpp.xournalpp.appdata.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "com.github.xournalpp.xournalpp"
+keeps = """\
+Your notes stay where you saved them, and Xournal++'s settings, toolbars and palettes in \
+~/.config/xournalpp: install Xournal++ again and they're all there."""
+
+[[action]]
+name = "Install Xournal++"
+kind = "apt"
+packages = ["xournalpp"]

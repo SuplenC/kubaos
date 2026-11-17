@@ -1,0 +1,40 @@
+# ONLYOFFICE Desktop Editors from Ascensio's signed apt repository, whose key system/packages.toml
+# pins ([repo.onlyoffice]); its package writes no source of its own. The repository has amd64 and
+# arm64. It also carries Ascensio's server packages and a ttf-mscorefonts-installer newer than
+# Ubuntu's, so a pin, written first, keeps every package of it below Ubuntu's archive.
+# https://helpcenter.onlyoffice.com/desktop/installation/desktop-install-ubuntu.aspx
+name = "ONLYOFFICE"
+category = "office"
+tags = ["office", "documents", "spreadsheets", "presentations", "pdf", "docx"]
+summary = "Microsoft Office's looks and formats, minus the subscription. Tabs too, like a browser."
+# From its AppStream metainfo, CC0-1.0 (flathub/org.onlyoffice.desktopeditors), its first two
+# paragraphs.
+description = """\
+ONLYOFFICE Desktop Editors is a free and open-source office suite pack that comprises editors \
+for text documents, spreadsheets, presentations, PDFs and PDF forms, along with a Diagram \
+Viewer. It allows you to create, view and edit office docs stored on your Windows/Linux PC or \
+Mac without an Internet connection. The suite is fully compatible with Office Open XML formats: \
+.docx, .xlsx, .pptx. Thanks to the tab-based user interface, you can deal with multiple files \
+within one and the same window. Multiple plugins allow adding any extra functionality you might \
+need. Password protection and digital signatures ensure a higher level of security while working \
+with files."""
+description_from = "https://github.com/flathub/org.onlyoffice.desktopeditors/blob/master/org.onlyoffice.desktopeditors.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "onlyoffice-desktopeditors"
+keeps = """\
+Your documents stay where you saved them, and the editors' settings and plugins in \
+~/.config/onlyoffice and ~/.local/share/onlyoffice: install ONLYOFFICE again and they're all \
+there."""
+
+[[action]]
+name = "Keep ONLYOFFICE's repository to its own packages"
+kind = "file"
+to = "/etc/apt/preferences.d/kubaos-onlyoffice"
+from = "kubaos-onlyoffice.pref"
+
+[[action]]
+name = "Install ONLYOFFICE"
+kind = "apt"
+repo = "onlyoffice"
+packages = ["onlyoffice-desktopeditors"]

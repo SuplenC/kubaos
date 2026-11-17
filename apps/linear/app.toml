@@ -1,0 +1,30 @@
+# Linear in a window of its own: Linear makes no app for Linux.
+# https://linear.app/login
+name = "Linear"
+category = "office"
+tags = ["issues", "projects", "tracker", "roadmap", "web app"]
+summary = "Issue tracking for software teams. So fast the backlog grows quicker than ever."
+# Linear's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Linear is an issue tracker for software teams: issues, cycles, projects and roadmaps, with \
+keyboard shortcuts for everything and links to GitHub and GitLab. Its website, here in a \
+window of its own, works with your Linear workspace."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix); the window's own icon is the same one.
+icon = "linear"
+requires = ["google-chrome"]
+keeps = """\
+Your sign-in stays in ~/.local/share/kubaos/web-apps/linear: install Linear again and you're \
+still signed in. Your issues live on Linear's servers anyway."""
+
+[[ready]]
+check = ["./closed", "linear"]
+says = "Linear's window is open: close it, then try again"
+
+[[action]]
+name = "Put Linear in a window of its own"
+kind = "web_app"
+id = "linear"
+title = "Linear"
+url = "https://linear.app/login"
+icon = "linear"

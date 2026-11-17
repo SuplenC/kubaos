@@ -230,6 +230,15 @@ key_url = "https://dl.winehq.org/wine-builds/winehq.key"
 fingerprint = "D43F640145369C51D786DDEA76F1A20FF987672F"
 keyring = "/etc/apt/keyrings/winehq.gpg"
 
+# Ascensio's repository of ONLYOFFICE Desktop Editors, for the app of the
+# catalog (apps/onlyoffice/). Its package writes no source of its own. The
+# repository also carries a ttf-mscorefonts-installer newer than Ubuntu's,
+# which the app's apt pin (apps/onlyoffice/kubaos-onlyoffice.pref) keeps out.
+[repo.onlyoffice]
+key_url = "https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE"
+fingerprint = "E09CA29F6E178040EF22B4098320CA65CB2DE8E5"
+keyring = "/etc/apt/keyrings/onlyoffice.gpg"
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"
