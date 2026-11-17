@@ -175,3 +175,46 @@ fn a_line_qt_cant_read_as_one_setting_is_refused() {
     }
     assert!(IniText::parse("; comment\n\n[General]\nkey=\nescaped=a\\;b\n").is_ok());
 }
+
+#[test]
+fn a_carriage_return_alone_is_refused_as_qt_ends_a_line_there() {
+    for text in [
+        "[General]\rxwayland=true\n",
+        "[General]\nxwayland=true\r",
+        "[General]\na=1\r\r\n",
+    ] {
+        assert!(IniText::parse(text).is_err(), "{text:?}");
+    }
+    assert!(IniText::parse("[General]\r\nxwayland=true\r\n").is_ok());
+}
+
+#[test]
+fn only_asciis_space_tab_vertical_tab_and_form_feed_are_trimmed() {
+    let ini = IniText::parse("[\u{b}General\u{c}]\n\txwayland\u{b}=\u{c}true\t\nname=\u{a0}den\u{a0}\n").unwrap();
+
+    assert_eq!(ini.get("General", "xwayland").as_deref(), Some("true"));
+    assert_eq!(ini.get("General", "name").as_deref(), Some("\u{a0}den\u{a0}"));
+    assert_eq!(ini.get("General", "\u{a0}name"), None);
+}
+
+#[test]
+fn a_header_is_read_up_to_its_first_bracket_after_its_comment_is_cut() {
+    let mut ini = IniText::parse("[General] ;c\nautoScale=true\n[AS];x]\nshow=true\n").unwrap();
+
+    ini.set("General", "xwayland", Some("false"), true);
+
+    assert_eq!(
+        ini.text(),
+        "[General] ;c\nautoScale=true\nxwayland=false\n[AS];x]\nshow=true\n"
+    );
+    assert_eq!(ini.get("AS", "show").as_deref(), Some("true"));
+    assert!(IniText::parse("[General ;c]\n").is_err());
+}
+
+#[test]
+fn an_equals_sign_inside_quotes_doesnt_end_the_key() {
+    let ini = IniText::parse("[General]\n\"a=b\"=1\n").unwrap();
+
+    assert_eq!(ini.get("General", "\"a=b\"").as_deref(), Some("1"));
+    assert_eq!(ini.get("General", "\"a"), None);
+}

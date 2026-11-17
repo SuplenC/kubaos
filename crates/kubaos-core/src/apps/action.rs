@@ -821,27 +821,19 @@ impl Action {
             }
             Kind::File {
                 to, from, text, mode, ..
-            } => {
-                check_path(to)?;
-                match (from, text) {
-                    (Some(from), None) if is_folder_file(from) => {}
-                    (Some(from), None) => return Err(ActionError::InvalidFrom { value: from.clone() }),
-                    (None, Some(_)) => {}
-                    _ => return Err(ActionError::FileSource),
-                }
-                if let Some(mode) = mode
-                    && parse_mode(mode).is_none()
-                {
-                    return Err(ActionError::InvalidMode { value: mode.clone() });
-                }
-            }
+            } => check_file(to, from.as_deref(), text.is_some(), mode.as_deref())?,
             Kind::Symlink { to, target } => {
                 check_path(to)?;
                 if target.is_empty() {
                     return Err(ActionError::Empty { key: "target" });
                 }
             }
-            Kind::Setting { .. } => check_setting(&self.kind)?,
+            Kind::Setting {
+                file,
+                section,
+                key,
+                value,
+            } => check_setting(file, section.as_deref(), key, value)?,
             Kind::Unit {
                 unit, enable, start, ..
             } => {
@@ -1054,26 +1046,37 @@ fn file_text(
     Ok((text, false))
 }
 
+/// Whether a `file` step's path, source and mode are well formed: one source, `from` a file of
+/// the folder or `text`.
+fn check_file(to: &str, from: Option<&str>, text: bool, mode: Option<&str>) -> Result<(), ActionError> {
+    check_path(to)?;
+    match (from, text) {
+        (Some(from), false) if is_folder_file(from) => {}
+        (Some(from), false) => return Err(ActionError::InvalidFrom { value: from.to_owned() }),
+        (None, true) => {}
+        _ => return Err(ActionError::FileSource),
+    }
+    if let Some(mode) = mode
+        && parse_mode(mode).is_none()
+    {
+        return Err(ActionError::InvalidMode { value: mode.to_owned() });
+    }
+    Ok(())
+}
+
 /// Whether a `setting` step's file, section, key and value are well formed.
-fn check_setting(kind: &Kind) -> Result<(), ActionError> {
-    let Kind::Setting {
-        file,
-        section,
-        key,
-        value,
-    } = kind
-    else {
-        return Ok(());
-    };
+fn check_setting(file: &str, section: Option<&str>, key: &str, value: &toml::Value) -> Result<(), ActionError> {
     let home = file.starts_with("~/") && check_path(file).is_ok();
     let extension = Path::new(file).extension().and_then(|e| e.to_str());
     if !home || !matches!(extension, Some("json" | "toml" | "conf")) {
-        return Err(ActionError::InvalidSettingFile { value: file.clone() });
+        return Err(ActionError::InvalidSettingFile { value: file.to_owned() });
     }
     if let Some(section) = section
         && (extension != Some("conf") || !settings::is_ini_name(section))
     {
-        return Err(ActionError::InvalidSection { value: section.clone() });
+        return Err(ActionError::InvalidSection {
+            value: section.to_owned(),
+        });
     }
     let fits = match (section, extension) {
         (Some(_), _) => settings::is_ini_name(key),
@@ -1083,7 +1086,7 @@ fn check_setting(kind: &Kind) -> Result<(), ActionError> {
         (None, _) => !key.split('.').any(str::is_empty),
     };
     if !fits {
-        return Err(ActionError::InvalidKey { value: key.clone() });
+        return Err(ActionError::InvalidKey { value: key.to_owned() });
     }
     if !matches!(
         value,

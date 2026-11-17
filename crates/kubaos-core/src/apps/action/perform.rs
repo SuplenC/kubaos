@@ -532,7 +532,12 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             let there = host.place(&path).symlink_metadata().is_ok();
             Ok(at_path(host, &path, there))
         }
-        Kind::Setting { .. } => look_setting(host, &action.kind),
+        Kind::Setting {
+            file,
+            section,
+            key,
+            value,
+        } => look_setting(host, &SettingStep::new(host, file, section.as_deref(), key, value)),
         Kind::Unit { .. } | Kind::Group { .. } | Kind::Linger {} => look_machine(action, host, &user),
         Kind::Architecture { architecture } => look_architecture(host, architecture),
         Kind::Dkms { .. } => look_dkms(action, host, recorded),
@@ -958,7 +963,12 @@ pub fn apply(
             symlink(target, &path).map_err(PerformError::io(&path))
         }
         Kind::Output { path } => make_parents(&host.place(&logical(host, path))),
-        Kind::Setting { .. } => apply_setting(host, &action.kind),
+        Kind::Setting {
+            file,
+            section,
+            key,
+            value,
+        } => apply_setting(&SettingStep::new(host, file, section.as_deref(), key, value)),
         Kind::Unit {
             unit,
             scope,
@@ -1128,11 +1138,16 @@ pub fn undo(
             remove_dirs(host, owned("dir:"));
             Ok(())
         }
-        Kind::Setting { .. } => {
+        Kind::Setting {
+            file,
+            section,
+            key,
+            value,
+        } => {
             if owned("key:").is_empty() {
                 return Ok(None);
             }
-            undo_setting(host, &action.kind, prior)?;
+            undo_setting(&SettingStep::new(host, file, section.as_deref(), key, value), prior)?;
             remove_dirs(host, owned("dir:"));
             Ok(())
         }
@@ -1145,22 +1160,7 @@ pub fn undo(
             if owned("unit:").is_empty() {
                 return Ok(None);
             }
-            let state = host.unit_state(*scope, unit).map_err(PerformError::Host)?;
-            let as_left = enable.is_none_or(|e| state.enabled == e) && start.is_none_or(|s| started_as(state, s));
-            if !state.exists || !as_left {
-                return Ok(None);
-            }
-            if let (Some(_), Some(was)) = (enable, prior.enabled)
-                && state.enabled != was
-            {
-                host.set_enabled(*scope, unit, was).map_err(PerformError::Host)?;
-            }
-            if let (Some(_), Some(was)) = (start, prior.active)
-                && !started_as(state, was)
-            {
-                host.set_active(*scope, unit, was).map_err(PerformError::Host)?;
-            }
-            Ok(())
+            undo_unit(host, *scope, unit, *enable, *start, prior)
         }
         Kind::Group { group } => {
             if !owned("member:").is_empty() && host.member(group).map_err(PerformError::Host)? {
@@ -1194,6 +1194,34 @@ pub fn undo(
         }
     };
     undone.map(|()| None)
+}
+
+/// Puts a unit the step enabled or started back as `prior` found it, while it is as the step left
+/// it; one the user changed since stays.
+fn undo_unit(
+    host: &mut dyn Host,
+    scope: Scope,
+    unit: &str,
+    enable: Option<bool>,
+    start: Option<bool>,
+    prior: &Prior,
+) -> Result<(), PerformError> {
+    let state = host.unit_state(scope, unit).map_err(PerformError::Host)?;
+    let as_left = enable.is_none_or(|e| state.enabled == e) && start.is_none_or(|s| started_as(state, s));
+    if !state.exists || !as_left {
+        return Ok(());
+    }
+    if let (Some(_), Some(was)) = (enable, prior.enabled)
+        && state.enabled != was
+    {
+        host.set_enabled(scope, unit, was).map_err(PerformError::Host)?;
+    }
+    if let (Some(_), Some(was)) = (start, prior.active)
+        && !started_as(state, was)
+    {
+        host.set_active(scope, unit, was).map_err(PerformError::Host)?;
+    }
+    Ok(())
 }
 
 /// Has dpkg take packages of `arch`, then apt read its sources again: it has no list of the
@@ -1719,26 +1747,16 @@ struct SettingStep<'a> {
 }
 
 impl<'a> SettingStep<'a> {
-    /// The step `kind` is, when it is a `setting`.
-    fn of(host: &dyn Host, kind: &'a Kind) -> Option<Self> {
-        let Kind::Setting {
-            file,
+    fn new(host: &dyn Host, file: &str, section: Option<&'a str>, key: &'a str, value: &'a toml::Value) -> Self {
+        let path = logical(host, file);
+        let placed = host.place(&path);
+        Self {
+            path,
+            placed,
             section,
             key,
             value,
-        } = kind
-        else {
-            return None;
-        };
-        let path = logical(host, file);
-        let placed = host.place(&path);
-        Some(Self {
-            path,
-            placed,
-            section: section.as_deref(),
-            key,
-            value,
-        })
+        }
     }
 
     /// The file's settings and its text; none when it isn't there.
@@ -1779,10 +1797,7 @@ impl<'a> SettingStep<'a> {
     }
 }
 
-fn look_setting(host: &dyn Host, kind: &Kind) -> Result<Look, PerformError> {
-    let Some(step) = SettingStep::of(host, kind) else {
-        return Ok(Look::default());
-    };
+fn look_setting(host: &dyn Host, step: &SettingStep<'_>) -> Result<Look, PerformError> {
     let (path, key) = (&step.path, step.key);
     let found = step.read()?;
     let exists = found.is_some();
@@ -1809,10 +1824,7 @@ fn look_setting(host: &dyn Host, kind: &Kind) -> Result<Look, PerformError> {
     })
 }
 
-fn apply_setting(host: &dyn Host, kind: &Kind) -> Result<(), PerformError> {
-    let Some(step) = SettingStep::of(host, kind) else {
-        return Ok(());
-    };
+fn apply_setting(step: &SettingStep<'_>) -> Result<(), PerformError> {
     let (mut settings, _) = step.read()?.unwrap_or_else(|| (step.empty(), String::new()));
     let written = settings::written(&settings, step.value);
     settings
@@ -1825,10 +1837,7 @@ fn apply_setting(host: &dyn Host, kind: &Kind) -> Result<(), PerformError> {
 /// whole, so its layout and key order are the user's again; once something else changed it, only
 /// the key goes back, its old value as the file had it. A key changed since, or a file that is no
 /// longer settings this action can read, stays as it is.
-fn undo_setting(host: &dyn Host, kind: &Kind, prior: &Prior) -> Result<(), PerformError> {
-    let Some(step) = SettingStep::of(host, kind) else {
-        return Ok(());
-    };
+fn undo_setting(step: &SettingStep<'_>, prior: &Prior) -> Result<(), PerformError> {
     let (path, key) = (&step.path, step.key);
     let Ok(Some((mut settings, text))) = step.read() else {
         return Ok(());

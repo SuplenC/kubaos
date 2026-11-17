@@ -7,13 +7,18 @@
 //! - the keys before the first header and those under a `[general]` header, in any case, are one
 //!   section, General;
 //! - a key there twice has its last line's value;
-//! - a byte order mark at the start is left out of the first line.
+//! - a byte order mark at the start is left out of the first line;
+//! - a header's section is the text up to its first `]`, after a `;` comment is cut;
+//! - an `=` inside quotes is no key's end;
+//! - the space trimmed around a key, a value or a section is ASCII's space, tab, vertical tab and
+//!   form feed.
 //!
 //! A value is the text from the key's first `=` to its end, trimmed. A key's value is replaced
 //! where it stands, a line is added after its section's last line or a section at the end of the
 //! file, or a line, or the section a step appended, is taken out, and every other line, blank and
 //! comment lines included, stays as it was. A value continued on the next line, after a `\` or
-//! inside quotes, is refused with its file.
+//! inside quotes, and a `\r` that isn't part of a `\r\n` (Qt ends a line there, so a line added
+//! after it would be added again on every run) are refused with their file.
 //!
 //! # Owns
 //!
@@ -58,7 +63,7 @@ enum What<'a> {
         key: &'a str,
         value: Range<usize>,
     },
-    /// A line Qt can't read as one setting.
+    /// A line Qt can't read as one setting or one header.
     Other,
 }
 
@@ -75,6 +80,10 @@ impl IniText {
     ///
     /// The first line that is none of them.
     pub fn parse(text: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let bytes = text.as_bytes();
+        if let Some(at) = (0..bytes.len()).find(|&i| bytes[i] == b'\r' && bytes.get(i + 1) != Some(&b'\n')) {
+            return Err(format!("a line ends in a `\\r` alone at byte {at}, which Qt reads as two lines").into());
+        }
         let ini = Self { text: text.to_owned() };
         if let Some(line) = ini.lines().find(|l| matches!(l.what, What::Other)) {
             let line = &ini.text[line.start..line.end];
@@ -90,7 +99,7 @@ impl IniText {
 
     /// Whether it has nothing but blank space.
     pub fn is_empty(&self) -> bool {
-        self.text.trim_start_matches(BOM).trim().is_empty()
+        self.lines().all(|l| matches!(l.what, What::Blank))
     }
 
     /// Whether `section` is there: a header of it, or for General, a key before the first header.
@@ -241,14 +250,19 @@ impl IniText {
                 here = BOM.len_utf8();
                 line = rest;
             }
-            let trimmed = line.trim();
+            let trimmed = trim(line);
             let what = if trimmed.is_empty() {
                 What::Blank
             } else if trimmed.starts_with(';') {
                 What::Comment
-            } else if let Some(name) = header(trimmed) {
-                section = Some(name);
-                What::Header(name)
+            } else if trimmed.starts_with('[') {
+                match header(trimmed) {
+                    Some(name) => {
+                        section = Some(name);
+                        What::Header(name)
+                    }
+                    None => What::Other,
+                }
             } else {
                 setting(line, here, section)
             };
@@ -276,7 +290,7 @@ fn setting<'a>(line: &'a str, here: usize, section: Option<&'a str>) -> What<'a>
             b'\\' if i + 1 == bytes.len() => return What::Other,
             b'\\' => i += 1,
             b'"' => quoted = !quoted,
-            b'=' if equals.is_none() => equals = Some(i),
+            b'=' if equals.is_none() && !quoted => equals = Some(i),
             b';' if !quoted => {
                 end = i;
                 break;
@@ -288,16 +302,16 @@ fn setting<'a>(line: &'a str, here: usize, section: Option<&'a str>) -> What<'a>
     let Some(equals) = equals.filter(|&e| e < end) else {
         return What::Other;
     };
-    let key = line[..equals].trim();
+    let key = trim(&line[..equals]);
     if quoted || key.is_empty() {
         return What::Other;
     }
     let value = &line[equals + 1..end];
-    let at = here + equals + 1 + (value.len() - value.trim_start().len());
+    let at = here + equals + 1 + (value.len() - value.trim_start_matches(is_space).len());
     What::Setting {
         section,
         key,
-        value: at..at + value.trim().len(),
+        value: at..at + trim(value).len(),
     }
 }
 
@@ -312,7 +326,36 @@ fn same_section(found: Option<&str>, wanted: &str) -> bool {
     }
 }
 
-/// The section a trimmed `[section]` line names.
+/// The section a trimmed line starting with `[` names: up to its first `]`, once a `;` comment
+/// outside quotes is cut; none when it has no `]`.
 fn header(line: &str) -> Option<&str> {
-    line.strip_prefix('[')?.strip_suffix(']').map(str::trim)
+    let inner = uncommented(line).strip_prefix('[')?;
+    inner.find(']').map(|end| trim(&inner[..end]))
+}
+
+/// `line` up to a `;` outside quotes and not after a `\`, which starts a comment.
+fn uncommented(line: &str) -> &str {
+    let bytes = line.as_bytes();
+    let mut quoted = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 1,
+            b'"' => quoted = !quoted,
+            b';' if !quoted => return &line[..i],
+            _ => {}
+        }
+        i += 1;
+    }
+    line
+}
+
+/// Whether `c` is space Qt trims: ASCII's space, tab, vertical tab and form feed, never another
+/// Unicode space.
+fn is_space(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\x0b' | '\x0c')
+}
+
+fn trim(text: &str) -> &str {
+    text.trim_matches(is_space)
 }
