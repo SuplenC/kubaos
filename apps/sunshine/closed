@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Ready: Sunshine isn't running for this user, from its service or a terminal.
+set -euo pipefail
+! pgrep -u "$(id -u)" -f '^(/usr/bin/)?sunshine( |$)' >/dev/null

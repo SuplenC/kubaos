@@ -2,6 +2,7 @@
 
 use std::fs;
 
+use super::super::EngineError;
 use super::World;
 use super::ai::run;
 use super::ai::shipped;
@@ -103,6 +104,13 @@ fn in_place(world: &World, app: &Folder) {
                 );
             }
             Kind::File { to, .. } => assert!(home_or_system(to).is_file(), "{id}: {to}"),
+            Kind::Setting { file, key, .. } => {
+                let text = fs::read_to_string(home_or_system(file)).unwrap();
+                assert!(
+                    text.lines().any(|l| l.starts_with(&format!("{key} = "))),
+                    "{id}: {text}"
+                );
+            }
             Kind::WebApp { id: web, icon, .. } => {
                 let entry = world
                     .host_home()
@@ -220,4 +228,57 @@ fn sunshine_starts_nothing_at_login_and_its_icon_takes_the_packages_name() {
             .join(".local/share/icons/hicolor/scalable/apps/dev.lizardbyte.app.Sunshine.svg")
             .is_file()
     );
+}
+
+#[test]
+fn sunshines_web_page_answers_this_machine_alone_and_its_removal_leaves_your_settings() {
+    let world = served("sunshine");
+    let conf = world.host_home().join(".config/sunshine/sunshine.conf");
+    fs::create_dir_all(conf.parent().unwrap()).unwrap();
+    // A sunshine.conf as Sunshine writes it, from an install of the user's own before.
+    let mine = "sunshine_name = den\nencoder = vaapi\n";
+    fs::write(&conf, mine).unwrap();
+
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&conf).unwrap(),
+        format!("{mine}origin_web_ui_allowed = pc\n"),
+        "the page answers this machine alone, and the user's lines stay"
+    );
+    // Sunshine rewrites its file as the user changes a setting in its page.
+    fs::write(
+        &conf,
+        "sunshine_name = den\nencoder = nvenc\norigin_web_ui_allowed = pc\n",
+    )
+    .unwrap();
+
+    run(&world, |e| e.remove_with("sunshine", &Picks::default())).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(&conf).unwrap(),
+        "sunshine_name = den\nencoder = nvenc\n"
+    );
+}
+
+#[test]
+fn sunshine_running_is_left_alone_until_it_is_quit() {
+    let world = served("sunshine");
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+    let installed = world.host.snapshot();
+    // pgrep as the machine answers it while Sunshine's service runs it: the script's pattern is
+    // matched against its command line, as `pgrep -f` matches.
+    world.host.sandbox().stub(
+        "pgrep",
+        "full=; for a; do [ \"$a\" = -f ] && full=1; pattern=$a; done\n\
+         [ -n \"$full\" ] && printf '/usr/bin/sunshine\\n' | grep -Eq -- \"$pattern\"",
+    );
+
+    let refused = run(&world, |e| e.remove_with("sunshine", &Picks::default())).unwrap_err();
+
+    assert!(
+        matches!(&refused, EngineError::NotReady(says) if says.contains("Sunshine is running")),
+        "{refused}"
+    );
+    assert_eq!(world.host.snapshot(), installed);
 }
