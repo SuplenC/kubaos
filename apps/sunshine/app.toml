@@ -20,12 +20,12 @@
 # alone. Sunshine itself gives the page's first sign-in to whoever asks for it, from any address,
 # until one is set, so the install sets one before anything can start Sunshine, which nothing does
 # until you pick its menu entry: Sunshine's own sunshine --creds, with your login name and a random
-# 32-character password, saved readable by you alone in ~/.config/kubaos/sunshine/password, a path
-# the app owns, so its removal takes it. The page has no open first-sign-in window. A sign-in
-# already there is yours: it is adopted and left alone. The removal takes the sign-in it set while
-# it is still that one, keeping your paired clients; one you changed in the page stays. Sunshine
-# takes the password as an argument, its one way, so it shows in the process list for the moment the
-# command runs.
+# 32-character password, saved readable by you alone in ~/.config/kubaos/sunshine/password, which
+# the step's undo takes with the app. The page has no open first-sign-in window. A sign-in already
+# there is yours: it is adopted and left alone. The removal takes the sign-in it set while it is
+# still that one, keeping your paired clients; one you changed in the page stays. Sunshine takes the
+# password as an argument, its one way, so it shows in the process list for the moment the command
+# runs.
 # https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2getting__started.html
 name = "Sunshine"
 category = "games"
@@ -69,15 +69,11 @@ file = "~/.config/sunshine/sunshine.conf"
 key = "origin_web_ui_allowed"
 value = "pc"
 
-[[action]]
-name = "Keep your Sunshine password in ~/.config/kubaos/sunshine/password, not on a sticky note"
-kind = "output"
-path = "~/.config/kubaos/sunshine/password"
-
 # Before anything can start Sunshine: no unit is enabled and no autostart entry is written, so
 # only a click on its menu entry in the moment since its package went in could start it first.
+# A sign-in already there makes the step found, and no password file is written or claimed.
 [[action]]
-name = "Set Sunshine's sign-in to you, before some stranger on the Wi-Fi does"
+name = "Sign Sunshine in as you before a stranger does, password in ~/.config/kubaos/sunshine/password"
 kind = "run"
 do = ["./sign-in"]
 check = ["./signed-in"]

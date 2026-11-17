@@ -427,3 +427,32 @@ fn a_sunshine_conf_line_already_set_keeps_your_comment_and_stays_after_the_remov
 
     assert_eq!(fs::read_to_string(&conf).unwrap(), mine);
 }
+
+#[test]
+fn an_adopted_sunshine_sign_in_is_found_and_no_step_claims_a_password_file() {
+    let world = served("sunshine");
+    let (state, _) = sunshine_sign_in(&world);
+    fs::create_dir_all(state.parent().unwrap()).unwrap();
+    fs::write(
+        &state,
+        "{\"username\": \"mine\", \"salt\": \"pepper\", \"password\": \"ABC\"}\n",
+    )
+    .unwrap();
+
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+
+    let user = world.journals("sunshine").0.unwrap();
+    let sign_in = user
+        .entries
+        .iter()
+        .find(|e| matches!(e.action.kind, Kind::Run { .. }))
+        .unwrap();
+    assert_eq!(sign_in.state, crate::apps::journal::State::Found);
+    let claims: Vec<&str> = user
+        .entries
+        .iter()
+        .flat_map(|e| &e.claims)
+        .map(|c| c.claim.as_str())
+        .collect();
+    assert!(claims.iter().all(|c| !c.contains("password")), "{claims:?}");
+}

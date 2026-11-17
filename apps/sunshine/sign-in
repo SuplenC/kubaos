@@ -1,21 +1,30 @@
 #!/usr/bin/env bash
 # Sets the sign-in of Sunshine's web page before Sunshine first starts, as until one is set
 # Sunshine gives it to whoever on the network asks first: the login name and a random password,
-# saved where only the user can read it. Sunshine's own command hashes it into its state file,
-# taking the password as an argument, the one way it has.
+# saved where only the user can read it, the step's own file. Sunshine's own command hashes it
+# into its state file, taking the password as an argument, the one way it has.
 set -euo pipefail
 saved="$HOME/.config/kubaos/sunshine/password"
 state="$HOME/.config/sunshine/sunshine_state.json"
 umask 077
-mkdir -p "${saved%/*}"
 random="$(head -c 48 /dev/urandom | base64 -w0 | tr -dc 'A-Za-z0-9')"
 password="${random:0:32}"
 if ((${#password} < 32)); then
   echo "The random password came out short; try again" >&2
   exit 1
 fi
+mkdir -p "${saved%/*}"
 tmp="$(mktemp "$saved.XXXXXX")"
-trap 'rm -f "$tmp"' EXIT
+done=
+# A sign-in that didn't take leaves no password behind, and no folder made for it.
+cleanup() {
+  rm -f "$tmp"
+  if [[ -z $done ]]; then
+    rm -f "$saved"
+    rmdir "${saved%/*}" "${saved%/*/*}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
 printf '%s\n' "$password" >"$tmp"
 chmod 600 "$tmp"
 mv "$tmp" "$saved"
@@ -27,3 +36,4 @@ if ! [[ -f $state ]] || ! jq -e 'has("username") and has("password") and has("sa
   echo "Sunshine didn't write its sign-in to $state: its log is ~/.config/sunshine/sunshine.log" >&2
   exit 1
 fi
+done=1
