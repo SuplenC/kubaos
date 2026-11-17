@@ -161,6 +161,8 @@ pub struct Keeper<'h> {
     /// handed to another app: what a rolled-back removal does again. Kept here, never sent, so
     /// root's side trusts only its own record.
     undone: Vec<Undone>,
+    /// The other side's journals, when this side may read them: root's, for the user's side.
+    other_journals: Option<PathBuf>,
 }
 
 /// A step a removal undid, as its entry was, and the claims its undo handed to other apps.
@@ -198,6 +200,7 @@ impl<'h> Keeper<'h> {
             catalog: catalog.into(),
             journals: journals.into(),
             undone: Vec::new(),
+            other_journals: None,
         }
     }
 
@@ -346,7 +349,8 @@ impl<'h> Keeper<'h> {
         if let Some(entry) = old.take_if(|e| !e.action.same_thing(&action)) {
             self.set_aside(&mut journal, id, setup, &entry)?;
         }
-        let look = perform::look(&action, &mut *self.host, recorded(old.as_ref())).map_err(StepError::Perform)?;
+        let recorded = self.recorded_for(&journal, &action, old.as_ref())?;
+        let look = perform::look(&action, &mut *self.host, recorded).map_err(StepError::Perform)?;
         if let Kind::Run { window: Some(says), .. } = &action.kind
             && !windows
             && !look.done
@@ -531,6 +535,14 @@ impl<'h> Keeper<'h> {
         let Some(entry) = journal.entry(step).cloned() else {
             return Ok(Outcome::Undone);
         };
+        // HAZARD: a `run` with `undo` alone the folder moved to the other side is forgotten, never
+        // undone, here: the other side's entry runs it, and run twice it would be done twice. It
+        // goes at the removal, as this side may not be started while the other records it.
+        if entry.action.removal_only() && self.moved_away(id, journal.setup.as_deref(), step) {
+            journal.drop_step(step);
+            journal.save(&self.journals).map_err(StepError::Journal)?;
+            return Ok(Outcome::Undone);
+        }
         let mut handed = Vec::new();
         let undone = self.undo_journaled(&mut journal, id, &entry, &mut handed);
         // Kept whether or not it went through: a claim handed over before a later part failed
@@ -555,7 +567,12 @@ impl<'h> Keeper<'h> {
     ///
     /// As [`Keeper::step`], or the journal that couldn't be written.
     pub fn redo(&mut self, id: &str, setup: Option<&str>, step: usize) -> Result<Outcome, StepError> {
-        if let Some(at) = self.undone.iter().rposition(|u| u.app == id && u.entry.step == step) {
+        let recorded = self.undone.iter().rposition(|u| u.app == id && u.entry.step == step);
+        // A stale `run` with `undo` alone this side forgot, as the other side's runs it now.
+        if recorded.is_none() && self.moved_away(id, setup, step) {
+            return Ok(Outcome::Settled);
+        }
+        if let Some(at) = recorded {
             let undone = self.undone.remove(at);
             for handed in undone.handed.iter().rev() {
                 journal::give_back(&self.journals, &handed.holder, &handed.claim, &handed.prior)
@@ -600,6 +617,57 @@ impl<'h> Keeper<'h> {
         self.host
             .apt_repo(&repo)
             .map_err(|e| StepError::Perform(PerformError::Host(e)))
+    }
+
+    /// What `old`, the entry of `action`'s step in `journal`, says for its check; for a `run` with
+    /// `undo` alone the journal doesn't record yet, found when its app is ([`Keeper::found`]).
+    fn recorded_for<'e>(
+        &self,
+        journal: &Journal,
+        action: &Action,
+        old: Option<&'e Entry>,
+    ) -> Result<Recorded<'e>, StepError> {
+        if old.is_none() && action.removal_only() && self.found(journal)? {
+            return Ok(Recorded::Found);
+        }
+        Ok(recorded(old))
+    }
+
+    /// Whether the app of `journal`, this side's, is found, as far as this side can read: every
+    /// entry of it and of the other side's journal, when this side reads that, found and owning
+    /// nothing, and at least one. A `run` with `undo` alone that a found app's journal doesn't
+    /// record yet (a release added it, or moved it to this side) is found with it.
+    fn found(&self, journal: &Journal) -> Result<bool, StepError> {
+        let other = match &self.other_journals {
+            Some(dir) => Journal::read(dir, &journal.app).map_err(StepError::Journal)?,
+            None => None,
+        };
+        let entries: Vec<&Entry> = journal
+            .entries
+            .iter()
+            .chain(other.iter().flat_map(|j| &j.entries))
+            .collect();
+        Ok(!entries.is_empty()
+            && entries
+                .iter()
+                .all(|e| e.state == State::Found && e.claims.iter().all(|c| !c.owned)))
+    }
+
+    /// Whether the folder of the app `id` in `setup` now has step `step` as a `run` with `undo`
+    /// alone of the other side: this side's entry of it is stale, and the other side's runs it.
+    fn moved_away(&self, id: &str, setup: Option<&str>, step: usize) -> bool {
+        let Ok(folder) = Folder::load(&self.catalog, id) else {
+            return false;
+        };
+        folder
+            .steps(setup)
+            .ok()
+            .and_then(|steps| {
+                steps
+                    .get(step.wrapping_sub(1))
+                    .map(|a| a.side() != self.side && a.removal_only())
+            })
+            .unwrap_or(false)
     }
 
     /// Takes `entry` out of `journal` for another thing its step now holds: undone, or, for a `run`
@@ -946,11 +1014,14 @@ impl<'a> Engine<'a> {
         sink: &'a mut dyn Sink,
         windows: bool,
     ) -> Self {
+        let root_journals = root_journals.into();
+        let mut user = user;
+        user.other_journals = Some(root_journals.clone());
         Self {
             user,
             root,
             sink,
-            root_journals: root_journals.into(),
+            root_journals,
             lock: lock.into(),
             windows,
             root_started: false,

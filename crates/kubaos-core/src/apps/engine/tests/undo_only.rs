@@ -1,8 +1,6 @@
 //! A `run` with an `undo` alone: nothing at install, the app's from the run that records it, and
 //! its undo on removal.
 
-use std::fs;
-
 use super::EngineError;
 use super::Events;
 use super::World;
@@ -93,7 +91,12 @@ fn a_run_that_only_undoes_needs_no_root_once_recorded() {
 
 /// The guard installed by hand, taken in: `owned` when the user picked it, else found.
 fn guard_by_hand(owned: bool) -> World {
-    let world = guard();
+    taken_in(guard(), owned)
+}
+
+/// `world`'s guard package installed by hand and the app taken in: `owned` when the user picked
+/// it, else found.
+fn taken_in(world: World, owned: bool) -> World {
     world
         .host
         .state
@@ -177,7 +180,7 @@ fn a_step_put_before_a_run_that_only_undoes_moves_it_without_running_its_undo() 
 }
 
 #[test]
-fn a_run_that_only_undoes_moved_from_root_to_the_user_runs_no_undo_until_the_removal() {
+fn a_run_that_only_undoes_moved_from_root_to_the_user_moves_and_runs_its_undo_once() {
     let world = guard();
     world.install("guard", true).0.unwrap();
     world.write_app("guard", &GUARD.replace("root = true\n", ""));
@@ -185,10 +188,70 @@ fn a_run_that_only_undoes_moved_from_root_to_the_user_runs_no_undo_until_the_rem
     world.install("guard", true).0.unwrap();
 
     assert!(!turned_off(&world));
+    let user = recorded_at(&world, false, 2).unwrap();
+    assert_eq!(user.state, State::Done);
+    assert!(user.claims.iter().all(|c| c.owned), "{user:?}");
 
     world.remove("guard").0.unwrap();
 
-    assert!(turned_off(&world));
+    assert_eq!(offs(&world), 1, "root's stale entry ran it too");
+    assert_eq!(world.journals("guard"), (None, None));
+}
+
+#[test]
+fn a_rolled_back_removal_leaves_the_stale_side_of_a_moved_run_that_only_undoes_forgotten() {
+    let world = guard();
+    world.install("guard", true).0.unwrap();
+    world.write_app("guard", &GUARD.replace("root = true\n", ""));
+    world.install("guard", true).0.unwrap();
+    world.host.state.borrow_mut().fail.insert("apt-remove:guard".to_owned());
+
+    let (removed, _) = world.remove("guard");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(offs(&world), 1);
+    assert!(recorded_at(&world, true, 2).is_none(), "root's stale entry is back");
+    assert_eq!(recorded_at(&world, false, 2).unwrap().state, State::Done);
+}
+
+#[test]
+fn a_run_that_only_undoes_a_release_adds_to_a_found_app_is_found_and_its_removal_runs_nothing() {
+    let before_it = GUARD[..GUARD.find("[[action]]\nname = \"Turn").unwrap()].to_owned();
+    let world = World::new(&[("guard", &before_it)]);
+    world.script("guard", "off", "systemctl stop guard.service");
+    let world = taken_in(world, false);
+    world.install("guard", true).0.unwrap();
+    world.write_app("guard", GUARD);
+
+    world.install("guard", true).0.unwrap();
+
+    let entry = recorded_at(&world, true, 2).unwrap();
+    assert_eq!(entry.state, State::Found);
+    assert!(entry.claims.iter().all(|c| !c.owned), "{entry:?}");
+
+    world.remove("guard").0.unwrap();
+
+    assert_eq!(offs(&world), 0);
+    assert!(world.host.state.borrow().dpkg.contains_key("guard"));
+}
+
+#[test]
+fn a_found_apps_run_that_only_undoes_moved_to_the_user_is_found_and_its_removal_runs_nothing() {
+    let world = guard_by_hand(false);
+    world.install("guard", true).0.unwrap();
+    world.write_app("guard", &GUARD.replace("root = true\n", ""));
+
+    world.install("guard", true).0.unwrap();
+
+    assert_eq!(recorded_at(&world, false, 2).unwrap().state, State::Found);
+
+    world.remove("guard").0.unwrap();
+
+    assert_eq!(offs(&world), 0);
+    assert!(world.host.state.borrow().dpkg.contains_key("guard"));
 }
 
 #[test]
@@ -324,16 +387,16 @@ fn a_rolled_back_removal_moves_a_run_that_only_undoes_to_its_step_in_the_folder_
 
 #[test]
 fn a_found_apps_run_takes_nothing_from_another_apps_run_that_goes() {
-    // The guard found, its run that only undoes holding `run` unowned.
-    let world = guard_by_hand(false);
-    world.install("guard", true).0.unwrap();
     let warden = GUARD
         .replace("\"guard\"", "\"warden\"")
         .replace("./off", "./warden-off")
         .replace("name = \"Guard\"", "name = \"Warden\"");
-    fs::create_dir_all(world.catalog.join("warden")).unwrap();
-    world.write_app("warden", &warden);
+    let world = World::new(&[("guard", GUARD), ("warden", &warden)]);
+    world.script("guard", "off", "systemctl stop guard.service");
     world.script("warden", "warden-off", "systemctl stop warden.service");
+    // The guard found, its run that only undoes holding `run` unowned.
+    let world = taken_in(world, false);
+    world.install("guard", true).0.unwrap();
     world.install("warden", true).0.unwrap();
 
     world.remove("warden").0.unwrap();
