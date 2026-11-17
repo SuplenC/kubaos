@@ -271,8 +271,10 @@ impl Sandbox {
     }
 
     /// `git -C dir` in the sandbox, as a test's fixture repository wants it: a test identity, no
-    /// signing unless the test asks, `main` for the first branch and no system-wide
-    /// configuration. git and `ssh-keygen`, which makes and checks SSH signatures, are linked in.
+    /// signing unless the test asks, `main` for the first branch, no system-wide configuration,
+    /// and no maintenance in the background, which a commit would otherwise start, detached, to
+    /// write in the repository after the test has looked at it. git and `ssh-keygen`, which makes
+    /// and checks SSH signatures, are linked in.
     #[must_use]
     pub fn git(&self, dir: &Path) -> Command {
         self.link("git");
@@ -284,7 +286,8 @@ impl Sandbox {
             .arg(dir)
             .args(["-c", "user.name=t", "-c", "user.email=t@kubaos"])
             .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"])
-            .args(["-c", "init.defaultBranch=main"]);
+            .args(["-c", "init.defaultBranch=main"])
+            .args(["-c", "maintenance.auto=false", "-c", "gc.auto=0"]);
         command
     }
 
