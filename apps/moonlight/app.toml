@@ -14,7 +14,7 @@ description = """\
 Moonlight can stream games and other applications from another PC with Sunshine or GeForce \
 Experience software installed."""
 description_from = "https://github.com/moonlight-stream/moonlight-qt/blob/v6.2.0/app/deploy/linux/com.moonlight_stream.Moonlight.appdata.xml"
-# Moonlight's logo, GPL-3.0-only, on a tile (moonlight.svg's header), put in the theme as
+# Moonlight's logo, GPL-3.0-or-later, on a tile (moonlight.svg's header), put in the theme as
 # "moonlight", the name its desktop entry gives.
 icon = "moonlight.svg"
 keeps = """\
