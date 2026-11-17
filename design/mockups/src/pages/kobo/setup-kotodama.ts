@@ -171,7 +171,7 @@ export default page<Shown>({
       pressed: "its cards and buttons press on their pages",
       disabled: "every machine has it: never passed by",
       error: "it runs nothing that can fail",
-      empty: "every step holds its content; Try it is its keys and two lines",
+      empty: "every step holds its content",
     },
     rows: [{ name: "Kotodama", cell: screen((state: Shown) => CELLS[state]()) }],
     looks: {
@@ -195,7 +195,7 @@ export default page<Shown>({
     keys: [
       { keys: ["Enter"], does: "Next: the next step; in the menu, runs the Result" },
       { keys: ["Esc"], does: "back a step; in the menu, clears, then shuts it" },
-      { keys: ["Super+Space"], does: "the keys picked: from any step, the menu over the screen, as on the desktop" },
+      { keys: ["Super+Space"], does: "the keys picked: the menu over the screen, from any step" },
       { keys: ["↑", "↓"], does: "in the menu, the Result above or below" },
       { keys: ["Tab", "Shift+Tab"], does: "rail, the step's parts, the band" },
     ],
