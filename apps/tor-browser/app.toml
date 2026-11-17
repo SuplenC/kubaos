@@ -1,6 +1,7 @@
 # Tor Browser through Ubuntu's torbrowser-launcher, which downloads Tor Browser from
 # torproject.org, checks the Tor Project's signature on it and keeps it current, as the Tor
-# Project wants it to be. The browser it downloads lives in the home, with its profile.
+# Project wants it to be. The browser it downloads lives in the home, with its profile. The Tor
+# Project builds Tor Browser for x86-64 Linux alone, and Ubuntu builds the launcher for amd64 alone.
 # https://gitlab.torproject.org/tpo/applications/torbrowser-launcher
 name = "Tor Browser"
 category = "browsers"
@@ -23,4 +24,5 @@ Tor Browser and its profile stay in ~/.local/share/torbrowser, and the launcher'
 [[action]]
 name = "Install Tor Browser's launcher"
 kind = "apt"
+arch = "amd64"
 packages = ["torbrowser-launcher"]
