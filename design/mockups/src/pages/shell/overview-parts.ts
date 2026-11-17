@@ -928,6 +928,17 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
             part.style.setProperty("--ov-arrive", isOpen || (home && !reduced) ? "1" : "0");
             part.style.setProperty("--ov-fly", !isOpen && home ? "1" : "0");
           }
+          // A number shows once its miniature has come to rest: the screen's own after its flight.
+          const tag = made.tag;
+          tag.style.setProperty("--ov-tt", motion === "none" ? "0s" : isOpen ? "var(--motion-short)" : "var(--motion-micro)");
+          tag.style.setProperty("--ov-td", motion === "open" && home && !reduced ? "var(--motion-medium)" : "0s");
+          if (motion === "open" && home) {
+            tag.style.setProperty("--ov-tt", "0s");
+            tag.style.setProperty("--ov-tag", "0");
+            commit(tag);
+            tag.style.setProperty("--ov-tt", "var(--motion-short)");
+          }
+          tag.style.setProperty("--ov-tag", isOpen ? "1" : "0");
         }
       }
       for (const element of [...each.layer.querySelectorAll<HTMLElement>(".ov-plus, .ov-label")]) {

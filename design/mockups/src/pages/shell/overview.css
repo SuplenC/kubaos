@@ -26,6 +26,7 @@
 @property --ov-aside { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-held { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-hover { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
 
 /* The sample: a whole screen, the size the stage or the full screen gives it. */
 .ov {
@@ -56,6 +57,7 @@
   position: absolute;
   left: var(--ov-at-x);
   top: var(--ov-at-y);
+  isolation: isolate;
 }
 
 /* Screens apart on the desk, each its own glass. */
@@ -133,6 +135,11 @@
     --ov-held var(--motion-short) var(--easing-standard);
 }
 
+/* The screen's own desktop flies over the others, shrinking into its place and growing out of it. */
+.ov-ws[data-rank="home"] {
+  z-index: 1;
+}
+
 /* The desktop drawn at the screen's own size and scaled into the box: the windows are the real
    ones, seen from above. Its corners are the control radius at the miniature's size. */
 .ov-ws-desk {
@@ -176,9 +183,9 @@
   align-items: center;
   justify-content: center;
   height: var(--size-control_sm);
-  opacity: calc(1 - var(--ov-fly));
+  opacity: var(--ov-tag);
   transition:
-    --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
+    --ov-tag var(--ov-tt, 0s) var(--easing-standard) var(--ov-td, 0s),
     opacity var(--motion-short) var(--easing-standard);
 }
 
@@ -422,6 +429,7 @@
 .ov-lift {
   position: absolute;
   inset: 0;
+  z-index: 1;
   display: block;
   pointer-events: none;
 }
