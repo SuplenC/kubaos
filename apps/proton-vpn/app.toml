@@ -7,10 +7,13 @@
 # that file, word for word. It connects through NetworkManager, WireGuard or OpenVPN
 # (network-manager-openvpn, on every machine), with a tunnel of its own (Proton's NetworkManager
 # plugin, nm-protun); its core library also brings network-manager-openvpn-gnome, the OpenVPN
-# plugin's GTK editor, and libnftnl11. Its kill switch is an nftables table of its own, put up
-# through me.proton.vpn.kill_switch, a D-Bus service of root's started only while it is asked
-# for, and kept at boot by proton-vpn-kill-switch-boot.service, which the window turns on and off
-# as you set the kill switch to permanent. Its daemon, me.proton.vpn.split_tunneling.service, which
+# plugin's GTK editor, and libnftnl11. Its kill switch is NetworkManager connections of its own
+# (pvpn-killswitch and its kin, on dummy interfaces), saved to disk while it is permanent; behind a
+# flag of Proton's it is two nftables tables instead, inet proton_vpn_ks and ip6
+# proton_vpn_ks_ipv6, put up through me.proton.vpn.kill_switch, a D-Bus service of root's, and
+# kept at boot by proton-vpn-kill-switch-boot.service. Proton's removal leaves either up, and its
+# service keeps the tables when it stops, so the last step turns the kill switch off before the
+# packages go (./kill-switch-off). Its daemon, me.proton.vpn.split_tunneling.service, which
 # its postinst enables and starts, keeps split tunnelling, and with it python3-bpfcc and LLVM come
 # in.
 # KubaOS's Proxy and Proton VPN each block what leaves outside their own tunnel: with the Proxy's
@@ -47,3 +50,13 @@ unit = "me.proton.vpn.split_tunneling.service"
 scope = "system"
 enable = true
 start = true
+
+# Nothing to set up: its check never passes, so the step stays the app's and its undo runs on
+# removal, before the packages go.
+[[action]]
+name = "Turn Proton VPN's kill switch off when it goes"
+kind = "run"
+root = true
+do = ["true"]
+check = ["false"]
+undo = ["./kill-switch-off"]

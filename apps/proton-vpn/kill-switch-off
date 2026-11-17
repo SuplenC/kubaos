@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Turns Proton VPN's kill switch off, for its removal: Proton's packages leave it up when they go,
+# with nothing left that can take it down. Its default kind is NetworkManager connections (a
+# permanent one saved to disk, so NetworkManager brings it up again at every boot); its firewall
+# kind is two nftables tables, which its service keeps when it stops.
+# Usage: ./kill-switch-off
+# It runs while Proton's packages are still there. A kind Proton's command couldn't reach doesn't
+# stop the removal; a table of Proton's that stays up does.
+# https://github.com/ProtonVPN/python-proton-vpn-api-core/blob/stable/docs/firewall_kill_switch.md
+set -euo pipefail
+
+# Proton's own command for this, which turns off every kind it has and says which it couldn't.
+# -I: it runs as root, so it never imports from the folder it runs in.
+python3 -I -m proton.vpn.killswitch.disable || true
+
+# The firewall kind's tables by their names, which no other program's have, for when its service
+# couldn't be reached.
+for table in "inet proton_vpn_ks" "ip6 proton_vpn_ks_ipv6"; do
+  # shellcheck disable=SC2086 # The family and the name, two words.
+  if nft list table $table >/dev/null 2>&1; then
+    nft delete table $table
+  fi
+done
