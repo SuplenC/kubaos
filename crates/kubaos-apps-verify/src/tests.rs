@@ -63,10 +63,11 @@ fn a_change_reaches_the_apps_whose_folder_or_vendor_repository_it_touches() {
         ids(&touched("system/files/apt/sources.list.d/docker.sources\n", &catalog)),
         ["docker"]
     );
-    assert_eq!(
-        ids(&touched("system/packages.toml\n", &catalog)),
-        ["claude-code", "docker", "google-chrome"]
-    );
+    let every_repo = ids(&touched("system/packages.toml\n", &catalog));
+    for id in ["docker", "firefox", "steam", "vivaldi"] {
+        assert!(every_repo.contains(&id.to_owned()), "{id}");
+    }
+    assert!(!every_repo.contains(&"penpot".to_owned()));
     assert!(
         touched(
             "apps/README.md\nsystem/files/apt/sources.list.d/tuxedo.sources\n",

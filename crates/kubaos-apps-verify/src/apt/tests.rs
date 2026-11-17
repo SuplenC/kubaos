@@ -25,6 +25,51 @@ fn a_sources_file_with_one_architecture_serves_only_it() {
 }
 
 #[test]
+fn a_flat_sources_file_needs_no_components_and_its_release_file_sits_in_its_folder() {
+    let at_top = Sources::parse("URIs: https://dbeaver.io/debs/dbeaver-ce\nSuites: /\n").unwrap();
+    let below = Sources::parse("URIs: https://download.sublimetext.com/\nSuites: apt/stable/\n").unwrap();
+
+    assert!(at_top.flat() && below.flat());
+    assert!(at_top.components.is_empty());
+    assert_eq!(at_top.dists(), "https://dbeaver.io/debs/dbeaver-ce");
+    assert_eq!(below.dists(), "https://download.sublimetext.com/apt/stable");
+}
+
+#[test]
+fn a_sources_file_that_isnt_flat_needs_components() {
+    assert!(Sources::parse("URIs: https://example.org\nSuites: stable\n").is_err());
+}
+
+#[test]
+fn a_sources_files_architectures_may_be_parted_by_commas() {
+    let text = "URIs: https://example.org\nSuites: stable\nComponents: main\nArchitectures: amd64,arm64\n";
+
+    let sources = Sources::parse(text).unwrap();
+
+    assert_eq!(sources.architectures, ["amd64", "arm64"]);
+    assert!(sources.serves("arm64"));
+}
+
+#[test]
+fn an_index_gives_only_the_packages_of_the_architecture_and_of_all() {
+    let text = "Package: tool\nVersion: 2\nArchitecture: arm64\n\nPackage: tool\nVersion: 1\nArchitecture: amd64\n\nPackage: data\nVersion: 3\nArchitecture: all\n";
+
+    let found = newest(text, "amd64");
+
+    assert_eq!(found["tool"], "1");
+    assert_eq!(found["data"], "3");
+}
+
+#[test]
+fn a_release_file_lists_an_index_plain_or_gzipped() {
+    let release = Release::parse("SHA256:\n ab 1 main/binary-all/Packages.gz\n cd 1 Packages\n");
+
+    assert!(release.lists("main/binary-all/Packages"));
+    assert!(release.lists("Packages"));
+    assert!(!release.lists("main/binary-amd64/Packages"));
+}
+
+#[test]
 fn a_sources_file_without_a_suite_is_refused() {
     assert!(Sources::parse("URIs: https://example.org\nComponents: main\n").is_err());
 }
@@ -44,7 +89,7 @@ fn a_release_file_lists_the_sha256_section_only() {
 fn an_index_gives_the_newest_version_of_each_package_in_dpkgs_order() {
     let text = "Package: tool\nVersion: 1.9\n\nPackage: tool\nVersion: 1.10~rc1\n\nPackage: tool\nVersion: 1.10\nArchitecture: amd64\n\nPackage: other\nVersion: 2:0.1\n";
 
-    let found = newest(text);
+    let found = newest(text, "amd64");
 
     assert_eq!(found["tool"], "1.10");
     assert_eq!(found["other"], "2:0.1");

@@ -11,7 +11,6 @@
 //! - Reading repositories: `apt.rs`. Fetching: `fetch.rs`. The table: `main.rs`.
 
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -19,8 +18,8 @@ use std::process::Command;
 use std::sync::Mutex;
 
 use kubaos_core::apps::Folder;
-use kubaos_core::apps::action::Download;
 use kubaos_core::apps::action::Kind;
+use kubaos_core::apps::action::version_matches;
 use kubaos_core::apps::version;
 use kubaos_core::apt::Manifest;
 
@@ -114,7 +113,8 @@ impl Context {
 
     fn fetch_ubuntu(&self, arch: &str) -> Result<Versions, AptError> {
         let keys = fs::read(UBUNTU_KEYRING).map_err(|e| AptError::Invalid(format!("reading {UBUNTU_KEYRING}: {e}")))?;
-        let mirror = if arch == "amd64" {
+        // i386 is served beside amd64, on the archive's main mirror.
+        let mirror = if matches!(arch, "amd64" | "i386") {
             "http://archive.ubuntu.com/ubuntu"
         } else {
             "http://ports.ubuntu.com/ubuntu-ports"
@@ -123,10 +123,8 @@ impl Context {
         for pocket in ["", "-updates", "-security"] {
             let dists = format!("{mirror}/dists/{}{pocket}", self.release);
             let (_, release) = apt::release(&dists, &keys)?;
-            for component in UBUNTU_COMPONENTS {
-                for (package, found) in apt::index(&dists, &release, component, arch)? {
-                    keep_newest(&mut newest, package, found);
-                }
+            for (package, found) in apt::index(&dists, &release, &UBUNTU_COMPONENTS, arch)? {
+                keep_newest(&mut newest, package, found);
             }
         }
         Ok(newest)
@@ -149,29 +147,58 @@ pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
         .actions
         .iter()
         .chain(app.setups.iter().flat_map(|setup| &setup.actions));
-    let mut seen_repos = BTreeSet::new();
+    let mut repos: BTreeMap<String, Option<Repository>> = BTreeMap::new();
     for action in actions {
         match &action.kind {
-            Kind::Apt { packages, repo, arch } => {
-                let arches: Vec<&str> = ARCHES
-                    .iter()
-                    .map(|(arch, _)| *arch)
-                    .filter(|each| arch.as_deref().is_none_or(|only| only == *each))
-                    .collect();
-                match repo {
-                    Some(repo) if seen_repos.insert(repo.clone()) => vendor(context, repo, packages, &arches, &mut row),
-                    Some(_) => {}
-                    None => ubuntu(context, packages, &arches, &mut row),
+            Kind::Apt {
+                packages,
+                repo,
+                arch,
+                versions,
+                amd64,
+                arm64,
+                ..
+            } => {
+                if let Some(name) = repo
+                    && !repos.contains_key(name)
+                {
+                    let checked = vendor(context, name, &mut row);
+                    repos.insert(name.clone(), checked);
+                }
+                // A repository whose key or InRelease failed was reported; its packages aren't
+                // looked up.
+                let repository = match repo {
+                    Some(name) => match repos.get(name).and_then(Option::as_ref) {
+                        Some(repository) => Some(repository),
+                        None => continue,
+                    },
+                    None => None,
+                };
+                for (machine, _) in ARCHES {
+                    if arch.as_deref().is_some_and(|only| only != machine) {
+                        continue;
+                    }
+                    let own = match machine {
+                        "amd64" => amd64.as_ref(),
+                        _ => arm64.as_ref(),
+                    };
+                    let wanted = packages.iter().chain(own.into_iter().flat_map(|own| &own.packages));
+                    for package in wanted {
+                        candidate(context, repository, package, machine, versions.as_deref(), &mut row);
+                    }
                 }
             }
             Kind::Deb { amd64, arm64, .. } | Kind::Download { amd64, arm64, .. } => {
                 for (arch, download) in [("amd64", amd64), ("arm64", arm64)] {
                     if let Some(download) = download {
-                        pinned(arch, download, &mut row);
+                        pinned(&format!("({arch})"), &download.url, &download.sha256, &mut row);
                     }
                 }
             }
-            Kind::Nix { packages } => nix(&context.root, packages, &mut row),
+            Kind::Dkms {
+                module, url, sha256, ..
+            } => pinned(&format!("({module})"), url, sha256, &mut row),
+            Kind::Nix { packages, arch, unfree } => nix(&context.root, packages, arch.as_deref(), *unfree, &mut row),
             Kind::WebApp { url, .. } => web_app(url, &mut row),
             _ => {}
         }
@@ -181,9 +208,39 @@ pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
 
 type Report<'a> = dyn FnMut(&'static str, String, Outcome, String) + 'a;
 
-/// A vendor repository's key against its pin, its `InRelease` against the key, and each package's
-/// candidate for each architecture.
-fn vendor(context: &Context, name: &str, packages: &[String], arches: &[&str], row: &mut Report<'_>) {
+/// A vendor repository whose key and `InRelease` checked out: what its packages are looked up in.
+#[derive(Debug)]
+struct Repository {
+    name: String,
+    sources: Sources,
+    release: apt::Release,
+    /// Its newest version of each package, by architecture, fetched on first use.
+    indexes: Mutex<BTreeMap<String, Result<Versions, String>>>,
+}
+
+impl Repository {
+    /// The repository's newest version of each package for `arch`, over its indexes, or `None`
+    /// when its sources file doesn't serve `arch`.
+    fn index(&self, arch: &str) -> Option<Result<Versions, String>> {
+        if !self.sources.serves(arch) {
+            return None;
+        }
+        let mut cache = self.indexes.lock().expect("repository index cache mutex poisoned");
+        let found = cache.entry(arch.to_owned()).or_insert_with(|| {
+            let components: Vec<&str> = self.sources.components.iter().map(String::as_str).collect();
+            apt::index(&self.sources.dists(), &self.release, &components, arch).map_err(|e| chain(&e))
+        });
+        Some(found.clone())
+    }
+
+    fn label(&self) -> String {
+        format!("{} {}", self.name, self.sources.suite)
+    }
+}
+
+/// A vendor repository's key against its pin, and its next key's when the vendor is moving to
+/// one, and its `InRelease` against them: signed by either, as its sources file trusts both.
+fn vendor(context: &Context, name: &str, row: &mut Report<'_>) -> Option<Repository> {
     let Some(pin) = context.manifest.repos().get(name) else {
         row(
             "key",
@@ -191,135 +248,168 @@ fn vendor(context: &Context, name: &str, packages: &[String], arches: &[&str], r
             Outcome::Error,
             "the package manifest has no such repo".to_owned(),
         );
-        return;
+        return None;
     };
-    let key = match apt::key(&pin.key_url) {
-        Ok(key) => key,
-        Err(e) => return row("key", name.to_owned(), Outcome::Error, chain(&e)),
-    };
-    match apt::fingerprints(&key) {
-        Ok(found) if found == [pin.fingerprint.clone()] => {
-            row("key", name.to_owned(), Outcome::Ok, pin.fingerprint.clone());
+    let mut keys = Vec::new();
+    let next = pin.next_key_url.as_deref().zip(pin.next_fingerprint.as_deref());
+    let pinned_keys = std::iter::once((pin.key_url.as_str(), pin.fingerprint.as_str())).chain(next);
+    let mut good = true;
+    for (url, fingerprint) in pinned_keys {
+        let subject = if fingerprint == pin.fingerprint {
+            name.to_owned()
+        } else {
+            format!("{name} (next)")
+        };
+        let key = match apt::key(url) {
+            Ok(key) => key,
+            Err(e) => {
+                row("key", subject, Outcome::Error, chain(&e));
+                good = false;
+                continue;
+            }
+        };
+        match apt::fingerprints(&key) {
+            Ok(found) if found == [fingerprint] => row("key", subject, Outcome::Ok, fingerprint.to_owned()),
+            Ok(found) => {
+                row(
+                    "key",
+                    subject,
+                    Outcome::Mismatch,
+                    format!("pinned {fingerprint}, the key holds {}", found.join(", ")),
+                );
+                good = false;
+            }
+            Err(e) => {
+                row("key", subject, Outcome::Error, chain(&e));
+                good = false;
+            }
         }
-        Ok(found) => row(
-            "key",
-            name.to_owned(),
-            Outcome::Mismatch,
-            format!("pinned {}, the key holds {}", pin.fingerprint, found.join(", ")),
-        ),
-        Err(e) => return row("key", name.to_owned(), Outcome::Error, chain(&e)),
+        keys.extend(key);
+    }
+    if !good {
+        return None;
     }
     let path = context
         .root
         .join(format!("system/files/apt/sources.list.d/{name}.sources"));
-    let sources =
-        match fs::read_to_string(&path).map_err(|e| AptError::Invalid(format!("reading {}: {e}", path.display()))) {
-            Ok(text) => Sources::parse(&text),
-            Err(e) => Err(e),
-        };
+    let sources = fs::read_to_string(&path)
+        .map_err(|e| AptError::Invalid(format!("reading {}: {e}", path.display())))
+        .and_then(|text| Sources::parse(&text));
     let sources = match sources {
         Ok(sources) => sources,
-        Err(e) => return row("InRelease", name.to_owned(), Outcome::Error, chain(&e)),
+        Err(e) => {
+            row("InRelease", name.to_owned(), Outcome::Error, chain(&e));
+            return None;
+        }
     };
-    let dists = sources.dists();
-    let release = match apt::release(&dists, &key) {
-        Ok((verified, release)) if verified.primary == pin.fingerprint => {
+    let subject = format!("{name} {}", sources.suite);
+    let trusted = [Some(pin.fingerprint.as_str()), pin.next_fingerprint.as_deref()];
+    match apt::release(&sources.dists(), &keys) {
+        Ok((verified, release)) if trusted.contains(&Some(verified.primary.as_str())) => {
             row(
                 "InRelease",
-                format!("{name} {}", sources.suite),
+                subject,
                 Outcome::Ok,
                 format!("signed by {}", verified.primary),
             );
-            release
+            Some(Repository {
+                name: name.to_owned(),
+                sources,
+                release,
+                indexes: Mutex::new(BTreeMap::new()),
+            })
         }
         Ok((verified, _)) => {
-            return row(
+            row(
                 "InRelease",
-                format!("{name} {}", sources.suite),
+                subject,
                 Outcome::Mismatch,
-                format!("signed by {}, not the pin", verified.primary),
+                format!("signed by {}, not a pin", verified.primary),
             );
+            None
         }
         Err(e) => {
-            return row(
-                "InRelease",
-                format!("{name} {}", sources.suite),
-                Outcome::Error,
-                chain(&e),
-            );
+            row("InRelease", subject, Outcome::Error, chain(&e));
+            None
         }
-    };
-    for arch in arches {
-        if !sources.serves(arch) {
-            row(
-                "candidate",
-                format!("{name} ({arch})"),
-                Outcome::Mismatch,
-                "the sources file doesn't serve it".to_owned(),
-            );
-            continue;
-        }
-        let mut newest = BTreeMap::new();
-        for component in &sources.components {
-            match apt::index(&dists, &release, component, arch) {
-                Ok(found) => found
-                    .into_iter()
-                    .for_each(|(package, found)| keep_newest(&mut newest, package, found)),
-                Err(e) => {
-                    return row(
-                        "candidate",
-                        format!("{name} {component} ({arch})"),
-                        Outcome::Error,
-                        chain(&e),
-                    );
-                }
+    }
+}
+
+/// `package`'s candidate on a `machine`: in the vendor `repository` where it serves it, else in
+/// Ubuntu's archive, as apt with both finds it. A `package` named `<name>:<architecture>` is that
+/// architecture's, as dpkg takes it. With `versions`, the candidate must be one of the app's.
+fn candidate(
+    context: &Context,
+    repository: Option<&Repository>,
+    package: &str,
+    machine: &str,
+    versions: Option<&str>,
+    row: &mut Report<'_>,
+) {
+    let (name, arch) = package.split_once(':').unwrap_or((package, machine));
+    let subject = format!("{package} ({machine})");
+    let mut found = None;
+    if let Some(repository) = repository {
+        match repository.index(arch) {
+            Some(Ok(newest)) => found = newest.get(name).map(|version| (repository.label(), version.clone())),
+            Some(Err(e)) => {
+                return row(
+                    "candidate",
+                    subject,
+                    Outcome::Error,
+                    format!("{}: {e}", repository.label()),
+                );
             }
+            None => {}
         }
-        candidates(&format!("{name} {}", sources.suite), packages, arch, &newest, row);
+    }
+    let found = match found {
+        Some(found) => Some(found),
+        None => match context.ubuntu(arch) {
+            Ok(newest) => newest
+                .get(name)
+                .map(|version| (format!("ubuntu {}", context.release), version.clone())),
+            Err(e) => return row("candidate", subject, Outcome::Error, format!("ubuntu ({arch}): {e}")),
+        },
+    };
+    let searched = repository.map_or_else(
+        || format!("ubuntu {}", context.release),
+        |repository| format!("{} or ubuntu {}", repository.label(), context.release),
+    );
+    match (found, versions) {
+        (None, _) => row("candidate", subject, Outcome::Mismatch, format!("not in {searched}")),
+        (Some((source, version)), Some(pattern)) if !version_matches(pattern, &version) => row(
+            "candidate",
+            subject,
+            Outcome::Mismatch,
+            format!("{version} in {source}, not one of the app's versions ({pattern})"),
+        ),
+        (Some((source, version)), _) => row("candidate", subject, Outcome::Ok, format!("{version} in {source}")),
     }
 }
 
-/// Each of Ubuntu's packages' candidate in the archive, for each architecture.
-fn ubuntu(context: &Context, packages: &[String], arches: &[&str], row: &mut Report<'_>) {
-    for arch in arches {
-        match context.ubuntu(arch) {
-            Ok(newest) => candidates(&format!("ubuntu {}", context.release), packages, arch, &newest, row),
-            Err(e) => row("candidate", format!("ubuntu ({arch})"), Outcome::Error, e),
-        }
-    }
-}
-
-fn candidates(source: &str, packages: &[String], arch: &str, newest: &BTreeMap<String, String>, row: &mut Report<'_>) {
-    for package in packages {
-        let subject = format!("{package} ({arch})");
-        match newest.get(package) {
-            Some(found) => row("candidate", subject, Outcome::Ok, format!("{found} in {source}")),
-            None => row("candidate", subject, Outcome::Mismatch, format!("not in {source}")),
-        }
-    }
-}
-
-/// A pinned download's sha256 against the pin, and against the digest its vendor publishes.
-fn pinned(arch: &str, download: &Download, row: &mut Report<'_>) {
-    let file = download.url.rsplit('/').next().unwrap_or(&download.url).to_owned();
-    let subject = format!("{file} ({arch})");
-    match fetch::sha256(&download.url) {
-        Ok(got) if got == download.sha256 => row("sha256", subject.clone(), Outcome::Ok, got),
+/// A pinned download's sha256 against the pin, and against the digest its vendor publishes;
+/// `what` follows the file's name in the table.
+fn pinned(what: &str, url: &str, sha256: &str, row: &mut Report<'_>) {
+    let file = url.rsplit('/').next().unwrap_or(url).to_owned();
+    let subject = format!("{file} {what}");
+    match fetch::sha256(url) {
+        Ok(got) if got == sha256 => row("sha256", subject.clone(), Outcome::Ok, got),
         Ok(got) => row(
             "sha256",
             subject.clone(),
             Outcome::Mismatch,
-            format!("pinned {}, served {got}", download.sha256),
+            format!("pinned {sha256}, served {got}"),
         ),
         Err(e) => row("sha256", subject.clone(), Outcome::Error, chain(&e)),
     }
-    match published(&download.url) {
-        Ok(Some((source, digest))) if digest == download.sha256 => row("published", subject, Outcome::Ok, source),
+    match published(url) {
+        Ok(Some((source, digest))) if digest == sha256 => row("published", subject, Outcome::Ok, source),
         Ok(Some((source, digest))) => row(
             "published",
             subject,
             Outcome::Mismatch,
-            format!("pinned {}, {source} says {digest}", download.sha256),
+            format!("pinned {sha256}, {source} says {digest}"),
         ),
         Ok(None) => row(
             "published",
@@ -375,57 +465,92 @@ fn digest_for(text: &str, file: &str) -> Option<String> {
         .map(str::to_ascii_lowercase)
 }
 
-/// Each nixpkgs package's version at the checkout's `flake.lock`, for each system, and whether it
-/// is available there (its platforms, not broken; unfree allowed, as the user flake decides it).
-fn nix(root: &Path, packages: &[String], row: &mut Report<'_>) {
-    for package in packages {
-        for (_, system) in ARCHES {
+/// Each nixpkgs package's version at the checkout's `flake.lock`, for each system the action is
+/// for, and whether it is available there (its platforms, not broken; unfree allowed, as the user
+/// flake decides it). An action is `unfree` exactly when nixpkgs marks one of its packages unfree.
+fn nix(root: &Path, packages: &[String], arch: Option<&str>, unfree: bool, row: &mut Report<'_>) {
+    for (machine, system) in ARCHES {
+        if arch.is_some_and(|only| only != machine) {
+            continue;
+        }
+        let mut found_unfree = Vec::new();
+        let mut evaluated = true;
+        for package in packages {
             let subject = format!("{package} ({system})");
-            // Nix reads the checkout's flake from git.
-            let output = kubaos_git::clear(&mut Command::new("nix"))
-                .args(["eval", "--json", "--impure", "--inputs-from"])
-                .arg(root)
-                .arg(format!("nixpkgs#legacyPackages.{system}.{package}"))
-                .args([
-                    "--apply",
-                    "p: { version = p.version or null; available = p.meta.available or false; }",
-                ])
-                .env("NIXPKGS_ALLOW_UNFREE", "1")
-                .output();
-            let output = match output {
-                Ok(output) if output.status.success() => output,
-                Ok(output) => {
-                    let said = String::from_utf8_lossy(&output.stderr);
-                    let last = said
-                        .lines()
-                        .rfind(|line| !line.trim().is_empty())
-                        .unwrap_or("nix eval failed");
-                    row("nixpkgs", subject, Outcome::Error, last.trim().to_owned());
-                    continue;
+            match evaluate(root, system, package) {
+                Ok(value) => {
+                    let version = value["version"].as_str().unwrap_or("no version").to_owned();
+                    if value["unfree"] == true {
+                        found_unfree.push(package.as_str());
+                    }
+                    if value["available"] == true {
+                        row("nixpkgs", subject, Outcome::Ok, version);
+                    } else {
+                        row(
+                            "nixpkgs",
+                            subject,
+                            Outcome::Mismatch,
+                            format!("{version}, not available on {system}"),
+                        );
+                    }
                 }
                 Err(e) => {
-                    row("nixpkgs", subject, Outcome::Error, format!("running nix: {e}"));
-                    continue;
+                    evaluated = false;
+                    row("nixpkgs", subject, Outcome::Error, e);
                 }
-            };
-            let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_default();
-            let version = value["version"].as_str().unwrap_or("no version").to_owned();
-            if value["available"] == true {
-                row("nixpkgs", subject, Outcome::Ok, version);
-            } else {
-                row(
-                    "nixpkgs",
-                    subject,
-                    Outcome::Mismatch,
-                    format!("{version}, not available on {system}"),
-                );
             }
+        }
+        if !evaluated {
+            continue;
+        }
+        let subject = format!("{} ({system})", packages.join(" "));
+        match (unfree, found_unfree.is_empty()) {
+            (true, true) => row(
+                "unfree",
+                subject,
+                Outcome::Mismatch,
+                "marked unfree, but nixpkgs marks none of them unfree".to_owned(),
+            ),
+            (false, false) => row(
+                "unfree",
+                subject,
+                Outcome::Mismatch,
+                format!("nixpkgs marks {} unfree; the action says not", found_unfree.join(", ")),
+            ),
+            _ => {}
         }
     }
 }
 
-/// A web app's URL answers with a success after its redirects. One of this machine's, plain HTTP
-/// on a loopback host, isn't reachable from here; any other URL that isn't HTTPS is a mismatch.
+/// `package`'s version, availability and licence in nixpkgs at the checkout's `flake.lock`, for
+/// `system`, as `nix eval` gives them; the last line nix said when it fails.
+fn evaluate(root: &Path, system: &str, package: &str) -> Result<serde_json::Value, String> {
+    // Nix reads the checkout's flake from git.
+    let output = kubaos_git::clear(&mut Command::new("nix"))
+        .args(["eval", "--json", "--impure", "--inputs-from"])
+        .arg(root)
+        .arg(format!("nixpkgs#legacyPackages.{system}.{package}"))
+        .args([
+            "--apply",
+            "p: { version = p.version or null; available = p.meta.available or false; unfree = p.meta.unfree or false; }",
+        ])
+        .env("NIXPKGS_ALLOW_UNFREE", "1")
+        .output()
+        .map_err(|e| format!("running nix: {e}"))?;
+    if !output.status.success() {
+        let said = String::from_utf8_lossy(&output.stderr);
+        let last = said
+            .lines()
+            .rfind(|line| !line.trim().is_empty())
+            .unwrap_or("nix eval failed");
+        return Err(last.trim().to_owned());
+    }
+    Ok(serde_json::from_slice(&output.stdout).unwrap_or_default())
+}
+
+/// A web app's URL answers with a success after its redirects, or Cloudflare's bot challenge. One
+/// of this machine's, plain HTTP on a loopback host, isn't reachable from here; any other URL that
+/// isn't HTTPS is a mismatch.
 fn web_app(url: &str, row: &mut Report<'_>) {
     if let Some(rest) = url.strip_prefix("http://") {
         let (outcome, detail) = if loopback(rest) {
@@ -444,10 +569,29 @@ fn web_app(url: &str, row: &mut Report<'_>) {
         );
     }
     match fetch::status(url) {
-        Ok(status) if (200..300).contains(&status) => {
-            row("web_app", url.to_owned(), Outcome::Ok, format!("HTTP {status}"));
+        Ok(answer) if (200..300).contains(&answer.status) => {
+            row(
+                "web_app",
+                url.to_owned(),
+                Outcome::Ok,
+                format!("HTTP {}", answer.status),
+            );
         }
-        Ok(status) => row("web_app", url.to_owned(), Outcome::Mismatch, format!("HTTP {status}")),
+        Ok(answer) if answer.challenged => row(
+            "web_app",
+            url.to_owned(),
+            Outcome::Note,
+            format!(
+                "HTTP {}, Cloudflare's bot challenge, which a browser passes",
+                answer.status
+            ),
+        ),
+        Ok(answer) => row(
+            "web_app",
+            url.to_owned(),
+            Outcome::Mismatch,
+            format!("HTTP {}", answer.status),
+        ),
         Err(e) => row("web_app", url.to_owned(), Outcome::Error, chain(&e)),
     }
 }

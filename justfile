@@ -72,7 +72,7 @@ nextest *args:
     done
     test/git-decoy cargo nextest run ${scope[@]+"${scope[@]}"} "$@"
 
-# Hold the Apps catalog's pins to their upstreams (crates/kubaos-apps-verify, docs/TESTING.md): each vendor key's fingerprint and the InRelease it signs, each package's candidate in its repository or Ubuntu's archive, each pinned download's sha256 as served and as published, each nixpkgs package at flake.lock for both systems, each web app's URL. Every app with no ID; `just apps-verify --changed origin/main` the apps a branch changed. Network only: it installs nothing and reads no apt state.
+# Hold the Apps catalog's pins to their upstreams (crates/kubaos-apps-verify, docs/TESTING.md): each vendor key's fingerprint, its next key's, and the release file they sign, each package's candidate in its repository or Ubuntu's archive and in the app's versions, each pinned download's and DKMS source's sha256 as served and as published, each nixpkgs package at flake.lock for the systems its action is for and its unfree mark, each web app's URL. Every app with no ID; `just apps-verify --changed origin/main` the apps a branch changed. Network only: it installs nothing and reads no apt state.
 [positional-arguments]
 apps-verify *args:
     cargo run -q -p kubaos-apps-verify -- "$@"

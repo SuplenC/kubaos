@@ -5,14 +5,18 @@
 //! kubaos-apps-verify [--root DIR] --changed BASE               the apps a branch changed
 //! ```
 //!
-//! For each app: a vendor repository's key against its pinned fingerprint and its `InRelease`
-//! verified with that key alone; each package's candidate in that repository, or in Ubuntu's
-//! archive for the release (its `Packages` indexes, never the machine's apt), for each
-//! architecture; each pinned download's sha256 as served and as the vendor publishes it; each
-//! nixpkgs package at the checkout's `flake.lock`, for each system; and a web app's URL. It prints
-//! a table and exits 1 on a mismatch or a check that couldn't run, 2 on a usage error. It installs
-//! nothing and reads no apt, dpkg or gpg state of the machine's: keys are checked in a gpg home of
-//! their own.
+//! For each app, in its own actions and every setup's: a vendor repository's key against its
+//! pinned fingerprint, and its next key's where the vendor is moving to one, and its release file
+//! (`InRelease`, or `Release` and `Release.gpg`) verified with those keys alone; each apt package's
+//! candidate for each architecture the action is for, its per-architecture packages and a
+//! `<name>:<architecture>` package's other architecture included, in the vendor's repository and
+//! else Ubuntu's archive for the release (their `Packages` indexes, never the machine's apt), and
+//! one of the app's `versions` where the action names them; each pinned download's and DKMS
+//! source's sha256 as served and as the vendor publishes it; each nixpkgs package at the checkout's
+//! `flake.lock`, for each system the action is for, and its `unfree` mark against nixpkgs'; and a
+//! web app's URL. It prints a table and exits 1 on a mismatch or a check that couldn't run, 2 on a
+//! usage error. It installs nothing and reads no apt, dpkg or gpg state of the machine's: keys are
+//! checked in a gpg home of their own.
 //!
 //! `--changed BASE` checks the apps whose folder changed since the merge base with BASE, and the
 //! apps whose vendor repository changed (`system/packages.toml`, a sources file).
