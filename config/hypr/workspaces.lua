@@ -90,16 +90,17 @@ local function state_dir()
   return state_home .. "/kubaos/hypr"
 end
 
--- Cleared once the user's last session ends, so a new login says again what
--- the last one said.
+-- Hyprland's own folder for this run of it, which a config reload keeps and
+-- the next login doesn't share, so a new login says again what the last one
+-- said. Nil without a runtime folder: nothing is remembered then.
 local function runtime_dir()
-  local runtime = os.getenv("XDG_RUNTIME_DIR") or ("/tmp/kubaos-" .. (os.getenv("USER") or "session"))
-  return runtime .. "/kubaos/hypr"
+  local runtime, instance = os.getenv("XDG_RUNTIME_DIR"), os.getenv("HYPRLAND_INSTANCE_SIGNATURE")
+  return runtime and instance and (runtime .. "/hypr/" .. instance)
 end
 
 local SCREENS_FILE = state_dir() .. "/workspace-screens"
 local GROUPS_FILE = user_layer.file("workspaces", "groups.toml")
-local TOASTS_FILE = runtime_dir() .. "/workspace-groups-toasts"
+local TOASTS_FILE = runtime_dir() and (runtime_dir() .. "/kubaos-workspace-groups-toasts")
 
 local M = { slots = SLOTS }
 
@@ -160,7 +161,7 @@ local TOAST_TRIES = 60
 -- token and the time its tries run out. A problem is kept on one line.
 local function read_toasts()
   local toasts = { token = 0 }
-  for line in read(TOASTS_FILE):gmatch("[^\n]+") do
+  for line in (TOASTS_FILE and read(TOASTS_FILE) or ""):gmatch("[^\n]+") do
     local token = line:match("^token\t(%d+)$")
     local shown = line:match("^shown\t(.*)$")
     local trying, expires, problem = line:match("^trying\t(%d+)\t(%d+)\t(.*)$")
@@ -176,6 +177,9 @@ local function read_toasts()
 end
 
 local function write_toasts(toasts)
+  if not TOASTS_FILE then
+    return
+  end
   local lines = { "token\t" .. toasts.token }
   if toasts.shown then
     lines[#lines + 1] = "shown\t" .. toasts.shown
@@ -600,8 +604,10 @@ local function target_monitor(name)
   return hl.get_active_monitor()
 end
 
--- Connector -> the workspace the user last went to on that screen, which the
--- reconcile leaves in view, empty or not, until the screen shows another.
+-- Connector -> the workspace of a waiting group the user last went to on that
+-- screen, which the reconcile leaves in view, empty or not, until the screen
+-- shows another. A workspace of a group that has a screen is never held here:
+-- when the screen's group changes, its view goes to the new group's.
 local went = {}
 
 -- Show workspace `id` on a screen and focus it, bringing it back from another
@@ -611,7 +617,7 @@ local function go(monitor, id)
     hl.dispatch(hl.dsp.focus({ monitor = monitor.name }))
   end
   reclaim(monitor, id)
-  went[monitor.name] = id
+  went[monitor.name] = not owner(id, mapping()) and id or nil
   hl.dispatch(hl.dsp.focus({ workspace = tostring(id) }))
 end
 
@@ -1143,6 +1149,9 @@ hl.on("monitor.removed", function(monitor)
     leave_foreign(focused_name)
   end
   left_on_removal = nil
+  if name then
+    went[name] = nil
+  end
   settle_later(nil, name)
 end)
 

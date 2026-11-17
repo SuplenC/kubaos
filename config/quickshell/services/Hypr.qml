@@ -79,16 +79,17 @@ Singleton {
     }
 
     // The block of the screen named `name`, whose Hyprland monitor is `monitor`, looked up by name
-    // so a screen Hyprland doesn't list yet still finds its own. Until Hyprland has written the
-    // file, the block of the workspace the monitor shows; once it has, -1 for a screen the file
-    // doesn't list yet, which holds no block.
+    // so a screen Hyprland doesn't list yet still finds its own. A screen the file doesn't name
+    // takes the block of the workspace its monitor shows: Hyprland writes the file only once a
+    // new screen's workspaces have moved. With no monitor either it holds no block, -1, so it
+    // never draws the laptop's group as its own; with no file at all, the laptop's.
     function blockOfScreen(name: string, monitor: HyprlandMonitor): int {
         const block = blocks[name];
         if (block !== undefined)
             return block;
-        if (screenLines.length > 0)
-            return -1;
-        const active = monitor?.activeWorkspace?.id ?? 1;
+        if (!monitor)
+            return screenLines.length > 0 ? -1 : 0;
+        const active = monitor.activeWorkspace?.id ?? 1;
         return active > 0 ? blockOf(active) : 0;
     }
 
@@ -184,15 +185,16 @@ Singleton {
     // Hyprland's workspaces, screens and windows read again once its workspace and screen events
     // have held still for a moment, as one burst. Quickshell (v0.3.2) puts a workspace switch on
     // the focused screen whichever screen it happened on, and moves the workspace there with it:
-    // the reconcile in `config/hypr/workspaces.lua` switching a screen that just arrived would leave the
-    // workspace on the focused screen's bar. A list asked for before an event and read after it
-    // can drop a screen just added or leave windows on a renumbered workspace's old object, and a
-    // read asked for while one is in flight is dropped. The read after the burst puts all of it
-    // right, and an ordinary switch costs one burst of three reads, a window event none.
+    // the reconcile in `config/hypr/workspaces.lua` switching a screen that just arrived would
+    // leave the workspace on the focused screen's bar. A list asked for before an event and read
+    // after it can drop a screen just added or leave windows on a renumbered workspace's old
+    // object, and a read asked for while one is in flight is dropped. The read after the burst
+    // puts all of it right, and an ordinary switch costs one burst of three reads, a window event
+    // none.
     //
     // Each move and switch the reconcile makes starts the wait again, so the read follows its last
-    // one whatever the interval. `medium` outlasts the reconcile's own wait for the screens to
-    // settle (250 ms, `SETTLE_MS` there), so a screen arriving and its reconcile are read once.
+    // one whatever the interval; an interval shorter than the reconcile's own wait for the screens
+    // to settle (`SETTLE_MS` there) only costs a second read.
     //
     // HAZARD: the workspaces before the screens. The workspace list makes again a screen that
     // Quickshell dropped, from the one each workspace names, and only then can the screen list,

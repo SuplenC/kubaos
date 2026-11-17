@@ -62,6 +62,8 @@ local function bare()
       return dir .. "/config"
     elseif key == "XDG_RUNTIME_DIR" then
       return dir .. "/run"
+    elseif key == "HYPRLAND_INSTANCE_SIGNATURE" then
+      return "instance"
     end
     return real_getenv(key)
   end
@@ -1652,6 +1654,18 @@ test("a groups file saved leaves the view on the empty first workspace of a wait
   run(module.reload_groups())
 
   same(world:shown_on("eDP-1"), 11, "still there")
+end)
+
+test("an empty workspace of its own group the user went to gives way when the screen changes group", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(3))
+  same(world:shown_on("DP-1"), 13, "the empty third of its own group")
+
+  write(world.groups, '[group.2]\nscreens = ["' .. LG_A .. '"]\n')
+  run(module.reload_groups())
+
+  same(world:shown_on("DP-1"), 21, "the first of the group it stands at")
 end)
 
 test("a config reload leaves the screens file as it is", function()

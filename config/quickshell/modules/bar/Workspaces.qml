@@ -11,7 +11,8 @@ import qs.services
 // `groups()` in config/hypr/workspace_blocks.lua, which next and previous
 // walk: the screen's own group first, unless a waiting group has lower numbers
 // (the laptop's, while its lid is closed). Its own group always shows its
-// first workspace. The group of a desk position no screen holds, waiting
+// first workspace; a screen Hyprland lists no monitor for yet has no group of
+// its own. The group of a desk position no screen holds, waiting
 // here, sits on a tint, so it reads as borrowed, and starts with its name
 // when the user gave it one (the workspace groups file). Scroll to step
 // through them.
