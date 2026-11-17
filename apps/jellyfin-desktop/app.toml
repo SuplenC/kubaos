@@ -1,0 +1,24 @@
+# Jellyfin Desktop, which was Jellyfin Media Player, from nixpkgs, through the User flake: 2.0.0.
+# Jellyfin's apt repository carries its server alone, Ubuntu doesn't package it, and its own
+# builds for Linux are a .deb for each older Ubuntu. It plays through libmpv, on the GPU through
+# VA-API with the drivers KubaOS gives Nix apps (home/desktop.nix).
+# https://github.com/jellyfin/jellyfin-desktop
+name = "Jellyfin Desktop"
+category = "media"
+tags = ["jellyfin", "media player", "media server", "movies", "tv", "streaming"]
+summary = "The player for your own Jellyfin server. Your films, your disks, nobody's fucking subscription."
+# From its AppStream metainfo, CC0-1.0 (jellyfin/jellyfin-desktop).
+description = """\
+Jellyfin Desktop Client based on Plex Media Player. Play your Jellyfin media in the jellyfin-web \
+application with significantly improved media support. The client also supports SyncPlay."""
+description_from = "https://github.com/jellyfin/jellyfin-desktop/blob/v2.0.0/resources/meta/org.jellyfin.JellyfinDesktop.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "jellyfin-desktop"
+keeps = """\
+Your servers and sign-ins stay in ~/.local/share/jellyfin-desktop: install Jellyfin Desktop \
+again and you're still signed in. Your media lives on your server anyway."""
+
+[[action]]
+name = "Install Jellyfin Desktop"
+kind = "nix"
+packages = ["jellyfin-desktop"]

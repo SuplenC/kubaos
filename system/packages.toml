@@ -239,6 +239,26 @@ key_url = "https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE"
 fingerprint = "E09CA29F6E178040EF22B4098320CA65CB2DE8E5"
 keyring = "/etc/apt/keyrings/onlyoffice.gpg"
 
+# Spotify's repository, for the app of the catalog (apps/spotify/). It has amd64
+# only. Spotify signs it with a key a year, each one's fingerprint in its file's
+# name (pubkey_<fingerprint>.asc); this one expires 2027-02-14. Spotify's package
+# copies the key into /etc/apt/trusted.gpg.d, where apt trusts it for every
+# repository: the app keeps a new install from doing it, and repo setup removes
+# the copy a Spotify installed by hand made.
+[repo.spotify]
+key_url = "https://download.spotify.com/debian/pubkey_5384CE82BA52C83A.asc"
+fingerprint = "E1096BCBFF6D418796DE78515384CE82BA52C83A"
+keyring = "/etc/apt/keyrings/spotify.gpg"
+global_keyrings = ["spotify-2025-11-21-5384CE82BA52C83A.gpg"]
+
+# ppa:obsproject/obs-studio, the OBS Project's Launchpad PPA, for the app of the
+# catalog (apps/obs-studio/). It builds OBS Studio for amd64 only, and its
+# package writes no source of its own.
+[repo.obs-studio]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xBC7345F522079769F5BBE987EFC71127F425E228"
+fingerprint = "BC7345F522079769F5BBE987EFC71127F425E228"
+keyring = "/etc/apt/keyrings/obs-studio.gpg"
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"

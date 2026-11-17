@@ -1,0 +1,26 @@
+# VLC from Ubuntu's archive, 3.0.23, where nixpkgs has 3.0.24. It decodes through Ubuntu's FFmpeg,
+# which carries every common codec, and on the GPU through VA-API; nothing restricted to add. An
+# encrypted DVD needs libdvdcss, which Ubuntu only builds on the machine (libdvd-pkg), so it isn't
+# installed. Of what the package recommends, the steps take its translations, notifications, Samba
+# shares (a NAS) and visualizations; not the skins, the video wall or the capture devices.
+# https://www.videolan.org/vlc/download-ubuntu.html
+name = "VLC"
+category = "media"
+tags = ["video", "audio", "player", "dvd", "streaming", "codecs"]
+summary = "Plays anything you throw at it, under a traffic cone. If VLC won't open it, the file's dead."
+# From its AppStream metainfo, CC0-1.0 (videolan/vlc).
+description = """\
+VLC is a free and open source cross-platform multimedia player and framework that plays most \
+multimedia files as well as DVDs, Audio CDs, VCDs, and various streaming protocols."""
+description_from = "https://github.com/videolan/vlc/blob/3.0.23/share/org.videolan.vlc.appdata.xml.in.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "vlc"
+keeps = """\
+Your settings stay in ~/.config/vlc and the media library in ~/.local/share/vlc: install VLC \
+again and they're there."""
+
+[[action]]
+name = "Install VLC"
+kind = "apt"
+packages = ["vlc", "vlc-l10n", "vlc-plugin-notify", "vlc-plugin-samba", "vlc-plugin-visualization"]

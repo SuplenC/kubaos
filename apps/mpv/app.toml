@@ -1,0 +1,28 @@
+# mpv from Ubuntu's archive, 0.41.0, as nixpkgs' is. It decodes through Ubuntu's FFmpeg, every
+# common codec, and on the GPU with --hwdec (off until its config turns it on). The yt-dlp it
+# recommends, to play a website's video, isn't installed: Ubuntu's falls behind the sites within
+# weeks.
+# https://mpv.io/installation/
+name = "mpv"
+category = "media"
+tags = ["video", "audio", "player", "minimal", "cli", "scripting"]
+summary = "A video player that's just the video. Everything else is a line in its config file."
+# From its AppStream metainfo, CC0-1.0 (mpv-player/mpv), its first two paragraphs.
+description = """\
+mpv is a free (as in freedom) media player for the command line. It supports a wide variety of \
+media file formats, audio and video codecs, and subtitle types. mpv has an OpenGL, Vulkan, and \
+D3D11 based video output that is capable of many features loved by videophiles, such as video \
+scaling with popular high quality algorithms, color management, frame timing, interpolation, \
+HDR, and more."""
+description_from = "https://github.com/mpv-player/mpv/blob/v0.41.0/etc/mpv.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "mpv"
+keeps = """\
+Your config and scripts stay in ~/.config/mpv, and where you stopped watching in \
+~/.local/state/mpv: install mpv again and it picks up from there."""
+
+[[action]]
+name = "Install mpv"
+kind = "apt"
+packages = ["mpv"]
