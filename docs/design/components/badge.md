@@ -10,6 +10,8 @@ What is new about something, over its icon's top right corner: a count in a pill
 
 `accent` draws it in `primary`, with `on_primary` on it, where it marks something unread rather than something wrong: an unread notification's dot on its app's tile, or past the tile's edge on what is behind it. Red there would make every new message look like a failure.
 
+In a fixed meaning of the palette (`meaning`: `success`, `warning`, `sharing`, `microphone`, `recording`) it is only a dot, in that meaning's colour: those meanings have no `on_*` role a count could be drawn in. The bar's mic carries the `microphone` dot while an app records from it. *Not built yet: neither library draws a badge in a fixed meaning.*
+
 ## `BadgedIcon`
 
 QML `BadgedIcon`. Its mockup page is the source of truth: Molecules, BadgedIcon, in `design/mockups/`. *QML only: the bar's. Its badge hangs past the top of its box, which iced lays out only inside it, so `kubaos-ui` gets it as a widget of its own with the first app that badges a symbol. Until then it is on the QML specimen's "Shell only" page, which the parity check leaves out.*
