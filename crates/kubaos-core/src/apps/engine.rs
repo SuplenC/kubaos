@@ -344,7 +344,7 @@ impl<'h> Keeper<'h> {
         journal.setup = setup.map(str::to_owned);
         let mut old = journal.entry(step).cloned();
         if let Some(entry) = old.take_if(|e| !e.action.same_thing(&action)) {
-            self.set_aside(&mut journal, id, &entry)?;
+            self.set_aside(&mut journal, id, setup, &entry)?;
         }
         let look = perform::look(&action, &mut *self.host, recorded(old.as_ref())).map_err(StepError::Perform)?;
         if let Kind::Run { window: Some(says), .. } = &action.kind
@@ -603,16 +603,38 @@ impl<'h> Keeper<'h> {
     }
 
     /// Takes `entry` out of `journal` for another thing its step now holds: undone, or, for a `run`
-    /// that only undoes, forgotten.
-    fn set_aside(&mut self, journal: &mut Journal, id: &str, entry: &Entry) -> Result<(), StepError> {
-        // HAZARD: a `run` that only undoes is forgotten, never undone, here: the app stays, and its
-        // undo (Proton VPN's kill switch turned off) is for a removal. The folder's own such step,
-        // at whatever number, records it again.
-        if entry.action.removal_only() {
-            journal.drop_step(entry.step);
-            return journal.save(&self.journals).map_err(StepError::Journal);
+    /// that only undoes, moved to the folder's own such step of this side that the journal doesn't
+    /// record yet, owned as it was, else forgotten.
+    fn set_aside(
+        &mut self,
+        journal: &mut Journal,
+        id: &str,
+        setup: Option<&str>,
+        entry: &Entry,
+    ) -> Result<(), StepError> {
+        if !entry.action.removal_only() {
+            return self.undo_journaled(journal, id, entry, &mut Vec::new());
         }
-        self.undo_journaled(journal, id, entry, &mut Vec::new())
+        // HAZARD: never undone here: the app stays, and its undo (Proton VPN's kill switch turned
+        // off) is for a removal. It moves rather than wait for its new step to be reached, as a
+        // rolled-back removal does again only the steps it undid.
+        journal.drop_step(entry.step);
+        let (_, steps) = self.steps(id, setup)?;
+        let moved = steps
+            .into_iter()
+            .find(|(n, action)| action.removal_only() && journal.entry(*n).is_none());
+        if let Some((step, action)) = moved {
+            let owned = entry.claims.iter().any(|c| c.owned);
+            journal.put(Entry {
+                step,
+                state: if owned { State::Done } else { State::Found },
+                claims: entry.claims.clone(),
+                prior: journal::Prior::default(),
+                action,
+                replaced: None,
+            });
+        }
+        journal.save(&self.journals).map_err(StepError::Journal)
     }
 
     /// Marks `entry` as being undone, undoes it, and takes it out of `journal`; a run stopped
@@ -1305,7 +1327,8 @@ impl<'a> Engine<'a> {
                         self.sink.event(&UpdateEvent::Note { text: says });
                         ActionState::Skipped
                     }
-                    Ok(Outcome::Done) if undoable.kind_is_run => {
+                    // A `run` with `undo` alone ran nothing to be put back.
+                    Ok(Outcome::Done) if undoable.kind_is_run && !undoable.removal_only => {
                         self.sink.event(&UpdateEvent::Note {
                             text: format!(
                                 "{}: I ran it again to put it back, so what it makes is new.",

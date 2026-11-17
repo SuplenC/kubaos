@@ -1,11 +1,15 @@
 //! A `run` with an `undo` alone: nothing at install, the app's from the run that records it, and
 //! its undo on removal.
 
+use std::fs;
+
+use super::EngineError;
 use super::Events;
 use super::World;
 use crate::apps::Catalog;
 use crate::apps::journal::Journal;
 use crate::apps::journal::State;
+use crate::update::event::UpdateEvent;
 
 /// A package, then root's `run` that only undoes: `./off` stops the package's service.
 const GUARD: &str = r#"
@@ -224,4 +228,120 @@ fn a_run_with_do_but_no_check_or_with_no_undo_is_refused() {
 
         assert!(refused.contains(want), "{refused}");
     }
+}
+
+/// How many times `./off` ran: the stand-in `systemctl` asked to stop the guard.
+fn offs(world: &World) -> usize {
+    world
+        .host
+        .sandbox()
+        .calls()
+        .iter()
+        .filter(|c| *c == "systemctl stop guard.service")
+        .count()
+}
+
+/// Its run that only undoes as `side`'s journal records it at `step`.
+fn recorded_at(world: &World, root: bool, step: usize) -> Option<crate::apps::journal::Entry> {
+    let dir = if root {
+        &world.root_journals
+    } else {
+        &world.user_journals
+    };
+    Journal::read(dir, "guard").unwrap().unwrap().entry(step).cloned()
+}
+
+#[test]
+fn a_rolled_back_removal_puts_a_run_that_only_undoes_back_owned_running_nothing_on_either_side() {
+    for root in [true, false] {
+        let text = if root {
+            GUARD.to_owned()
+        } else {
+            GUARD.replace("root = true\n", "")
+        };
+        let world = World::new(&[("guard", &text)]);
+        world.script("guard", "off", "systemctl stop guard.service");
+        world.install("guard", true).0.unwrap();
+        // The package's undo, after the run's, fails: the removal is rolled back, the run's step
+        // done again on its own side (root's through the root helper's redo).
+        world.host.state.borrow_mut().fail.insert("apt-remove:guard".to_owned());
+
+        let (removed, events) = world.remove("guard");
+
+        assert!(
+            matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+            "root {root}: {removed:?}"
+        );
+        assert_eq!(offs(&world), 1, "root {root}: its undo ran once, and nothing ran again");
+        let entry = recorded_at(&world, root, 2).unwrap();
+        assert_eq!(entry.state, State::Done, "root {root}");
+        assert!(
+            entry.claims.iter().all(|c| c.claim == "run" && c.owned),
+            "root {root}: {entry:?}"
+        );
+        let ran_again = |e: &UpdateEvent| matches!(e, UpdateEvent::Note { text } if text.contains("ran it again"));
+        assert!(!events.0.iter().any(ran_again), "root {root}: {:#?}", events.0);
+
+        world.host.state.borrow_mut().fail.clear();
+        world.remove("guard").0.unwrap();
+
+        assert_eq!(offs(&world), 2, "root {root}: the next removal runs it");
+    }
+}
+
+#[test]
+fn a_rolled_back_removal_moves_a_run_that_only_undoes_to_its_step_in_the_folder_running_nothing() {
+    let world = guard();
+    world.install("guard", true).0.unwrap();
+    // A release puts a step before it, and the removal comes before the update.
+    let extra = "[[action]]\nname = \"Install the extra\"\nkind = \"apt\"\npackages = [\"guard-extra\"]\n\n";
+    world.write_app(
+        "guard",
+        &GUARD.replacen(
+            "[[action]]\nname = \"Turn",
+            &format!("{extra}[[action]]\nname = \"Turn"),
+            1,
+        ),
+    );
+    world.host.state.borrow_mut().fail.insert("apt-remove:guard".to_owned());
+
+    let (removed, _) = world.remove("guard");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(offs(&world), 1);
+    let moved = recorded_at(&world, true, 3).unwrap();
+    assert_eq!(moved.state, State::Done);
+    assert!(moved.action.removal_only());
+
+    world.host.state.borrow_mut().fail.clear();
+    world.remove("guard").0.unwrap();
+
+    assert_eq!(offs(&world), 2);
+}
+
+#[test]
+fn a_found_apps_run_takes_nothing_from_another_apps_run_that_goes() {
+    // The guard found, its run that only undoes holding `run` unowned.
+    let world = guard_by_hand(false);
+    world.install("guard", true).0.unwrap();
+    let warden = GUARD
+        .replace("\"guard\"", "\"warden\"")
+        .replace("./off", "./warden-off")
+        .replace("name = \"Guard\"", "name = \"Warden\"");
+    fs::create_dir_all(world.catalog.join("warden")).unwrap();
+    world.write_app("warden", &warden);
+    world.script("warden", "warden-off", "systemctl stop warden.service");
+    world.install("warden", true).0.unwrap();
+
+    world.remove("warden").0.unwrap();
+
+    let calls = world.host.sandbox().calls();
+    assert!(
+        calls.contains(&"systemctl stop warden.service".to_owned()),
+        "{calls:#?}"
+    );
+    assert_eq!(recorded_at(&world, true, 2).unwrap().state, State::Found);
 }
