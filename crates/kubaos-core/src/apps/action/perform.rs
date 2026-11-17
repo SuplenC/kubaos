@@ -879,7 +879,7 @@ fn installed_as(
     Ok(installed)
 }
 
-/// Whether `path` is a file holding `text` with `mode`.
+/// Whether `path` is a file holding `contents` with `mode`.
 fn has_file(host: &dyn Host, path: &Path, contents: &[u8], mode: u32) -> bool {
     let placed = host.place(path);
     placed.symlink_metadata().is_ok_and(|m| m.is_file())
@@ -935,9 +935,9 @@ pub fn apply(
         } => {
             let logical_path = logical(host, to);
             let path = host.place(&logical_path);
+            let contents = file_contents(text.as_deref(), *binary).ok_or(PerformError::NotBase64)?;
             make_parents(&path)?;
             let mode = mode.as_deref().and_then(parse_mode).unwrap_or(DEFAULT_FILE_MODE);
-            let contents = file_contents(text.as_deref(), *binary).ok_or(PerformError::NotBase64)?;
             write_bytes(&path, &contents, mode)?;
             reload_unit_file(host, &logical_path)
         }
@@ -1534,8 +1534,6 @@ fn make_parents(path: &Path) -> Result<(), PerformError> {
     }
 }
 
-/// Writes `text` to `path` through a new file renamed into place, so a reader never sees half of
-/// it and a link left at the staging path is never followed.
 /// The bytes a `file` step writes: its text, or for a `binary` one the bytes its base64 text
 /// holds; none when that text isn't base64.
 fn file_contents(text: Option<&str>, binary: bool) -> Option<Vec<u8>> {
@@ -1547,10 +1545,13 @@ fn file_contents(text: Option<&str>, binary: bool) -> Option<Vec<u8>> {
     }
 }
 
+/// Writes `text` to `path`, as `write_bytes` does.
 fn write_file(path: &Path, text: &str, mode: u32) -> Result<(), PerformError> {
     write_bytes(path, text.as_bytes(), mode)
 }
 
+/// Writes `contents` to `path` through a new file renamed into place, so a reader never sees
+/// half of it and a link left at the staging path is never followed.
 fn write_bytes(path: &Path, contents: &[u8], mode: u32) -> Result<(), PerformError> {
     let tmp = staging(path);
     write_new(&tmp, contents).map_err(PerformError::io(&tmp))?;

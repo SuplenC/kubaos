@@ -505,3 +505,35 @@ fn resolving_a_dkms_module_reads_its_conf_with_its_own_version() {
     };
     assert_eq!(conf_text.as_deref(), Some("PACKAGE_VERSION=\"1.2\"\n"));
 }
+
+#[test]
+fn a_template_that_is_not_text_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("icon.in"), [0x89, b'P', b'N', b'G']).unwrap();
+    let words = Words {
+        user: "kuba".to_owned(),
+        home: Path::new("/home/kuba").to_path_buf(),
+        arch: "amd64".to_owned(),
+        version: None,
+    };
+    let file =
+        action("name = \"X\"\nkind = \"file\"\nto = \"~/.local/share/x.png\"\nfrom = \"icon.in\"\ntemplate = true\n")
+            .unwrap();
+
+    let resolved = file.resolve(&words, dir.path());
+
+    assert!(
+        matches!(resolved, Err(ActionError::BinaryTemplate { .. })),
+        "{resolved:?}"
+    );
+}
+
+#[test]
+fn a_folder_marking_a_file_binary_is_refused() {
+    let result = action("name = \"X\"\nkind = \"file\"\nto = \"~/.local/share/x\"\ntext = \"x\"\nbinary = true\n");
+
+    assert!(
+        matches!(result, Err(ActionError::JournalOnly { key: "binary" })),
+        "{result:?}"
+    );
+}
