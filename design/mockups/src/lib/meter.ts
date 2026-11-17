@@ -9,6 +9,7 @@
 // A live meter is a mic's level as it comes, one `primary` part with no easing, and a peak tick: a
 // `stroke.thin` line across the bar at the highest level lately, which holds for `slow` and then
 // falls back at the whole bar per `scene`, never under the level. Muted, it is the track alone.
+// Disabled, with no mic to hear, it is the track alone dimmed as a disabled slider's track is.
 //
 // A sparkline is the last minute of a reading as a line in the thin stroke, in whole device pixels,
 // filled under it with the line's colour at `opacity.tint`, each sample placed by its time with the
@@ -76,6 +77,8 @@ export interface LiveMeter {
   readonly feed: (level: number, now: number) => void;
   /** Muted, it is empty and takes no level; unmuted, it starts again from nothing. */
   readonly mute: (muted: boolean) => void;
+  /** Disabled, with no mic to hear, its track dims, empty, and it takes no level; enabled, it starts again from nothing. */
+  readonly disable: (disabled: boolean) => void;
 }
 
 /** The duration token `name` in milliseconds under the speed setting. */
@@ -91,6 +94,7 @@ export function liveMeter(level = 0, peak = level): LiveMeter {
   tick.className = "k-meter-peak";
   bar.append(tick);
   let muted = false;
+  let disabled = false;
   // The peak last caught and when: it holds there, then falls from it.
   let top = Math.max(level, peak);
   let since = Number.NEGATIVE_INFINITY;
@@ -111,7 +115,7 @@ export function liveMeter(level = 0, peak = level): LiveMeter {
   return {
     bar,
     feed(next, now) {
-      if (muted) return;
+      if (muted || disabled) return;
       const reach = Math.max(0, Math.min(1, next));
       if (reach >= peakAt(now, 0)) {
         top = reach;
@@ -121,6 +125,14 @@ export function liveMeter(level = 0, peak = level): LiveMeter {
     },
     mute(on) {
       muted = on;
+      top = 0;
+      since = Number.NEGATIVE_INFINITY;
+      draw(0, 0);
+    },
+    disable(on) {
+      disabled = on;
+      if (on) bar.setAttribute("aria-disabled", "true");
+      else bar.removeAttribute("aria-disabled");
       top = 0;
       since = Number.NEGATIVE_INFINITY;
       draw(0, 0);

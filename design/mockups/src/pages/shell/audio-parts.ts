@@ -342,6 +342,11 @@ export function subtitleOf(options: AudioOptions): string {
   return subtitleCase(options).line(heard(options, devicesOf(options)));
 }
 
+/** Whether there is no mic to hear: neither the mic's own device nor one the default brings. */
+function noMic(devices: Devices): boolean {
+  return (devices.input ?? devices.defaultInput) === null;
+}
+
 /** Whether the mic is a headset's own in Music mode, which has none: Input is then off. */
 function micInMusic(devices: Devices): boolean {
   return devices.mode === "music" && (devices.input === null || devices.input === devices.default);
@@ -356,10 +361,11 @@ export function sideOf(at: number): string {
 /** The output's level when none is given. */
 const LEVEL = 0.62;
 
-/** The output's slider: compact, boosting to 150% and holding at 100%, its icon muting it. */
-function outputSlider(options: AudioOptions, told?: (change: AudioOptions) => void): HTMLElement {
+/** The output's slider: compact, boosting to 150% and holding at 100%, its icon muting it; disabled with no device that plays. */
+function outputSlider(options: AudioOptions, disabled: boolean, told?: (change: AudioOptions) => void): HTMLElement {
   const level = options.output ?? LEVEL;
   return slider({
+    ...(disabled ? { disabled: true } : {}),
     icon: volumeIcon(Math.min(1, level)),
     size: "Compact",
     value: level / BOOST,
@@ -372,9 +378,10 @@ function outputSlider(options: AudioOptions, told?: (change: AudioOptions) => vo
   });
 }
 
-/** The mic's slider, its icon muting it, telling `muted` as it turns. */
-function micSlider(level: number, muted: boolean, told?: (on: boolean) => void): HTMLElement {
+/** The mic's slider, its icon muting it, telling `muted` as it turns; disabled with no mic to hear. */
+function micSlider(level: number, muted: boolean, disabled: boolean, told?: (on: boolean) => void): HTMLElement {
   return slider({
+    ...(disabled ? { disabled: true } : {}),
     icon: "mic",
     size: "Compact",
     value: level,
@@ -569,7 +576,7 @@ function appsCard(apps: readonly App[], devices: Devices, input: boolean, state?
 
 /** The Output tab: its Device card (the output's own device, balance) and the Apps card. */
 function outputTab(options: AudioOptions, devices: Devices, told?: (change: AudioOptions) => void): HTMLElement {
-  const knob = slider({ icon: "balance", size: "Compact", knob: true, value: options.balance ?? 0.5, sticky: 0.5, number: sideOf, ...(told ? { changed: (balance: number) => told({ balance }) } : {}) });
+  const knob = slider({ icon: "balance", size: "Compact", knob: true, ...(devices.outputs ? {} : { disabled: true }), value: options.balance ?? 0.5, sticky: 0.5, number: sideOf, ...(told ? { changed: (balance: number) => told({ balance }) } : {}) });
   return stack("s12", "start", cardOf("Device", sidePicker(devices, false, told), knob), filling(appsCard(options.playing ?? PLAYING, devices, false, options.appPicker, told)));
 }
 
@@ -647,16 +654,17 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     devices = devicesOf(state);
     page.subtitle(subtitleOf(state));
   } : undefined;
-  const output = outputSlider(state, told);
+  const output = outputSlider(state, !devices.outputs, told);
   const inputMuted = () => (state.inputMuted ?? false) || micInMusic(devices);
   const meterOf = liveMeter(state.meter?.level ?? 0.46, state.meter?.peak ?? 0.68);
   if (inputMuted()) meterOf.mute(true);
+  if (noMic(devices)) meterOf.disable(true);
   /** The mic's slider turned: its meter, and the subtitle, which a headset in Music mode leaves be. */
   const micTurned = (on: boolean) => {
     meterOf.mute(on);
     if (!micInMusic(devices)) told?.({ inputMuted: on });
   };
-  let mic = micSlider(state.input ?? 0.8, inputMuted(), live ? micTurned : undefined);
+  let mic = micSlider(state.input ?? 0.8, inputMuted(), noMic(devices), live ? micTurned : undefined);
   const room = document.createElement("span");
   room.className = "audio-tab";
   const picker = tabs({
@@ -691,7 +699,7 @@ export function audioPanel(options: AudioOptions = {}): Panel {
     const codecs = filling(codecPicker(devices.default, mode, undefined));
     codec?.replaceWith(codecs);
     codec = codecs;
-    const fresh = filling(micSlider(state.input ?? 0.8, inputMuted(), micTurned));
+    const fresh = filling(micSlider(state.input ?? 0.8, inputMuted(), noMic(devices), micTurned));
     mic.replaceWith(fresh);
     mic = fresh;
     meterOf.mute(inputMuted());

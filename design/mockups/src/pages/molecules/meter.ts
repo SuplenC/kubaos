@@ -162,6 +162,13 @@ function still(level: number, peak: number): HTMLElement {
   return within(PANEL, liveMeter(level, peak).bar);
 }
 
+/** A live meter with no mic to hear: its track dimmed, empty. */
+function deaf(): HTMLElement {
+  const none = liveMeter();
+  none.disable(true);
+  return within(PANEL, none.bar);
+}
+
 /** A muted mic's live meter: the track alone. */
 function silent(): HTMLElement {
   const muted = liveMeter();
@@ -205,6 +212,7 @@ export default page<"rest" | "error" | "empty">({
     { name: "One part", for: "a disk as used", sample: () => disk("System", 38) },
     { name: "In the pill", for: "the bar's pill: a small control wide beside its symbol", sample: () => row("s12", "centre", inPill("memory", 23, 0), inPill("memory_alt", 84, 1), inPill("thermostat", 96, 2)) },
     { name: "Live", for: "a mic's level as it comes: no easing, a peak tick", sample: () => still(0.46, 0.68) },
+    { name: "Live, no mic", for: "disabled: the track dimmed, empty", sample: deaf },
   ],
   sizes: [
     { name: "Its room", for: "a system monitor card: across the card", sample: () => disk("System", 38) },
@@ -215,7 +223,7 @@ export default page<"rest" | "error" | "empty">({
     absent: {
       lit: "it takes neither pointer nor keyboard",
       pressed: "it takes no press",
-      disabled: "a missing reading leaves its line out",
+      disabled: "a missing reading leaves its line out; Live, no mic: a variant",
       selected: "it holds no choice",
       loading: "drawn empty before the first sample, so nothing moves",
     },

@@ -289,6 +289,11 @@
   transition: none;
 }
 
+/* A live meter with no mic to hear: its track dimmed as a disabled slider's is, empty. */
+.k-meter[aria-disabled="true"] {
+  background: rgb(from var(--color-surface_container_highest) r g b / calc(var(--opacity-track) * var(--opacity-disabled_content)));
+}
+
 /* Where a live meter's peak tick stands, 0 to 1 along the bar. */
 @property --meter-peak {
   syntax: "<number>";
