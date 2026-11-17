@@ -105,6 +105,8 @@ pub struct Look {
     /// What it changes (owned) and what it finds there (not owned).
     pub claims: Vec<Claim>,
     pub prior: Prior,
+    /// What the user has to know of the step as it stands, said whenever a run reaches it.
+    pub note: Option<String>,
 }
 
 /// What a step's journal entry says its path holds, which a download's check can't read from
@@ -361,6 +363,7 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
                     active: Some(state.started()),
                     ..Prior::default()
                 },
+                note: None,
             })
         }
         Kind::Group { group } => {
@@ -373,6 +376,7 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
                     Claim::new(format!("member:{group}:{user}"), !member),
                 ],
                 prior: Prior::default(),
+                note: None,
             })
         }
         Kind::Linger {} => {
@@ -384,6 +388,7 @@ fn look_machine(action: &Action, host: &mut dyn Host, user: &str) -> Result<Look
                     lingered: Some(on),
                     ..Prior::default()
                 },
+                note: None,
             })
         }
         _ => Ok(Look::default()),
@@ -447,6 +452,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
                 done,
                 claims: vec![Claim::new(format!("package:{package}"), have.is_none())],
                 prior: Prior::default(),
+                note: None,
             })
         }
         Kind::Nix { packages, arch, unfree } => look_nix(host, packages, arch.as_deref(), *unfree),
@@ -502,8 +508,20 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
         }
         Kind::Setting { file, key, value } => look_setting(host, file, key, value),
         Kind::Unit { .. } | Kind::Group { .. } | Kind::Linger {} => look_machine(action, host, &user),
+        Kind::Architecture { architecture } => look_architecture(host, architecture),
         Kind::Run { .. } => look_run(action, host, recorded),
     }
+}
+
+/// What an `architecture` step finds: dpkg taking packages of `arch`. The machine's own is dpkg's
+/// always: there, and never the app's.
+fn look_architecture(host: &mut dyn Host, arch: &str) -> Result<Look, PerformError> {
+    let there = arch == host.arch() || host.foreign_arches().map_err(PerformError::Host)?.contains(arch);
+    Ok(Look {
+        done: there,
+        claims: vec![Claim::new(format!("arch:{arch}"), !there)],
+        ..Look::default()
+    })
 }
 
 /// A `run`'s check: its `check` exits 0; for one with `undo` alone, its own settled entry. Recorded
@@ -519,6 +537,7 @@ fn look_run(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             done: found || matches!(recorded, Recorded::Done(_)),
             claims: vec![Claim::new("run", !found)],
             prior: Prior::default(),
+            note: None,
         });
     }
     let done = ran(run_recorded(host, action, check)?)?;
@@ -526,6 +545,7 @@ fn look_run(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
         done,
         claims: vec![Claim::new("run", !done)],
         prior: Prior::default(),
+        note: None,
     })
 }
 
@@ -667,6 +687,7 @@ pub fn apply(
             host.set_member(group, true).map_err(PerformError::Host)
         }
         Kind::Linger {} => host.set_linger(true).map_err(PerformError::Host),
+        Kind::Architecture { architecture } => add_architecture(host, architecture),
         Kind::Run { .. } if action.removal_only() => Ok(()),
         Kind::Run { run, .. } => run_recorded(host, action, run)?.map_err(PerformError::Host),
     }
@@ -731,15 +752,20 @@ fn record_dependencies(
 
 /// Takes back what `claims`, the owned claims of a done step that pass to no other app, changed,
 /// from `prior`. What was changed since, a key the user set again, a unit they turned back on,
-/// stays as it is.
+/// stays as it is. Returns what the user has to know of what it left, and why.
 ///
 /// # Errors
 ///
 /// [`PerformError`] for the change the machine refused, or a removal apt would take further
 /// than the action's own packages.
-pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prior) -> Result<(), PerformError> {
+pub fn undo(
+    action: &Action,
+    host: &mut dyn Host,
+    claims: &[Claim],
+    prior: &Prior,
+) -> Result<Option<String>, PerformError> {
     let owned = |prefix: &str| owned_names(claims, prefix);
-    match &action.kind {
+    let undone = match &action.kind {
         Kind::Apt {
             versions: Some(versions),
             ..
@@ -755,7 +781,7 @@ pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prio
         Kind::Nix { .. } => {
             let mine = owned("nix:");
             if mine.is_empty() {
-                return Ok(());
+                return Ok(None);
             }
             host.nix_remove(&mine).map_err(PerformError::Host)
         }
@@ -776,7 +802,7 @@ pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prio
         }
         Kind::Setting { file, key, value } => {
             if owned("key:").is_empty() {
-                return Ok(());
+                return Ok(None);
             }
             undo_setting(host, file, key, value, prior)?;
             remove_dirs(host, owned("dir:"));
@@ -789,12 +815,12 @@ pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prio
             start,
         } => {
             if owned("unit:").is_empty() {
-                return Ok(());
+                return Ok(None);
             }
             let state = host.unit_state(*scope, unit).map_err(PerformError::Host)?;
             let as_left = enable.is_none_or(|e| state.enabled == e) && start.is_none_or(|s| started_as(state, s));
             if !state.exists || !as_left {
-                return Ok(());
+                return Ok(None);
             }
             if let (Some(_), Some(was)) = (enable, prior.enabled)
                 && state.enabled != was
@@ -819,17 +845,53 @@ pub fn undo(action: &Action, host: &mut dyn Host, claims: &[Claim], prior: &Prio
         }
         Kind::Linger {} => {
             if owned("linger:").is_empty() {
-                return Ok(());
+                return Ok(None);
             }
             host.set_linger(false).map_err(PerformError::Host)
         }
+        Kind::Architecture { architecture } => {
+            if owned("arch:").is_empty() {
+                return Ok(None);
+            }
+            return undo_architecture(host, architecture);
+        }
         Kind::Run { undo, .. } => {
             if owned("run").is_empty() {
-                return Ok(());
+                return Ok(None);
             }
             run_recorded(host, action, undo)?.map_err(PerformError::Host)
         }
+    };
+    undone.map(|()| None)
+}
+
+/// Has dpkg take packages of `arch`, then apt read its sources again: it has no list of the
+/// architecture's packages before.
+fn add_architecture(host: &mut dyn Host, arch: &str) -> Result<(), PerformError> {
+    host.set_foreign_arch(arch, true).map_err(PerformError::Host)?;
+    host.apt_update().map_err(PerformError::Host)
+}
+
+/// Takes `arch` away from dpkg, which an app's step added, once dpkg has no package of it: one
+/// the user installed, or one another app's removal kept as something needs it, keeps the
+/// architecture, and the note says which.
+fn undo_architecture(host: &mut dyn Host, arch: &str) -> Result<Option<String>, PerformError> {
+    let left: Vec<String> = host
+        .arch_packages(arch)
+        .map_err(PerformError::Host)?
+        .into_iter()
+        .collect();
+    if let Some(first) = left.first() {
+        return Ok(Some(match left.len() {
+            1 => format!("dpkg keeps taking {arch} packages, as {first} is still installed."),
+            n => format!(
+                "dpkg keeps taking {arch} packages, as {n} of them are still installed: {}.",
+                left.join(", ")
+            ),
+        }));
     }
+    host.set_foreign_arch(arch, false).map_err(PerformError::Host)?;
+    Ok(None)
 }
 
 /// Removes `mine`, the packages a step installed, and of `dependencies`, those it pulled in, the
@@ -933,6 +995,7 @@ fn parts(prefix: &str, names: &[String], there: impl Fn(&String) -> bool) -> Loo
         done: claims.iter().all(|c| !c.owned),
         claims,
         prior: Prior::default(),
+        note: None,
     }
 }
 
@@ -959,6 +1022,7 @@ fn look_file(host: &dyn Host, kind: &Kind) -> Look {
             done,
             claims: vec![Claim::new(format!("path:{}", path.display()), false)],
             prior: Prior::default(),
+            note: None,
         };
     }
     at_path(host, &path, done)
@@ -1028,6 +1092,7 @@ fn at_path(host: &dyn Host, path: &Path, done: bool) -> Look {
         done,
         claims,
         prior: Prior::default(),
+        note: None,
     }
 }
 
@@ -1250,6 +1315,7 @@ fn look_setting(host: &dyn Host, file: &str, key: &str, value: &toml::Value) -> 
             tables: Some(tables),
             ..Prior::default()
         },
+        note: None,
     })
 }
 

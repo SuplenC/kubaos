@@ -405,6 +405,36 @@ pub trait Host {
     /// When loginctl fails.
     fn set_linger(&mut self, on: bool) -> Result<(), HostError>;
 
+    /// The architectures dpkg installs packages of beside the machine's own.
+    ///
+    /// # Errors
+    ///
+    /// When dpkg can't be asked.
+    fn foreign_arches(&mut self) -> Result<BTreeSet<String>, HostError>;
+
+    /// dpkg taking packages of `arch` too, or no longer: `dpkg --add-architecture` or
+    /// `--remove-architecture`, which dpkg refuses while it has a package of it.
+    ///
+    /// # Errors
+    ///
+    /// When dpkg fails.
+    fn set_foreign_arch(&mut self, arch: &str, on: bool) -> Result<(), HostError>;
+
+    /// The packages of `arch` dpkg has, installed or with their configuration left, as the
+    /// engine names them (`libc6:i386`): while one is there, dpkg keeps the architecture.
+    ///
+    /// # Errors
+    ///
+    /// When dpkg can't be asked.
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeSet<String>, HostError>;
+
+    /// apt's lists read again from the sources (`apt-get update`).
+    ///
+    /// # Errors
+    ///
+    /// When apt fails.
+    fn apt_update(&mut self) -> Result<(), HostError>;
+
     /// Runs `argv` in `dir` with [`RUN_PATH`](super::action::RUN_PATH): as the user, with their
     /// environment and home; as root, with root's own environment and none of the user's.
     /// `./<script>` is a script in `dir`.

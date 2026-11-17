@@ -315,3 +315,22 @@ fn folder_version(text: &str) -> Option<String> {
         .version()
         .map(str::to_owned)
 }
+
+#[test]
+fn a_package_of_another_architecture_comes_after_the_step_that_adds_it() {
+    let apt = "[[action]]\nname = \"Install\"\nkind = \"apt\"\npackages = [\"libgl1:i386\"]\n";
+    let arch = "[[action]]\nname = \"Take i386\"\nkind = \"architecture\"\narchitecture = \"i386\"\n";
+    let parse = |actions: &str| Folder::parse("sketch", Path::new("/catalog/sketch"), &format!("{ABOUT}{actions}"));
+
+    let before = parse(&format!("{arch}{apt}"));
+    let after = parse(&format!("{apt}{arch}"));
+    let none = parse(apt);
+
+    assert!(before.is_ok(), "{before:?}");
+    for refused in [after, none] {
+        assert!(
+            matches!(&refused, Err(FolderError::ArchitectureFirst { arch, .. }) if arch == "i386"),
+            "{refused:?}"
+        );
+    }
+}

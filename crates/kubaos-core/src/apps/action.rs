@@ -38,6 +38,11 @@ pub const SYSTEM_PREFIXES: [&str; 3] = ["/etc/", "/opt/", "/usr/local/"];
 /// The architectures a pinned download may be for, as `dpkg --print-architecture` names them.
 pub const ARCHES: [&str; 2] = ["amd64", "arm64"];
 
+/// The architectures dpkg may install packages of beside the machine's own, as `dpkg
+/// --add-architecture` names them: 32-bit x86 beside amd64 (Steam's and Wine's libraries), 32-bit
+/// ARM beside arm64, and each 64-bit one.
+pub const FOREIGN_ARCHES: [&str; 4] = ["amd64", "arm64", "armhf", "i386"];
+
 /// The packages an `apt` action installs on one architecture alone, beside its `packages`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -69,7 +74,7 @@ pub enum ActionError {
     NoName,
     #[error("{key} is empty")]
     Empty { key: &'static str },
-    #[error("{name:?} is not an apt package name")]
+    #[error("{name:?} is not an apt package name, with `:<architecture>` for another architecture's")]
     InvalidPackage { name: String },
     #[error("{name:?} is not a nixpkgs attribute name")]
     InvalidAttribute { name: String },
@@ -79,6 +84,8 @@ pub enum ActionError {
     InvalidVersions { value: String },
     #[error("{value:?} is not an architecture dpkg names: amd64 or arm64")]
     InvalidArch { value: String },
+    #[error("{value:?} is not an architecture dpkg installs beside the machine's: amd64, arm64, armhf or i386")]
+    InvalidForeignArch { value: String },
     #[error("an apt action for {arch} alone lists no packages of another architecture's")]
     ArchPackagesWithArch { arch: String },
     #[error("{value:?} is not a path an action writes: `~/…` in the home, or under /etc/, /opt/ or /usr/local/")]
@@ -284,6 +291,13 @@ pub enum Kind {
     },
     /// The user's services kept running without a session.
     Linger {},
+    /// dpkg taking packages of another architecture than the machine's (`dpkg --add-architecture`),
+    /// apt's lists then read again, so a later `apt` step installs `<package>:<architecture>`.
+    /// Shared by claim: an app that finds it there owns nothing of it, and the last app that owns
+    /// it takes it away only once dpkg has no package of it left.
+    Architecture {
+        architecture: String,
+    },
     /// A web app in a window of its own: a desktop entry and an icon that open `url` as a Chrome
     /// app window, in a browser folder and a profile of its own, which give the window an app id
     /// of its own.
@@ -500,7 +514,7 @@ impl Action {
             if path.starts_with("~/") { Side::User } else { Side::Root }
         };
         match &self.kind {
-            Kind::Apt { .. } | Kind::Deb { .. } | Kind::Group { .. } => Side::Root,
+            Kind::Apt { .. } | Kind::Deb { .. } | Kind::Group { .. } | Kind::Architecture { .. } => Side::Root,
             Kind::Nix { .. } | Kind::Setting { .. } | Kind::Linger {} | Kind::WebApp { .. } => Side::User,
             Kind::Download { to, .. } | Kind::File { to, .. } | Kind::Symlink { to, .. } => by_path(to),
             Kind::Output { path } => by_path(path),
@@ -544,6 +558,7 @@ impl Action {
             (Kind::Run { .. }, Kind::Run { .. }) => self.removal_only() == other.removal_only(),
             (Kind::Deb { package: a, .. }, Kind::Deb { package: b, .. })
             | (Kind::Group { group: a }, Kind::Group { group: b })
+            | (Kind::Architecture { architecture: a }, Kind::Architecture { architecture: b })
             | (Kind::WebApp { id: a, .. }, Kind::WebApp { id: b, .. })
             | (Kind::File { to: a, .. }, Kind::File { to: b, .. })
             | (Kind::Symlink { to: a, .. }, Kind::Symlink { to: b, .. })
@@ -769,6 +784,13 @@ impl Action {
                 }
             }
             Kind::Linger {} => {}
+            Kind::Architecture { architecture } => {
+                if !FOREIGN_ARCHES.contains(&architecture.as_str()) {
+                    return Err(ActionError::InvalidForeignArch {
+                        value: architecture.clone(),
+                    });
+                }
+            }
             Kind::WebApp {
                 id, title, url, icon, ..
             } => check_web_app(id, title, url, icon)?,
@@ -906,7 +928,7 @@ fn check_apt(
             value: versions.to_owned(),
         });
     }
-    if let Some(name) = packages.iter().find(|p| !is_package_name(p)) {
+    if let Some(name) = packages.iter().find(|p| !is_apt_package(p)) {
         return Err(ActionError::InvalidPackage { name: name.clone() });
     }
     if let Some(repo) = repo
@@ -918,6 +940,21 @@ fn check_apt(
         check_arch(arch)?;
     }
     Ok(())
+}
+
+/// Whether `name` is a package an `apt` step installs: a package name, or one with the
+/// architecture dpkg installs it for when that isn't the machine's (`libgl1:i386`).
+fn is_apt_package(name: &str) -> bool {
+    match name.split_once(':') {
+        Some((package, arch)) => is_package_name(package) && FOREIGN_ARCHES.contains(&arch),
+        None => is_package_name(name),
+    }
+}
+
+/// The architecture an `apt` step's package names, `libgl1:i386`'s `i386`; none for one of the
+/// machine's own.
+pub fn package_arch(name: &str) -> Option<&str> {
+    name.split_once(':').map(|(_, arch)| arch)
 }
 
 /// A `run`'s argvs as a journal records them: `do`, `check` and `undo`, or `undo` alone, which

@@ -426,3 +426,24 @@ fn a_conf_setting_takes_one_bare_key_and_other_files_dotted_ones() {
         Err(ActionError::InvalidSettingFile { .. })
     ));
 }
+
+#[test]
+fn an_architecture_is_roots_and_one_dpkg_installs_beside_the_machines() {
+    let i386 = action("name = \"X\"\nkind = \"architecture\"\narchitecture = \"i386\"\n").unwrap();
+    let bogus = action("name = \"X\"\nkind = \"architecture\"\narchitecture = \"x86\"\n");
+
+    assert_eq!(i386.side(), Side::Root);
+    assert!(
+        matches!(bogus, Err(ActionError::InvalidForeignArch { .. })),
+        "{bogus:?}"
+    );
+}
+
+#[test]
+fn an_apt_package_of_another_architecture_names_one_dpkg_installs() {
+    let i386 = action("name = \"X\"\nkind = \"apt\"\npackages = [\"libgl1:i386\", \"libgl1\"]\n");
+    let bogus = action("name = \"X\"\nkind = \"apt\"\npackages = [\"libgl1:x86\"]\n");
+
+    assert!(i386.is_ok(), "{i386:?}");
+    assert!(matches!(bogus, Err(ActionError::InvalidPackage { .. })), "{bogus:?}");
+}

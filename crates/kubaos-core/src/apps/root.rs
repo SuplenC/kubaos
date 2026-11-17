@@ -89,6 +89,9 @@ pub enum Reply {
     Ready,
     Step {
         outcome: Outcome,
+        /// What the user has to know of the step: what it left to them, what its undo kept.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        notes: Vec<String>,
     },
     /// The request isn't one the helper takes, or the install may not write what it writes.
     Refused {
@@ -283,15 +286,24 @@ impl<'h> Server<'h> {
                 step,
                 windows,
             } => match self.keeper.step(&app, setup.as_deref(), step, windows) {
-                Ok(outcome) => Reply::Step { outcome },
+                Ok(outcome) => Reply::Step {
+                    outcome,
+                    notes: self.keeper.take_notes(),
+                },
                 Err(e) => answer(&e),
             },
             Request::Undo { app, step } => match self.keeper.undo(&app, step) {
-                Ok(outcome) => Reply::Step { outcome },
+                Ok(outcome) => Reply::Step {
+                    outcome,
+                    notes: self.keeper.take_notes(),
+                },
                 Err(e) => answer(&e),
             },
             Request::Redo { app, setup, step } => match self.keeper.redo(&app, setup.as_deref(), step) {
-                Ok(outcome) => Reply::Step { outcome },
+                Ok(outcome) => Reply::Step {
+                    outcome,
+                    notes: self.keeper.take_notes(),
+                },
                 Err(e) => answer(&e),
             },
             Request::Adopt { app, setup, owned } => match self.keeper.adopt(&app, setup.as_deref(), owned) {

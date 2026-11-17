@@ -2,6 +2,7 @@ use std::fs;
 
 use super::SystemHost;
 use super::candidate;
+use super::known_of_arch;
 use super::simulation;
 use crate::apps::host::Downgrade;
 use crate::apps::host::Host;
@@ -109,4 +110,13 @@ fn apt_moves_a_package_down_only_when_the_install_allows_it() {
     assert_eq!(calls.len(), 2, "{calls:?}");
     assert!(!calls[0].contains("--allow-downgrades"), "{}", calls[0]);
     assert!(calls[1].contains("--allow-downgrades"), "{}", calls[1]);
+}
+
+#[test]
+fn an_architectures_packages_are_those_dpkg_has_installed_or_configured() {
+    let shown = "ii \tlibc6\ti386\nrc \tlibgl1\ti386\nun \tlibold\ti386\nii \tlibc6\tamd64\nii \ttzdata\tall\n";
+
+    let known = known_of_arch(shown, "i386", "amd64");
+
+    assert_eq!(known, ["libc6:i386".to_owned(), "libgl1:i386".to_owned()].into());
 }

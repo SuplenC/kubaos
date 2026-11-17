@@ -163,6 +163,9 @@ pub struct Keeper<'h> {
     undone: Vec<Undone>,
     /// The other side's journals, when this side may read them: root's, for the user's side.
     other_journals: Option<PathBuf>,
+    /// What the user has to know of the steps this side ran or undid since the last
+    /// [`Keeper::take_notes`], in order.
+    notes: Vec<String>,
 }
 
 /// A step a removal undid, as its entry was, and the claims its undo handed to other apps.
@@ -201,7 +204,14 @@ impl<'h> Keeper<'h> {
             journals: journals.into(),
             undone: Vec::new(),
             other_journals: None,
+            notes: Vec::new(),
         }
+    }
+
+    /// What the user has to know of the steps this side ran or undid since it was last asked:
+    /// what a step that stands left to the user, what an undo left behind and why.
+    pub fn take_notes(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.notes)
     }
 
     /// It, with `undone`, the steps this side undid earlier in the run, kept by a caller that
@@ -351,6 +361,7 @@ impl<'h> Keeper<'h> {
         }
         let recorded = self.recorded_for(&journal, &action, old.as_ref())?;
         let look = perform::look(&action, &mut *self.host, recorded).map_err(StepError::Perform)?;
+        self.notes.extend(look.note.clone().filter(|_| look.done));
         if let Kind::Run { window: Some(says), .. } = &action.kind
             && !windows
             && !look.done
@@ -750,7 +761,9 @@ impl<'h> Keeper<'h> {
             }
             // HAZARD: handed over before an undo that then fails, a claim would be owned by both
             // apps, and the first to go would take it from the other.
-            perform::undo(&entry.action, &mut *self.host, &mine, &entry.prior).map_err(StepError::Perform)?;
+            let note =
+                perform::undo(&entry.action, &mut *self.host, &mine, &entry.prior).map_err(StepError::Perform)?;
+            self.notes.extend(note);
             for (holder, held) in passing {
                 if let Some(prior) =
                     journal::hand_over(&self.journals, &holder, &held, &entry.prior).map_err(StepError::Journal)?
@@ -804,13 +817,15 @@ pub fn recorded_repos(dir: &Path) -> Result<BTreeMap<String, (String, usize)>, J
 pub const LINGER_MARK: &str = "-linger-was-off";
 
 /// The claims and prior state of a step of an app KubaOS put on the machine, adopted: owned as
-/// [`Keeper::adopt`] says, with the prior state of a machine without the app.
+/// [`Keeper::adopt`] says, with the prior state of a machine without the app. A foreign
+/// architecture dpkg takes is never owned: no record says whether KubaOS added it, and a removal
+/// that took it away from what the user installed for it would break their packages.
 fn adopted(action: &Action, look: perform::Look, lingered_off: bool) -> (Vec<Claim>, journal::Prior) {
     let claims = look
         .claims
         .into_iter()
         .map(|c| {
-            let owned = if c.claim.starts_with("group:") || c.claim.starts_with("dep:") {
+            let owned = if ["group:", "dep:", "arch:"].iter().any(|p| c.claim.starts_with(p)) {
                 false
             } else if c.claim.starts_with("linger:") {
                 lingered_off
@@ -1081,7 +1096,11 @@ impl<'a> Engine<'a> {
             });
             self.sink.event(&UpdateEvent::Progress { done: i, total });
             let outcome = match action.side() {
-                Side::User => self.user.step(id, setup, step, self.windows),
+                Side::User => {
+                    let outcome = self.user.step(id, setup, step, self.windows);
+                    self.user_notes();
+                    outcome
+                }
                 // Root's steps were checked as settled before the run, as no root was asked for.
                 Side::Root if !self.root_started => Ok(Outcome::Settled),
                 Side::Root => self.root_step(&Request::Step {
@@ -1385,7 +1404,11 @@ impl<'a> Engine<'a> {
         } else {
             for undoable in &undone {
                 let outcome = match undoable.side {
-                    Side::User => self.user.redo(id, back.setup, undoable.step),
+                    Side::User => {
+                        let outcome = self.user.redo(id, back.setup, undoable.step);
+                        self.user_notes();
+                        outcome
+                    }
                     Side::Root => self.root_step(&Request::Redo {
                         app: id.to_owned(),
                         setup: back.setup.map(str::to_owned),
@@ -1674,7 +1697,12 @@ impl<'a> Engine<'a> {
             self.root_started = true;
         }
         match self.root.call(request) {
-            Ok(Reply::Step { outcome }) => Ok(outcome),
+            Ok(Reply::Step { outcome, notes }) => {
+                for text in notes {
+                    self.sink.event(&UpdateEvent::Note { text });
+                }
+                Ok(outcome)
+            }
             Ok(Reply::Failed { why }) => Err(StepError::RootFailed { why }),
             Ok(Reply::Refused { why }) => Err(StepError::RootRefused { why }),
             Ok(Reply::Ready) => Err(StepError::RootOutOfTurn),
@@ -1682,9 +1710,20 @@ impl<'a> Engine<'a> {
         }
     }
 
+    /// Says what the user's side has to tell of the steps it ran or undid.
+    fn user_notes(&mut self) {
+        for text in self.user.take_notes() {
+            self.sink.event(&UpdateEvent::Note { text });
+        }
+    }
+
     fn undo_one(&mut self, id: &str, undoable: &Undoable) -> Result<(), StepError> {
         match undoable.side {
-            Side::User => self.user.undo(id, undoable.step).map(|_| ()),
+            Side::User => {
+                let undone = self.user.undo(id, undoable.step).map(|_| ());
+                self.user_notes();
+                undone
+            }
             Side::Root => self
                 .root_step(&Request::Undo {
                     app: id.to_owned(),

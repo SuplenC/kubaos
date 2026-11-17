@@ -415,6 +415,32 @@ impl Host for SystemHost {
         Self::out(self.command("loginctl").args([verb, &self.user])).map(drop)
     }
 
+    fn foreign_arches(&mut self) -> Result<BTreeSet<String>, HostError> {
+        let shown = Self::out(self.command("dpkg").arg("--print-foreign-architectures"))?;
+        Ok(shown.split_whitespace().map(str::to_owned).collect())
+    }
+
+    fn set_foreign_arch(&mut self, arch: &str, on: bool) -> Result<(), HostError> {
+        let verb = if on {
+            "--add-architecture"
+        } else {
+            "--remove-architecture"
+        };
+        Self::out(self.command("dpkg").args([verb, arch])).map(drop)
+    }
+
+    fn arch_packages(&mut self, arch: &str) -> Result<BTreeSet<String>, HostError> {
+        let shown = Self::out(
+            self.command("dpkg-query")
+                .args(["-W", "-f=${db:Status-Abbrev}\t${Package}\t${Architecture}\n"]),
+        )?;
+        Ok(known_of_arch(&shown, arch, &self.arch))
+    }
+
+    fn apt_update(&mut self) -> Result<(), HostError> {
+        Self::out(self.command("apt-get").args(["update", "-q"])).map(drop)
+    }
+
     fn run(&mut self, argv: &[String], dir: &Path) -> Result<(), HostError> {
         let Some((program, rest)) = argv.split_first() else {
             return Ok(());
@@ -481,6 +507,21 @@ fn package_name(name: &str, of: &str, arch: &str) -> String {
     } else {
         format!("{name}:{of}")
     }
+}
+
+/// The packages of `of` in what `dpkg-query -W` shows, `<status>\t<package>\t<architecture>` a
+/// line, on a machine of `arch`: every one dpkg has in a state other than not installed (its
+/// status's second letter `n`), as dpkg refuses to drop an architecture while it has one.
+fn known_of_arch(shown: &str, of: &str, arch: &str) -> BTreeSet<String> {
+    shown
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split('\t');
+            let (status, name, its) = (fields.next()?, fields.next()?, fields.next()?);
+            let known = status.chars().nth(1).is_some_and(|c| c != 'n');
+            (known && its == of).then(|| package_name(name, its, arch))
+        })
+        .collect()
 }
 
 /// The candidate `apt-cache policy` shows, none when it shows `(none)` or no package.

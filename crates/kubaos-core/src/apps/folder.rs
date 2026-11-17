@@ -119,6 +119,14 @@ pub enum FolderError {
     )]
     ZstdFirst { name: String },
     #[error(
+        "{name}: apt installs {package} only once dpkg takes {arch} packages: an `architecture` step before it adds {arch}"
+    )]
+    ArchitectureFirst {
+        name: String,
+        package: String,
+        arch: String,
+    },
+    #[error(
         "{name}: a configure step writes the app's KubaOS defaults as the user, in ~/.config/kubaos/{id}/, and nowhere else"
     )]
     ConfigureOutside { id: String, name: String },
@@ -501,6 +509,7 @@ impl Folder {
         }
         self.check_requires()?;
         self.check_downloads()?;
+        self.check_architectures()?;
         for action in self.all_actions().filter(|a| a.stage == Stage::Configure) {
             if !self.configures_inside(action) {
                 return Err(FolderError::ConfigureOutside {
@@ -587,6 +596,47 @@ impl Folder {
                     return Err(FolderError::InsideDownload {
                         name: step.name.clone(),
                     });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks that each `apt` package of another architecture (`libgl1:i386`) comes, in each
+    /// install, after an `architecture` step that has dpkg take that architecture: apt has no
+    /// list of its packages before.
+    fn check_architectures(&self) -> Result<(), FolderError> {
+        let setups: Vec<Option<&str>> = if self.setups.is_empty() {
+            vec![None]
+        } else {
+            self.setups.iter().map(|s| Some(s.id.as_str())).collect()
+        };
+        for setup in setups {
+            let steps = self.steps(setup)?;
+            for (i, step) in steps.iter().enumerate() {
+                let Kind::Apt {
+                    packages, amd64, arm64, ..
+                } = &step.kind
+                else {
+                    continue;
+                };
+                let all = packages
+                    .iter()
+                    .chain([amd64, arm64].into_iter().flatten().flat_map(|own| &own.packages));
+                for package in all {
+                    let Some(arch) = super::action::package_arch(package) else {
+                        continue;
+                    };
+                    let added = steps[..i].iter().any(
+                        |before| matches!(&before.kind, Kind::Architecture { architecture } if architecture == arch),
+                    );
+                    if !added {
+                        return Err(FolderError::ArchitectureFirst {
+                            name: step.name.clone(),
+                            package: package.clone(),
+                            arch: arch.to_owned(),
+                        });
+                    }
                 }
             }
         }

@@ -566,7 +566,9 @@ impl Engine<'_> {
             });
             self.sink.event(&UpdateEvent::Progress { done, total });
             let new = journal.entry(*step).is_none();
-            match self.user.step(id, setup, *step, self.windows) {
+            let outcome = self.user.step(id, setup, *step, self.windows);
+            self.user_notes();
+            match outcome {
                 Ok(Outcome::Found) => self.report(id, *step, of, &action.name, ActionState::Found),
                 Ok(Outcome::Skipped { says }) => {
                     self.report(id, *step, of, &action.name, ActionState::Skipped);
