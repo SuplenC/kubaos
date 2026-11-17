@@ -618,6 +618,12 @@ fn the_root_helper_refuses_anything_but_a_root_step_of_a_catalog_app() {
         r#"{"op":"adopt","app":"nothing","owned":true}"#,
         r#"{"op":"adopt","app":"../etc","owned":true}"#,
         r#"{"op":"adopt","app":"fixture","owned":true,"step":1}"#,
+        r#"{"op":"redo","app":"../etc","step":1}"#,
+        r#"{"op":"redo","app":"nothing","step":1}"#,
+        r#"{"op":"redo","app":"fixture","setup":"../x","step":1}"#,
+        r#"{"op":"redo","app":"fixture","setup":"other","step":1}"#,
+        r#"{"op":"redo","app":"fixture","step":2}"#,
+        r#"{"op":"redo","app":"fixture","step":1,"entry":{}}"#,
     ] {
         let reply = root.serve(line);
         assert!(refused(reply.clone()), "{line} was taken: {reply:?}");
@@ -627,6 +633,11 @@ fn the_root_helper_refuses_anything_but_a_root_step_of_a_catalog_app() {
     fs::set_permissions(world.catalog.join("fixture"), fs::Permissions::from_mode(0o777)).unwrap();
     let reply = root.serve(r#"{"op":"step","app":"fixture","step":1,"windows":false}"#);
     assert!(refused(reply.clone()), "a folder others may write was run: {reply:?}");
+    let reply = root.serve(r#"{"op":"redo","app":"fixture","step":1}"#);
+    assert!(
+        refused(reply.clone()),
+        "a folder others may write was done again: {reply:?}"
+    );
     fs::set_permissions(world.catalog.join("fixture"), fs::Permissions::from_mode(0o755)).unwrap();
 
     let repo = world.catalog.parent().unwrap().join("system/apt-repo.sh");
@@ -1077,7 +1088,8 @@ fn a_removal_that_fails_partway_is_rolled_back_and_leaves_the_app_as_it_was() {
     assert!(user_after.complete);
     let mark = journal::rolled_back(&world.user_journals, "fixture");
     assert!(
-        mark.as_deref().is_some_and(|why| why.starts_with("Install the tool: ")),
+        mark.as_ref()
+            .is_some_and(|m| m.whole && m.why.starts_with("Install the tool: ")),
         "{mark:?}"
     );
     let steps = |j: &Journal| j.entries.iter().map(|e| (e.step, e.state)).collect::<Vec<_>>();
@@ -1135,7 +1147,7 @@ fn a_step_a_rollback_cant_do_again_is_a_warning_and_the_next_install_finishes_it
     assert!(warned, "{:?}", events.0);
     let user = world.journals("fixture").0.unwrap();
     assert!(!user.complete, "{user:?}");
-    assert!(journal::rolled_back(&world.user_journals, "fixture").is_some());
+    assert!(journal::rolled_back(&world.user_journals, "fixture").is_some_and(|m| !m.whole));
     // The steps after the one it couldn't do again were still done again.
     assert!(world.settings().is_file());
 
@@ -2558,4 +2570,102 @@ fn a_stopped_runs_undoing_entry_is_done_again_by_the_next_install() {
     assert!(world.host.state.borrow().groups["grouped"].contains("kuba"));
     let root = world.journals("grouped").1.unwrap();
     assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Done);
+}
+
+/// A sink that reads the rollback mark of `app` as the first step a rollback does again is
+/// reported, after the step that failed.
+struct MarkAtFirstRedo {
+    journals: PathBuf,
+    app: &'static str,
+    failed: bool,
+    redone: bool,
+    seen: Option<journal::RolledBack>,
+}
+
+impl Sink for MarkAtFirstRedo {
+    fn event(&mut self, event: &UpdateEvent) {
+        let UpdateEvent::Action(action) = event else {
+            return;
+        };
+        match action.state {
+            ActionState::Failed => self.failed = true,
+            ActionState::Done if self.failed && !self.redone => {
+                self.redone = true;
+                self.seen = journal::rolled_back(&self.journals, self.app);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[test]
+fn the_rollback_is_marked_as_not_whole_before_its_first_step_is_done_again() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:fixture-tool".to_owned());
+    let mut sink = MarkAtFirstRedo {
+        journals: world.user_journals.clone(),
+        app: "fixture",
+        failed: false,
+        redone: false,
+        seen: None,
+    };
+    let mut root = world.root();
+
+    let removed = world.run(&mut root, &mut sink, true, |e| e.remove("fixture"));
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert!(sink.redone, "a step was done again");
+    let seen = sink.seen.expect("marked by then");
+    assert!(!seen.whole && seen.why.starts_with("Install the tool: "), "{seen:?}");
+    assert!(journal::rolled_back(&world.user_journals, "fixture").is_some_and(|m| m.whole));
+}
+
+#[test]
+fn a_step_kubaos_did_that_owns_nothing_is_done_again_as_done() {
+    let early = app(r#"
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["early-engine"]
+
+[[action]]
+name = "Install the tool"
+kind = "apt"
+repo = "fixture"
+packages = ["fixture-tool"]
+"#);
+    let world = World::new(&[("early", &early)]);
+    // The tool is there already: the step sets its repository up and owns nothing.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .dpkg
+        .insert("fixture-tool".to_owned(), "1.0".to_owned());
+    world.install("early", true).0.unwrap();
+    let state = |world: &World| world.journals("early").1.unwrap().entry(2).unwrap().state;
+    assert_eq!(state(&world), crate::apps::journal::State::Done);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:early-engine".to_owned());
+
+    let (removed, _) = world.remove("early");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(state(&world), crate::apps::journal::State::Done);
 }

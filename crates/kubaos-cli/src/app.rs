@@ -363,11 +363,14 @@ fn table(status: &Status) -> String {
             let _ = write!(line, "  {version}");
         }
         let _ = writeln!(out, "{}", line.trim_end());
-        if let Some(why) = &app.removal_rolled_back {
+        if let Some(rolled) = &app.removal_rolled_back {
             let _ = writeln!(
                 out,
-                "  {:<11} {:<6}  {:<width$}  its last removal was rolled back: {why}",
-                "", "", ""
+                "  {:<11} {:<6}  {:<width$}  {}",
+                "",
+                "",
+                "",
+                rolled_back_line(rolled)
             );
         }
     }
@@ -399,9 +402,10 @@ struct Showing<'a> {
     /// The apps whose install brought it, which it goes with.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     brought_by: Vec<String>,
-    /// Its last removal couldn't undo a step and was rolled back: that step and why.
+    /// Its last removal couldn't undo a step and was rolled back: that step and why, and
+    /// whether the rollback put everything back.
     #[serde(skip_serializing_if = "Option::is_none")]
-    removal_rolled_back: Option<String>,
+    removal_rolled_back: Option<journal::RolledBack>,
     /// Every step of both journals, by step.
     steps: Vec<Owned>,
 }
@@ -501,6 +505,18 @@ fn show(id: &str, json: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// The line under an app in `kubaos app status` whose last removal was rolled back.
+fn rolled_back_line(rolled: &journal::RolledBack) -> String {
+    if rolled.whole {
+        format!("its last removal was rolled back: {}", rolled.why)
+    } else {
+        format!(
+            "its last removal was rolled back in part, kubaos update finishes it: {}",
+            rolled.why
+        )
+    }
+}
+
 /// An app as `kubaos app show` prints it.
 fn show_text(shown: &Showing) -> String {
     let about = &shown.about;
@@ -544,11 +560,13 @@ fn show_text(shown: &Showing) -> String {
             shown.brought_by.join(", ")
         );
     }
-    if let Some(why) = &shown.removal_rolled_back {
-        let _ = writeln!(
-            out,
-            "Its last removal was rolled back, so it's all still here. What stopped it: {why}"
-        );
+    if let Some(rolled) = &shown.removal_rolled_back {
+        let said = if rolled.whole {
+            "Its last removal was rolled back, so it's all still here."
+        } else {
+            "Its last removal was rolled back only in part: some steps aren't back yet, and kubaos update puts them back."
+        };
+        let _ = writeln!(out, "{said} What stopped it: {}", rolled.why);
     }
     for step in &shown.steps {
         let _ = writeln!(out, "  {}. {} ({}, {})", step.step, step.name, step.side, step.state);
