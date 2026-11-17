@@ -1,10 +1,10 @@
 <!-- Aider's icon, its project's mark, from Aider-AI/aider v0.86.0 (aider/website/assets/icons/safari-pinned-tab.svg, https://github.com/Aider-AI/aider), Apache-2.0: a black tile with its mark cut out of it, placed, unchanged, on KubaOS's rounded tile, clipped to its shape, so it matches the catalog's other icons, white under the cut-out. -->
 <svg height="500" viewBox="0 0 500 500" width="500" xmlns="http://www.w3.org/2000/svg">
-<defs><clipPath id="kubaos-tile"><rect x="20" y="20" width="460" height="460" rx="110"/></clipPath></defs>
+<defs><clipPath id="kubaos-tile"><rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625"/></clipPath></defs>
 <g clip-path="url(#kubaos-tile)">
-<rect x="20" y="20" width="460" height="460" rx="110" fill="#000"/>
-<rect x="70.6" y="70.6" width="358.8" height="358.8" fill="#fff"/>
-<svg x="55" y="55" width="390" height="390" viewBox="0 0 436.000000 436.000000" preserveAspectRatio="xMidYMid meet">
+<rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625" fill="#000"/>
+<rect x="79.375" y="79.375" width="341.25" height="341.25" fill="#fff"/>
+<svg x="64.538" y="64.538" width="370.924" height="370.924" viewBox="0 0 436.000000 436.000000" preserveAspectRatio="xMidYMid meet">
 <metadata>
 Created by potrace 1.14, written by Peter Selinger 2001-2017
 </metadata>
