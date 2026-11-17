@@ -446,6 +446,7 @@ impl Machine for Fake {
             started: false,
             requests: Vec::new(),
             calls: std::rc::Rc::clone(&apps.root_calls),
+            undone: Vec::new(),
         };
         (Box::new(apps.host.clone()), Box::new(root))
     }

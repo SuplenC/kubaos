@@ -12,6 +12,7 @@ use crate::apps::action::Side;
 use crate::apps::host::fake::FakeHost;
 use crate::apps::host::fake::FakeRoot;
 use crate::apps::host::fake::Unit;
+use crate::apps::journal;
 use crate::apps::journal::Journal;
 use crate::apps::root::Reply;
 use crate::sandbox::Sandbox;
@@ -238,6 +239,7 @@ impl World {
             started: false,
             requests: Vec::new(),
             calls: std::rc::Rc::default(),
+            undone: Vec::new(),
         }
     }
 
@@ -1073,12 +1075,10 @@ fn a_removal_that_fails_partway_is_rolled_back_and_leaves_the_app_as_it_was() {
     let (user_after, root_after) = world.journals("fixture");
     let user_after = user_after.unwrap();
     assert!(user_after.complete);
+    let mark = journal::rolled_back(&world.user_journals, "fixture");
     assert!(
-        user_after
-            .removal_rolled_back
-            .as_deref()
-            .is_some_and(|why| why.starts_with("Install the tool: ")),
-        "{user_after:?}"
+        mark.as_deref().is_some_and(|why| why.starts_with("Install the tool: ")),
+        "{mark:?}"
     );
     let steps = |j: &Journal| j.entries.iter().map(|e| (e.step, e.state)).collect::<Vec<_>>();
     assert_eq!(steps(&user_after), steps(&user.unwrap()));
@@ -1106,7 +1106,7 @@ fn a_removal_that_fails_partway_is_rolled_back_and_leaves_the_app_as_it_was() {
     // Once apt can, the removal goes through, and an install no longer tells of the rollback.
     world.host.state.borrow_mut().fail.clear();
     world.install("fixture", true).0.unwrap();
-    assert_eq!(world.journals("fixture").0.unwrap().removal_rolled_back, None);
+    assert_eq!(journal::rolled_back(&world.user_journals, "fixture"), None);
     world.remove("fixture").0.unwrap();
     assert_eq!(world.journals("fixture"), (None, None));
 }
@@ -1134,7 +1134,8 @@ fn a_step_a_rollback_cant_do_again_is_a_warning_and_the_next_install_finishes_it
     });
     assert!(warned, "{:?}", events.0);
     let user = world.journals("fixture").0.unwrap();
-    assert!(!user.complete && user.removal_rolled_back.is_some(), "{user:?}");
+    assert!(!user.complete, "{user:?}");
+    assert!(journal::rolled_back(&world.user_journals, "fixture").is_some());
     // The steps after the one it couldn't do again were still done again.
     assert!(world.settings().is_file());
 
@@ -1143,7 +1144,8 @@ fn a_step_a_rollback_cant_do_again_is_a_warning_and_the_next_install_finishes_it
 
     assert_eq!(world.host.snapshot(), installed);
     let user = world.journals("fixture").0.unwrap();
-    assert!(user.complete && user.removal_rolled_back.is_none());
+    assert!(user.complete);
+    assert_eq!(journal::rolled_back(&world.user_journals, "fixture"), None);
 }
 
 #[test]
@@ -2395,3 +2397,170 @@ mod media;
 mod office;
 mod requires;
 mod versions;
+
+/// The claim `claim` of the app `id`'s journals: whether it owns it, when a step claims it.
+fn owns(world: &World, id: &str, claim: &str) -> Option<bool> {
+    let (user, root) = world.journals(id);
+    user.into_iter()
+        .chain(root)
+        .flat_map(|j| j.entries)
+        .flat_map(|e| e.claims)
+        .find(|c| c.claim == claim)
+        .map(|c| c.owned)
+}
+
+#[test]
+fn a_shared_package_stays_the_removed_apps_while_its_undo_fails_and_the_other_app_never_takes_it() {
+    let world = World::new(&[("grouped", GROUPED), ("rival", RIVAL)]);
+    world.install("grouped", true).0.unwrap();
+    world.install("rival", true).0.unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:grouped-engine".to_owned());
+
+    let (removed, _) = world.remove("grouped");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(owns(&world, "grouped", "package:shared-tool"), Some(true));
+    assert_eq!(
+        owns(&world, "rival", "package:shared-tool"),
+        Some(false),
+        "never handed over"
+    );
+    // The rival's removal leaves the package the other app still needs.
+    world.host.state.borrow_mut().fail.clear();
+    world.remove("rival").0.unwrap();
+    assert!(world.host.state.borrow().dpkg.contains_key("shared-tool"));
+    world.remove("grouped").0.unwrap();
+    assert!(!world.host.state.borrow().dpkg.contains_key("shared-tool"));
+}
+
+#[test]
+fn a_rollback_takes_back_a_claim_its_removal_handed_over_and_the_step_owns_it_again() {
+    let late = app(r#"
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["late-engine"]
+
+[[action]]
+name = "Install the shared tool"
+kind = "apt"
+packages = ["shared-tool"]
+"#);
+    let world = World::new(&[("late", &late), ("rival", RIVAL)]);
+    world.install("late", true).0.unwrap();
+    world.install("rival", true).0.unwrap();
+    let (_, root) = world.journals("late");
+    // The shared tool's step goes first, handing the package to the rival; then the engine's
+    // removal fails.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:late-engine".to_owned());
+
+    let (removed, _) = world.remove("late");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert_eq!(owns(&world, "late", "package:shared-tool"), Some(true));
+    assert_eq!(owns(&world, "rival", "package:shared-tool"), Some(false));
+    let states = |j: Journal| j.entries.iter().map(|e| (e.step, e.state)).collect::<Vec<_>>();
+    assert_eq!(states(world.journals("late").1.unwrap()), states(root.unwrap()));
+}
+
+#[test]
+fn a_rollback_leaves_a_step_that_opens_a_window_to_a_note_and_says_a_run_ran_again() {
+    let paired = app(r#"
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["paired-engine"]
+
+[[action]]
+name = "Install the tool"
+kind = "run"
+do = ["./install"]
+check = ["./installed"]
+undo = ["./uninstall"]
+
+[[action]]
+name = "Pair the app"
+kind = "run"
+do = ["./pair"]
+check = ["./paired"]
+undo = ["./unpair"]
+window = "Open the app and pair it"
+"#);
+    let world = World::new(&[("paired", &paired)]);
+    world.script("paired", "install", "touch \"$HOME/installed\"");
+    world.script("paired", "installed", "test -e \"$HOME/installed\"");
+    world.script("paired", "uninstall", "rm -f \"$HOME/installed\"");
+    world.script("paired", "pair", "touch \"$HOME/paired\"");
+    world.script("paired", "paired", "test -e \"$HOME/paired\"");
+    world.script("paired", "unpair", "rm -f \"$HOME/paired\"");
+    world.install("paired", true).0.unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:paired-engine".to_owned());
+
+    let (removed, events) = world.remove("paired");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert!(!world.host_home().join("paired").exists(), "no window opened");
+    assert!(world.host_home().join("installed").exists());
+    assert!(events.0.contains(&UpdateEvent::Note {
+        text: "Open the app and pair it".to_owned()
+    }));
+    assert!(events.0.contains(&UpdateEvent::Note {
+        text: "Install the tool: I ran it again to put it back, so what it makes is new.".to_owned()
+    }));
+    let user = world.journals("paired").0.unwrap();
+    assert_eq!(
+        user.entry(3).unwrap().state,
+        crate::apps::journal::State::Undoing,
+        "left for the user"
+    );
+}
+
+#[test]
+fn a_stopped_runs_undoing_entry_is_done_again_by_the_next_install() {
+    let world = World::new(&[("grouped", GROUPED)]);
+    world.install("grouped", true).0.unwrap();
+    // A removal stopped during the group's undo: the entry marked, the membership gone.
+    let mut root = world.journals("grouped").1.unwrap();
+    let mut entry = root.entry(2).unwrap().clone();
+    entry.state = crate::apps::journal::State::Undoing;
+    root.put(entry);
+    root.save(&world.root_journals).unwrap();
+    world
+        .host
+        .state
+        .borrow_mut()
+        .groups
+        .get_mut("grouped")
+        .unwrap()
+        .remove("kuba");
+
+    world.install("grouped", true).0.unwrap();
+
+    assert!(world.host.state.borrow().groups["grouped"].contains("kuba"));
+    let root = world.journals("grouped").1.unwrap();
+    assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Done);
+}

@@ -2,7 +2,9 @@
 
 use std::fs;
 
+use super::super::Engine;
 use super::super::EngineError;
+use super::super::Keeper;
 use super::World;
 use super::ai::run;
 use super::ai::shipped;
@@ -11,8 +13,10 @@ use crate::apps::Catalog;
 use crate::apps::Folder;
 use crate::apps::Platform;
 use crate::apps::action::Kind;
+use crate::apps::action::Side;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
+use crate::update::event::UpdateEvent;
 
 const APPS: [&str; 12] = [
     "gamescope",
@@ -427,11 +431,27 @@ fn a_sunshine_removal_apt_cant_finish_puts_its_sign_in_and_its_local_page_back()
         .fail
         .insert("apt-remove:sunshine".to_owned());
 
-    let removed = run(&world, |e| e.remove_with("sunshine", &Picks::default()));
+    let mut events = super::Events::default();
+    let removed = {
+        let mut root = world.root();
+        let mut user_host = world.host.clone();
+        let keeper = Keeper::new(&mut user_host, Side::User, &world.catalog, &world.user_journals);
+        let mut engine = Engine::new(keeper, &mut root, &world.root_journals, &world.lock, &mut events, true);
+        engine.remove_with("sunshine", &Picks::default())
+    };
 
     assert!(
         matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
         "{removed:?}"
+    );
+    let renewed = "Sign Sunshine in as you before a stranger does, with a new password in \
+                   ~/.config/kubaos/sunshine/password: I ran it again to put it back, so what it makes is new.";
+    assert!(
+        events.0.contains(&UpdateEvent::Note {
+            text: renewed.to_owned()
+        }),
+        "{:?}",
+        events.0
     );
     assert!(world.host.state.borrow().dpkg.contains_key("sunshine"));
     assert_eq!(fs::read_to_string(&conf).unwrap(), "origin_web_ui_allowed = pc\n");

@@ -157,6 +157,26 @@ pub struct Keeper<'h> {
     side: Side,
     catalog: PathBuf,
     journals: PathBuf,
+    /// The entries this side undid in this run, as they were, newest last, with the claims each
+    /// handed to another app: what a rolled-back removal does again. Kept here, never sent, so
+    /// root's side trusts only its own record.
+    undone: Vec<Undone>,
+}
+
+/// A step a removal undid, as its entry was, and the claims its undo handed to other apps.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Undone {
+    app: String,
+    entry: Entry,
+    handed: Vec<Handed>,
+}
+
+/// A claim an undo handed to the app that held it unowned, and that app's prior state before.
+#[derive(Clone, Debug, PartialEq)]
+struct Handed {
+    holder: String,
+    claim: String,
+    prior: journal::Prior,
 }
 
 impl std::fmt::Debug for Keeper<'_> {
@@ -177,7 +197,21 @@ impl<'h> Keeper<'h> {
             side,
             catalog: catalog.into(),
             journals: journals.into(),
+            undone: Vec::new(),
         }
+    }
+
+    /// It, with `undone`, the steps this side undid earlier in the run, kept by a caller that
+    /// makes a keeper a request.
+    #[must_use]
+    pub fn with_undone(mut self, undone: Vec<Undone>) -> Self {
+        self.undone = undone;
+        self
+    }
+
+    /// The steps this side undid in the run, for [`Keeper::with_undone`].
+    pub fn take_undone(&mut self) -> Vec<Undone> {
+        std::mem::take(&mut self.undone)
     }
 
     /// Its journals' folder.
@@ -310,7 +344,7 @@ impl<'h> Keeper<'h> {
         journal.setup = setup.map(str::to_owned);
         let mut old = journal.entry(step).cloned();
         if let Some(entry) = old.take_if(|e| !e.action.same_thing(&action)) {
-            self.undo_journaled(&mut journal, id, &entry)?;
+            self.undo_journaled(&mut journal, id, &entry, &mut Vec::new())?;
         }
         let look = perform::look(&action, &mut *self.host, recorded(old.as_ref())).map_err(StepError::Perform)?;
         if let Kind::Run { window: Some(says), .. } = &action.kind
@@ -476,7 +510,7 @@ impl<'h> Keeper<'h> {
         let Some(replaced) = entry.replaced.take() else {
             return Ok(());
         };
-        self.undo_entry(id, &replaced)?;
+        self.undo_entry(id, &replaced, &mut Vec::new())?;
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)
     }
@@ -495,8 +529,50 @@ impl<'h> Keeper<'h> {
         let Some(entry) = journal.entry(step).cloned() else {
             return Ok(Outcome::Undone);
         };
-        self.undo_journaled(&mut journal, id, &entry)?;
+        let mut handed = Vec::new();
+        let undone = self.undo_journaled(&mut journal, id, &entry, &mut handed);
+        // Kept whether or not it went through: a claim handed over before a later part failed
+        // goes back all the same.
+        self.undone.push(Undone {
+            app: id.to_owned(),
+            entry,
+            handed,
+        });
+        undone?;
         Ok(Outcome::Undone)
+    }
+
+    /// Does step `step` of the app `id` in `setup` again after this run's [`Keeper::undo`] of
+    /// it, for a removal rolled back: first the claims that undo handed to other apps go back to
+    /// them, then the step's entry is put back as it was, still being undone, so the step done
+    /// again owns what it owned; then it is done as [`Keeper::step`] does it, from the folder,
+    /// with no window, so a step that opens one is left to the user as a note. A step this run
+    /// didn't undo is only done.
+    ///
+    /// # Errors
+    ///
+    /// As [`Keeper::step`], or the journal that couldn't be written.
+    pub fn redo(&mut self, id: &str, setup: Option<&str>, step: usize) -> Result<Outcome, StepError> {
+        if let Some(at) = self.undone.iter().rposition(|u| u.app == id && u.entry.step == step) {
+            let undone = self.undone.remove(at);
+            for handed in undone.handed.iter().rev() {
+                journal::give_back(&self.journals, &handed.holder, &handed.claim, &handed.prior)
+                    .map_err(StepError::Journal)?;
+            }
+            let mut journal = Journal::read(&self.journals, id)
+                .map_err(StepError::Journal)?
+                .unwrap_or_else(|| Journal::new(id, setup));
+            if journal.entry(step).is_none() {
+                let state = if undone.entry.state == State::Skipped {
+                    State::Skipped
+                } else {
+                    State::Undoing
+                };
+                journal.put(Entry { state, ..undone.entry });
+                journal.save(&self.journals).map_err(StepError::Journal)?;
+            }
+        }
+        self.step(id, setup, step, false)
     }
 
     /// Sets the vendor repository of root's settled `apt` step `step` of the app `id` up again,
@@ -523,7 +599,13 @@ impl<'h> Keeper<'h> {
 
     /// Marks `entry` as being undone, undoes it, and takes it out of `journal`; a run stopped
     /// during the undo leaves it marked, never looking settled.
-    fn undo_journaled(&mut self, journal: &mut Journal, id: &str, entry: &Entry) -> Result<(), StepError> {
+    fn undo_journaled(
+        &mut self,
+        journal: &mut Journal,
+        id: &str,
+        entry: &Entry,
+        handed: &mut Vec<Handed>,
+    ) -> Result<(), StepError> {
         let step = entry.step;
         journal.put(Entry {
             state: if entry.state == State::Skipped {
@@ -534,16 +616,19 @@ impl<'h> Keeper<'h> {
             ..entry.clone()
         });
         journal.save(&self.journals).map_err(StepError::Journal)?;
-        self.undo_entry(id, entry)?;
+        self.undo_entry(id, entry, handed)?;
         journal.drop_step(step);
         journal.save(&self.journals).map_err(StepError::Journal)
     }
 
-    fn undo_entry(&mut self, id: &str, entry: &Entry) -> Result<(), StepError> {
+    /// Undoes `entry` of the app `id`; a claim another app holds unowned passes to it instead,
+    /// once the undo of the rest went through, each one handed over added to `handed`.
+    fn undo_entry(&mut self, id: &str, entry: &Entry, handed: &mut Vec<Handed>) -> Result<(), StepError> {
         // A found step owns nothing, unless another app's removal has handed it a claim since.
         if entry.state != State::Skipped {
             let owners = Owners::load(&[&self.journals]).map_err(StepError::Journal)?;
             let mut mine = Vec::new();
+            let mut passing = Vec::new();
             for claim in entry.claims.iter().filter(|c| c.owned) {
                 // A package one step pulled in, which another app's step found, passes to it.
                 let held = match claim.claim.strip_prefix("dep:") {
@@ -551,16 +636,27 @@ impl<'h> Keeper<'h> {
                     None => claim.claim.clone(),
                 };
                 match owners.holder(&held, id) {
-                    Some(holder) => {
-                        journal::hand_over(&self.journals, holder, &held, &entry.prior).map_err(StepError::Journal)?;
-                    }
+                    Some(holder) => passing.push((holder.to_owned(), held)),
                     None => mine.push(claim.clone()),
                 }
             }
+            // HAZARD: handed over before an undo that then fails, a claim would be owned by both
+            // apps, and the first to go would take it from the other.
             perform::undo(&entry.action, &mut *self.host, &mine, &entry.prior).map_err(StepError::Perform)?;
+            for (holder, held) in passing {
+                if let Some(prior) =
+                    journal::hand_over(&self.journals, &holder, &held, &entry.prior).map_err(StepError::Journal)?
+                {
+                    handed.push(Handed {
+                        holder,
+                        claim: held,
+                        prior,
+                    });
+                }
+            }
         }
         match &entry.replaced {
-            Some(replaced) => self.undo_entry(id, replaced),
+            Some(replaced) => self.undo_entry(id, replaced, handed),
             None => Ok(()),
         }
     }
@@ -777,8 +873,8 @@ struct Rollback<'f> {
     folder: Option<&'f Folder>,
     /// The highest step, for the report.
     total: usize,
-    /// Whether the app was complete when the removal began.
-    was_complete: bool,
+    /// The user journal as the removal found it, before it marked it incomplete.
+    header: Option<&'f Journal>,
 }
 
 /// One step of either side's journal, for an undo across both.
@@ -788,6 +884,7 @@ struct Undoable {
     side: Side,
     name: String,
     kind_is_nix: bool,
+    kind_is_run: bool,
 }
 
 impl<'a> Engine<'a> {
@@ -881,6 +978,7 @@ impl<'a> Engine<'a> {
                 side: action.side(),
                 name: action.name.clone(),
                 kind_is_nix: matches!(action.kind, Kind::Nix { .. }),
+                kind_is_run: matches!(action.kind, Kind::Run { .. }),
             };
             let new = !journaled.contains(&(undoable.side, step));
             match outcome {
@@ -921,8 +1019,8 @@ impl<'a> Engine<'a> {
             .unwrap_or_else(|| Journal::new(id, setup));
         journal.setup = setup.map(str::to_owned);
         journal.complete = true;
-        journal.removal_rolled_back = None;
         journal.save(self.user.journals()).map_err(EngineError::Journal)?;
+        journal::mark_rolled_back(self.user.journals(), id, None).map_err(EngineError::Journal)?;
         Ok(finished)
     }
 
@@ -1033,11 +1131,11 @@ impl<'a> Engine<'a> {
     ///
     /// [`EngineError`]. A removal is all or nothing, as an install is: a step that couldn't be
     /// undone stops it, and the steps it undid are done again, that step's with them, oldest
-    /// first, as an install does them, so the app is as it was
-    /// ([`EngineError::RemovalRolledBack`]; the user's journal records it). A step done again
-    /// makes anew what it makes: a `run` runs its `do` again. One that can't be done again is a
-    /// warning, the rest still go, and the app is left incomplete for the next update to finish
-    /// ([`EngineError::RemovalHalfRolledBack`]).
+    /// first, as the current folder has them and with no window, so the app is as it was
+    /// ([`EngineError::RemovalRolledBack`]; a mark beside the user journal records it, which
+    /// [`journal::rolled_back`] reads). A step done again makes anew what it makes: a `run` runs
+    /// its `do` again. One that can't be done again is a warning, the rest still go, and the app
+    /// is left incomplete for the next update to finish ([`EngineError::RemovalHalfRolledBack`]).
     pub fn remove(&mut self, id: &str) -> Result<Finished, EngineError> {
         self.locked(|engine| engine.remove_locked(id))
     }
@@ -1077,7 +1175,10 @@ impl<'a> Engine<'a> {
             self.start_root()?;
         }
         let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
-        let was_complete = user_journal.as_ref().is_some_and(|j| j.complete);
+        // What the user journal says of the app beyond its steps, which a rollback writes back:
+        // saved with no steps and incomplete, as it is here for an app of root's steps alone, it
+        // goes.
+        let header = user_journal.clone();
         if let Some(mut journal) = user_journal {
             journal.complete = false;
             journal.save(self.user.journals()).map_err(EngineError::Journal)?;
@@ -1101,7 +1202,7 @@ impl<'a> Engine<'a> {
                     setup: setup.as_deref(),
                     folder: folder.as_ref(),
                     total,
-                    was_complete,
+                    header: header.as_ref(),
                 };
                 return Err(self.roll_back_removal(id, &back, undone, name, source));
             }
@@ -1114,6 +1215,7 @@ impl<'a> Engine<'a> {
             total: count,
         });
         Journal::forget(self.user.journals(), id).map_err(EngineError::Journal)?;
+        journal::mark_rolled_back(self.user.journals(), id, None).map_err(EngineError::Journal)?;
         finished.left = !owns;
         if let Some(folder) = &folder {
             let picked = setup.as_deref().and_then(|s| folder.setup(s));
@@ -1125,9 +1227,13 @@ impl<'a> Engine<'a> {
     }
 
     /// Does again, oldest first, the steps a removal of the app `id` undid before the step
-    /// `name` failed, that step with them, so the app is as it was before the removal; a step
-    /// that can't be done again is a warning, and the rest still go. The user's journal records
-    /// the rollback, and is complete again when the app was and every step stands.
+    /// `name` failed, that step with them, so the app is as it was before the removal. A mark
+    /// beside the user journals records the rollback before the first step is done again, so a
+    /// run stopped during it leaves the record. Each step is done again by its own side from that
+    /// side's record of the undo ([`Keeper::redo`]), with no window; a step that can't be is a
+    /// warning, and the rest still go. A `run` done again is a note, as what it makes is new.
+    /// The user journal then gets back what it said beyond its steps, and is complete again when
+    /// the app was and every step stands.
     fn roll_back_removal(
         &mut self,
         id: &str,
@@ -1137,6 +1243,7 @@ impl<'a> Engine<'a> {
         source: StepError,
     ) -> EngineError {
         let why = format!("{name}: {}", crate::update::event::chain(&source));
+        let mut recorded = journal::mark_rolled_back(self.user.journals(), id, Some(&why)).is_ok();
         self.sink.event(&UpdateEvent::Note {
             text: format!("{name} couldn't be undone, so I'm putting back what the removal took."),
         });
@@ -1150,12 +1257,11 @@ impl<'a> Engine<'a> {
         } else {
             for undoable in &undone {
                 let outcome = match undoable.side {
-                    Side::User => self.user.step(id, back.setup, undoable.step, self.windows),
-                    Side::Root => self.root_step(&Request::Step {
+                    Side::User => self.user.redo(id, back.setup, undoable.step),
+                    Side::Root => self.root_step(&Request::Redo {
                         app: id.to_owned(),
                         setup: back.setup.map(str::to_owned),
                         step: undoable.step,
-                        windows: self.windows,
                     }),
                 };
                 let state = match outcome {
@@ -1163,6 +1269,15 @@ impl<'a> Engine<'a> {
                     Ok(Outcome::Skipped { says }) => {
                         self.sink.event(&UpdateEvent::Note { text: says });
                         ActionState::Skipped
+                    }
+                    Ok(Outcome::Done) if undoable.kind_is_run => {
+                        self.sink.event(&UpdateEvent::Note {
+                            text: format!(
+                                "{}: I ran it again to put it back, so what it makes is new.",
+                                undoable.name
+                            ),
+                        });
+                        ActionState::Done
                     }
                     Ok(_) => ActionState::Done,
                     Err(e) => {
@@ -1178,16 +1293,20 @@ impl<'a> Engine<'a> {
                 self.report(id, undoable.step, back.total, &undoable.name, state);
             }
         }
-        let recorded = Journal::read(self.user.journals(), id).and_then(|journal| {
+        let header = Journal::read(self.user.journals(), id).and_then(|journal| {
             let mut journal = journal.unwrap_or_else(|| Journal::new(id, back.setup));
-            journal.complete = whole && back.was_complete;
-            journal.removal_rolled_back = Some(why);
+            if let Some(header) = back.header {
+                journal.setup.clone_from(&header.setup);
+                journal.brought_by.clone_from(&header.brought_by);
+                journal.root_adoption = header.root_adoption;
+            }
+            journal.complete = whole && back.header.is_some_and(|h| h.complete);
             journal.save(self.user.journals())
         });
-        if let Err(e) = recorded {
+        recorded &= header.is_ok();
+        if !recorded {
             self.warn(format!(
-                "the rollback of {id}'s removal couldn't be recorded: {}",
-                crate::update::event::chain(&e)
+                "the rollback of {id}'s removal couldn't be recorded in its journal: kubaos app show {id} may not say it"
             ));
         }
         let source = Box::new(source);
@@ -1476,6 +1595,7 @@ impl<'a> Engine<'a> {
                     side,
                     name: e.action.name.clone(),
                     kind_is_nix: matches!(e.action.kind, Kind::Nix { .. }),
+                    kind_is_run: matches!(e.action.kind, Kind::Run { .. }),
                 }));
             }
         }

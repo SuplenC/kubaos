@@ -60,6 +60,14 @@ pub enum Request {
     },
     /// One step of root's journal of the app, undone.
     Undo { app: String, step: usize },
+    /// A root step this run undid, done again for a removal rolled back, from root's own record
+    /// of the undo.
+    Redo {
+        app: String,
+        #[serde(default)]
+        setup: Option<String>,
+        step: usize,
+    },
     /// Root's steps of an app the machine had before it had a journal, recorded from what their
     /// checks find, nothing run: owned when KubaOS put the app there.
     Adopt {
@@ -226,6 +234,11 @@ impl<'h> Server<'h> {
         }
     }
 
+    /// Its keeper, given back once the requests are answered.
+    pub fn into_keeper(self) -> Keeper<'h> {
+        self.keeper
+    }
+
     /// Answers one request line.
     pub fn handle(&mut self, line: &str) -> Reply {
         let refuse = |why: String| Reply::Refused { why: vec![why] };
@@ -236,7 +249,8 @@ impl<'h> Server<'h> {
         let (app, setup) = match &request {
             Request::Preflight { app, setup, .. }
             | Request::Step { app, setup, .. }
-            | Request::Adopt { app, setup, .. } => (app, setup.as_deref()),
+            | Request::Adopt { app, setup, .. }
+            | Request::Redo { app, setup, .. } => (app, setup.as_deref()),
             Request::Undo { app, .. } | Request::Refresh { app, .. } => (app, None),
         };
         if !is_app_id(app) {
@@ -273,6 +287,10 @@ impl<'h> Server<'h> {
                 Err(e) => answer(&e),
             },
             Request::Undo { app, step } => match self.keeper.undo(&app, step) {
+                Ok(outcome) => Reply::Step { outcome },
+                Err(e) => answer(&e),
+            },
+            Request::Redo { app, setup, step } => match self.keeper.redo(&app, setup.as_deref(), step) {
                 Ok(outcome) => Reply::Step { outcome },
                 Err(e) => answer(&e),
             },

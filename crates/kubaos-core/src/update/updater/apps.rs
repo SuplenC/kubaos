@@ -191,7 +191,17 @@ impl<M: Machine> Updater<'_, M> {
         let apps = self.phase(Phase::Apps, |u| {
             let done = u.run_changes(&catalog, (&before, &picks), ids, &chosen, change);
             if done.is_err() && changed {
-                before.write(&path).map_err(UpdateError::Picks)?;
+                // The picks go back to what the machine has: an app whose removal was rolled
+                // back is there and stays picked, and one removed before the failure stays out.
+                let mut back = before.clone();
+                if change == Change::Remove {
+                    for id in ids {
+                        if !u.has_journal(id) {
+                            back.remove(id);
+                        }
+                    }
+                }
+                back.write(&path).map_err(UpdateError::Picks)?;
             }
             done
         })?;
@@ -219,6 +229,13 @@ impl<M: Machine> Updater<'_, M> {
         };
         self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
+    }
+
+    /// Whether either side has a journal of the app `id`: it is on the machine, or partly.
+    fn has_journal(&self, id: &str) -> bool {
+        [self.user.app_journals(), self.sys.app_journals()]
+            .iter()
+            .any(|dir| !matches!(Journal::read(dir, id), Ok(None)))
     }
 
     /// Installs, removes or configures each app of `ids`, in its `chosen` setup, through pkexec,

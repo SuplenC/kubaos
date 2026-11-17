@@ -125,6 +125,9 @@ pub struct AppStatus {
     /// configure` runs alone again.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub configurable: bool,
+    /// Its last removal couldn't undo a step and was rolled back: that step and why.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub removal_rolled_back: Option<String>,
     /// Whether each setup, or the app without setups, has something for this machine: by
     /// `setups`' order, or one value for an app without setups.
     #[serde(skip)]
@@ -230,6 +233,7 @@ impl Status {
                 setup: installed.and_then(|j| j.setup.clone()),
                 setups: app.setups.iter().map(|s| SetupInfo::of(app, s)).collect(),
                 configurable,
+                removal_rolled_back: super::journal::rolled_back(journals, &app.id),
                 available,
             });
         }

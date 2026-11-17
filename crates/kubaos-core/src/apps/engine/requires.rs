@@ -607,5 +607,6 @@ fn undoable(step: usize, action: &Action) -> Undoable {
         side: action.side(),
         name: action.name.clone(),
         kind_is_nix: matches!(action.kind, Kind::Nix { .. }),
+        kind_is_run: matches!(action.kind, Kind::Run { .. }),
     }
 }
