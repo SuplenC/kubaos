@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Logseq
+Comment=Your notes as an outline of linked blocks
+Exec="@HOME@/.local/opt/logseq/Logseq.AppImage" %U
+Icon=logseq
+Terminal=false
+StartupWMClass=Logseq
+Categories=Office;
+Keywords=notes;outliner;journal;knowledge;markdown;
+MimeType=x-scheme-handler/logseq;

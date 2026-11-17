@@ -1,0 +1,24 @@
+# Zotero from nixpkgs, through the User flake. Zotero keeps no apt repository and Ubuntu doesn't
+# package it. nixpkgs' is 9.0, a major release behind Zotero's 10; Zotero's own build is a
+# .tar.xz, which no download action unpacks, with no checksum published beside it to pin.
+# https://www.zotero.org/download/
+name = "Zotero"
+category = "office"
+tags = ["references", "citations", "bibliography", "research", "papers"]
+summary = "Collects your sources and formats the citations. The bibliography stops being an all-nighter."
+# From its AppStream metainfo, CC0-1.0 (flathub/org.zotero.Zotero), without the line about the
+# Flatpak.
+description = """\
+Zotero is a tool for managing references and research materials. It helps to collect \
+bibliographic data, organize files, and generate citations in a wide range of formats."""
+description_from = "https://github.com/flathub/org.zotero.Zotero/blob/master/org.zotero.Zotero.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "zotero"
+keeps = """\
+Your library and its attachments stay in ~/Zotero, and Zotero's profile in ~/.zotero: install \
+Zotero again and it opens them."""
+
+[[action]]
+name = "Install Zotero"
+kind = "nix"
+packages = ["zotero"]

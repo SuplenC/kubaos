@@ -1,0 +1,27 @@
+# Anki from nixpkgs, through the User flake, built from source. Ubuntu 26.04 has none, and Anki's
+# own download is a launcher that installs Anki from PyPI as it first starts, a version it picks
+# then, which no pin covers. nixpkgs' is 25.09, a year behind Anki's 26.09; AnkiWeb syncs with it.
+# https://apps.ankiweb.net/
+name = "Anki"
+category = "office"
+tags = ["flashcards", "study", "spaced repetition", "memory", "learning"]
+summary = "Flashcards that come back right before you'd forget them. Two hundred due today, good luck."
+# From its AppStream metainfo, CC0-1.0 (flathub/net.ankiweb.Anki), without the line about the
+# Flatpak.
+description = """\
+Anki is a program which makes remembering things easy. Because it's a lot more efficient than \
+traditional study methods, you can either greatly decrease your time spent studying, or greatly \
+increase the amount you learn. Anyone who needs to remember things in their daily life can \
+benefit from Anki. Since it is content-agnostic and supports images, audio, videos and \
+scientific markup (via LaTeX), the possibilities are endless."""
+description_from = "https://github.com/flathub/net.ankiweb.Anki/blob/master/net.ankiweb.Anki.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix).
+icon = "anki"
+keeps = """\
+Your decks, their review history and your add-ons stay in ~/.local/share/Anki2: install Anki \
+again and they're all there."""
+
+[[action]]
+name = "Install Anki"
+kind = "nix"
+packages = ["anki"]

@@ -1,0 +1,40 @@
+# LibreOffice from Ubuntu's archive: 26.2, The Document Foundation's maintained branch, which
+# Ubuntu keeps patched. The 26.8 branch is out, from the libreoffice PPA, which isn't the
+# Foundation's own and moves to each new branch as it lands; nixpkgs has 26.2 too, behind Ubuntu's
+# point release. The apps by name, without Base and its Java: Writer, Calc, Impress, Draw and Math,
+# GTK 3's integration, which draws on Wayland rather than through XWayland, and the fonts
+# metric-compatible with Microsoft's (Carlito, Caladea and Liberation), so a .docx keeps its
+# layout.
+# https://www.libreoffice.org/download/download-libreoffice/
+name = "LibreOffice"
+category = "office"
+tags = ["office", "documents", "spreadsheets", "presentations", "word processor", "odf"]
+summary = "The office suite that opens your boss's .docx. Where the boxes end up is anyone's fucking guess."
+# Its AppStream metainfo describes each app alone, so this is ours.
+description = """\
+LibreOffice is a free and open source office suite from The Document Foundation. Writer edits \
+documents, Calc spreadsheets, Impress presentations, Draw diagrams and drawings, and Math \
+formulas. It saves in OpenDocument, its own format, and opens and saves Microsoft Office's \
+.docx, .xlsx and .pptx, and exports PDF."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "libreoffice-startcenter"
+keeps = """\
+Your documents stay where you saved them, and your settings, templates and autocorrect in \
+~/.config/libreoffice: install LibreOffice again and they're all there."""
+
+[[action]]
+name = "Install LibreOffice"
+kind = "apt"
+packages = [
+  "libreoffice-writer",
+  "libreoffice-calc",
+  "libreoffice-impress",
+  "libreoffice-draw",
+  "libreoffice-math",
+  "libreoffice-gtk3",
+  "fonts-crosextra-carlito",
+  "fonts-crosextra-caladea",
+  "fonts-liberation",
+]

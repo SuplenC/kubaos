@@ -1,0 +1,29 @@
+# Qalculate! from Ubuntu's archive, its GTK app, 5.9; nixpkgs has 5.10 and upstream 5.13, so the
+# archive, first in KubaOS's order, is about as current. It plots through gnuplot, which its
+# package only recommends, so the step installs gnuplot's build without a window of its own:
+# Qalculate! shows the plot in its own. The `qalc` command line is on every machine already.
+# https://qalculate.github.io/
+name = "Qalculate!"
+category = "office"
+tags = ["calculator", "units", "currency", "math", "conversion"]
+summary = "A calculator that converts currencies, solves equations and knows a parsec. Overkill for the tip."
+# From its AppStream metainfo, CC0-1.0 (Qalculate/qalculate-gtk).
+description = """\
+Qalculate! is a multi-purpose cross-platform desktop calculator. It is simple to use but \
+provides power and versatility normally reserved for complicated math packages, as well as \
+useful tools for everyday needs (such as currency conversion and percent calculation). Features \
+include a large library of customizable functions, unit calculations and conversion, physical \
+constants, symbolic calculations (including integrals and equations), arbitrary precision, \
+uncertainty propagation, interval arithmetic, plotting, and a user-friendly interface."""
+description_from = "https://github.com/Qalculate/qalculate-gtk/blob/v5.9.0/data/qalculate-gtk.appdata.xml.in"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "qalculate-gtk"
+keeps = """\
+Your variables, functions and history stay in ~/.config/qalculate and ~/.local/share/qalculate, \
+which qalc reads too: install Qalculate! again and they're all there."""
+
+[[action]]
+name = "Install Qalculate!"
+kind = "apt"
+packages = ["qalculate-gtk", "gnuplot-nox"]
