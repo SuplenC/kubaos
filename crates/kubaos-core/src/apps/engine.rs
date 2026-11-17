@@ -1,6 +1,6 @@
 //! Installing and removing an app of folders: its steps in order, each checked and journaled
-//! before it runs, a failure rolled back, a removal undone from the journal, a stopped run
-//! resumed, a step a release changed updated in place.
+//! before it runs, a failure rolled back, a removal undone from the journal and rolled back
+//! when a step of it fails, a stopped run resumed, a step a release changed updated in place.
 //!
 //! A run has two sides. The user's [`Keeper`] runs in this process; root's runs in the root
 //! helper (`kubaos-apps serve`), reached through a [`RootSide`], started once before the first
@@ -121,6 +121,20 @@ pub enum EngineError {
     },
     #[error("{name}: it couldn't be undone")]
     Undo {
+        name: String,
+        #[source]
+        source: Box<StepError>,
+    },
+    #[error("{name}: it couldn't be undone, so the removal was rolled back and the app is as it was")]
+    RemovalRolledBack {
+        name: String,
+        #[source]
+        source: Box<StepError>,
+    },
+    #[error(
+        "{name}: it couldn't be undone, and rolling the removal back left steps undone: the warnings name them, and kubaos update does them again"
+    )]
+    RemovalHalfRolledBack {
         name: String,
         #[source]
         source: Box<StepError>,
@@ -757,6 +771,16 @@ pub struct Adopted {
     pub setup: Option<String>,
 }
 
+/// Where a failed removal is rolled back to.
+struct Rollback<'f> {
+    setup: Option<&'f str>,
+    folder: Option<&'f Folder>,
+    /// The highest step, for the report.
+    total: usize,
+    /// Whether the app was complete when the removal began.
+    was_complete: bool,
+}
+
 /// One step of either side's journal, for an undo across both.
 #[derive(Clone, Debug)]
 struct Undoable {
@@ -897,6 +921,7 @@ impl<'a> Engine<'a> {
             .unwrap_or_else(|| Journal::new(id, setup));
         journal.setup = setup.map(str::to_owned);
         journal.complete = true;
+        journal.removal_rolled_back = None;
         journal.save(self.user.journals()).map_err(EngineError::Journal)?;
         Ok(finished)
     }
@@ -1006,8 +1031,13 @@ impl<'a> Engine<'a> {
     ///
     /// # Errors
     ///
-    /// [`EngineError`]. A step that couldn't be undone stops the removal; the journal keeps the
-    /// steps left, and the next removal goes on from them.
+    /// [`EngineError`]. A removal is all or nothing, as an install is: a step that couldn't be
+    /// undone stops it, and the steps it undid are done again, that step's with them, oldest
+    /// first, as an install does them, so the app is as it was
+    /// ([`EngineError::RemovalRolledBack`]; the user's journal records it). A step done again
+    /// makes anew what it makes: a `run` runs its `do` again. One that can't be done again is a
+    /// warning, the rest still go, and the app is left incomplete for the next update to finish
+    /// ([`EngineError::RemovalHalfRolledBack`]).
     pub fn remove(&mut self, id: &str) -> Result<Finished, EngineError> {
         self.locked(|engine| engine.remove_locked(id))
     }
@@ -1047,6 +1077,7 @@ impl<'a> Engine<'a> {
             self.start_root()?;
         }
         let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
+        let was_complete = user_journal.as_ref().is_some_and(|j| j.complete);
         if let Some(mut journal) = user_journal {
             journal.complete = false;
             journal.save(self.user.journals()).map_err(EngineError::Journal)?;
@@ -1055,18 +1086,28 @@ impl<'a> Engine<'a> {
         let total = all.iter().map(|u| u.step).max().unwrap_or(0);
         let count = all.len();
         let mut finished = Finished::default();
+        let mut undone = Vec::new();
         for (done, undoable) in all.into_iter().enumerate() {
             self.sink.event(&UpdateEvent::Step {
                 text: undoable.name.clone(),
             });
             self.sink.event(&UpdateEvent::Progress { done, total: count });
             self.report(id, undoable.step, total, &undoable.name, ActionState::Undoing);
-            self.undo_one(id, &undoable).map_err(|source| EngineError::Undo {
-                name: undoable.name.clone(),
-                source: Box::new(source),
-            })?;
+            if let Err(source) = self.undo_one(id, &undoable) {
+                self.report(id, undoable.step, total, &undoable.name, ActionState::Failed);
+                let name = undoable.name.clone();
+                undone.push(undoable);
+                let back = Rollback {
+                    setup: setup.as_deref(),
+                    folder: folder.as_ref(),
+                    total,
+                    was_complete,
+                };
+                return Err(self.roll_back_removal(id, &back, undone, name, source));
+            }
             finished.switch |= undoable.kind_is_nix;
             self.report(id, undoable.step, total, &undoable.name, ActionState::Undone);
+            undone.push(undoable);
         }
         self.sink.event(&UpdateEvent::Progress {
             done: count,
@@ -1081,6 +1122,80 @@ impl<'a> Engine<'a> {
             }
         }
         Ok(finished)
+    }
+
+    /// Does again, oldest first, the steps a removal of the app `id` undid before the step
+    /// `name` failed, that step with them, so the app is as it was before the removal; a step
+    /// that can't be done again is a warning, and the rest still go. The user's journal records
+    /// the rollback, and is complete again when the app was and every step stands.
+    fn roll_back_removal(
+        &mut self,
+        id: &str,
+        back: &Rollback<'_>,
+        mut undone: Vec<Undoable>,
+        name: String,
+        source: StepError,
+    ) -> EngineError {
+        let why = format!("{name}: {}", crate::update::event::chain(&source));
+        self.sink.event(&UpdateEvent::Note {
+            text: format!("{name} couldn't be undone, so I'm putting back what the removal took."),
+        });
+        undone.sort_by_key(|u| u.step);
+        let mut whole = true;
+        if back.folder.is_none() {
+            whole = false;
+            self.warn(format!(
+                "{id} is gone from the catalog, so the steps its removal undid can't be done again"
+            ));
+        } else {
+            for undoable in &undone {
+                let outcome = match undoable.side {
+                    Side::User => self.user.step(id, back.setup, undoable.step, self.windows),
+                    Side::Root => self.root_step(&Request::Step {
+                        app: id.to_owned(),
+                        setup: back.setup.map(str::to_owned),
+                        step: undoable.step,
+                        windows: self.windows,
+                    }),
+                };
+                let state = match outcome {
+                    Ok(Outcome::Found) => ActionState::Found,
+                    Ok(Outcome::Skipped { says }) => {
+                        self.sink.event(&UpdateEvent::Note { text: says });
+                        ActionState::Skipped
+                    }
+                    Ok(_) => ActionState::Done,
+                    Err(e) => {
+                        whole = false;
+                        self.warn(format!(
+                            "{}: rolling the removal back, it couldn't be done again: {}",
+                            undoable.name,
+                            crate::update::event::chain(&e)
+                        ));
+                        ActionState::Failed
+                    }
+                };
+                self.report(id, undoable.step, back.total, &undoable.name, state);
+            }
+        }
+        let recorded = Journal::read(self.user.journals(), id).and_then(|journal| {
+            let mut journal = journal.unwrap_or_else(|| Journal::new(id, back.setup));
+            journal.complete = whole && back.was_complete;
+            journal.removal_rolled_back = Some(why);
+            journal.save(self.user.journals())
+        });
+        if let Err(e) = recorded {
+            self.warn(format!(
+                "the rollback of {id}'s removal couldn't be recorded: {}",
+                crate::update::event::chain(&e)
+            ));
+        }
+        let source = Box::new(source);
+        if whole {
+            EngineError::RemovalRolledBack { name, source }
+        } else {
+            EngineError::RemovalHalfRolledBack { name, source }
+        }
     }
 
     /// Takes in the app `id` when the machine has it and no journal does: an app installed before

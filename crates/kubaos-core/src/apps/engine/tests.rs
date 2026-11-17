@@ -1031,24 +1031,119 @@ fn a_new_download_version_replaces_the_old_one_and_goes_whole_with_the_app() {
 }
 
 #[test]
-fn an_undo_that_stopped_partway_is_marked_and_done_again_by_the_next_install() {
+fn a_root_undo_that_stopped_partway_is_done_again_by_the_removals_rollback() {
     let world = World::new(&[("grouped", GROUPED)]);
     world.install("grouped", true).0.unwrap();
     world.host.state.borrow_mut().fail.insert("groupdel:grouped".to_owned());
 
     let (removed, _) = world.remove("grouped");
 
-    assert!(matches!(removed, Err(EngineError::Undo { .. })), "{removed:?}");
-    let root = world.journals("grouped").1.unwrap();
-    assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Undoing);
-    assert!(!world.host.state.borrow().groups["grouped"].contains("kuba"));
-
-    world.host.state.borrow_mut().fail.clear();
-    world.install("grouped", true).0.unwrap();
-
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
     assert!(world.host.state.borrow().groups["grouped"].contains("kuba"));
     let root = world.journals("grouped").1.unwrap();
     assert_eq!(root.entry(2).unwrap().state, crate::apps::journal::State::Done);
+}
+
+#[test]
+fn a_removal_that_fails_partway_is_rolled_back_and_leaves_the_app_as_it_was() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    fs::create_dir_all(world.settings().parent().unwrap()).unwrap();
+    fs::write(world.settings(), "{\"theme\": \"dark\"}").unwrap();
+    world.install("fixture", true).0.unwrap();
+    let installed = world.host.snapshot();
+    let (user, root) = world.journals("fixture");
+    // apt can't remove the package, as with dpkg's lock held: the last step undone fails.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:fixture-tool".to_owned());
+
+    let (removed, events) = world.remove("fixture");
+
+    let Err(EngineError::RemovalRolledBack { name, .. }) = &removed else {
+        panic!("not rolled back: {removed:?}");
+    };
+    assert_eq!(name, "Install the tool");
+    assert_eq!(world.host.snapshot(), installed, "the app is as it was");
+    let (user_after, root_after) = world.journals("fixture");
+    let user_after = user_after.unwrap();
+    assert!(user_after.complete);
+    assert!(
+        user_after
+            .removal_rolled_back
+            .as_deref()
+            .is_some_and(|why| why.starts_with("Install the tool: ")),
+        "{user_after:?}"
+    );
+    let steps = |j: &Journal| j.entries.iter().map(|e| (e.step, e.state)).collect::<Vec<_>>();
+    assert_eq!(steps(&user_after), steps(&user.unwrap()));
+    assert_eq!(steps(&root_after.unwrap()), steps(&root.unwrap()));
+    // Undone newest first, the failed one last; done again oldest first.
+    let order: Vec<(usize, ActionState)> = events.steps().into_iter().collect();
+    assert_eq!(
+        order,
+        [
+            (4, ActionState::Undoing),
+            (4, ActionState::Undone),
+            (3, ActionState::Undoing),
+            (3, ActionState::Undone),
+            (2, ActionState::Undoing),
+            (2, ActionState::Undone),
+            (1, ActionState::Undoing),
+            (1, ActionState::Failed),
+            (1, ActionState::Done),
+            (2, ActionState::Done),
+            (3, ActionState::Done),
+            (4, ActionState::Done),
+        ]
+    );
+
+    // Once apt can, the removal goes through, and an install no longer tells of the rollback.
+    world.host.state.borrow_mut().fail.clear();
+    world.install("fixture", true).0.unwrap();
+    assert_eq!(world.journals("fixture").0.unwrap().removal_rolled_back, None);
+    world.remove("fixture").0.unwrap();
+    assert_eq!(world.journals("fixture"), (None, None));
+}
+
+#[test]
+fn a_step_a_rollback_cant_do_again_is_a_warning_and_the_next_install_finishes_it() {
+    let world = World::new(&[("fixture", FIXTURE)]);
+    world.install("fixture", true).0.unwrap();
+    let installed = world.host.snapshot();
+    {
+        let mut state = world.host.state.borrow_mut();
+        state.fail.insert("apt-remove:fixture-tool".to_owned());
+        state.fail.insert("enable:fixture.service".to_owned());
+    }
+
+    let (removed, events) = world.remove("fixture");
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalHalfRolledBack { .. })),
+        "{removed:?}"
+    );
+    let warned = events.0.iter().any(|e| {
+        matches!(e, UpdateEvent::Warning { text }
+            if text.starts_with("Start the service: rolling the removal back, it couldn't be done again: "))
+    });
+    assert!(warned, "{:?}", events.0);
+    let user = world.journals("fixture").0.unwrap();
+    assert!(!user.complete && user.removal_rolled_back.is_some(), "{user:?}");
+    // The steps after the one it couldn't do again were still done again.
+    assert!(world.settings().is_file());
+
+    world.host.state.borrow_mut().fail.clear();
+    world.install("fixture", true).0.unwrap();
+
+    assert_eq!(world.host.snapshot(), installed);
+    let user = world.journals("fixture").0.unwrap();
+    assert!(user.complete && user.removal_rolled_back.is_none());
 }
 
 #[test]
@@ -1116,7 +1211,7 @@ fn a_removal_that_would_take_a_package_the_user_installed_since_is_refused() {
 
     let (result, _) = world.remove("grouped");
 
-    let Err(EngineError::Undo { source, .. }) = result else {
+    let Err(EngineError::RemovalRolledBack { source, .. }) = result else {
         panic!("the removal went through: {result:?}");
     };
     assert!(source.to_string().contains("also remove user-app"), "{source}");

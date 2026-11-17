@@ -443,8 +443,8 @@ fn a_brought_app_that_cant_be_removed_is_a_warning_once_the_app_asked_for_is_gon
     let neovim_root = world.journals("neovim").1.unwrap();
     assert_eq!(
         neovim_root.entries.len(),
-        1,
-        "the removal stopped at the package: {neovim_root:?}"
+        2,
+        "the removal stopped at the package and was rolled back: {neovim_root:?}"
     );
     let warned = events.0.iter().any(|e| {
         matches!(e, UpdateEvent::Warning { text }

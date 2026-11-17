@@ -515,6 +515,10 @@ impl Host for FakeHost {
     }
 
     fn apt_remove(&mut self, packages: &[String]) -> Result<(), HostError> {
+        // As apt does with dpkg's lock held: it fails before it changes anything.
+        for p in packages {
+            self.fails(&format!("apt-remove:{p}"))?;
+        }
         let gone = self.apt_simulate(AptPlan::Remove(packages))?.removes;
         let mut state = self.state.borrow_mut();
         for p in &gone {
