@@ -16,6 +16,8 @@ Item {
     property var entry: null
     readonly property bool runs: (entry?.unavailable ?? "") === ""
     readonly property string iconSource: Words.iconSource(entry?.icon ?? "", name => Quickshell.iconPath(name, true))
+    // The symbol the row's tile draws; none for an app shown by its initial.
+    readonly property string glyph: Words.tileGlyph(entry?.icon ?? "", entry?.extension ?? "")
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property real dim: content.runs ? 1 : K.Tokens.opacity.disabled_content
 
@@ -24,8 +26,9 @@ Item {
 
         width: content.width
 
-        // A page's one big symbol: the app's icon, else the symbol its icon names, else its
-        // Extension's.
+        // A page's one big mark, in the row's order: the app's picture once it has loaded, else
+        // the symbol its icon names, else its Extension's. An app that names none shows its
+        // initial on the lg tile, its row's tile at the pane's size, while its picture loads too.
         Item {
             width: K.Tokens.icon.s48
             height: K.Tokens.icon.s48
@@ -35,17 +38,31 @@ Item {
 
                 anchors.fill: parent
                 implicitSize: K.Tokens.icon.s48
-                visible: content.iconSource !== ""
+                visible: status === Image.Ready
                 asynchronous: true
                 source: content.iconSource
                 opacity: content.dim
             }
 
             K.Icon {
-                visible: !image.visible
-                name: Words.itemGlyph(content.entry?.icon ?? "", content.entry?.extension ?? "")
+                objectName: "symbol"
+                visible: !image.visible && content.glyph !== ""
+                name: content.glyph
                 size: K.Tokens.icon.s48
                 color: K.Look.alpha(K.Tokens.color.primary, content.dim)
+            }
+
+            // Made only while it shows: the pane changes with every move of the selection.
+            Loader {
+                active: !image.visible && content.glyph === ""
+
+                sourceComponent: K.IconTile {
+                    objectName: "initialTile"
+                    size: "Lg"
+                    icon: ""
+                    name: Words.rowName(content.entry?.icon ?? "", content.entry?.title ?? "")
+                    opacity: content.dim
+                }
             }
         }
 
