@@ -125,16 +125,18 @@ fn which_developer_tools_a_machine_can_have_follows_its_architecture_and_the_unf
 
     assert_eq!(on("amd64", Unfree::Allowed), ALL);
     // DBeaver's, Bruno's, Lens' and WineHQ's repositories, Insomnia's .deb and Android Studio's
-    // tarball are amd64 alone, and the virtual machines' firmware is amd64's.
+    // tarball are amd64 alone.
     assert_eq!(
         on("arm64", Unfree::Allowed),
         [
             "distrobox",
             "github-desktop",
+            "gnome-boxes",
             "k9s",
             "kubectl",
             "podman-desktop",
             "postman",
+            "virt-manager",
             "wireshark"
         ]
     );
@@ -211,6 +213,41 @@ fn gnome_boxes_needs_kvm_and_leaves_the_libvirtd_its_package_brings_as_it_is() {
     run(&world, |e| e.remove_with("gnome-boxes", &Picks::default())).unwrap();
 
     assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn the_virtual_machines_install_their_architectures_qemu_and_firmware() {
+    for id in ["virt-manager", "gnome-boxes"] {
+        for (arm64, ours, theirs) in [
+            (
+                false,
+                ["qemu-system-x86", "ovmf"],
+                ["qemu-system-arm", "qemu-efi-aarch64"],
+            ),
+            (
+                true,
+                ["qemu-system-arm", "qemu-efi-aarch64"],
+                ["qemu-system-x86", "ovmf"],
+            ),
+        ] {
+            let world = world(id);
+            libvirt_as_packaged(&world);
+            world.host.state.borrow_mut().arm64 = arm64;
+            let before = world.host.snapshot();
+
+            run(&world, |e| e.add(id, None, &picks(id))).unwrap();
+
+            let dpkg = world.host.state.borrow().dpkg.clone();
+            for package in ["qemu-utils", "swtpm-tools"].into_iter().chain(ours) {
+                assert!(dpkg.contains_key(package), "{id}, arm64 {arm64}: {package}");
+            }
+            for package in theirs {
+                assert!(!dpkg.contains_key(package), "{id}, arm64 {arm64}: {package}");
+            }
+            run(&world, |e| e.remove_with(id, &Picks::default())).unwrap();
+            assert_eq!(world.host.snapshot(), before, "{id}, arm64 {arm64}");
+        }
+    }
 }
 
 /// Where the fake debconf keeps its answers: outside the machine's snapshot, as debconf's

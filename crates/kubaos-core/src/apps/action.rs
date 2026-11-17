@@ -38,6 +38,13 @@ pub const SYSTEM_PREFIXES: [&str; 3] = ["/etc/", "/opt/", "/usr/local/"];
 /// The architectures a pinned download may be for, as `dpkg --print-architecture` names them.
 pub const ARCHES: [&str; 2] = ["amd64", "arm64"];
 
+/// The packages an `apt` action installs on one architecture alone, beside its `packages`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArchPackages {
+    pub packages: Vec<String>,
+}
+
 /// One pinned download: an https URL and the sha256 of what it serves.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -72,6 +79,8 @@ pub enum ActionError {
     InvalidVersions { value: String },
     #[error("{value:?} is not an architecture dpkg names: amd64 or arm64")]
     InvalidArch { value: String },
+    #[error("an apt action for {arch} alone lists no packages of another architecture's")]
+    ArchPackagesWithArch { arch: String },
     #[error("{value:?} is not a path an action writes: `~/…` in the home, or under /etc/, /opt/ or /usr/local/")]
     InvalidPath { value: String },
     #[error("{value:?} is not an https:// URL with a sha256 of 64 lowercase hex digits")]
@@ -176,6 +185,13 @@ pub enum Kind {
         /// replaces.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         versions: Option<String>,
+        /// The packages it installs on amd64 alone, beside `packages`: what one architecture
+        /// needs that the other has no package of (a virtual machine's firmware). Resolving puts
+        /// the machine's into `packages`, so a journal records one list.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        amd64: Option<ArchPackages>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        arm64: Option<ArchPackages>,
     },
     /// A vendor's `.deb`, pinned to its sha256 for each architecture.
     Deb {
@@ -564,6 +580,7 @@ impl Action {
     pub fn resolve(&self, words: &Words, folder: &Path) -> Result<Self, ActionError> {
         let fill = |text: &str, version: Option<&str>| words.fill(text, version);
         let kind = match &self.kind {
+            Kind::Apt { .. } => resolve_apt(&words.arch, &self.kind),
             Kind::Download { .. } => resolve_download(words, &self.kind),
             Kind::File {
                 to,
@@ -663,7 +680,17 @@ impl Action {
                 repo,
                 arch,
                 versions,
-            } => check_apt(packages, repo.as_deref(), arch.as_deref(), versions.as_deref())?,
+                amd64,
+                arm64,
+            } => {
+                check_apt(packages, repo.as_deref(), arch.as_deref(), versions.as_deref())?;
+                for own in [amd64, arm64].into_iter().flatten() {
+                    if let Some(arch) = arch {
+                        return Err(ActionError::ArchPackagesWithArch { arch: arch.clone() });
+                    }
+                    check_apt(&own.packages, None, None, None)?;
+                }
+            }
             Kind::Deb { package, .. } => {
                 if !is_package_name(package) {
                     return Err(ActionError::InvalidPackage { name: package.clone() });
@@ -757,6 +784,25 @@ impl Action {
         }
         Ok(())
     }
+}
+
+/// An `apt` action as it runs on a machine of `arch`: that architecture's packages after its
+/// own, in one list.
+fn resolve_apt(arch: &str, kind: &Kind) -> Kind {
+    let mut kind = kind.clone();
+    if let Kind::Apt {
+        packages, amd64, arm64, ..
+    } = &mut kind
+    {
+        let (amd64, arm64) = (amd64.take(), arm64.take());
+        let own = match arch {
+            "amd64" => amd64,
+            "arm64" => arm64,
+            _ => None,
+        };
+        packages.extend(own.into_iter().flat_map(|o| o.packages));
+    }
+    kind
 }
 
 /// A download as it runs: its `to` with its words and version filled in, and whether its

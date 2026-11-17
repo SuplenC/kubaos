@@ -108,6 +108,8 @@ pub struct State {
     pub manual: BTreeSet<String>,
     /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
+    /// The machine is arm64's, not amd64's.
+    pub arm64: bool,
     /// Every change made, in order.
     pub log: Vec<String>,
 }
@@ -315,7 +317,7 @@ impl Host for FakeHost {
     }
 
     fn arch(&self) -> &'static str {
-        "amd64"
+        if self.state.borrow().arm64 { "arm64" } else { "amd64" }
     }
 
     fn place(&self, path: &Path) -> PathBuf {

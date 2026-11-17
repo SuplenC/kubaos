@@ -411,6 +411,7 @@ pub fn look(action: &Action, host: &mut dyn Host, recorded: Recorded<'_>) -> Res
             arch,
             versions,
             repo,
+            ..
         } => {
             if let Some(only) = arch
                 && only != host.arch()
