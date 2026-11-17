@@ -21,7 +21,7 @@
 //!
 //! # Not here
 //!
-//! - The rest of the screen, its copy and its actions: `crate::view`.
+//! - The rest of the screen, its copy and its actions: `crate::view::done`.
 
 mod art;
 mod mark;

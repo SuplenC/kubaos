@@ -1,4 +1,4 @@
-//! State, messages and update logic. The views live in `view.rs`.
+//! State, messages and update logic. The views live in `view.rs` and `view/`.
 //!
 //! Keyboard first (docs/BRAND.md): the app owns focus. Every screen has an
 //! ordered list of focus targets (`App::focus_order`); Tab moves through it,
@@ -1957,7 +1957,7 @@ impl App {
 }
 
 /// The scrollable and the container that hold a control on a long screen.
-/// The ids are on the containers in view.rs.
+/// The ids are on the containers in the screens' views (`view/`).
 pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str)> {
     let item = match (screen, f) {
         (Screen::Disk, F::DiskList) => ids::REVEAL_DISKS,
@@ -1980,7 +1980,7 @@ pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str
 /// Rows Page Up and Page Down move in a list.
 const PAGE: i32 = 8;
 
-/// Thumbnails in a row on the Wallpapers screen (`view.rs`, `wallpapers`).
+/// Thumbnails in a row on the Wallpapers screen (`view/wallpapers.rs`, `wallpapers`).
 pub const WALLPAPER_COLUMNS: usize = 4;
 
 /// An arrow key's direction.
