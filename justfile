@@ -261,6 +261,10 @@ branding:
     nix develop .#branding -c branding/render.sh
     cargo run -q -p kubaos-tokens -- write
 
+# Draw the Apps catalog icon of an app whose vendor publishes none into apps/<id>/<id>.svg: Colloid's plate with the app's KubaOS Symbol, by its Tabler name, or else its initial, outlined (docs/APPS.md, "Icons"). In the flake's `branding` shell.
+app-icon id symbol="":
+    nix develop .#branding -c python3 design/app-icon.py {{id}} {{symbol}}
+
 # After fixing literal design values: lower design/lint-baseline.toml to what the lint finds. It never raises a count.
 design-baseline:
     cargo run -q -p kubaos-design -- baseline
