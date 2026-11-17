@@ -414,6 +414,35 @@ fn a_sunshine_sign_in_you_changed_and_your_paired_clients_stay_after_its_removal
 }
 
 #[test]
+fn a_sunshine_removal_apt_cant_finish_puts_its_sign_in_and_its_local_page_back() {
+    let world = served("sunshine");
+    run(&world, |e| e.add("sunshine", None, &picks("sunshine"))).unwrap();
+    let (state, saved) = sunshine_sign_in(&world);
+    let conf = world.host_home().join(".config/sunshine/sunshine.conf");
+    // apt can't take the package, as with dpkg's lock held, after the sign-in and the setting went.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:sunshine".to_owned());
+
+    let removed = run(&world, |e| e.remove_with("sunshine", &Picks::default()));
+
+    assert!(
+        matches!(removed, Err(EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    assert!(world.host.state.borrow().dpkg.contains_key("sunshine"));
+    assert_eq!(fs::read_to_string(&conf).unwrap(), "origin_web_ui_allowed = pc\n");
+    let sign_in: serde_json::Value = serde_json::from_str(&fs::read_to_string(&state).unwrap()).unwrap();
+    assert!(sign_in.get("username").is_some(), "{sign_in}");
+    assert!(saved.is_file(), "a new sign-in, with its password saved");
+    let user = world.journals("sunshine").0.unwrap();
+    assert!(user.complete, "{user:?}");
+}
+
+#[test]
 fn a_sunshine_conf_line_already_set_keeps_your_comment_and_stays_after_the_removal() {
     let world = served("sunshine");
     let conf = world.host_home().join(".config/sunshine/sunshine.conf");

@@ -92,6 +92,11 @@ pub struct Journal {
     /// journal has it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub brought_by: Vec<String>,
+    /// The last removal stopped at a step it couldn't undo and was rolled back: that step and
+    /// why. Only the user's journal has it; the next install that completes clears it, and a
+    /// removal that goes through takes the journal away with it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub removal_rolled_back: Option<String>,
     #[serde(default, rename = "entry")]
     pub entries: Vec<Entry>,
 }
@@ -271,6 +276,7 @@ impl Journal {
             complete: false,
             root_adoption: None,
             brought_by: Vec::new(),
+            removal_rolled_back: None,
             entries: Vec::new(),
         }
     }
@@ -330,8 +336,8 @@ impl Journal {
         Ok(journals)
     }
 
-    /// Writes it whole, through a file renamed into place; with no entries and not complete, takes
-    /// it and its folder away instead.
+    /// Writes it whole, through a file renamed into place; with no entries, not complete and no
+    /// removal rolled back to tell of, takes it and its folder away instead.
     ///
     /// # Errors
     ///
@@ -342,7 +348,7 @@ impl Journal {
             path: path.clone(),
             source,
         };
-        if self.entries.is_empty() && !self.complete {
+        if self.entries.is_empty() && !self.complete && self.removal_rolled_back.is_none() {
             return Self::forget(dir, &self.app);
         }
         let folder = dir.join(&self.app);
