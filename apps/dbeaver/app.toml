@@ -1,0 +1,27 @@
+# DBeaver Community from DBeaver's signed apt repository, whose key system/packages.toml pins
+# ([repo.dbeaver]). The repository has amd64 only. Its package brings its own Java runtime and
+# writes no source of its own.
+# https://dbeaver.io/download/
+name = "DBeaver"
+category = "development"
+tags = ["database", "sql", "postgresql", "mysql", "sqlite", "client"]
+summary = "One database tool for every database you've got. It's Java, so give it a second to wake up."
+# From its AppStream metainfo, CC0-1.0 (flathub/io.dbeaver.DBeaverCommunity).
+description = """\
+Free multi-platform database tool for developers, SQL programmers, database administrators and \
+analysts. Supports all popular databases: MySQL, PostgreSQL, MariaDB, SQLite, Oracle, DB2, SQL \
+Server, Sybase, MS Access, Teradata, Firebird, Derby, etc."""
+description_from = "https://github.com/flathub/io.dbeaver.DBeaverCommunity/blob/master/io.dbeaver.DBeaverCommunity.appdata.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "dbeaver"
+keeps = """\
+Your connections, scripts and settings stay in ~/.local/share/DBeaverData: install DBeaver again \
+and they're all there."""
+
+[[action]]
+name = "Install DBeaver"
+kind = "apt"
+repo = "dbeaver"
+arch = "amd64"
+packages = ["dbeaver-ce"]

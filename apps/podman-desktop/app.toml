@@ -1,0 +1,29 @@
+# Podman Desktop from nixpkgs, through the User flake, and Podman, which it runs, from Ubuntu's
+# archive. Red Hat keeps no apt repository for it and Ubuntu doesn't package it. Podman Desktop
+# starts Podman's API service itself as it opens, so no unit is enabled. An install takes no
+# package's recommendations, so the step names passt and uidmap, which containers of the user's
+# need for their network and their users.
+# https://podman-desktop.io/docs/installation/linux-install
+name = "Podman Desktop"
+category = "development"
+tags = ["containers", "podman", "kubernetes", "images", "docker"]
+summary = "Containers and Kubernetes in a window, on Podman. Docker Desktop minus the licence lawyers."
+# From its AppStream metainfo, CC0-1.0 (github.com/podman-desktop/podman-desktop), its first
+# paragraph.
+description = """\
+Podman Desktop is an open source graphical tool enabling you to seamlessly work with containers \
+and Kubernetes from your local environment."""
+description_from = "https://github.com/podman-desktop/podman-desktop/blob/v1.30.5/.flatpak-appdata.xml"
+keeps = """\
+Your containers and images stay in ~/.local/share/containers, and Podman Desktop's settings in \
+~/.local/share/containers/podman-desktop: install it again and they're all there."""
+
+[[action]]
+name = "Install Podman"
+kind = "apt"
+packages = ["podman", "passt", "uidmap"]
+
+[[action]]
+name = "Install Podman Desktop"
+kind = "nix"
+packages = ["podman-desktop"]

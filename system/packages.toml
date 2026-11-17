@@ -190,6 +190,46 @@ key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xEB
 fingerprint = "EBC733B78AAB352DC773BF857FE2FA12CF6E38F2"
 keyring = "/etc/apt/keyrings/sublime-text.gpg"
 
+# DBeaver's repository of DBeaver Community, for the app of the catalog
+# (apps/dbeaver/), a flat one with amd64 only. Its package writes no source of
+# its own.
+[repo.dbeaver]
+key_url = "https://dbeaver.io/debs/dbeaver.gpg.key"
+fingerprint = "BDFB19F681514B43875D16FA132C13A8A330F403"
+keyring = "/etc/apt/keyrings/dbeaver.gpg"
+
+# Bruno's repository, for the app of the catalog (apps/bruno/). It has amd64
+# only and is served over plain HTTP; apt checks its index against this key.
+# Its InRelease is signed by a subkey of the pinned key. Its package writes no
+# source of its own.
+[repo.bruno]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xE598552E09C999055FEFA7159FA6017ECABE0266"
+fingerprint = "E598552E09C999055FEFA7159FA6017ECABE0266"
+keyring = "/etc/apt/keyrings/bruno.gpg"
+
+# Mirantis' repository of Lens, for the app of the catalog (apps/lens/). It
+# has amd64 only. Its package writes no source of its own.
+[repo.lens]
+key_url = "https://downloads.k8slens.dev/keys/gpg"
+fingerprint = "958F4ED752DE9C0FE68C177A666A7D882011D3CE"
+keyring = "/etc/apt/keyrings/lens.gpg"
+
+# The Kubernetes project's repository of kubectl, for the app of the catalog
+# (apps/kubectl/), a flat one for each minor version, all signed by the same
+# key; the source names the newest. Its package writes no source of its own.
+[repo.kubernetes]
+key_url = "https://pkgs.k8s.io/core:/stable:/v1.37/deb/Release.key"
+fingerprint = "DE15B14486CD377B9E876E1A234654DA9A296436"
+keyring = "/etc/apt/keyrings/kubernetes.gpg"
+
+# WineHQ's repository, for the app of the catalog (apps/wine/). Its build for
+# Ubuntu 26.04 has amd64 only, in Wine's WoW64 mode, so it needs no i386 in
+# dpkg. Its packages write no source of their own.
+[repo.winehq]
+key_url = "https://dl.winehq.org/wine-builds/winehq.key"
+fingerprint = "D43F640145369C51D786DDEA76F1A20FF987672F"
+keyring = "/etc/apt/keyrings/winehq.gpg"
+
 # ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
 [repo.cppiber-hyprland]
 key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"

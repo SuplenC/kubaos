@@ -1,0 +1,29 @@
+# Lens from Mirantis' signed apt repository, whose key system/packages.toml pins ([repo.lens]). The
+# repository has amd64 only. Its package writes no source of its own; it installs an AppArmor
+# profile for itself, /etc/apparmor.d/lens-desktop, and takes it away as it is removed. nixpkgs'
+# Lens is two years behind.
+# https://docs.k8slens.dev/getting-started/install-lens/
+name = "Lens"
+category = "development"
+tags = ["kubernetes", "k8s", "cluster", "pods", "ide"]
+summary = "Your Kubernetes clusters in a window. It wants a Lens ID before it'll show you a single pod."
+# Mirantis' own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Lens is a desktop app for Kubernetes. It connects to the clusters in your kubeconfig and shows \
+their workloads, nodes, events and metrics, with logs, a terminal in any pod and an editor for \
+any resource. It needs a Lens ID, Mirantis' account, to start, and a paid plan for use at a \
+larger company."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "lens"
+keeps = """\
+Your Lens ID sign-in and settings stay in ~/.config/Lens, and your clusters in your own \
+kubeconfig: install Lens again and it's all there."""
+
+[[action]]
+name = "Install Lens"
+kind = "apt"
+repo = "lens"
+arch = "amd64"
+packages = ["lens"]

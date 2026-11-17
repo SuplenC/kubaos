@@ -1,0 +1,6 @@
+Types: deb
+URIs: http://debian.usebruno.com/
+Suites: bruno
+Components: stable
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/bruno.gpg

@@ -1,0 +1,43 @@
+# Wireshark from Ubuntu's archive, as current as its own repository. Capturing as a user is
+# wireshark-common's debconf question, which an install with no one to ask answers no: the first
+# step answers yes, so its package gives dumpcap the two capabilities capturing needs and lets the
+# wireshark group run it, then puts you in the group. The user's own answer, yes or no, is found
+# and left as it is.
+# https://www.wireshark.org/docs/wsug_html_chunked/ChBuildInstallUnixInstallBins.html
+name = "Wireshark"
+category = "development"
+tags = ["network", "packets", "capture", "protocol", "analyzer", "pcap"]
+summary = "Every packet on the wire, taken apart. Find out what your smart TV says behind your back."
+# From its AppStream metainfo, CC0-1.0 (gitlab.com/wireshark/wireshark).
+description = """\
+Wireshark allows you to examine protocol data stored in files or as it is captured from wired or \
+wireless (WiFi or Bluetooth) networks, USB devices, and many other sources. It supports dozens \
+of protocol capture file formats and understands thousands of protocols. It has many powerful \
+features including a rich display filter language and the ability to reassemble multiple \
+protocol packets in order to, for example, view a complete TCP stream, save the contents of a \
+file which was transferred over HTTP or CIFS, or play back an RTP audio stream."""
+description_from = "https://gitlab.com/wireshark/wireshark/-/blob/release-4.6/resources/freedesktop/org.wireshark.Wireshark.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "wireshark"
+keeps = """\
+Your profiles, colouring rules and recent captures stay in ~/.config/wireshark: install \
+Wireshark again and they're all there. Captures you saved are files of your own."""
+
+[[action]]
+name = "Let the wireshark group capture packets"
+kind = "run"
+root = true
+do = ["./capture"]
+check = ["./captures"]
+undo = ["./no-capture"]
+
+[[action]]
+name = "Install Wireshark"
+kind = "apt"
+packages = ["wireshark"]
+
+[[action]]
+name = "Let you capture without sudo"
+kind = "group"
+group = "wireshark"

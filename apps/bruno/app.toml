@@ -1,0 +1,28 @@
+# Bruno from its signed apt repository, whose key system/packages.toml pins ([repo.bruno]). The
+# repository has amd64 only and is served over plain HTTP: apt checks every index against the
+# pinned key, as it does Ubuntu's own archive over HTTP. Bruno's package writes no source of its
+# own. nixpkgs' Bruno is a major version behind.
+# https://docs.usebruno.com/get-started/bruno-basics/download
+name = "Bruno"
+category = "development"
+tags = ["api", "rest", "http", "graphql", "client", "git"]
+summary = "An API client that keeps your requests as plain files in git. No cloud, no account, no nonsense."
+# From its AppStream metainfo, CC0-1.0 (flathub/com.usebruno.Bruno), without the line that speaks
+# as the vendor.
+description = """\
+Bruno is a Fast and Git-Friendly API client. Bruno stores your collections directly in a folder \
+on your filesystem. No cloud sync. Fully offline."""
+description_from = "https://github.com/flathub/com.usebruno.Bruno/blob/master/com.usebruno.Bruno.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "bruno"
+keeps = """\
+Your collections are folders of your own, wherever you saved them, and Bruno's settings stay in \
+~/.config/bruno: install Bruno again and open them."""
+
+[[action]]
+name = "Install Bruno"
+kind = "apt"
+repo = "bruno"
+arch = "amd64"
+packages = ["bruno"]
