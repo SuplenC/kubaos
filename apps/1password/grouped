@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Exits 0 when the three groups of 1Password's helpers are there.
+# Usage: ./grouped
+set -euo pipefail
+for group in onepassword onepassword-mcp onepassword-cli; do
+  getent group "$group" >/dev/null
+done

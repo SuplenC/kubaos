@@ -1,0 +1,32 @@
+# Yubico Authenticator from nixpkgs, through the User flake: 7.3.3, where Yubico's release is
+# 7.5.0. Yubico keeps no apt repository, and Ubuntu's archive has only yubioath-desktop 5.1, the
+# app this one replaced, which Yubico no longer makes; its tarball comes after nixpkgs. nixpkgs
+# builds it for amd64 and arm64. The key's FIDO side (PIN, fingerprints, passkeys) it reaches
+# directly, as system/75-yubikey.sh lets your session; its codes (OATH) are on the key's smart card
+# side, which it reads through pcscd, the piv group of system/packages.toml. That group is KubaOS's
+# YubiKey setup, off unless you turned it on, and the app leaves it as it is (an app installing
+# pcscd would make it the catalog's, and the group would lose it): its description says how to
+# turn it on.
+# https://search.nixos.org/packages?show=yubioath-flutter
+name = "Yubico Authenticator"
+category = "security"
+tags = ["2fa", "totp", "otp", "yubikey", "authenticator", "passkeys"]
+summary = "Your 2FA codes, kept on the YubiKey instead of the phone you'll drop in a lake."
+# Yubico's metainfo is MIT, and it lists features; this says what to do on KubaOS, so it's ours.
+description = """\
+Yubico Authenticator shows the one-time codes (TOTP and HOTP) whose secrets your YubiKey keeps, \
+adds a new one from a QR code on the screen, and manages the key's FIDO PIN, fingerprints and \
+passkeys. It reads the codes through the smart card service: on a YubiKey with a smart card (a \
+YubiKey 5, or the Multi-protocol Edition), turn it on with `kubaos packages enable piv`, or \
+"Install PIV smart card support" in the Command menu."""
+description_from = "kubaos"
+# Its mark, Apache-2.0, on a tile (yubico-authenticator.svg's header): no icon theme has the app.
+icon = "yubico-authenticator.svg"
+keeps = """\
+Your codes stay on the YubiKey itself, and the app's settings in \
+~/.local/share/com.yubico.yubioath: install it again and it's as you left it."""
+
+[[action]]
+name = "Install Yubico Authenticator"
+kind = "nix"
+packages = ["yubioath-flutter"]

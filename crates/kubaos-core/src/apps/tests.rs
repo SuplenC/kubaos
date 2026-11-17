@@ -468,7 +468,8 @@ fn shipped() -> Catalog {
 }
 
 /// Every app of the shipped catalog, by id, in the catalog's order.
-const SHIPPED: [&str; 109] = [
+const SHIPPED: [&str; 118] = [
+    "1password",
     "aider",
     "alacritty",
     "android-studio",
@@ -485,6 +486,7 @@ const SHIPPED: [&str; 109] = [
     "claude-code",
     "claude-desktop",
     "codex",
+    "cryptomator",
     "cursor",
     "darktable",
     "dbeaver",
@@ -494,6 +496,7 @@ const SHIPPED: [&str; 109] = [
     "docker",
     "element",
     "emacs",
+    "ente-auth",
     "excalidraw",
     "figma",
     "firefox",
@@ -515,6 +518,7 @@ const SHIPPED: [&str; 109] = [
     "joplin",
     "k9s",
     "kdenlive",
+    "keepassxc",
     "kitty",
     "krita",
     "kubectl",
@@ -533,7 +537,9 @@ const SHIPPED: [&str; 109] = [
     "minecraft-launcher",
     "moonlight",
     "mpv",
+    "mullvad-vpn",
     "neovide",
+    "nordvpn",
     "notion",
     "obs-studio",
     "obsidian",
@@ -546,6 +552,8 @@ const SHIPPED: [&str; 109] = [
     "postman",
     "prismlauncher",
     "proton-mail-bridge",
+    "proton-pass",
+    "proton-vpn",
     "protonup-qt",
     "qalculate",
     "rawtherapee",
@@ -573,6 +581,7 @@ const SHIPPED: [&str; 109] = [
     "xbox-cloud-gaming",
     "xournalpp",
     "youtube-music",
+    "yubico-authenticator",
     "zed",
     "zen-browser",
     "zoom",

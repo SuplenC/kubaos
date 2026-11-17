@@ -1,0 +1,52 @@
+# Mullvad VPN from Mullvad's signed apt repository, whose key system/packages.toml pins
+# ([repo.mullvad]), for amd64 and arm64. Its package writes no source of its own. Its postinst
+# enables and starts its daemon, mullvad-daemon.service, which runs the tunnel (WireGuard, as
+# wg0-mullvad) and its own firewall, an nftables table of its own, and enables
+# mullvad-early-boot-blocking.service, which blocks the network at boot until the daemon is up
+# while "Lockdown mode" is on; it also puts an AppArmor profile in place for the window's Electron
+# sandbox, which its removal takes away. The two unit steps are what the package sets up, so each
+# update checks them as any step. Its removal signs this machine out of your account, takes its
+# units away, and leaves its settings in /etc/mullvad-vpn and its logs in /var/log/mullvad-vpn.
+# KubaOS's Proxy and Mullvad each block what leaves outside their own tunnel: with the Proxy's kill
+# switch up Mullvad can't reach its servers, and with Mullvad connected or in lockdown the Proxy's
+# VPN can't reach IT's. Use one at a time.
+# https://mullvad.net/en/download/vpn/linux
+name = "Mullvad VPN"
+category = "security"
+tags = ["vpn", "wireguard", "privacy", "mullvad", "kill switch"]
+summary = "A VPN you pay for with an account number, or cash in an envelope. No email, no bullshit."
+# Mullvad's own words aren't under a licence that allows copying them, so this is ours.
+description = """\
+Mullvad VPN sends your traffic through Mullvad's WireGuard servers, with a kill switch that \
+blocks the network while it isn't connected, multihop through two servers, DAITA against traffic \
+analysis, and split tunnelling for the apps you leave outside it. An account is a number: no \
+email, no name, and you can pay in cash."""
+description_from = "kubaos"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before the
+# package is installed.
+icon = "mullvad-vpn"
+keeps = """\
+Its settings stay in /etc/mullvad-vpn and ~/.config/Mullvad VPN, and its logs in \
+/var/log/mullvad-vpn. Mullvad's own removal signs this machine out of your account: sign in \
+again with your account number when you install it again."""
+
+[[action]]
+name = "Install Mullvad VPN"
+kind = "apt"
+repo = "mullvad"
+packages = ["mullvad-vpn"]
+
+[[action]]
+name = "Start Mullvad's daemon"
+kind = "unit"
+unit = "mullvad-daemon.service"
+scope = "system"
+enable = true
+start = true
+
+[[action]]
+name = "Let Mullvad block the network at boot until it connects"
+kind = "unit"
+unit = "mullvad-early-boot-blocking.service"
+scope = "system"
+enable = true
