@@ -284,9 +284,10 @@
               export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/kubaos/sccache}
             '';
           };
-          # The logo's tools, for `just branding` (branding/README.md, "Regenerating").
-          # nixpkgs' Pillow is built with libimagequant, which neon.py picks the
-          # boot layers' palettes with.
+          # The logo's tools, for `just branding` (branding/README.md, "Regenerating"),
+          # and the Apps catalog's generated icons, for `just app-icon`, which outline
+          # Geist's letters with fontTools. nixpkgs' Pillow is built with libimagequant,
+          # which neon.py picks the boot layers' palettes with.
           branding = pkgs.mkShell {
             packages = [
               pkgs.resvg
@@ -295,8 +296,12 @@
               (pkgs.python3.withPackages (p: [
                 p.pillow
                 p.numpy
+                p.fonttools
               ]))
             ];
+            # The full M PLUS 1, for a generated icon's kana or kanji: the bundled subset
+            # (crates/kubaos-ui/assets/fonts) has only the characters the apps show.
+            MPLUS1_DIR = "${pkgs.mplus-outline-fonts.githubRelease}/share/fonts/truetype/mplus-outline-fonts";
           };
         }
       );
