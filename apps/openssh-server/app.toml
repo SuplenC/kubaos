@@ -1,12 +1,20 @@
 # The OpenSSH server from Ubuntu's archive, for logging in to this machine with a key and nothing
-# else. The first step, before the package, writes /etc/ssh/sshd_config.d/00-kubaos-key-only.conf:
-# no passwords, no keyboard-interactive prompts, no root; sshd keeps the first value it reads, and
-# the file comes first there, so sshd never runs taking a password. Then ssh.socket, enabled and
-# started: TCP 22 on every network, sshd started on the first connection. Its removal stops and
-# disables it again only if this app enabled it. A machine is never locked out by it: logging in
-# at the machine doesn't go through sshd. With no key in ~/.ssh/authorized_keys nobody can log in
-# over SSH, which the last step says, as a notification where the install can show one and as a
-# note on every update until a key is there; it changes nothing, so its undo is nothing.
+# else. Before the package, /etc/ssh/sshd_config.d/00-kubaos-key-only.conf turns passwords,
+# keyboard-interactive prompts and root logins off: sshd keeps the first value it reads, and the
+# file is read before the rest of sshd_config.d and sshd_config, so it outranks the same settings
+# there, but a Match block, there or in a later file, can still set them again for the connections
+# it matches. An sshd already running reads it at once (./reload-sshd: ssh.service's reload,
+# sshd -t then a HUP), and a configuration sshd -t refuses fails the install, whose rollback takes
+# the drop-in out. Its removal reloads sshd again once the drop-in is gone, so the user's own
+# configuration applies; one sshd -t refuses then leaves the running sshd as it was, keys alone.
+# The package's postinst enables and starts ssh.socket on a first install: TCP 22 on every network,
+# sshd started on the first connection. Where sshd doesn't start at boot yet (the package there
+# with its socket off), a step enables and starts the socket, and the removal disables it again;
+# one that does already, through the socket or through ssh.service enabled the classic way, which
+# holds port 22 itself, is left as it is. A machine is never locked out by it: logging in at the
+# machine doesn't go through sshd. With no key in ~/.ssh/authorized_keys nobody can log in over
+# SSH, which the last step says, as a notification where the install can show one and as a note
+# on every update until a key is there; it changes nothing, so its undo is nothing.
 # https://documentation.ubuntu.com/server/how-to/security/openssh-server/
 name = "OpenSSH server"
 category = "system"
@@ -23,6 +31,13 @@ keeps = """\
 This machine's host keys stay in /etc/ssh, so other machines still know it, and your \
 ~/.ssh/authorized_keys stays as it is."""
 
+# Before the drop-in, so a removal runs it after the drop-in is gone.
+[[action]]
+name = "Have sshd read your own configuration again once the app goes"
+kind = "run"
+root = true
+undo = ["./reload-sshd", "--if-it-can"]
+
 [[action]]
 name = "Turn passwords and root logins off for SSH"
 kind = "file"
@@ -31,17 +46,25 @@ from = "00-kubaos-key-only.conf"
 mode = "644"
 
 [[action]]
+name = "Have a running sshd take keys alone at once"
+kind = "run"
+root = true
+do = ["./reload-sshd"]
+check = ["./reloaded", "/etc/ssh/sshd_config.d/00-kubaos-key-only.conf"]
+undo = ["true"]
+
+[[action]]
 name = "Install the OpenSSH server"
 kind = "apt"
 packages = ["openssh-server"]
 
 [[action]]
 name = "Listen for SSH on port 22, now and at boot"
-kind = "unit"
-unit = "ssh.socket"
-scope = "system"
-enable = true
-start = true
+kind = "run"
+root = true
+do = ["./listen"]
+check = ["./listening"]
+undo = ["./unlisten"]
 
 [[action]]
 name = "Make sure a key can log in, as passwords can't"

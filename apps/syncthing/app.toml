@@ -2,8 +2,12 @@
 # pins ([repo.syncthing]): 2.x, where Ubuntu's archive has 1.29. Its package writes no source of
 # its own. It runs as you, the package's user unit syncthing.service, enabled and started, so it
 # syncs whenever you're logged in. Its web page, where you add folders and devices, answers on this
-# machine alone: a drop-in of the unit sets STGUIADDRESS=127.0.0.1:8384, which outranks the
-# address in Syncthing's own settings. On the network it listens for other devices on TCP and
+# machine alone: a drop-in of the unit sets STGUIADDRESS=http://127.0.0.1:8384, which outranks the
+# address in Syncthing's own settings, and whose scheme outranks its HTTPS setting (Syncthing reads
+# TLS from the variable's scheme alone, so the user's choice can't be kept; plain HTTP stays on
+# this machine). A Syncthing that was already running when the drop-in landed (installed by hand)
+# keeps its old address until it next starts, at the next login: the drop-in only reloads the
+# user manager, and a fresh install starts Syncthing after it. On the network it listens for other devices on TCP and
 # UDP (QUIC) 22000 on every network, and finds them on the LAN through broadcasts and multicasts
 # to UDP 21027; beyond the LAN it uses Syncthing's global discovery and relays. Nothing syncs until
 # you add a device and share a folder with it. Its package also raises the kernel's socket buffers
@@ -19,7 +23,8 @@ description = """\
 Syncthing keeps folders in sync between your devices, directly from one to the other over \
 encrypted connections, on the LAN or across the internet, with no server of anyone else's \
 holding your files. Each device and each folder is shared by hand, and its web page on this \
-machine, http://127.0.0.1:8384, is where you do it."""
+machine, http://127.0.0.1:8384, is where you do it. A Syncthing that was already running moves \
+its web page there at your next login."""
 description_from = "kubaos"
 # Colloid's, the system's icon theme (home/curated.nix), the name Syncthing's package gives, so the
 # Command menu shows it before the package is installed.

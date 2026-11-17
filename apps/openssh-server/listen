@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Enables and starts ssh.socket, which listens on TCP 22 and starts sshd on the first connection.
+set -euo pipefail
+systemctl enable --now ssh.socket

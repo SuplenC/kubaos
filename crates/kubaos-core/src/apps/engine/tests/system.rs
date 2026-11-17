@@ -13,6 +13,7 @@ use crate::apps::Folder;
 use crate::apps::Platform;
 use crate::apps::action::Kind;
 use crate::apps::host::fake::Unit;
+use crate::apps::journal::State;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 use crate::update::event::UpdateEvent;
@@ -36,13 +37,7 @@ const APPS: [&str; 14] = [
 
 const DROPBOX_REPO: &str = "/etc/default/dropbox-repo";
 
-/// The units the apps' packages bring, there on the fake machine as dpkg leaves them: neither
-/// enabled nor running.
-const PACKAGED_UNITS: [&str; 3] = [
-    "system:tailscaled.service",
-    "user:syncthing.service",
-    "system:ssh.socket",
-];
+const DROP_IN: &str = "/etc/ssh/sshd_config.d/00-kubaos-key-only.conf";
 
 fn picks(id: &str) -> Picks {
     let mut picks = Picks::default();
@@ -50,30 +45,110 @@ fn picks(id: &str) -> Picks {
     picks
 }
 
-/// The shipped app `id`'s world, with its package's units. Dropbox's steps name
-/// `/etc/default/dropbox-repo` as an argument, which its scripts write as they are, so its folder
-/// names the fake machine's instead, in a folder that is there, as on any machine.
+fn unit(enabled: bool, active: bool) -> Unit {
+    Unit {
+        exists: true,
+        enabled,
+        active,
+        ..Unit::default()
+    }
+}
+
+/// The units the apps' packages bring, as each package's postinst leaves them on a first install:
+/// openssh-server's enables and starts `ssh.socket`, tailscale's starts tailscaled without
+/// enabling it, syncthing's ships its user unit and does nothing with it.
+fn postinsts(world: &World) {
+    let mut state = world.host.state.borrow_mut();
+    for (package, units) in [
+        (
+            "openssh-server",
+            vec![
+                ("system:ssh.socket", unit(true, true)),
+                ("system:ssh.service", unit(false, false)),
+            ],
+        ),
+        ("tailscale", vec![("system:tailscaled.service", unit(false, true))]),
+        ("syncthing", vec![("user:syncthing.service", unit(false, false))]),
+    ] {
+        state.package_units.insert(
+            package.to_owned(),
+            units.into_iter().map(|(k, u)| (k.to_owned(), u)).collect(),
+        );
+    }
+}
+
+/// A `systemctl` that answers `is-enabled`, `is-active` and `show -p ActiveState` from the fake
+/// machine's units (the `units` file it writes before each script), and logs whether the drop-in
+/// was there as it reloads sshd.
+fn systemctl_reads_the_units(world: &World) {
+    let sandbox = world.host.sandbox();
+    let units = sandbox.log().with_file_name("units");
+    sandbox.stub(
+        "systemctl",
+        &format!(
+            r#"units='{units}'
+scope=system
+if [ "$1" = --user ]; then scope=user; shift; fi
+field() {{ grep "^$scope:$1 " "$units" 2>/dev/null | cut -d' ' -f"$2"; }}
+case "$1" in
+is-enabled) s=$(field "$2" 2); echo "${{s:-disabled}}"; [ "$s" = enabled ] ;;
+is-active) s=$(field "$2" 3); echo "${{s:-inactive}}"; [ "$s" = active ] ;;
+show) case "$*" in *ActiveState*) s=$(field "$2" 3); echo "${{s:-inactive}}" ;; esac ;;
+try-reload-or-restart)
+	if [ -e '{drop_in}' ]; then w=with; else w=without; fi
+	echo "sshd reloaded $w the drop-in" >>'{log}' ;;
+esac"#,
+            units = units.display(),
+            drop_in = world.system_path(DROP_IN).display(),
+            log = sandbox.log().display(),
+        ),
+    );
+}
+
+/// The shipped app `id`'s world, its packages' postinsts and a `systemctl` that sees the units.
+/// Dropbox's steps name `/etc/default/dropbox-repo`, and the SSH server's check names its drop-in,
+/// as arguments, which their scripts read as they are, so their folders name the fake machine's
+/// paths instead, in folders that are there, as on any machine.
 fn system_world(id: &str) -> World {
     let world = world(id);
-    {
-        let mut state = world.host.state.borrow_mut();
-        for unit in PACKAGED_UNITS {
-            state.units.insert(
-                unit.to_owned(),
-                Unit {
-                    exists: true,
-                    ..Unit::default()
-                },
-            );
-        }
-    }
+    postinsts(&world);
+    systemctl_reads_the_units(&world);
+    let toml = world.catalog.join(id).join("app.toml");
+    let text = fs::read_to_string(&toml).unwrap();
     if id == "dropbox" {
         let file = world.system_path(DROPBOX_REPO);
         fs::create_dir_all(file.parent().unwrap()).unwrap();
-        let text = fs::read_to_string(world.catalog.join(id).join("app.toml")).unwrap();
         world.write_app(id, &text.replace(DROPBOX_REPO, &file.display().to_string()));
     }
+    if id == "openssh-server" {
+        let check = format!("\"./reloaded\", \"{DROP_IN}\"");
+        assert!(text.contains(&check), "{text}");
+        let fake = format!("\"./reloaded\", \"{}\"", world.system_path(DROP_IN).display());
+        world.write_app(id, &text.replace(&check, &fake));
+    }
     world
+}
+
+/// The state of step `step` of the app `id` in its root journal.
+fn root_step(world: &World, id: &str, step: usize) -> Option<State> {
+    let (_, root) = world.journals(id);
+    root?.entries.into_iter().find(|e| e.step == step).map(|e| e.state)
+}
+
+/// The sandbox's calls of `systemctl` that change something, and its notes of sshd's reloads.
+fn systemctl_calls(world: &World) -> Vec<String> {
+    world
+        .host
+        .sandbox()
+        .calls()
+        .into_iter()
+        .filter(|c| {
+            c.starts_with("systemctl enable")
+                || c.starts_with("systemctl disable")
+                || c.starts_with("systemctl try-")
+                || c.starts_with("sshd reloaded")
+        })
+        .collect()
 }
 
 /// The kinds of the app `id`'s steps, in order.
@@ -175,39 +250,27 @@ fn tailscales_daemon_starts_at_boot_while_the_app_is_installed_and_no_longer_onc
 
     run(&world, |e| e.add("tailscale", None, &picks("tailscale"))).unwrap();
 
+    // Its postinst started it; the step enabled it.
     let unit = world.host.state.borrow().units["system:tailscaled.service"];
     assert!(unit.enabled && unit.active, "{unit:?}");
+    assert_eq!(root_step(&world, "tailscale", 2), Some(State::Done));
 
     run(&world, |e| e.remove_with("tailscale", &Picks::default())).unwrap();
 
-    let unit = world.host.state.borrow().units["system:tailscaled.service"];
-    assert!(!unit.enabled && !unit.active, "{unit:?}");
     let log = world.host.state.borrow().log.clone();
     let at = |what: &str| log.iter().position(|l| l == what).unwrap();
     assert!(
         at("enable tailscaled.service false") < at("apt remove tailscale"),
         "{log:#?}"
     );
-}
-
-#[test]
-fn a_tailscale_daemon_the_user_had_enabled_stays_enabled_when_the_app_goes() {
-    let world = system_world("tailscale");
-    world.host.state.borrow_mut().units.insert(
-        "system:tailscaled.service".to_owned(),
-        Unit {
-            exists: true,
-            enabled: true,
-            active: true,
-            ..Unit::default()
-        },
+    assert!(
+        !world
+            .host
+            .state
+            .borrow()
+            .units
+            .contains_key("system:tailscaled.service")
     );
-
-    run(&world, |e| e.add("tailscale", None, &picks("tailscale"))).unwrap();
-    run(&world, |e| e.remove_with("tailscale", &Picks::default())).unwrap();
-
-    let unit = world.host.state.borrow().units["system:tailscaled.service"];
-    assert!(unit.enabled && unit.active, "{unit:?}");
 }
 
 #[test]
@@ -219,7 +282,7 @@ fn syncthings_web_page_answers_on_this_machine_alone_before_its_service_first_st
     let drop_in = home_path(&world, "~/.config/systemd/user/syncthing.service.d/kubaos-gui.conf");
     let text = fs::read_to_string(&drop_in).unwrap();
     let lines: Vec<&str> = text.lines().filter(|l| !l.starts_with('#')).collect();
-    assert_eq!(lines, ["[Service]", "Environment=STGUIADDRESS=127.0.0.1:8384"]);
+    assert_eq!(lines, ["[Service]", "Environment=STGUIADDRESS=http://127.0.0.1:8384"]);
     let unit = world.host.state.borrow().units["user:syncthing.service"];
     assert!(unit.enabled && unit.active, "{unit:?}");
     assert_eq!(
@@ -308,12 +371,12 @@ fn nextclouds_start_at_login_entry_goes_with_it() {
 }
 
 #[test]
-fn the_ssh_servers_drop_in_turns_passwords_and_root_off_before_sshd_can_run() {
+fn a_fresh_ssh_server_takes_keys_alone_and_listens_through_the_socket_its_package_starts() {
     let world = system_world("openssh-server");
 
     run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
 
-    let text = fs::read_to_string(world.system_path("/etc/ssh/sshd_config.d/00-kubaos-key-only.conf")).unwrap();
+    let text = fs::read_to_string(world.system_path(DROP_IN)).unwrap();
     let settings: Vec<&str> = text.lines().filter(|l| !l.starts_with('#')).collect();
     assert_eq!(
         settings,
@@ -325,11 +388,127 @@ fn the_ssh_servers_drop_in_turns_passwords_and_root_off_before_sshd_can_run() {
     );
     assert_eq!(
         kinds(&world, "openssh-server"),
-        ["file", "apt", "unit", "run"],
-        "the drop-in is there before sshd"
+        ["run", "file", "run", "apt", "run", "run"],
+        "the drop-in is there before sshd, and the removal's reload comes after it goes"
     );
+    // The package's postinst enabled and started ssh.socket, so the step found it.
     let socket = world.host.state.borrow().units["system:ssh.socket"];
     assert!(socket.enabled && socket.active, "{socket:?}");
+    assert_eq!(root_step(&world, "openssh-server", 5), Some(State::Found));
+    // No sshd ran before the package, so none was reloaded.
+    assert_eq!(root_step(&world, "openssh-server", 3), Some(State::Found));
+    assert!(systemctl_calls(&world).is_empty(), "{:#?}", systemctl_calls(&world));
+
+    run(&world, |e| e.remove_with("openssh-server", &Picks::default())).unwrap();
+
+    let state = world.host.state.borrow();
+    assert!(!state.dpkg.contains_key("openssh-server"));
+    assert!(
+        !state.units.contains_key("system:ssh.socket"),
+        "the package took its socket"
+    );
+    drop(state);
+    assert_eq!(
+        systemctl_calls(&world),
+        [
+            "systemctl try-reload-or-restart ssh.service",
+            "sshd reloaded without the drop-in"
+        ]
+    );
+}
+
+/// The SSH server's package there already, with its units `socket` and `service`.
+fn ssh_server_there(world: &World, socket: Unit, service: Unit) {
+    let mut state = world.host.state.borrow_mut();
+    state
+        .dpkg
+        .insert("openssh-server".to_owned(), "1:10.2p1-2ubuntu3.8".to_owned());
+    state.units.insert("system:ssh.socket".to_owned(), socket);
+    state.units.insert("system:ssh.service".to_owned(), service);
+}
+
+#[test]
+fn an_ssh_server_there_with_its_socket_off_listens_while_the_app_is_installed() {
+    let world = system_world("openssh-server");
+    ssh_server_there(&world, unit(false, false), unit(false, false));
+
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+
+    assert_eq!(root_step(&world, "openssh-server", 5), Some(State::Done));
+    assert_eq!(systemctl_calls(&world), ["systemctl enable --now ssh.socket"]);
+
+    run(&world, |e| e.remove_with("openssh-server", &Picks::default())).unwrap();
+
+    let calls = systemctl_calls(&world);
+    assert_eq!(calls[1], "systemctl disable --now ssh.socket", "{calls:#?}");
+}
+
+#[test]
+fn a_running_sshd_takes_keys_alone_at_once_and_the_users_configuration_again_once_the_app_goes() {
+    let world = system_world("openssh-server");
+    ssh_server_there(&world, unit(true, true), unit(false, true));
+
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+
+    assert_eq!(
+        systemctl_calls(&world),
+        [
+            "systemctl try-reload-or-restart ssh.service",
+            "sshd reloaded with the drop-in"
+        ]
+    );
+    assert_eq!(root_step(&world, "openssh-server", 3), Some(State::Done));
+
+    run(&world, |e| e.remove_with("openssh-server", &Picks::default())).unwrap();
+
+    let calls = systemctl_calls(&world);
+    assert_eq!(
+        calls.last().map(String::as_str),
+        Some("sshd reloaded without the drop-in"),
+        "{calls:#?}"
+    );
+    assert!(!world.system_path(DROP_IN).exists());
+}
+
+#[test]
+fn an_sshd_its_configuration_check_refuses_fails_the_install_and_takes_the_drop_in_out() {
+    let world = system_world("openssh-server");
+    ssh_server_there(&world, unit(true, true), unit(false, true));
+    // ssh.service's reload runs sshd -t first, which refuses the user's configuration.
+    let sandbox = world.host.sandbox();
+    let body = fs::read_to_string(sandbox.bin().join("systemctl")).unwrap();
+    let body = body.replacen(
+        "try-reload-or-restart)\n",
+        "try-reload-or-restart)\n\techo 'Job for ssh.service failed.' >&2; exit 1 ;;\nnever)\n",
+        1,
+    );
+    let body = body.lines().skip(2).collect::<Vec<_>>().join("\n");
+    sandbox.stub("systemctl", &body);
+    let before = world.host.snapshot();
+
+    let added = run(&world, |e| e.add("openssh-server", None, &picks("openssh-server")));
+
+    let err = added.unwrap_err().to_string();
+    assert!(err.contains("Have a running sshd take keys alone at once"), "{err}");
+    assert!(!world.system_path(DROP_IN).exists());
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn an_ssh_service_enabled_the_classic_way_is_found_and_no_socket_starts_against_it() {
+    let world = system_world("openssh-server");
+    ssh_server_there(&world, unit(false, false), unit(true, true));
+
+    run(&world, |e| e.add("openssh-server", None, &picks("openssh-server"))).unwrap();
+
+    assert_eq!(root_step(&world, "openssh-server", 5), Some(State::Found));
+    let calls = systemctl_calls(&world);
+    assert!(!calls.iter().any(|c| c.contains("ssh.socket")), "{calls:#?}");
+
+    run(&world, |e| e.remove_with("openssh-server", &Picks::default())).unwrap();
+
+    let calls = systemctl_calls(&world);
+    assert!(!calls.iter().any(|c| c.contains("ssh.socket")), "{calls:#?}");
 }
 
 /// The notes of `events`.

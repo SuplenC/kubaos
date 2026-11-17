@@ -118,6 +118,10 @@ pub struct State {
     /// its own rather than the machine's user, as the `nordvpn` package does: the group and the
     /// user.
     pub preinst_groups: BTreeMap<String, (String, String)>,
+    /// Package to its units as its postinst leaves them on a first install (`<scope>:<unit>` to
+    /// the unit), as openssh-server's enables and starts `ssh.socket`; removing the package takes
+    /// them, as its unit files go with it.
+    pub package_units: BTreeMap<String, BTreeMap<String, Unit>>,
     /// Operations that fail: `enable:<unit>`, `apt:<package>`, `fetch:<url>`, `groupdel:<group>`.
     pub fail: BTreeSet<String>,
     /// The machine is arm64's, not amd64's.
@@ -286,10 +290,24 @@ impl FakeHost {
             conflicts: BTreeMap::new(),
             depends: BTreeMap::new(),
             preinst_groups: BTreeMap::new(),
+            package_units: BTreeMap::new(),
             ..self.state.borrow().clone()
         };
         let _ = write!(out, "{state:#?}");
         out
+    }
+
+    /// The machine's units where a test's `systemctl` stand-in can read them, `units` beside the
+    /// sandbox's log: a line a unit, `<scope>:<unit> enabled|disabled active|inactive`, as a
+    /// script a `run` starts sees the same machine the engine does.
+    fn show_units(&self) {
+        let mut text = String::new();
+        for (key, unit) in &self.state.borrow().units {
+            let enabled = if unit.enabled { "enabled" } else { "disabled" };
+            let active = if unit.active { "active" } else { "inactive" };
+            let _ = writeln!(text, "{key} {enabled} {active}");
+        }
+        fs::write(self.sandbox.log().with_file_name("units"), text).unwrap();
     }
 
     fn fails(&self, op: &str) -> Result<(), HostError> {
@@ -482,6 +500,8 @@ impl Host for FakeHost {
             if let Some((group, user)) = state.preinst_groups.get(&p).cloned() {
                 state.groups.insert(group, BTreeSet::from([user]));
             }
+            let units = state.package_units.get(&p).cloned().unwrap_or_default();
+            state.units.extend(units);
             let version = state.candidates.get(&p).cloned().unwrap_or_else(|| "1.0".to_owned());
             state.dpkg.insert(p, version);
         }
@@ -539,6 +559,10 @@ impl Host for FakeHost {
         let mut state = self.state.borrow_mut();
         for p in &gone {
             state.dpkg.remove(p);
+            let units = state.package_units.get(p).cloned().unwrap_or_default();
+            for unit in units.keys() {
+                state.units.remove(unit);
+            }
         }
         state.log.push(format!("apt remove {}", packages.join(" ")));
         Ok(())
@@ -685,6 +709,7 @@ impl Host for FakeHost {
     }
 
     fn run(&mut self, argv: &[String], dir: &Path) -> Result<(), HostError> {
+        self.show_units();
         let (program, rest) = argv.split_first().unwrap();
         let program = match program.strip_prefix("./") {
             Some(script) => {

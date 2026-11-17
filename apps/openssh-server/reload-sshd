@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Has a running sshd read its configuration again: ssh.service's reload checks it with sshd -t
+# first, then sends sshd a HUP, and a configuration sshd -t refuses fails the reload, leaving the
+# running sshd as it was. An sshd that isn't running reads it as it next starts.
+# With --if-it-can, as a removal runs it once the drop-in is gone, a reload that fails (sshd -t
+# refusing the user's own configuration, the package already gone) leaves sshd as it runs and
+# fails nothing: that sshd still takes keys alone.
+# Usage: ./reload-sshd [--if-it-can]
+set -euo pipefail
+if [[ ${1-} == --if-it-can ]]; then
+  systemctl try-reload-or-restart ssh.service || true
+else
+  systemctl try-reload-or-restart ssh.service
+fi

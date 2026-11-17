@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Stops and disables ssh.socket again, as ./listen enabled and started it.
+set -euo pipefail
+systemctl disable --now ssh.socket
