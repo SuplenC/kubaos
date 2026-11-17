@@ -261,7 +261,8 @@ impl Cli {
     }
 
     fn command_in(&self, cwd: &Path, args: &[&str]) -> Command {
-        let mut command = Command::new(&self.program);
+        // mise's plugins and its git-sourced tools run git.
+        let mut command = crate::started::command(&self.program);
         // `MISE_YES` answers mise's own prompts (prune's, a plugin's install) as a script must.
         command
             .args(args)

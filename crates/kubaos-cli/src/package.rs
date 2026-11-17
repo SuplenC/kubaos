@@ -143,14 +143,19 @@ pub fn try_main(name: &str) -> ExitCode {
     let Some((nix, nix_args)) = argv.split_first() else {
         return usage_error("nothing to run");
     };
+    // Nix reads the user flake, which may be a git checkout.
     if std::io::stdin().is_terminal() {
-        return match Command::new(nix).args(nix_args).status() {
+        return match kubaos_git::clear(&mut Command::new(nix)).args(nix_args).status() {
             Ok(status) if status.success() => ExitCode::SUCCESS,
             Ok(_) => ExitCode::FAILURE,
             Err(e) => report(e),
         };
     }
-    match Command::new(TERMINAL).arg("-e").args(&argv).spawn() {
+    match kubaos_git::clear(&mut Command::new(TERMINAL))
+        .arg("-e")
+        .args(&argv)
+        .spawn()
+    {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => report(e),
     }

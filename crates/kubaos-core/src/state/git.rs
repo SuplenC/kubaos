@@ -92,7 +92,7 @@ fn is_work_tree(flake: &Path) -> bool {
     if !flake.is_dir() {
         return false;
     }
-    kubaos_git::at(flake)
+    crate::started::git(flake)
         .args(["rev-parse", "--is-inside-work-tree"])
         .stderr(Stdio::null())
         .output()
@@ -100,7 +100,7 @@ fn is_work_tree(flake: &Path) -> bool {
 }
 
 fn git(flake: &Path, args: &[&OsStr]) -> Result<Output, GitError> {
-    let out = kubaos_git::at(flake)
+    let out = crate::started::git(flake)
         .args(args)
         .output()
         .map_err(|source| GitError::Spawn {

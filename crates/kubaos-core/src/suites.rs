@@ -47,7 +47,6 @@ use std::io::Write;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::process::Stdio;
 use std::sync::Arc;
 
@@ -720,7 +719,8 @@ impl Suites {
             });
         };
         let program_name = program.to_string_lossy().into_owned();
-        let status = Command::new(program)
+        // A scaffolder runs `git init` in the project it makes.
+        let status = crate::started::command(program)
             .args(args)
             .current_dir(&self.projects)
             .stdin(Stdio::null())

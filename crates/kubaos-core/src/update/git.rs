@@ -193,7 +193,8 @@ impl RemoteRefs {
     ///
     /// [`RefsError`] when git can't reach `url`.
     pub fn fetch(url: &str, local: GitRefs) -> Result<Self, RefsError> {
-        let out = kubaos_git::anywhere()
+        let mut command = kubaos_git::anywhere();
+        let out = crate::started::prepare(&mut command)
             .args(["ls-remote", "--", url, "refs/heads/main", "refs/tags/v*"])
             .output()
             .map_err(|e| RefsError::new(format!("git ls-remote {url}"), e))?;
@@ -264,7 +265,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    kubaos_git::at(dir).args(args).output()
+    crate::started::git(dir).args(args).output()
 }
 
 fn stderr(out: &Output) -> String {

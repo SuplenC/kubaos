@@ -120,6 +120,8 @@ fn output(argv: &[String], prepare: impl FnOnce(&mut Command)) -> Result<String,
         return Err(RunError::start("")(io::Error::from(io::ErrorKind::InvalidInput)));
     };
     let mut command = Command::new(program);
+    // What it starts (`kubaos`, a Suite's scaffolder) may run git.
+    kubaos_git::clear(&mut command);
     prepare(&mut command);
     let output = command
         .args(rest)
@@ -169,6 +171,7 @@ fn background(argv: &[String], line: OnLine, ended: OnEnd, prepare: impl FnOnce(
     let stderr = writer.try_clone().map_err(RunError::start(program))?;
     let mut mark = writer.try_clone().map_err(RunError::start(program))?;
     let mut command = Command::new(program);
+    kubaos_git::clear(&mut command);
     prepare(&mut command);
     // A group of its own, so a signal to the Extension's group, such as Ctrl+C in the
     // terminal a Daemon runs in, doesn't stop an install halfway. The Daemon itself kills

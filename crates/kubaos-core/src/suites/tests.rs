@@ -494,6 +494,61 @@ fn scaffolding_creates_the_project_in_the_projects_root() {
 }
 
 #[test]
+fn a_scaffolders_git_init_makes_the_projects_repository_and_not_the_one_the_environment_names() {
+    const GIT: Suite = Suite {
+        scaffolders: &[Scaffolder {
+            id: "app",
+            label: "New Demo project",
+            argv: &["sh", "-c", "mkdir \"$1\" && git -C \"$1\" init -q", "sh", "{path}"],
+        }],
+        ..DEMO
+    };
+    let h = home();
+    h.suites.add(&GIT, &OptionsChange::default()).unwrap();
+    let decoy = h.paths.home().join("decoy");
+    fs::create_dir_all(&decoy).unwrap();
+    crate::sandbox::git(&decoy, &["init", "-q"]);
+    let before = crate::sandbox::git(&decoy, &["config", "--list", "--local"]);
+    crate::started::testing::pass("GIT_DIR", decoy.join(".git"));
+    crate::started::testing::pass("GIT_WORK_TREE", &decoy);
+
+    let path = h.suites.scaffold(&GIT, &GIT.scaffolders[0], "hello-git").unwrap();
+
+    assert!(
+        path.join(".git/HEAD").is_file(),
+        "the project has no repository of its own"
+    );
+    assert_eq!(crate::sandbox::git(&decoy, &["config", "--list", "--local"]), before);
+}
+
+#[test]
+fn a_scaffolder_runs_in_the_tests_sandbox() {
+    const SHOWS: Suite = Suite {
+        scaffolders: &[Scaffolder {
+            id: "app",
+            label: "New Demo project",
+            argv: &[
+                "sh",
+                "-c",
+                "mkdir \"$1\" && printf '%s\\n' \"$PATH\" \"$DBUS_SESSION_BUS_ADDRESS\" >\"$1/ENV\"",
+                "sh",
+                "{path}",
+            ],
+        }],
+        ..DEMO
+    };
+    let h = home();
+    h.suites.add(&SHOWS, &OptionsChange::default()).unwrap();
+
+    let path = h.suites.scaffold(&SHOWS, &SHOWS.scaffolders[0], "hello-env").unwrap();
+
+    let shown = fs::read_to_string(path.join("ENV")).unwrap();
+    let lines: Vec<&str> = shown.lines().collect();
+    assert!(lines[0].ends_with("/sandbox/bin"), "{shown}");
+    assert_eq!(lines[1], crate::sandbox::NOWHERE);
+}
+
+#[test]
 fn scaffolding_needs_the_suite_installed() {
     let h = home();
 
