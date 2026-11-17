@@ -80,6 +80,8 @@ export interface Driver {
   readonly client: (point: Point) => Point;
   /** The middle of a workspace's miniature, a window, a group's new-workspace slot, in world points. */
   readonly centreOf: (what: { space: string } | { window: string } | { plus: string }) => Point;
+  /** Where a workspace is taken by its number, under its miniature, in world points. */
+  readonly handleOf: (space: string) => Point;
   /** The gutter's middle before place `index` of `group`. */
   readonly between: (group: string, index: number) => Point;
   readonly target: () => Target | null;
@@ -91,6 +93,8 @@ export interface Driver {
   readonly freeze: (at: number) => void;
   /** Lets go of the frozen moves, finished. */
   readonly thaw: () => void;
+  /** Draws the overview again with other options: another desk, view or fill. */
+  readonly redraw: (options: Partial<OverviewOptions>) => void;
 }
 
 // ── Measures ──────────────────────────────────────────────────────────────────────────────────
@@ -328,6 +332,15 @@ const VIEWS: readonly { readonly view: View; readonly name: string }[] = [
   { view: "desk", name: "Whole desk" },
 ];
 
+/**
+ * The sample's own size as a length. HAZARD: written in another form than `css` writes the screens'
+ * sizes inside it: a full screen or a capture re-sizes every property whose value is the sample's,
+ * and a screen of the same width inside the whole desk would be re-sized with it.
+ */
+function rootLength(value: number): string {
+  return `calc(var(--px) * ${value})`;
+}
+
 /** The focused screen's logical size, which the sample is drawn at. */
 export function sizeOf(desk: model.DeskName, focus?: string): { width: number; height: number } {
   const made = model.sampleDesk(desk);
@@ -342,9 +355,10 @@ export function sizeOf(desk: model.DeskName, focus?: string): { width: number; h
 export function overview(options: OverviewOptions): Overview {
   const root = span("ov");
   const size = sizeOf(options.desk, options.focus);
-  root.style.setProperty("--screen-width", `calc(${size.width} * var(--px))`);
-  root.style.setProperty("--screen-height", `calc(${size.height} * var(--px))`);
+  root.style.setProperty("--screen-width", rootLength(size.width));
+  root.style.setProperty("--screen-height", rootLength(size.height));
   root.tabIndex = 0;
+  let ours = root.style.getPropertyValue("--screen-width");
   let current = build(root, options);
   // A full screen, or a capture at a screen's size, lays the root out anew: the overview follows it.
   let seen = { w: 0, h: 0 };
@@ -365,12 +379,17 @@ export function overview(options: OverviewOptions): Overview {
   function build(into: HTMLElement, made: OverviewOptions, at?: { w: number; h: number }): Built {
     into.replaceChildren();
     const built = engine(into, made, (next) => {
+      // The sample takes the new desk's screen size, unless a full screen or a capture sized it.
       const resized = sizeOf(next.desk, next.focus);
-      if (!into.closest(".site-full-screen")) {
-        into.style.setProperty("--screen-width", `calc(${resized.width} * var(--px))`);
-        into.style.setProperty("--screen-height", `calc(${resized.height} * var(--px))`);
+      if (into.style.getPropertyValue("--screen-width") === ours) {
+        ours = rootLength(resized.width);
+        into.style.setProperty("--screen-width", ours);
+        into.style.setProperty("--screen-height", rootLength(resized.height));
       }
-      current = build(into, next);
+      const scale = settings().scale;
+      const now = { w: into.clientWidth / scale, h: into.clientHeight / scale };
+      seen = now;
+      current = build(into, next, now.w > 0 ? now : undefined);
     }, at);
     return built;
   }
@@ -958,7 +977,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         for (const [k, id] of section.items.entries()) {
           if (id === ROOM) continue;
           const slot = section.places[k]!;
-          if (!inside(local, slot)) continue;
+          // Its number under it is the workspace's too.
+          if (!inside(local, { ...slot, h: slot.h + L("space-s8") + L("size-control_sm") })) continue;
           const at = { x: (local.x - slot.x) / slot.s, y: (local.y - slot.y) / slot.s };
           for (const win of [...windowsShown(id)].reverse()) {
             const rect = tiles.get(win);
@@ -1570,6 +1590,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     snapshot: () => model.snapshot(desk),
     client: toClient,
     centreOf,
+    handleOf(space) {
+      const box = worldBox({ kind: "space", space });
+      return box ? { x: box.x + box.w / 2, y: box.y + box.h + L("space-s8") + L("size-control_sm") / 2 } : { x: 0, y: 0 };
+    },
     between: betweenPoint,
     target: () => carry?.target ?? null,
     lifted: () => carry?.id ?? null,
@@ -1584,6 +1608,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       }
     },
     thaw: settle,
+    redraw: (next) => redraw({ ...options, ...next }),
   };
 
   // A pin drawn mid-move plays the move once the sample is on the page, held at its moment.
