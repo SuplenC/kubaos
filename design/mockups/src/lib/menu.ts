@@ -23,7 +23,7 @@ import { icon } from "./icon.ts";
 import { smallInitial } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
 import { divider, filling, row, stack } from "./layout.ts";
-import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
+import { declare, FIXED_HEIGHT, probe, variant } from "./probe.ts";
 import { clamped } from "./text.ts";
 import { raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
@@ -45,6 +45,8 @@ export interface MenuItemSpec {
    * `label`, as an IconTile shows one.
    */
   readonly initial?: boolean;
+  /** Its words are a name that varies (an app's, a device's), cut with an ellipsis where they don't fit. */
+  readonly variable?: boolean;
   /** The keys that do the same, as `Ctrl+C`: one keycap each. */
   readonly keys?: string;
   /** Whether it shows a check, and whether it is ticked; none for an item that never does. */
@@ -107,6 +109,7 @@ export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinne
 /** An item's symbol, words, keys, check and chevron, in `ink`; its description and trailing symbol in `muted`. */
 function content(spec: MenuItemSpec, ink: string, muted: string): HTMLElement {
   const words = clamped(spec.label, "body");
+  if (spec.variable) declare(words, { variable: true });
   words.style.color = ink;
   const parts: Element[] = [];
   if (spec.picture) parts.push(picture(spec.picture));

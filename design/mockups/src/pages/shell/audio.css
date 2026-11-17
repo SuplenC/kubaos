@@ -5,12 +5,14 @@
   display: block;
 }
 
-/* An app's device drawn open hangs its Menu over the rows under it, as a live one does, rather
-   than in the flow, so the row's tile stays centred on the name and the pick. */
+/* An app's device drawn open hangs its Menu over the rows under it, as a live one does, keeping
+   none of the room a sample keeps for it, so the row's tile stays centred on the name and the pick. */
+.audio-app .k-select-room[data-look="inline"][data-shown] {
+  padding: 0;
+}
+
 .audio-app .k-select-room[data-look="inline"][data-shown] > .k-select-popover {
-  position: absolute;
   top: calc(100% + var(--space-s4));
-  margin-top: 0;
 }
 
 .audio-app .k-select-room[data-look="inline"][data-shown][data-up] > .k-select-popover {

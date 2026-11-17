@@ -31,7 +31,7 @@ import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { filling, row } from "./layout.ts";
 import { menuItem } from "./menu.ts";
-import { probe, variant } from "./probe.ts";
+import { declare, probe, variant } from "./probe.ts";
 import { clamped } from "./text.ts";
 import { popover } from "./tooltip.ts";
 
@@ -55,6 +55,8 @@ export interface SelectOptions {
   readonly trailing?: readonly (string | undefined)[];
   /** A field's box, or the inline look: the words and chevron alone, in a line of text. */
   readonly look?: SelectLook;
+  /** Its options are names that vary (devices'), cut with an ellipsis where they don't fit. */
+  readonly variable?: boolean;
   /** Drawn open in the sample's flow, the room taking the open surface's height. */
   readonly open?: boolean;
   /** The highlighted option of a select drawn open; the pick by default. */
@@ -127,7 +129,7 @@ export function select(options: SelectOptions): HTMLElement {
       const symbol = options.icons?.[index];
       const description = options.descriptions?.[index];
       const trailing = options.trailing?.[index];
-      const item = menuItem({ label, ...(symbol ? { icon: symbol } : {}), ...(description ? { description } : {}), ...(trailing ? { trailing } : {}) });
+      const item = menuItem({ label, ...(options.variable ? { variable: true } : {}), ...(symbol ? { icon: symbol } : {}), ...(description ? { description } : {}), ...(trailing ? { trailing } : {}) });
       item.id = `${id}-${index}`;
       item.setAttribute("role", "option");
       item.toggleAttribute("data-picked", index === picked);
@@ -158,7 +160,8 @@ export function select(options: SelectOptions): HTMLElement {
     room.dataset.look = "inline";
     room.toggleAttribute("data-icons", Boolean(options.icons));
     surface.append(row("s4", "centre", filling(value), chevron));
-    const card = popover(2, list);
+    // Its Menu floats over the page, off the words, drawn open in a sample's flow or not.
+    const card = declare(popover(2, list), { floats: true });
     card.classList.add("k-select-popover");
     room.append(surface, card);
   } else {
@@ -182,6 +185,7 @@ export function select(options: SelectOptions): HTMLElement {
   function showPick(): void {
     const words = options.options[picked] ?? options.placeholder ?? "";
     const text = clamped(words, inline ? "small" : "body_large");
+    if (options.variable) declare(text, { variable: true });
     text.style.color = "var(--value)";
     value.replaceChildren(text);
     const symbol = iconOf(picked);

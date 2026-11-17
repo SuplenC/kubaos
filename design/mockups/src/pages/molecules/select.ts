@@ -193,7 +193,7 @@ export default page({
     missingPicture: [{ name: "No symbol", for: "words start `space.s12` in", sample: () => boxed(often()) }],
     counts: [
       { name: "Nothing picked", for: "the placeholder", sample: () => boxed(holidays({ picked: -1 })) },
-      { name: "Inline, a long pick", for: "it ends in an ellipsis", sample: () => named(inline({ options: [OPTION.long], icons: [], picked: 0 })) },
+      { name: "Inline, a long pick", for: "it ends in an ellipsis", sample: () => named(inline({ options: [OPTION.long], icons: [], picked: 0, variable: true })) },
       { name: "A few options", for: "as tall as they are", sample: () => boxed(holidays({ open: true, highlight: 1 })) },
       { name: "Many", for: "eight in view, the rest scroll", sample: () => boxed(many({ open: true })) },
     ],

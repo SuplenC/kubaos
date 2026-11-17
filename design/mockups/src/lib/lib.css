@@ -2908,6 +2908,8 @@
   flex-direction: column;
   align-items: flex-start;
   align-self: auto;
+  box-sizing: border-box;
+  max-width: 100%;
   height: auto;
   transition: --select-open var(--motion-micro) var(--easing-emphasized_accel);
 }
@@ -2931,6 +2933,12 @@
   --mark: var(--value);
 }
 
+/* Its words and chevron shrink to its room, the words cut with an ellipsis, never running past it. */
+.k-select-inline > .k-row {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .k-select-room[data-look="inline"]:is([data-open], [data-folding]) > .k-select-inline {
   --lit: 1;
 }
@@ -2947,11 +2955,15 @@
   position: absolute;
   z-index: 10;
   top: calc(100% + var(--space-s4));
-  left: calc(-1 * (var(--space-s4) + var(--space-s8) + var(--select-symbol, 0px)));
+  left: calc(-1 * var(--select-back));
   opacity: var(--select-open);
 }
 
-.k-select-room[data-icons] > .k-select-popover {
+.k-select-room[data-look="inline"] {
+  --select-back: calc(var(--space-s4) + var(--space-s8) + var(--select-symbol, 0px));
+}
+
+.k-select-room[data-icons] {
   --select-symbol: calc(var(--icon-s16) + var(--space-s8));
 }
 
@@ -2965,10 +2977,25 @@
   bottom: calc(100% + var(--space-s4));
 }
 
+/* Drawn open in a sample's flow, the Menu floats as a live one does and the room keeps its height
+   (`--drop`, the Menu's) and the gap to it below the words, or above them growing up, so the
+   sample holds the Menu and nothing round it moves. */
+.k-select-room[data-look="inline"][data-shown] {
+  padding-bottom: calc(var(--space-s4) + var(--drop));
+}
+
 .k-select-room[data-look="inline"][data-shown] > .k-select-popover {
-  position: relative;
-  top: auto;
-  margin-top: var(--space-s4);
+  top: calc(100% - var(--drop));
+}
+
+.k-select-room[data-look="inline"][data-shown][data-up] {
+  padding-top: calc(var(--space-s4) + var(--drop));
+  padding-bottom: 0;
+}
+
+.k-select-room[data-look="inline"][data-shown][data-up] > .k-select-popover {
+  top: 0;
+  bottom: auto;
 }
 
 .k-select-menu {
