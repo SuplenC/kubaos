@@ -724,6 +724,14 @@ export function audioPanel(options: AudioOptions = {}): Panel {
   body.classList.add("audio-body");
   const page = panelPage({ title: TITLE, subtitle: subtitleOf(state), body, ...(options.down !== undefined ? { down: options.down } : {}) });
   page.element.classList.add("audio-panel");
+  // 1 to 3 pick a tab from anywhere in the panel, as the control center's 1 to 4 do; a disabled
+  // tab's button takes no click, so Input in Music mode stays where it is.
+  page.element.addEventListener("keydown", (event) => {
+    const at = ["1", "2", "3"].indexOf(event.key);
+    if (at < 0 || event.ctrlKey || event.altKey || event.metaKey) return;
+    picker.querySelectorAll<HTMLButtonElement>(".k-tab")[at]?.click();
+    event.preventDefault();
+  });
 
   if (live && CHROME && !ALL) {
     const says = voice();

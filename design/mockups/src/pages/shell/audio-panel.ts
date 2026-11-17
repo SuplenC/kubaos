@@ -195,7 +195,7 @@ export default page<Shown>({
   lede: "Output and mic in one sheet: levels, the mic's meter, the default device, then each side's, each app's, and options.",
   code: { qml: "AudioPanel", unbuilt: "QML: not built yet" },
   from: ["panel-page", "slider", "meter", "tabs", "card", "select", "list", "empty-state"],
-  stage: { live, hint: "drag, Space mutes; Calls/Music; tabs; Esc", daylight: true },
+  stage: { live, hint: "drag, Space mutes; Calls/Music; tabs, 1–3; Esc", daylight: true },
   variants: [
     { name: "Laptop, Output", for: `${BUILT_IN_SET}: Calls and Music disabled`, sample: draw() },
     { name: "Laptop, Input", for: "Default · the built-in mic, from the set", sample: draw(INPUT) },
@@ -280,6 +280,7 @@ export default page<Shown>({
       { keys: ["Delete"], does: "on balance: back to Centre" },
       { keys: ["Space"], does: "on a slider: its icon, muting" },
       { keys: ["Enter", "↑", "↓"], does: "a Select, an app's too: open, then pick" },
+      { keys: ["1", "2", "3"], does: "straight to Output, Input or Options, from anywhere" },
       { keys: ["Esc"], does: "an open menu shuts; else the panel closes" },
     ],
     order: "Output's slider, the mic's, the device, Calls/Music, the codec, the tabs, then the picked tab's controls in reading order.",
