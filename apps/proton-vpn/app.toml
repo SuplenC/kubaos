@@ -51,12 +51,8 @@ scope = "system"
 enable = true
 start = true
 
-# Nothing to set up: its check never passes, so the step stays the app's and its undo runs on
-# removal, before the packages go.
 [[action]]
 name = "Turn Proton VPN's kill switch off when it goes"
 kind = "run"
 root = true
-do = ["true"]
-check = ["false"]
-undo = ["./kill-switch-off"]
+undo = ["./kill-switch-off", "/"]

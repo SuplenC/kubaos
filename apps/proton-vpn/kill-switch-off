@@ -3,15 +3,46 @@
 # with nothing left that can take it down. Its default kind is NetworkManager connections (a
 # permanent one saved to disk, so NetworkManager brings it up again at every boot); its firewall
 # kind is two nftables tables, which its service keeps when it stops.
-# Usage: ./kill-switch-off
+# Usage: ./kill-switch-off <root>
+#   <root> is the machine's /, under which NetworkManager keeps its connections' files.
 # It runs while Proton's packages are still there. A kind Proton's command couldn't reach doesn't
-# stop the removal; a table of Proton's that stays up does.
+# stop the removal; a connection or table of Proton's that stays up does.
+# TODO(#464): drop this script and its step once Proton's removal turns the kill switch off itself;
+# its docs say nothing does yet.
 # https://github.com/ProtonVPN/python-proton-vpn-api-core/blob/stable/docs/firewall_kill_switch.md
 set -euo pipefail
+
+root=${1:?usage: kill-switch-off <root>}
+
+# The names Proton gives its kill switch's connections: pvpn-killswitch, pvpn-routed-killswitch and
+# pvpn-killswitch-ipv6, each with -perm for the permanent one, saved to disk.
+proton_connection='^pvpn(-routed)?-killswitch(-ipv6)?(-perm)?$'
 
 # Proton's own command for this, which turns off every kind it has and says which it couldn't.
 # -I: it runs as root, so it never imports from the folder it runs in.
 python3 -I -m proton.vpn.killswitch.disable || true
+
+# The NetworkManager kind's connections Proton's command left, by name. With NetworkManager down,
+# a saved one is a file it would read as it starts, and an in-memory one a file under /run.
+if names=$(nmcli -g NAME connection show 2>/dev/null); then
+  while IFS= read -r name; do
+    nmcli connection delete id "$name" >/dev/null
+  done < <(grep -E "$proton_connection" <<<"$names" || true)
+  if nmcli -g NAME connection show | grep -qE "$proton_connection"; then
+    echo "kill-switch-off: a Proton VPN kill switch connection is still there" >&2
+    exit 1
+  fi
+else
+  for dir in "$root/etc/NetworkManager/system-connections" "$root/run/NetworkManager/system-connections"; do
+    [ -d "$dir" ] || continue
+    for file in "$dir"/*; do
+      [ -f "$file" ] || continue
+      if sed -n 's/^id=//p' "$file" | grep -qE "$proton_connection"; then
+        rm -f -- "$file"
+      fi
+    done
+  done
+fi
 
 # The firewall kind's tables by their names, which no other program's have, for when its service
 # couldn't be reached.
