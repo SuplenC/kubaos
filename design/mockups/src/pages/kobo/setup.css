@@ -435,6 +435,15 @@
   flex-direction: column;
 }
 
+/* The page under the menu has no compositor to blur it, and the shell's own menu page draws it on a
+   solid screen: here the frame keeps its `opacity.frame` fill over an opaque plate of the surface
+   it is drawn on, so nothing of the page reads through. */
+.setup-kotodama-at .k-command {
+  background:
+    linear-gradient(rgb(from var(--color-surface) r g b / var(--opacity-frame)), rgb(from var(--color-surface) r g b / var(--opacity-frame))),
+    var(--color-surface);
+}
+
 /* Key cards: each title on one line; three across while they fit, fewer under it. */
 /* Opens with's cards, side by side across the body; where three don't fit with their titles on
    one line, they wrap. */
