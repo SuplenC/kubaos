@@ -1,7 +1,9 @@
 //! The graphics apps of the shipped catalog, installed and removed on the fake machine.
 
 use std::fs;
+use std::process::Stdio;
 
+use super::super::EngineError;
 use super::World;
 use super::ai::run;
 use super::ai::shipped;
@@ -177,4 +179,129 @@ fn excalidraws_window_names_the_one_copy_of_its_icon_the_install_puts_in_the_the
     );
     let entry = fs::read_to_string(home.join(".local/share/applications/kubaos-web-excalidraw.desktop")).unwrap();
     assert!(entry.contains("\nIcon=excalidraw\n"), "{entry}");
+}
+
+const BLENDER: &str = "blender";
+
+/// A Blender release, packed as Blender packs it (`blender-<version>-linux-x64/`, its program, desktop
+/// entry and icons at the top), by the tar of `world`'s sandbox.
+fn blender_tarball(world: &World) -> Vec<u8> {
+    let src = tempfile::tempdir().unwrap();
+    let folder = src.path().join("blender-5.3.0-linux-x64");
+    fs::create_dir_all(&folder).unwrap();
+    for (name, text) in [
+        ("blender", "#!/bin/sh\n"),
+        ("blender.desktop", "[Desktop Entry]\nExec=blender %f\nIcon=blender\n"),
+        ("blender.svg", "<svg/>"),
+        ("blender-symbolic.svg", "<svg/>"),
+    ] {
+        fs::write(folder.join(name), text).unwrap();
+    }
+    let archive = src.path().join("blender.tar.xz");
+    let made = world
+        .host
+        .sandbox()
+        .command("tar")
+        .args(["-c", "--xz", "-f"])
+        .arg(&archive)
+        .arg("-C")
+        .arg(src.path())
+        .arg("blender-5.3.0-linux-x64")
+        .status()
+        .unwrap();
+    assert!(made.success());
+    fs::read(archive).unwrap()
+}
+
+/// The shipped Blender's world, its release served at the URL and sha256 its folder pins.
+fn blender_world() -> World {
+    let world = world(BLENDER);
+    let catalog = Catalog::load(&world.catalog).unwrap();
+    let pin = catalog.get(BLENDER).unwrap().actions[0].download("amd64").unwrap();
+    let tarball = blender_tarball(&world);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .downloads
+        .insert(pin.url.clone(), (pin.sha256.clone(), tarball));
+    world
+}
+
+#[test]
+fn blender_links_its_program_entry_and_icons_from_its_version_and_its_removal_keeps_your_config() {
+    let world = blender_world();
+    let home = world.host_home();
+    let before = world.host.snapshot();
+
+    run(&world, |e| e.add(BLENDER, None, &picks(BLENDER))).unwrap();
+
+    let version = home.join(".local/opt/blender/5.3.0");
+    for (link, target) in [
+        (".local/bin/blender", "blender"),
+        (".local/share/applications/blender.desktop", "blender.desktop"),
+        (".local/share/icons/hicolor/scalable/apps/blender.svg", "blender.svg"),
+        (
+            ".local/share/icons/hicolor/symbolic/apps/blender-symbolic.svg",
+            "blender-symbolic.svg",
+        ),
+    ] {
+        let link = home.join(link);
+        assert_eq!(fs::read_link(&link).unwrap(), version.join(target), "{}", link.display());
+        assert!(link.is_file(), "{} points at the unpacked release", link.display());
+    }
+    // What Blender makes as you use it.
+    let prefs = home.join(".config/blender/5.3/config/userpref.blend");
+    fs::create_dir_all(prefs.parent().unwrap()).unwrap();
+    fs::write(&prefs, "").unwrap();
+
+    run(&world, |e| e.remove_with(BLENDER, &Picks::default())).unwrap();
+
+    assert!(!version.exists());
+    assert!(prefs.is_file(), "your config stays");
+    assert_eq!(world.journals(BLENDER), (None, None));
+    fs::remove_dir_all(home.join(".config")).unwrap();
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn blender_running_from_its_folder_is_left_alone_until_it_is_quit() {
+    let world = blender_world();
+    run(&world, |e| e.add(BLENDER, None, &picks(BLENDER))).unwrap();
+    // A program running from Blender's folder, started by name as its entry starts it: a shell,
+    // waiting on its input.
+    let program = world.host_home().join(".local/opt/blender/5.3.0/blender");
+    fs::copy(world.host.sandbox().bin().join("bash"), &program).unwrap();
+    let mut blender = world
+        .host
+        .sandbox()
+        .command(&program)
+        .args(["-c", "read -r _"])
+        .stdin(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let running = world.host.snapshot();
+
+    let refused = run(&world, |e| e.remove_with(BLENDER, &Picks::default()));
+
+    blender.kill().unwrap();
+    blender.wait().unwrap();
+    let refused = refused.unwrap_err();
+    assert!(
+        matches!(&refused, EngineError::NotReady(says) if says.contains("quit it")),
+        "{refused}"
+    );
+    assert_eq!(world.host.snapshot(), running);
+    run(&world, |e| e.remove_with(BLENDER, &Picks::default())).unwrap();
+    assert!(!program.exists());
+}
+
+#[test]
+fn blender_is_for_amd64_alone() {
+    let catalog = Catalog::load(&shipped(BLENDER).join("..")).unwrap();
+    let blender = catalog.get(BLENDER).unwrap();
+    let on = |arch: &str| catalog.available(blender, None, Platform::new(arch, Unfree::Refused));
+
+    assert!(on("amd64"));
+    assert!(!on("arm64"), "Blender builds no arm64 Linux release");
 }

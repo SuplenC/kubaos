@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Ready: no process of the user's runs a program from Blender's folder. Blender starts by name, on
+# PATH, so its command line doesn't say where it runs from; the program each process runs does.
+# Usage: ./closed
+set -euo pipefail
+for exe in /proc/[0-9]*/exe; do
+  program=$(readlink "$exe" 2>/dev/null) || continue
+  [[ $program != "$HOME/.local/opt/blender/"* ]] || exit 1
+done

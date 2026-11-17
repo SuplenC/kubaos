@@ -1,0 +1,63 @@
+# Blender from the official tarball of its release, pinned to the sha256 Blender publishes beside it
+# (blender-<version>.sha256). Blender keeps no apt repository; Ubuntu 26.04 has 5.0.1, and nixpkgs'
+# 5.1.1 builds Cycles without CUDA, OptiX or HIP, so it renders on the CPU alone. The tarball is
+# the current release with every GPU backend. Blender builds it for amd64 alone: there is no arm64
+# Linux build. Each version lands in a folder of its own, which the links name: the program on
+# PATH, and the desktop entry and icons the tarball carries, whose entry runs `blender` by name.
+# https://www.blender.org/download/
+name = "Blender"
+category = "graphics"
+tags = ["3d", "modeling", "sculpting", "animation", "rendering", "cycles", "video editing"]
+summary = "The whole 3D pipeline, free. Model a donut, render it overnight, call yourself a 3D artist."
+# From its AppStream metainfo, CC0-1.0 (release/freedesktop/org.blender.Blender.metainfo.xml), its
+# first paragraph.
+description = """\
+Blender is the free and open source 3D creation suite. It supports the entirety of the 3D \
+pipeline — modeling, rigging, animation, simulation, rendering, compositing, motion tracking, and \
+video editing."""
+description_from = "https://projects.blender.org/blender/blender/src/tag/v5.3.0/release/freedesktop/org.blender.Blender.metainfo.xml"
+# Colloid's, the system's icon theme (home/curated.nix), so the Command menu shows it before it
+# is there.
+icon = "blender"
+keeps = """\
+Your preferences, startup file, add-ons and extensions stay in ~/.config/blender, and your .blend \
+files wherever you saved them: install Blender again and it finds them all."""
+
+# HAZARD: Blender runs from the folder a removal or a new version's download takes, and loads its
+# Python and add-ons from there as you use it.
+[[ready]]
+check = ["./closed"]
+says = "Blender is open: quit it, then try again"
+
+[[action]]
+name = "Download Blender"
+kind = "download"
+to = "~/.local/opt/blender/@VERSION@"
+version = "5.3.0"
+unpack = "tar-xz"
+strip = 1
+amd64 = { url = "https://download.blender.org/release/Blender5.3/blender-5.3.0-linux-x64.tar.xz", sha256 = "dacb8264197a3f7fda6001285a5a506fc97ee943881261c2c3bd63c882f22e05" }
+
+[[action]]
+name = "Put blender on your PATH"
+kind = "symlink"
+to = "~/.local/bin/blender"
+target = "@HOME@/.local/opt/blender/@VERSION@/blender"
+
+[[action]]
+name = "Put Blender in the Command menu"
+kind = "symlink"
+to = "~/.local/share/applications/blender.desktop"
+target = "@HOME@/.local/opt/blender/@VERSION@/blender.desktop"
+
+[[action]]
+name = "Put Blender's icon in the icon theme"
+kind = "symlink"
+to = "~/.local/share/icons/hicolor/scalable/apps/blender.svg"
+target = "@HOME@/.local/opt/blender/@VERSION@/blender.svg"
+
+[[action]]
+name = "Put Blender's symbolic icon in the icon theme"
+kind = "symlink"
+to = "~/.local/share/icons/hicolor/symbolic/apps/blender-symbolic.svg"
+target = "@HOME@/.local/opt/blender/@VERSION@/blender-symbolic.svg"
