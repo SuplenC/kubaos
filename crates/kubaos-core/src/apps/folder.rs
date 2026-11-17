@@ -28,6 +28,7 @@ use super::action::Kind;
 use super::action::RunSource;
 use super::action::Side;
 use super::action::Stage;
+use super::action::Unpack;
 use super::action::is_argv;
 use super::action::is_icon_name;
 use super::action::is_svg_icon;
@@ -113,6 +114,10 @@ pub enum FolderError {
         "{name}: a step whose path is in a download's folder comes after the download, which unpacks the folder whole"
     )]
     InsideDownload { name: String },
+    #[error(
+        "{name}: a zstd tarball unpacks through tar's --zstd, which runs zstd: an `apt` step before it installs `zstd`"
+    )]
+    ZstdFirst { name: String },
     #[error(
         "{name}: a configure step writes the app's KubaOS defaults as the user, in ~/.config/kubaos/{id}/, and nowhere else"
     )]
@@ -531,7 +536,8 @@ impl Folder {
     /// Checks the downloads: every one of the app's, in any setup, of one version, which the other
     /// actions' `@VERSION@` names; and, in each install, a step whose path is in a download's
     /// folder after that download, as the download unpacks its folder whole, over whatever a step
-    /// before it put there.
+    /// before it put there, and an `apt` step installing `zstd` before a zstd tarball, which tar
+    /// unpacks through it.
     fn check_downloads(&self) -> Result<(), FolderError> {
         let mut versions: Vec<&str> = self
             .all_actions()
@@ -555,6 +561,19 @@ impl Folder {
         for setup in setups {
             let steps = self.steps(setup)?;
             for (i, step) in steps.iter().enumerate() {
+                if matches!(
+                    step.kind,
+                    Kind::Download {
+                        unpack: Unpack::TarZst,
+                        ..
+                    }
+                ) && !steps[..i].iter().any(
+                    |before| matches!(&before.kind, Kind::Apt { packages, .. } if packages.iter().any(|p| p == "zstd")),
+                ) {
+                    return Err(FolderError::ZstdFirst {
+                        name: step.name.clone(),
+                    });
+                }
                 let Some(path) = step.path() else {
                     continue;
                 };

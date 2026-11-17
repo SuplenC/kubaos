@@ -237,9 +237,39 @@ fn a_configure_step_writes_only_the_apps_own_folder_of_the_user_layer_as_the_use
 fn download(to: &str, version: &str) -> String {
     format!(
         "[[action]]\nname = \"Download\"\nkind = \"download\"\nto = \"{to}\"\nversion = \"{version}\"\n\
-         unpack = \"tar-zst\"\namd64 = {{ url = \"https://x.example/a\", sha256 = \"{}\" }}\n",
+         unpack = \"tar-gz\"\namd64 = {{ url = \"https://x.example/a\", sha256 = \"{}\" }}\n",
         "a".repeat(64)
     )
+}
+
+#[test]
+fn a_zstd_tarball_comes_after_an_apt_step_installing_zstd_in_the_same_install() {
+    let zst = download("~/.v/@VERSION@", "1.0").replace("tar-gz", "tar-zst");
+    let zstd = "[[action]]\nname = \"Install zstd\"\nkind = \"apt\"\npackages = [\"zstd\"]\n";
+    let setup = |id: &str, actions: &str| format!("\n[setup.{id}]\nname = \"{id}\"\nsummary = \"{id}\"\n{actions}");
+    let in_setup = |text: &str, id: &str| text.replace("[[action]]", &format!("[[setup.{id}.action]]"));
+
+    let first = format!("{ABOUT}{zstd}{zst}");
+    let after = format!("{ABOUT}{zst}{zstd}");
+    let without = format!("{ABOUT}{zst}");
+    // One setup installs zstd, the other doesn't: each install is checked on its own.
+    let one_setup = format!(
+        "{ABOUT}{}{}",
+        setup("a", &in_setup(&format!("{zstd}{zst}"), "a")),
+        setup("b", &in_setup(&zst, "b"))
+    );
+    let app_wide = format!(
+        "{ABOUT}{zstd}{}{}",
+        setup("a", &in_setup(&zst, "a")),
+        setup("b", &in_setup(&zst, "b"))
+    );
+
+    assert_eq!(folder_version(&first).as_deref(), Some("1.0"));
+    assert_eq!(folder_version(&app_wide).as_deref(), Some("1.0"));
+    for refused in [after, without, one_setup] {
+        let result = Folder::parse("sketch", Path::new("/catalog/sketch"), &refused);
+        assert!(matches!(result, Err(FolderError::ZstdFirst { .. })), "{result:?}");
+    }
 }
 
 #[test]
