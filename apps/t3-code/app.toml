@@ -22,6 +22,8 @@ thread at your desk, then approve the next step from your phone. It works with C
 Codex, Cursor, OpenCode, Grok Build, Antigravity, Kiro, Pi, Muse Code, fx, and any ACP agent. \
 If an agent is set up on your computer, T3 Code can control it."""
 description_from = "https://github.com/pingdotgg/t3code"
+# T3 Code's logo, MIT, on KubaOS's tile (t3-code.svg's header): no icon theme has T3 Code.
+icon = "t3-code.svg"
 
 [[action]]
 name = "Install T3 Code"

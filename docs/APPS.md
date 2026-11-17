@@ -14,7 +14,7 @@ just apps-list                   # in a checkout: the table, from that checkout'
 
 ## Icons
 
-An app's icon is, in this order: Colloid's, the system's icon theme, named by the app; else the vendor's official logo or app icon as an `.svg` in its folder, on a white rounded tile unless it is a full-bleed tile already, its header naming where it was taken from and that it is the vendor's trademark, used to identify the app; else original art; else none (`docs/CONTRACTS.md`, "An app's folder").
+An app's icon is, in this order: Colloid's, the system's icon theme, named by the app; else the vendor's official logo or app icon as an `.svg` in its folder, never redrawn or recoloured, placed on the catalog's rounded tile at the same visual weight as the others (white, or the vendor's own tile colour where its mark needs it), its header naming where it was taken from and that it is the vendor's trademark, used to identify the app; else original art; else none (`docs/CONTRACTS.md`, "An app's folder").
 
 ## The table's columns
 

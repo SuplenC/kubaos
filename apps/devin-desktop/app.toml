@@ -16,6 +16,9 @@ Its agent, Cascade, works across a project, editing files, running commands and 
 of what you do, and its completions suggest the next edit as you type. VS Code's extensions \
 work in it."""
 description_from = "kubaos"
+# Devin's mark, Cognition's trademark, used to identify the app, on KubaOS's tile (devin.svg's
+# header names its source): no icon theme has Devin Desktop.
+icon = "devin.svg"
 keeps = """\
 Your settings and sign-in stay in ~/.config/Devin, and your extensions in ~/.devin: install \
 Devin Desktop again and they're all there."""
