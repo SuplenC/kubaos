@@ -11,6 +11,10 @@ LM Studio downloads open language models and runs them on this machine, on its g
 where it can. It chats with them offline, answers questions about your documents, and serves \
 them to other apps through a local server that speaks OpenAI's API."""
 description_from = "kubaos"
+# LM Studio's icon, Element Labs' trademark, used to identify the app, on KubaOS's tile
+# (lm-studio.png's comment names its source): LM Studio publishes it only as a raster, and no icon
+# theme has LM Studio.
+icon = "lm-studio.png"
 keeps = """\
 Your models and chats stay in ~/.lmstudio, and LM Studio's settings in ~/.config/LM Studio: \
 install it again and they're all there."""
