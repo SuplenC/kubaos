@@ -434,8 +434,12 @@ impl Owners {
     }
 
     /// The app other than `app` that holds `claim` without owning it: the one it passes to when
-    /// `app` goes.
+    /// `app` goes. A `run` claim is its step's own, never another app's, though every app's is
+    /// spelt the same.
     pub fn holder<'a>(&'a self, claim: &str, app: &'a str) -> Option<&'a str> {
+        if claim == "run" {
+            return None;
+        }
         self.others(app)
             .find(|(_, c)| !c.owned && c.claim == claim)
             .map(|(id, _)| id)
