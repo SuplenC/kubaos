@@ -308,10 +308,11 @@ export default page({
   },
   keyboard: {
     keys: [
-      { keys: ["←", "h"], does: "5% or one stop lower; leaves Toggled; a knob 10% left" },
-      { keys: ["→", "l"], does: "5% or one stop higher; leaves Toggled; a knob 10% right" },
+      { keys: ["←", "h"], does: "5% or one stop lower; leaves Toggled; a knob 5% left" },
+      { keys: ["→", "l"], does: "5% or one stop higher; leaves Toggled; a knob 5% right" },
       { keys: ["Home"], does: "to 0, or the first stop; a knob fully left" },
       { keys: ["End"], does: "to 1, the last stop, a boost's 150%; a knob fully right" },
+      { keys: ["Delete"], does: "a knob back to Centre" },
       {
         keys: ["Space"],
         does: "presses the icon, where it is a button, as the key lifts",

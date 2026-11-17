@@ -18,7 +18,8 @@
 // left and right along the track over the icon at the start and the words at the end, which it
 // covers at either end. Its centre is a sticky point with its dot, and the words name the side and
 // how far ("Centre", "Left 30%"), in tabular figures. Resting on the centre, the anchor shows on the
-// knob. The knob lifts as the fill does, lit and held.
+// knob. The knob lifts as the fill does, lit and held. An arrow or a wheel's notch moves it 5% as its
+// words read, and Delete puts it back on the centre.
 //
 // Steps show as dots on both sides of the fill, each in its side's colour; the mark the value rests
 // on, a stop or a sticky point it holds at, turns solid and pops in. No dot is drawn under the icon
@@ -45,6 +46,15 @@ export type SliderSize = (typeof SLIDER_SIZES)[number];
 
 /** A step of a continuous slider from an arrow key or a wheel's notch: a twentieth. */
 const NUDGE = 0.05;
+
+/**
+ * A knob's step from an arrow key or a wheel's notch: its words count each side from the centre, so
+ * a fortieth of the track is 5% as they read it.
+ */
+const KNOB_NUDGE = 0.025;
+
+/** The middle a knob's Delete puts it back on. */
+const CENTRE = 0.5;
 
 // The locale's percentage: a value is never put together from a number and a sign by hand.
 const PERCENT = new Intl.NumberFormat("en-GB", { style: "percent", maximumFractionDigits: 0 });
@@ -147,6 +157,7 @@ export function slider(options: SliderOptions): HTMLElement {
   const stepping = stops > 0;
   const knobbed = !stepping && (options.knob ?? false);
   const sticky = options.sticky;
+  const nudge = knobbed ? KNOB_NUDGE : NUDGE;
   let index = Math.max(0, Math.min(last, options.index ?? 0));
   let value = Math.max(0, Math.min(1, options.value ?? 0));
   const toggle = stepping || knobbed ? undefined : options.toggle;
@@ -492,8 +503,10 @@ export function slider(options: SliderOptions): HTMLElement {
         const end = event.key === "End";
         if (stepping) stepTo(end ? last : 0);
         else moveTo(end ? 1 : 0);
+      } else if (event.key === "Delete" && knobbed) {
+        moveTo(CENTRE);
       } else if (back || forward) {
-        const step = event.shiftKey && options.fine !== undefined ? options.fine : NUDGE;
+        const step = event.shiftKey && options.fine !== undefined ? options.fine : nudge;
         if (stepping) stepTo(index + (forward ? 1 : -1));
         else moveTo(value + (forward ? step : -step));
       } else {
@@ -505,7 +518,7 @@ export function slider(options: SliderOptions): HTMLElement {
     // the page past it, as everywhere else.
     sideways(root, (notches) => {
       if (stepping) stepTo(index + notches);
-      else moveTo(value + notches * NUDGE);
+      else moveTo(value + notches * nudge);
     });
   }
 

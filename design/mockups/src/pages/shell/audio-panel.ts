@@ -275,8 +275,9 @@ export default page<Shown>({
   keyboard: {
     keys: [
       { keys: ["Tab", "Shift+Tab"], does: "round the controls, top to bottom" },
-      { keys: ["←", "→", "h", "l"], does: "a slider's level; on Tabs, the choice beside" },
+      { keys: ["←", "→", "h", "l"], does: "a slider's level, balance 5%; on Tabs, the choice beside" },
       { keys: ["Home", "End"], does: "a slider to 0 or its most" },
+      { keys: ["Delete"], does: "on balance: back to Centre" },
       { keys: ["Space"], does: "on a slider: its icon, muting" },
       { keys: ["Enter", "↑", "↓"], does: "a Select, an app's too: open, then pick" },
       { keys: ["Esc"], does: "an open menu shuts; else the panel closes" },
