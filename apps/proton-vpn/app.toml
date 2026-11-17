@@ -1,16 +1,18 @@
 # Proton VPN from Proton's signed apt repository, whose key system/packages.toml pins
 # ([repo.protonvpn-stable]): proton-vpn-gnome-desktop, the package Proton's instructions install,
-# which brings the window (4.19), the protonvpn command and the daemon. The app's packages write no
-# source of their own; Proton's own setup, its protonvpn-stable-release package, ships the same
-# sources file and key, and the repository's is that file, word for word. Proton builds the core
-# library the window needs for amd64 alone; its arm64 build is a major version behind, which no
-# window of this release installs with. It connects through NetworkManager, WireGuard or OpenVPN
+# which brings the window (4.19), the protonvpn command and the daemon, for amd64 and arm64: the
+# one native package among them, its core library (python3-proton-vpn-api-core 6), Proton builds
+# for both. The app's packages write no source of their own; Proton's own setup, its
+# protonvpn-stable-release package, ships the same sources file and key, and the repository's is
+# that file, word for word. It connects through NetworkManager, WireGuard or OpenVPN
 # (network-manager-openvpn, on every machine), with a tunnel of its own (Proton's NetworkManager
-# plugin, nm-protun). Its kill switch is an nftables table of its own, put up through
-# me.proton.vpn.kill_switch, a D-Bus service of root's started only while it is asked for, and
-# kept at boot by proton-vpn-kill-switch-boot.service, which the window turns on and off as you set
-# the kill switch to permanent. Its daemon, me.proton.vpn.split_tunneling.service, which its
-# postinst enables and starts, keeps split tunnelling, and with it python3-bpfcc and LLVM come in.
+# plugin, nm-protun); its core library also brings network-manager-openvpn-gnome, the OpenVPN
+# plugin's GTK editor, and libnftnl11. Its kill switch is an nftables table of its own, put up
+# through me.proton.vpn.kill_switch, a D-Bus service of root's started only while it is asked
+# for, and kept at boot by proton-vpn-kill-switch-boot.service, which the window turns on and off
+# as you set the kill switch to permanent. Its daemon, me.proton.vpn.split_tunneling.service, which
+# its postinst enables and starts, keeps split tunnelling, and with it python3-bpfcc and LLVM come
+# in.
 # KubaOS's Proxy and Proton VPN each block what leaves outside their own tunnel: with the Proxy's
 # kill switch up Proton VPN can't reach its servers, and with Proton's on the Proxy's VPN can't
 # reach IT's. Use one at a time.
@@ -36,7 +38,6 @@ VPN again and it's still signed in."""
 name = "Install Proton VPN"
 kind = "apt"
 repo = "protonvpn-stable"
-arch = "amd64"
 packages = ["proton-vpn-gnome-desktop"]
 
 [[action]]
