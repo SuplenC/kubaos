@@ -356,3 +356,93 @@ fn a_slack_defaults_file_of_plain_words_quoted_or_bare_is_the_vendors() {
         assert_eq!(fs::read_to_string(&defaults).unwrap(), ours, "{theirs}");
     }
 }
+
+/// A `zoomus.conf` as Zoom writes it through Qt's `QSettings`: `[General]` first, its keys
+/// sorted, `key=value` with no spaces, Qt's quoting and percent-escaped keys, and its other
+/// sections after a blank line.
+const ZOOMS_OWN_CONF: &str = "[General]\nGeoLocale=system\nQFmw49%2By6zXS%23=1616522911\nautoScale=true\n\
+                              conf.webserver=https://us04web.zoom.us\nfake.version=\nxwayland=true\n\n\
+                              [zoom_new_im]\nmain_frame_pixel_pos_wide=\"1860,990\"\n";
+
+fn zoom_conf(world: &World) -> PathBuf {
+    world.host_home().join(".config/zoomus.conf")
+}
+
+#[test]
+fn zoom_starts_on_wayland_from_a_file_it_makes_and_its_removal_takes_the_file_away() {
+    let world = world("zoom");
+    let before = world.host.snapshot();
+
+    add(&world, "zoom").unwrap();
+
+    assert_eq!(
+        fs::read_to_string(zoom_conf(&world)).unwrap(),
+        "[General]\nxwayland=false\nenableWaylandShare=true\n"
+    );
+    remove(&world, "zoom").unwrap();
+
+    assert!(!zoom_conf(&world).exists());
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn zooms_own_settings_keep_every_other_line_and_get_their_text_back_whole() {
+    let world = world("zoom");
+    fs::create_dir_all(zoom_conf(&world).parent().unwrap()).unwrap();
+    fs::write(zoom_conf(&world), ZOOMS_OWN_CONF).unwrap();
+    let before = world.host.snapshot();
+
+    add(&world, "zoom").unwrap();
+
+    assert_eq!(
+        fs::read_to_string(zoom_conf(&world)).unwrap(),
+        ZOOMS_OWN_CONF.replace("xwayland=true\n", "xwayland=false\nenableWaylandShare=true\n")
+    );
+    remove(&world, "zoom").unwrap();
+
+    assert_eq!(fs::read_to_string(zoom_conf(&world)).unwrap(), ZOOMS_OWN_CONF);
+    assert_eq!(world.host.snapshot(), before);
+}
+
+#[test]
+fn zoom_rewriting_its_file_keeps_the_steps_done_and_its_removal_puts_back_only_the_keys() {
+    let world = world("zoom");
+    fs::create_dir_all(zoom_conf(&world).parent().unwrap()).unwrap();
+    fs::write(zoom_conf(&world), ZOOMS_OWN_CONF).unwrap();
+    add(&world, "zoom").unwrap();
+    // Zoom, run once, writes the whole file again: its keys sorted, one more of its own.
+    let rewritten = "[General]\nGeoLocale=system\nQFmw49%2By6zXS%23=1616522911\nautoScale=true\n\
+                     conf.webserver=https://us04web.zoom.us\nenableMiniWindow=true\nenableWaylandShare=true\n\
+                     fake.version=\nxwayland=false\n\n[zoom_new_im]\nmain_frame_pixel_pos_wide=\"1860,990\"\n";
+    fs::write(zoom_conf(&world), rewritten).unwrap();
+
+    add(&world, "zoom").unwrap();
+    assert_eq!(
+        fs::read_to_string(zoom_conf(&world)).unwrap(),
+        rewritten,
+        "nothing to do again"
+    );
+    remove(&world, "zoom").unwrap();
+
+    assert_eq!(
+        fs::read_to_string(zoom_conf(&world)).unwrap(),
+        rewritten
+            .replace("enableWaylandShare=true\n", "")
+            .replace("xwayland=false", "xwayland=true")
+    );
+}
+
+#[test]
+fn a_zoom_setting_you_changed_after_the_install_stays_as_you_set_it() {
+    let world = world("zoom");
+    add(&world, "zoom").unwrap();
+    // Back on XWayland, by hand.
+    fs::write(zoom_conf(&world), "[General]\nxwayland=true\nenableWaylandShare=true\n").unwrap();
+
+    remove(&world, "zoom").unwrap();
+
+    assert_eq!(
+        fs::read_to_string(zoom_conf(&world)).unwrap(),
+        "[General]\nxwayland=true\n"
+    );
+}
