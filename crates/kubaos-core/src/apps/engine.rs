@@ -914,13 +914,14 @@ impl<'a> Engine<'a> {
             self.ready(folder, had.as_ref().and_then(Option::as_deref))?;
         }
         let was_complete = !switching && user_journal.as_ref().is_some_and(|j| j.complete);
-        let root_unsettled = self.unsettled(folder, setup, root_journal.as_ref(), Side::Root);
+        let root_unsettled = self.unsettled(folder, setup, root_journal.as_ref(), Side::Root, false);
         // An installed app whose every step stands changes nothing, so it needn't be ready: an
-        // update checks it while the app is open.
+        // update checks it while the app is open. A step whose record only words the same thing
+        // differently stands too: the step rewrites its record and leaves the machine as it is.
         let stands = was_complete
             && user_journal.as_ref().is_some_and(|j| j.root_adoption.is_none())
-            && !root_unsettled
-            && !self.unsettled(folder, setup, user_journal.as_ref(), Side::User);
+            && !self.unsettled(folder, setup, root_journal.as_ref(), Side::Root, true)
+            && !self.unsettled(folder, setup, user_journal.as_ref(), Side::User, true);
         if !stands {
             self.ready(folder, setup)?;
         }
@@ -951,8 +952,17 @@ impl<'a> Engine<'a> {
 
     /// Whether a step of `side` of the install isn't settled: its journal doesn't record it as
     /// settled with the same action, word for word, or its check, run from the user's side,
-    /// doesn't say done. A root `run`'s check runs only as root, so such a step never is.
-    fn unsettled(&mut self, folder: &Folder, setup: Option<&str>, journal: Option<&Journal>, side: Side) -> bool {
+    /// doesn't say done. A root `run`'s check runs only as root, so such a step never is. With
+    /// `same_thing`, a recorded action that acts on the same thing as the step's
+    /// ([`Action::same_thing`]) will do in place of the same action word for word.
+    fn unsettled(
+        &mut self,
+        folder: &Folder,
+        setup: Option<&str>,
+        journal: Option<&Journal>,
+        side: Side,
+        same_thing: bool,
+    ) -> bool {
         let Ok(steps) = folder.steps(setup) else {
             return true;
         };
@@ -965,8 +975,15 @@ impl<'a> Engine<'a> {
                 return true;
             };
             let entry = journal.and_then(|j| j.entry(i + 1));
+            let recorded_as = |e: &Entry| {
+                if same_thing {
+                    e.action.same_thing(&resolved)
+                } else {
+                    e.action == resolved
+                }
+            };
             let settled =
-                entry.is_some_and(|e| e.action == resolved && e.state.settled(self.windows) && e.replaced.is_none());
+                entry.is_some_and(|e| recorded_as(e) && e.state.settled(self.windows) && e.replaced.is_none());
             if !settled || (side == Side::Root && matches!(resolved.kind, Kind::Run { .. })) {
                 return true;
             }
@@ -1402,13 +1419,23 @@ impl<'a> Engine<'a> {
             .map_err(unread)?
             .into_iter()
             .collect();
+        // The keys' script answers with repositories it was asked about; a line it printed
+        // besides is no repository an app set up.
+        let (due, stray): (Vec<String>, Vec<String>) = due.into_iter().partition(|r| recorded.contains_key(r));
+        for line in stray {
+            self.warn(format!(
+                "the check of the apt repositories' keys answered with {line:?}, which no app's repository is"
+            ));
+        }
         if due.is_empty() {
             return Ok(Vec::new());
         }
         self.start_root()?;
         let mut failed = BTreeSet::new();
         for repo in &due {
-            let (app, step) = &recorded[repo];
+            let Some((app, step)) = recorded.get(repo) else {
+                continue;
+            };
             let request = Request::Refresh {
                 app: app.clone(),
                 step: *step,
@@ -1426,7 +1453,7 @@ impl<'a> Engine<'a> {
             failed.insert(repo.clone());
         }
         let still = self.user.host().apt_keys_due(&due).map_err(unread)?;
-        for repo in still.iter().filter(|r| !failed.contains(*r)) {
+        for repo in still.iter().filter(|r| due.contains(*r) && !failed.contains(*r)) {
             self.warn(format!(
                 "the {repo} repository's signing key nears its expiry, and its vendor has no newer one yet: \
                  the next update tries again"

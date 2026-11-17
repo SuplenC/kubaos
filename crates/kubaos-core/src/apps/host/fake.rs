@@ -113,6 +113,8 @@ pub struct State {
     /// Vendor repositories whose key nears its expiry, until a setup of the repository fetches
     /// it again.
     pub keys_due: BTreeSet<String>,
+    /// Lines the keys' check prints besides the repositories it was asked about.
+    pub keys_stray: BTreeSet<String>,
     /// Every change made, in order.
     pub log: Vec<String>,
 }
@@ -383,7 +385,8 @@ impl Host for FakeHost {
 
     fn apt_keys_due(&mut self, repos: &[String]) -> Result<BTreeSet<String>, HostError> {
         let state = self.state.borrow();
-        Ok(repos.iter().filter(|r| state.keys_due.contains(*r)).cloned().collect())
+        let due = repos.iter().filter(|r| state.keys_due.contains(*r));
+        Ok(due.chain(&state.keys_stray).cloned().collect())
     }
 
     fn apt_simulate(&mut self, plan: AptPlan<'_>) -> Result<AptSimulation, HostError> {

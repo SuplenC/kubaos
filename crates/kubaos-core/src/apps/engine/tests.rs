@@ -1856,6 +1856,43 @@ fn a_self_updating_download_its_updater_rewrites_in_place_is_never_downloaded_ov
 }
 
 #[test]
+fn a_record_that_words_the_same_download_differently_is_rewritten_while_the_app_is_open() {
+    let open_check = "[[ready]]\ncheck = [\"test\", \"!\", \"-e\", \"@HOME@/tool-open\"]\nsays = \"Tool is running\"\n";
+    let tool = format!(
+        "{}{open_check}",
+        fixed_download("1.1", "file").replace("unpack =", "self_updates = true\nunpack =")
+    );
+    let world = World::new(&[("tool", &tool)]);
+    world.host.state.borrow_mut().downloads.insert(
+        "https://example.com/tool-1.1".to_owned(),
+        ("11".repeat(32), b"tool 1.1".to_vec()),
+    );
+    world.install("tool", true).0.unwrap();
+    // A journal from before the record said the updater rewrites the download in place.
+    let mut journal = world.journals("tool").0.unwrap();
+    for entry in &mut journal.entries {
+        if let crate::apps::action::Kind::Download { in_place, .. } = &mut entry.action.kind {
+            *in_place = false;
+        }
+    }
+    journal.save(&world.user_journals).unwrap();
+    fs::write(world.host_home().join("tool-open"), "").unwrap();
+    let mut root = world.root();
+    let mut events = Events::default();
+
+    world
+        .run(&mut root, &mut events, true, |e| e.install("tool", None))
+        .unwrap();
+
+    assert!(!root.started, "root was asked for");
+    let journal = world.journals("tool").0.unwrap();
+    assert!(journal.entries.iter().any(|e| matches!(
+        e.action.kind,
+        crate::apps::action::Kind::Download { in_place: true, .. }
+    )));
+}
+
+#[test]
 fn a_self_updating_download_of_a_folder_its_version_is_part_of_is_downloaded_again_when_its_pin_changes() {
     // `tool-@VERSION@` names the version in a folder of its own, not in place: a new build of
     // the same version replaces the old one, as for any download.
