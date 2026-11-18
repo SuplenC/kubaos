@@ -47,7 +47,7 @@ export type Target =
   | { readonly kind: "between"; readonly group: string; readonly index: number }
   | { readonly kind: "plus"; readonly group: string }
   | { readonly kind: "refused"; readonly group: string }
-  /** The delete zone: dropped there, it goes, with a few seconds to bring it back. */
+  /** The delete slot's reach: let go there, it waits in the slot, a few seconds to take it back out. */
   | { readonly kind: "bin" };
 
 /** A still state drawn on the overview for a sample: the same moves a hand makes, finished. */
@@ -55,12 +55,12 @@ export type Pin =
   | { readonly kind: "lit"; readonly space: string }
   | { readonly kind: "window"; readonly window: string; readonly to: Target; readonly crossing?: number }
   | { readonly kind: "space"; readonly space: string; readonly to: Target }
-  /** A window or a workspace carried toward the delete zone, or over it. */
-  /** `over`: on the round; `edge`: just inside the reach, far from the round; neither, on its way. */
+  /** A window or a workspace carried toward the delete slot: `over`, pulled in with the pointer on
+   * the slot; `edge`, pulled in with the pointer just inside the reach; neither, on its way. */
   | { readonly kind: "binning"; readonly what: Carried; readonly over: boolean | "edge" }
   /**
-   * Something dropped on the delete zone, `left` of its time to undo left; with `next`, a second
-   * thing carried over the zone meanwhile, or, `confirmed`, the first one gone and `what` pending.
+   * Something waiting in the delete slot, `left` of its time left; with `next`, a second thing carried
+   * into the slot meanwhile, or, `confirmed`, a first one deleted as `what` was let go there.
    */
   | { readonly kind: "pending"; readonly what: Carried; readonly left: number; readonly next?: Carried; readonly confirmed?: Carried }
   /** A window carried onto `to` and let go there: where it lands. */
@@ -90,7 +90,7 @@ export interface OverviewOptions {
    * the tip that teaches them is gone. The build keeps this in `~/.local/state/kubaos/overview.toml`.
    */
   readonly learned?: readonly Learned[];
-  /** The delete zone's reach drawn round it, dashed: a sample's annotation, not the Overview's. */
+  /** The delete slot's reach drawn round it, dashed: a sample's annotation, not the Overview's. */
   readonly reach?: boolean;
   /** Groups renamed, by id: a long name's sample. */
   readonly names?: Readonly<Record<string, string>>;
@@ -120,7 +120,7 @@ export interface Driver {
   readonly freeze: (at: number, commit?: boolean) => void;
   /** Lets go of the frozen moves, finished. */
   readonly thaw: () => void;
-  /** The middle of the delete zone where it stands, or would stand on the focused screen. */
+  /** The middle of the delete slot where it stands, or would stand on the focused screen. */
   readonly bin: () => Point;
   /** A point over `side` of `window` on `space`, in world points, and the order a workspace tiles its windows in. */
   readonly sidePoint: (space: string, window: string, side: model.Side) => Point;
@@ -133,7 +133,7 @@ export interface Driver {
   /** The drags learned, and whether the tip still shows. */
   readonly learned: () => Learned[];
   readonly tipShown: () => boolean;
-  /** What waits in the delete zone, or null. */
+  /** What waits in the delete slot, or null. */
   readonly pending: () => Carried | null;
   /** Draws the overview again with other options: another desk, view or fill. */
   readonly redraw: (options: Partial<OverviewOptions>) => void;
@@ -464,7 +464,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   marks.append(room, slit, aim, select);
 
   // How both drags go, on the focused screen: a tip on the frame's glass in the bottom margin's left
-  // end, under every miniature, the delete zone's corner left free. It shows every time until the
+  // end, under every miniature, the delete slot's corner left free. It shows every time until the
   // person has made both drags with the pointer, and then leaves for good. Each button is a phrase
   // of its own, which a mouse button's keycap can take the place of without the sentence changing.
   const tip = span("ov-tip", tipLine("Drag a window with the left button, a whole workspace with the right button."));
@@ -1477,7 +1477,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     }
     carry = null;
     delete root.dataset.carrying;
-    // Let go in the zone it keeps its lift: it vanishes from exactly how it is drawn.
+    // Let go in the reach it keeps its lift: it waits in the slot exactly as it is drawn.
     if (target?.kind !== "bin") delete was.element.dataset.held;
     delete was.element.dataset.refused;
     caught = false;
@@ -1700,7 +1700,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * Whether `point` is in the zone's reach: on its screen, within `scale.drop_reach` of the screen's
+   * Whether `point` is in the slot's reach: on its screen, within `scale.drop_reach` of the screen's
    * shorter side from the slot's middle. The carried thing covers the slot, so the drop counts
    * well before the pointer is on it.
    */
@@ -1755,8 +1755,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * A thing let go in the delete zone's reach shrinks to nothing and fades where it is drawn, from
-   * its size at that instant, settled in the round or mid-flight. Its origin moves to its own middle
+   * A thing deleted from the slot shrinks to nothing and fades where it is drawn, from its size at
+   * that instant, settled in the slot or mid-flight. Its origin moves to its own middle
    * with its place made up for, and everything it is drawn with is held as it is first, so the first
    * frame is the last frame of the carry: nothing grows, nothing jumps.
    */
@@ -1790,7 +1790,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-shrink", "0");
   }
 
-  /** Sets an element's glide into the zone: things leaving, over `medium`. */
+  /** Sets an element's glide as it is deleted: things leaving, over `medium`. */
   function bins(element: HTMLElement): void {
     if (settings().reduced) return glide(element, "none");
     element.style.setProperty("--ov-pt", "var(--motion-medium)");
@@ -2124,7 +2124,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     settle();
   }
 
-  /** A pin on the delete zone, which is measured, so played once the sample is on the page. */
+  /** A pin on the delete slot, which is measured, so played once the sample is on the page. */
   function applyZonePin(pin: Pin): void {
     if (pin.kind === "binning") {
       const from = liftThing(pin.what);
@@ -2178,14 +2178,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return at;
   }
 
-  /** Carries `what` onto the delete zone and lets go there. */
+  /** Carries `what` into the delete slot and lets go there. */
   function dropInBin(what: Carried): void {
     liftThing(what);
     moveCarry(binPoint());
     drop();
   }
 
-  /** The middle of the delete zone on the focused screen, or where it stands. */
+  /** The middle of the delete slot on the focused screen, or where it stands. */
   function binPoint(): Point {
     return binCentre();
   }
