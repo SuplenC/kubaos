@@ -28,6 +28,8 @@
 @property --ov-hover { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-bx { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-by { syntax: "<length>"; inherits: false; initial-value: 0px; }
 
 /* The sample: a whole screen, the size the stage or the full screen gives it. */
 .ov {
@@ -124,7 +126,7 @@
   opacity: var(--ov-arrive);
   scale: calc(var(--scale-behind) + (1 - var(--scale-behind)) * var(--ov-arrive));
   transform-origin: 50% 50%;
-  transform: translateY(calc(-1 * var(--space-s4) * var(--ov-hover))) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
+  transform: translate(var(--ov-bx), calc(var(--ov-by) - var(--space-s4) * var(--ov-hover))) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -134,7 +136,9 @@
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
     --ov-hover var(--motion-short) var(--easing-standard),
     --ov-held var(--motion-short) var(--easing-standard),
-    --ov-shrink var(--motion-short) var(--easing-standard);
+    --ov-shrink var(--motion-short) var(--easing-standard),
+    --ov-bx var(--motion-short) var(--easing-standard),
+    --ov-by var(--motion-short) var(--easing-standard);
 }
 
 /* The screen's own desktop flies over the others, shrinking into its place and growing out of it. */
@@ -276,7 +280,7 @@
   overflow: hidden;
   border-radius: calc(var(--radius-surface) - var(--space-s8));
   background: var(--color-surface);
-  transform: scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
+  transform: translate(var(--ov-bx), var(--ov-by)) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   box-shadow:
     inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
     0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
@@ -309,7 +313,9 @@
     --ov-sy var(--motion-short) var(--easing-standard),
     opacity var(--motion-short) var(--easing-standard),
     --ov-held var(--motion-short) var(--easing-standard),
-    --ov-shrink var(--motion-short) var(--easing-standard);
+    --ov-shrink var(--motion-short) var(--easing-standard),
+    --ov-bx var(--motion-short) var(--easing-standard),
+    --ov-by var(--motion-short) var(--easing-standard);
 }
 
 .ov-win[data-held] {
@@ -518,15 +524,13 @@
   transition-delay: var(--motion-medium);
 }
 
-/* The delete zone: in the corner while something is carried, or while a deletion waits. It rises
-   `space.s24` into place and fades in over `medium`, and leaves the same way, faster. */
+/* The delete zone: a round in the corner while something is carried, or while a deletion waits. It
+   rises `space.s24` into place and fades in over `medium`, and leaves the same way, faster. */
 .ov-bin {
   position: absolute;
   left: 0;
   top: 0;
   display: block;
-  width: var(--ov-w);
-  border-radius: var(--radius-content);
   translate: var(--ov-x) calc(var(--ov-y) + var(--space-s24));
   opacity: 0;
   pointer-events: none;
@@ -547,6 +551,23 @@
 .ov-bin[data-pending] {
   pointer-events: auto;
   cursor: pointer;
+}
+
+/* What it holds: the line, then the round at the corner. */
+.ov-bin-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s8);
+}
+
+/* The delete round drawn the medium round's size, grown to its own, the large, under a carry. */
+.ov-bin .ov-bin-delete {
+  scale: var(--ov-rest);
+  transition: scale var(--motion-short) var(--easing-standard);
+}
+
+.ov-bin[data-over] .ov-bin-delete {
+  scale: 1;
 }
 
 /* A thing gone into the zone: it shrinks into its symbol as it fades, over `medium`. */
@@ -570,10 +591,9 @@
   transition: none !important;
 }
 
-/* The zone's card alone, as wide as it stands in the corner: a move's sample. */
+/* The zone's round alone: a move's sample. */
 .ov-zone-alone {
   display: block;
-  width: var(--size-panel);
 }
 
 /* A corner of a screen cut out at its true size, for a sample: the screen stands where it would. */

@@ -9,8 +9,14 @@
 // round its circle in place of its lit tube, an unlit ring with a lit arc running clockwise from the
 // top as the hold fills, shown only while it is held. Its timing, its keys and what cancels it are
 // the one hold every held part shares (`lib/hold.ts`). A settings row's reset is one.
+//
+// An outlined icon button (`outlined`) stands on a picture: its circle is the frame's glass, its
+// symbol is in its tone, and its line shows at rest, as the tone's unlit glass; lit, it burns as
+// the kind's tube and glow do. The Overview's delete zone, and its Undo with the held ring as its
+// timer, are two.
 
-import { KINDS, lightKind, METRICS, paintKind, type Kind, type Size } from "./button.ts";
+import { KINDS, lightKind, METRICS, paintKind, TONES, type Kind, type Size } from "./button.ts";
+import { toneColour } from "./focus.ts";
 import { pin, type Pinned } from "./control.ts";
 import { type Held, withHint } from "./hint.ts";
 import { icon, type Morph, morphIcon } from "./icon.ts";
@@ -45,6 +51,8 @@ export interface IconButtonOptions {
   readonly hold?: () => void;
   /** A held button drawn this far through its hold, 0 to 1: a sample's. */
   readonly held?: number;
+  /** On a picture: the frame's glass for a circle, its symbol in its tone, its line shown at rest. */
+  readonly outlined?: boolean;
 }
 
 export function iconButton(options: IconButtonOptions): HTMLButtonElement {
@@ -59,6 +67,7 @@ export function iconButton(options: IconButtonOptions): HTMLButtonElement {
   element.setAttribute("aria-label", options.label);
   pin(element, options.pinned);
   paintKind(element, kind);
+  if (options.outlined) outline(element, kind);
   element.style.setProperty("--height", `var(--size-${METRICS[size].height})`);
   const slot = document.createElement("span");
   slot.className = "k-icon-slot";
@@ -74,6 +83,16 @@ export function iconButton(options: IconButtonOptions): HTMLButtonElement {
   const held: Held | undefined = options.hintAtEnd ? "end" : undefined;
   if (options.hint ?? true) withHint(element, options.label, { ...(options.hintAbove ? { side: "above" as const } : {}), ...(held ? { held } : {}) });
   return probe(element, { role: "component", name: "IconButton", variant: variant(kind, size), fixed: { width: true, height: true } });
+}
+
+/** An outlined button's colours: the frame's glass in every state, and its symbol in its tone. */
+function outline(element: HTMLElement, kind: Kind): void {
+  element.dataset.outlined = "";
+  const glass = "rgb(from var(--color-surface_container) r g b / var(--opacity-frame))";
+  for (const name of ["--fill", "--fill-lit", "--fill-off", "--fill-pressed"]) element.style.setProperty(name, glass);
+  if (kind === "Text" || kind === "Tonal") return;
+  const tone = `var(--color-${toneColour(TONES[kind])})`;
+  for (const name of ["--label", "--label-lit", "--label-off"]) element.style.setProperty(name, tone);
 }
 
 /** The ring a held button's hold fills: the Spinner's unlit ring and lit arc, round the circle. */

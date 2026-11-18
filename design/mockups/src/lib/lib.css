@@ -195,6 +195,21 @@
   pointer-events: none;
 }
 
+/* An outlined icon button (`lib/icon-button.ts`): its line shows at rest, as the tone's unlit glass,
+   and lit with the signs on it is the tube, with its glow; by day it stays glass. */
+.k-button[data-outlined] {
+  --line-shown: 1;
+}
+
+/* Its circle is the glass in every kind and state, a Text one's too, which has no fill elsewhere. */
+.k-button.k-kind[data-outlined] {
+  background: var(--fill);
+}
+
+.k-button[data-outlined] .k-ring > .k-tube {
+  border-color: color-mix(in srgb, var(--tube-unlit), var(--tube-lit) calc(var(--on) * 100%));
+}
+
 /* A held icon button's ring (`lib/icon-button.ts`): the Spinner's unlit ring and lit arc, `stroke.thin`
    in whole device pixels, inside the circle's edge, the arc running clockwise from the top as the
    hold fills, in place of the lit tube. It shows only while the button is held. */

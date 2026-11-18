@@ -5,7 +5,7 @@
 
 import type { Words } from "../../lib/content.ts";
 import { doesntApply, type Move, nonEmpty, page, screen, type Track } from "../../site/page.ts";
-import { DESKS, type OverviewOptions, overview, type Pin, sizeOf, VIEWS, zoneCard } from "./overview-parts.ts";
+import { DESKS, type OverviewOptions, overview, type Pin, sizeOf, VIEWS, zoneRound } from "./overview-parts.ts";
 
 type Shown = "rest" | "lit" | "pressed" | "selected" | "empty";
 
@@ -169,14 +169,14 @@ const INTO_ZONE: Move = {
 
 const TIMER: Move = {
   name: "The timer running",
-  what: "The Undo button's fill drains over `undo` on `linear`, as a held button's fills; empty, it closes.",
+  what: "The Undo round's ring drains over `undo` on `linear`, as a held round's fills; empty, it closes.",
   tracks: [{ part: "the fill", on: "Undo", target: ".k-button", property: "--hold", from: 1, to: 0, duration: "undo", curve: "linear" }],
   reduced: "same",
   back: "cuts",
   sample: () => {
     const zone = document.createElement("span");
     zone.className = "ov-zone-alone";
-    zone.append(zoneCard("window", { name: "just mockups", left: 1 }));
+    zone.append(zoneRound("window", { name: "just mockups", left: 1 }));
     return zone;
   },
 };
@@ -222,6 +222,7 @@ export default page<Shown>({
     { name: "The second dropped", for: "the first gone, the second waiting", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
     { name: "Brought back", for: "pressed: flying home", sample: at({ pin: { kind: "undoing", window: "w-term", share: 0.5 } }) },
     { name: "The tip, at true size", for: "the bottom left corner, 1:1", sample: corner({}, "left", 720, 160) },
+    { name: "Carrying, at true size", for: "the delete round waiting, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: false } }, "right", 720, 280) },
     { name: "Over the zone, at true size", for: "the bottom right corner, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: true } }, "right", 720, 280) },
     { name: "Waiting, at true size", for: "the zone's timer and Undo, 1:1", sample: corner({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }, "right", 720, 280) },
   ],

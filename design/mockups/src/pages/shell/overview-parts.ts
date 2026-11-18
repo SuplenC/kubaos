@@ -15,9 +15,9 @@
 // whole-desk view, where every screen stands as it does on the desk and the world is scaled to fit.
 
 import "./overview.css";
-import { tipLine, banner } from "../../lib/banner.ts";
-import { button } from "../../lib/button.ts";
+import { tipLine } from "../../lib/banner.ts";
 import { focusRing } from "../../lib/focus.ts";
+import { pill } from "../../lib/pill.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
@@ -334,19 +334,36 @@ function commit(element: Element): void {
   void getComputedStyle(element).opacity;
 }
 
-// ── The delete zone's card ──
+// ── The delete zone's round ──
 
 /**
- * What the delete zone holds: a Small Danger banner saying what a drop there does, "Close" for a
- * window and "Remove" for a workspace; with `waiting`, the name of what waits and the Undo button,
- * its fill `left` of the way, draining as its time runs out.
+ * What the delete zone holds: while something is carried, an outlined Danger round with the delete
+ * symbol, its name "Close" for a window and "Remove" for a workspace; with `waiting`, the same round
+ * as Undo, its held ring draining as the time to undo runs out (`left` of it still to go), and to
+ * its left one quiet line naming what waits.
  */
-export function zoneCard(what: "window" | "space", waiting?: { readonly name: string; readonly left: number }): HTMLElement {
-  const title = what === "window" ? "Close" : "Remove";
-  if (!waiting) return banner({ tone: "Danger", size: "Small", icon: "delete", title, body: "" });
-  const back = button({ label: "Undo", kind: "Tonal", size: "Sm", held: waiting.left });
-  back.tabIndex = -1;
-  return banner({ tone: "Danger", size: "Small", icon: "delete", title, body: waiting.name, actions: back });
+export function zoneRound(what: "window" | "space", waiting?: { readonly name: string; readonly left: number }, carrying = false): HTMLElement {
+  const zone = document.createElement("span");
+  zone.className = "ov-bin-content";
+  const remove = () => {
+    const round = iconButton({ icon: "delete", label: what === "window" ? "Close" : "Remove", kind: "Danger", size: "Lg", outlined: true, hint: false });
+    round.classList.add("ov-bin-delete");
+    return round;
+  };
+  if (!waiting) {
+    zone.append(remove());
+    return zone;
+  }
+  const said = pill({ lone: false, content: [text("Undo", "button_small"), text(waiting.name, "label", "on_surface_variant")] });
+  said.classList.add("ov-bin-line");
+  // Something carried while one waits: a drop on the round deletes it and the waiting one goes for good.
+  if (carrying) {
+    zone.append(said, remove());
+    return zone;
+  }
+  const back = iconButton({ icon: "undo", label: "Undo", kind: "Text", size: "Lg", outlined: true, held: waiting.left, hint: false });
+  zone.append(said, back);
+  return zone;
 }
 
 // ── The overview ──────────────────────────────────────────────────────────────────────────────
@@ -1177,6 +1194,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, extent: Math.max(rect.w, rect.h) * slot.s, target: { kind: "space", space }, point, bare: new Map() };
     root.dataset.carrying = "window";
     element.dataset.held = "";
+    if (pending) dressBin();
     place("reflow");
   }
 
@@ -1199,6 +1217,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     commit(made.root);
     root.dataset.carrying = "space";
     carry.target = spaceTarget(point);
+    if (pending) dressBin();
     place("reflow");
   }
 
@@ -1217,7 +1236,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const target = carry.kind === "window" ? windowTarget(point) : spaceTarget(point);
     if (sameTarget(target, carry.target)) return;
     carry.target = target;
-    bin.toggleAttribute("data-pinned", target?.kind === "bin");
+    lightBin(target?.kind === "bin");
     if (carry.kind === "window") {
       const scale = scaleOver(target);
       const rect = tiles.get(carry.id);
@@ -1226,8 +1245,15 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       element.style.setProperty("--ov-sy", String(scale));
       element.style.setProperty("--ov-badge", String(1 / scale));
     }
-    // Over the delete zone it shrinks round the pointer to the zone's height, so the lit zone shows.
-    element.style.setProperty("--ov-shrink", target?.kind === "bin" ? String(Math.min(1, binBox(viewOf(binOn!)!).h / carriedSize())) : "1");
+    // Over the delete zone it shrinks to a small round's size and stands off the round's top left
+    // edge, so the lit round shows beside it.
+    const over = target?.kind === "bin";
+    // A window's offset is drawn inside its own scale, so it is that much larger.
+    const within = carry.kind === "window" ? scaleOver(target) : 1;
+    const aside = over ? css(-L("size-control_lg") / 2 / within) : "0px";
+    element.style.setProperty("--ov-shrink", over ? String(Math.min(1, L("size-control_sm") / carriedSize())) : "1");
+    element.style.setProperty("--ov-bx", aside);
+    element.style.setProperty("--ov-by", aside);
     place("reflow");
   }
 
@@ -1259,6 +1285,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     delete was.element.dataset.held;
     delete was.element.dataset.refused;
     was.element.style.setProperty("--ov-shrink", "1");
+    was.element.style.setProperty("--ov-bx", "0px");
+    was.element.style.setProperty("--ov-by", "0px");
     delete landing.dataset.shown;
     if (target?.kind === "bin") {
       intoBin(was.kind === "window" ? { window: was.id } : { space: was.id }, was.element);
@@ -1268,6 +1296,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     else landSpace(was.id, was.element);
     sweepGone();
     place("reflow");
+    if (pending) dressBin();
     showBin();
     root.toggleAttribute("data-landed", landed);
   }
@@ -1434,7 +1463,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   let binOn: string | null = null;
 
   const bin = span("ov-bin");
-  const binRing = focusRing(bin, "content", "burn_error", false);
+  // At rest the round is drawn the medium round's size, and grows to the large one under a carry.
+  bin.style.setProperty("--ov-rest", String(L("size-control_md") / L("size-control_lg")));
   marks.append(bin);
   bin.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || carry || !pending) return;
@@ -1443,17 +1473,28 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     undo();
   });
 
-  /** The zone's words: what a drop there does, or what waits there and its way back. */
+  /** The zone's round: the delete one under a carry, or Undo with what waits beside it. */
   function dressBin(left = 1): void {
     if (pending) {
       const name = "window" in pending.what ? (desk.windows.get(pending.what.window)?.title ?? "") : spaceName(pending.taken);
-      bin.replaceChildren(zoneCard("window" in pending.what ? "window" : "space", { name, left }));
-      bin.dataset.pending = "";
+      bin.replaceChildren(zoneRound(carry?.kind === "window" || (!carry && "window" in pending.what) ? "window" : "space", { name, left }, carry !== null));
+      // The ring reads the time left from the zone, whose timer runs on however often the round is drawn.
+      bin.querySelector<HTMLElement>(".k-button[data-hold]")?.style.removeProperty("--hold");
+      if (!pending.drain) bin.style.setProperty("--hold", String(left));
+      bin.toggleAttribute("data-pending", !carry);
     } else {
-      bin.replaceChildren(zoneCard(carry?.kind === "window" ? "window" : "space"));
+      bin.replaceChildren(zoneRound(carry?.kind === "window" ? "window" : "space"));
       delete bin.dataset.pending;
     }
-    bin.append(binRing);
+  }
+
+  /** The zone's round, lit and grown while a carry is over it, as a lit Danger control is. */
+  function lightBin(over: boolean): void {
+    bin.toggleAttribute("data-over", over);
+    const round = bin.querySelector<HTMLElement>(".ov-bin-delete");
+    if (!round) return;
+    if (over) round.dataset.pinned = "lit";
+    else delete round.dataset.pinned;
   }
 
   /** A taken workspace's name: its number in its group, and its windows. */
@@ -1465,10 +1506,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return `Workspace ${number} and its ${count} windows`;
   }
 
-  /** The zone's place: the bottom right corner of screen `on`, `space.s16` in. */
+  /** The zone's place: the bottom right corner of screen `on`, `space.s16` in, as wide as it holds. */
   function binBox(on: ScreenView): model.Rect {
-    const w = L("size-panel");
-    const h = bin.offsetHeight > 0 ? bin.offsetHeight / settings().scale : L("size-row_two_line") + L("size-control_sm");
+    const scale = settings().scale;
+    const w = bin.offsetWidth > 0 ? bin.offsetWidth / scale : L("size-control_lg");
+    const h = bin.offsetHeight > 0 ? bin.offsetHeight / scale : L("size-control_lg");
     const inset = L("space-s16");
     return { x: on.at.x + on.size.w - inset - w, y: on.at.y + on.size.h - inset - h, w, h };
   }
@@ -1490,11 +1532,17 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     // It stands on its foot: grown with what it holds, it rises from the corner.
     const box = binBox(on);
     glide(bin, first || moved ? "none" : "reflow");
+    // It rises into its corner from just under it: put there at once, before it shows.
+    if (first) bin.style.transition = "none";
     bin.style.setProperty("--ov-x", css(box.x));
     bin.style.setProperty("--ov-y", css(box.y));
     bin.style.setProperty("--ov-w", css(box.w));
+    if (first) {
+      commit(bin);
+      bin.style.removeProperty("transition");
+    }
     bin.dataset.shown = "";
-    bin.toggleAttribute("data-pinned", carry?.target?.kind === "bin");
+    lightBin(carry?.target?.kind === "bin");
   }
 
   function overBin(point: Point): boolean {
@@ -1503,11 +1551,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return on ? inside(point, binBox(on)) : false;
   }
 
-  /** The zone's middle, in world points, where a thing dropped there goes. */
+  /** The round's middle, in world points, where a thing dropped there goes. */
   function binCentre(): Point {
     const on = viewOf(binOn ?? desk.focused) ?? views[0]!;
     const box = binBox(on);
-    return { x: box.x + L("space-s16") + L("type-label-icon") / 2, y: box.y + L("space-s16") + L("type-label-icon") / 2 };
+    return { x: box.x + box.w - L("size-control_lg") / 2, y: box.y + box.h / 2 };
   }
 
   /**
@@ -1518,7 +1566,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (pending) confirm();
     const { taken } = model.take(desk, what);
     const goal = binCentre();
-    const size = L("type-label-icon");
+    const size = L("type-button-icon");
     if ("window" in what) {
       const style = getComputedStyle(element);
       const k = Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1;
@@ -1573,10 +1621,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    * what is left of `duration.undo`, as a held button's fills; empty, the deletion is final.
    */
   function drain(left: number): void {
-    const back = bin.querySelector<HTMLElement>(".k-button");
-    if (!pending || !back) return;
+    if (!pending) return;
     const total = Number.parseFloat(raw("duration-undo")) / settings().speed;
-    const running = back.animate([{ "--hold": left }, { "--hold": 0 }], { duration: total * left, easing: "linear", fill: "forwards" });
+    const running = bin.animate([{ "--hold": left }, { "--hold": 0 }], { duration: total * left, easing: "linear", fill: "forwards" });
     pending = { ...pending, drain: running };
     running.finished.then(
       () => {
@@ -1603,7 +1650,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       spaceEls.delete(was.taken.space.id);
     }
     was.element.remove();
-    dressBin();
+    // Leaving, the zone fades out as it was drawn; it is drawn afresh when it comes back.
+    if (carry) dressBin();
+    else delete bin.dataset.pending;
     showBin();
   }
 
@@ -1627,7 +1676,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       }
       landSpace(was.what.space, was.element);
     }
-    dressBin();
+    delete bin.dataset.pending;
     showBin();
   }
 
