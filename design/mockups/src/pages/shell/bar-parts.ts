@@ -188,6 +188,58 @@ export function previewPill(branch = BRANCH, state: Shown = "rest"): HTMLElement
   return control([icon("code", "var(--icon-s16)", "var(--color-cold)")], `Live preview of feature/${branch}. Click to go back to the release`, state, { tone: "preview", lone: true });
 }
 
+// On air: the screen shared and the camera in use, each a pill of its own.
+
+/** What a share takes: a whole screen, one window, or a region drawn on a screen. */
+export type ShareKind = "screen" | "window" | "region";
+
+/** Each kind's symbol, the same in the picker's tabs and on the pill. */
+export const SHARE_ICONS: Record<ShareKind, string> = { screen: "desktop_windows", window: "app_window", region: "screenshot_region" };
+
+/** A share running: what it takes, named as the picker names it, and the app it goes to. */
+export interface Share {
+  readonly kind: ShareKind;
+  readonly what: string;
+  readonly who: string;
+}
+
+/** A camera in use: the app that has it. */
+export interface CameraUse {
+  readonly who: string;
+}
+
+/** What the on-air pills' hints say, one message each, the names as placeholders. */
+export const ON_AIR_WORDS = {
+  sharing: (what: string, who: string) => `Sharing ${what} · ${who}`,
+  camera: (who: string) => `Camera · ${who}`,
+} as const;
+
+/**
+ * The sharing pill: what is shared, by its kind's symbol alone, on the sharing tint in `sharing`,
+ * a circle a pill tall. Its hint says what and with whom; a press opens its panel.
+ */
+export function sharingPill(share: Share, state: Shown = "rest"): HTMLElement {
+  const made = control([icon(SHARE_ICONS[share.kind], "var(--icon-s16)", "var(--color-sharing)")], ON_AIR_WORDS.sharing(share.what, share.who), state, { tone: "sharing", lone: true });
+  made.classList.add("shell-on-air");
+  made.dataset.onAir = "sharing";
+  made.setAttribute("aria-haspopup", "dialog");
+  return made;
+}
+
+/** The camera pill: the camera's symbol alone on the camera's tint, in `recording`. Its hint names the app. */
+export function cameraPill(camera: CameraUse, state: Shown = "rest"): HTMLElement {
+  const made = control([icon("video", "var(--icon-s16)", "var(--color-recording)")], ON_AIR_WORDS.camera(camera.who), state, { tone: "camera", lone: true });
+  made.classList.add("shell-on-air");
+  made.dataset.onAir = "camera";
+  made.setAttribute("aria-haspopup", "dialog");
+  return made;
+}
+
+/** The on-air pills in their order: the share, then the camera. */
+export function onAirPills(on: { readonly sharing?: Share; readonly camera?: CameraUse }, state: Shown = "rest"): HTMLElement[] {
+  return [...(on.sharing ? [sharingPill(on.sharing, state)] : []), ...(on.camera ? [cameraPill(on.camera, state)] : [])];
+}
+
 // Recording.
 
 export interface RecordingOptions {
@@ -456,6 +508,10 @@ export interface BarContent {
   readonly playing: boolean;
   /** What plays, while something does. */
   readonly song?: Song;
+  /** A share runs: the sharing pill shows, first on the right, never given way. */
+  readonly sharing?: Share;
+  /** An app has the camera: the camera pill shows after the sharing pill, never given way. */
+  readonly camera?: CameraUse;
 }
 
 /** Every pill at once, as the shots' stand-ins hold them. */
@@ -576,6 +632,9 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   const right = document.createElement("span");
   right.className = "shell-bar-right";
   const folded = state.tray === "folded" || (content.update && !state.update) || (content.preview && !state.preview);
+  // First on the right, nearest the clock: the side is laid from its end, so a pill arriving here
+  // moves no other pill, and it lands in the room the eye already crosses to read the time.
+  right.append(...onAirPills(content, shown));
   right.append(content.tray && !folded ? trayPill() : morePill(shown));
   right.append(state.sysmon === "rings" ? rimPill(LOADS.slice(0, 3), shown) : sysmonPill({ readings: READINGS.slice(0, content.readings), state: shown }));
   right.append(mutePill({ ...(state.mute === "mic" ? { micOnly: true } : {}), ...(circle ? { pinned: { side: state.mute === "mic" ? "input" : "output", state: circle } } : {}) }), bellPill(false, shown), shedStatus({ shed: state.shed, state: shown }));

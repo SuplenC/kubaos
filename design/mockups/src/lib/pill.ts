@@ -23,13 +23,19 @@ import { probe } from "./probe.ts";
 import { cubic } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
-/** A pill's colours: the bar's own, or a tone's fill and ink together. */
-export type PillTone = "neutral" | "recording" | "preview";
+/**
+ * A pill's tone: the bar's own, a screen recording's, the live preview's cold tint, or what is on
+ * air, each tinted in its fixed meaning as the preview is in the cold accent: the screen shared, in
+ * `sharing`, and the camera in use, in the camera's privacy colour, `recording`.
+ */
+export type PillTone = "neutral" | "recording" | "preview" | "sharing" | "camera";
 
 const FILLS: Record<PillTone, { readonly fill: string; readonly ink: string; readonly tone: Tone }> = {
   neutral: { fill: "var(--color-surface_container)", ink: "var(--color-on_surface)", tone: "accent" },
   recording: { fill: "var(--color-error_container)", ink: "var(--color-on_error_container)", tone: "error" },
   preview: { fill: "rgb(from var(--color-cold) r g b / var(--opacity-tint))", ink: "var(--color-cold)", tone: "cold" },
+  sharing: { fill: "rgb(from var(--color-sharing) r g b / var(--opacity-tint))", ink: "var(--color-sharing)", tone: "sharing" },
+  camera: { fill: "rgb(from var(--color-recording) r g b / var(--opacity-tint))", ink: "var(--color-recording)", tone: "recording" },
 };
 
 export interface PillOptions {

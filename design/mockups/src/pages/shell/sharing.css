@@ -1,0 +1,123 @@
+/* The share prompt, the on-air panels and the marks on what is shared (`sharing-parts.ts`). */
+
+/* The choice's pane: five list rows tall in a well, its padding and gaps, for every kind, so the
+   picker and the panel keep their height as the kind changes. */
+.share-choice {
+  --share-pane: calc(5 * var(--size-row) + 4 * var(--space-s4) + 2 * var(--space-s8));
+}
+
+.share-pane {
+  display: grid;
+  align-content: center;
+  height: var(--share-pane);
+  border-radius: var(--radius-content);
+  outline: none;
+}
+
+.share-pane > * {
+  min-width: 0;
+}
+
+.share-region-pane {
+  height: 100%;
+}
+
+/* A window on the desktop: draft part, proposed. */
+.share-desk {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.share-window {
+  position: absolute;
+  box-sizing: border-box;
+  display: block;
+  padding: var(--space-s16);
+  border-radius: var(--corner);
+  background: var(--color-surface);
+}
+
+/* A shared window's border: `sharing`, the window border's width, over the neutral border, there
+   whether or not the window has the keyboard. The tube, while it has it, burns over it. */
+.share-border {
+  position: absolute;
+  inset: 0;
+  border: var(--line) solid var(--color-sharing);
+  border-radius: var(--corner);
+}
+
+/* A shared region's mark: the thin stroke just outside the region. */
+.share-region {
+  position: absolute;
+  display: block;
+  box-shadow: 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing);
+  pointer-events: none;
+}
+
+/* A shared screen's marks: squares a privacy dot's side, square, in the screen's own corners. */
+.share-corners {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.share-corner {
+  position: absolute;
+  width: var(--size-badge_dot);
+  height: var(--size-badge_dot);
+  background: var(--color-sharing);
+}
+
+.share-corner[data-at^="top"] {
+  top: 0;
+}
+
+.share-corner[data-at^="bottom"] {
+  bottom: 0;
+}
+
+.share-corner[data-at$="left"] {
+  left: 0;
+}
+
+.share-corner[data-at$="right"] {
+  right: 0;
+}
+
+/* Drawing a region: draft part, proposed. The dim is the box's own spread, so the box stays clear. */
+.share-draw {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  cursor: crosshair;
+  outline: none;
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+.share-draw[data-drawn] {
+  background: none;
+}
+
+.share-draw-box {
+  position: absolute;
+  display: none;
+  box-shadow:
+    0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-primary),
+    0 0 0 calc(var(--screen-width) + var(--screen-height)) rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+.share-draw[data-drawn] > .share-draw-box {
+  display: block;
+}
+
+.share-draw-size {
+  position: absolute;
+  display: none;
+}
+
+.share-draw[data-drawn] > .share-draw-size {
+  display: flex;
+}
