@@ -77,7 +77,7 @@
 .share-border {
   position: absolute;
   inset: 0;
-  border: var(--line) solid var(--color-sharing);
+  border: var(--line) solid var(--color-sharing_line);
   border-radius: var(--corner);
 }
 
@@ -85,7 +85,7 @@
 .share-region {
   position: absolute;
   display: block;
-  box-shadow: 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing);
+  box-shadow: 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line);
   pointer-events: none;
 }
 
@@ -102,7 +102,7 @@
   position: absolute;
   width: var(--size-bar);
   height: var(--size-bar);
-  background: var(--color-sharing);
+  background: var(--color-sharing_line);
 }
 
 .share-corner[data-at^="top"] {
@@ -142,7 +142,7 @@
   position: absolute;
   display: none;
   box-shadow:
-    0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing),
+    0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line),
     0 0 0 calc(var(--screen-width) + var(--screen-height)) rgb(from var(--color-scrim) r g b / var(--opacity-panel_scrim));
 }
 

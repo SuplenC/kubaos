@@ -1177,6 +1177,10 @@ warning = ""
 # shared, with `sharing_core` along its middle as `primary_core` runs along the accent's.
 burn_sharing = ""
 sharing = ""
+# The line of every on-air mark (a shared window's border, a region's line, a screen's corners) and
+# of a lit sharing control by day: violet that reads beside the window it marks and beside the dark
+# or light wallpaper past it, which text's fit, pinned dark by the day surfaces, would lose.
+sharing_line = ""
 # The sharing pill's fill and its ink: violet as strong as a recording's red on `error_container`,
 # so the pill is found at a glance the moment the screen is on air.
 sharing_container = ""
@@ -1281,7 +1285,7 @@ logo_core_cold = "#dcf1ff"
 burn_error = "oklch(0.56 0.21 27)"
 burn_success = "oklch(0.62 0.16 150)"
 burn_warning = "oklch(0.84 0.16 85)"
-burn_sharing = "oklch(0.52 0.22 300)"
+burn_sharing = "oklch(0.57 0.28 300)"
 burn_microphone = "oklch(0.70 0.18 55)"
 burn_recording = "oklch(0.55 0.22 29)"
 
@@ -1336,6 +1340,9 @@ error_container = { dark = { from = "burn_error", lightness = 0.5, chroma = 1.2 
 on_error_container = { dark = { mix = "burn_error", white = 0.85, text_on = ["error_container"] }, light = { from = "burn_error", lightness = 0.4, text_on = ["error_container"] } }
 # Sharing's container and its label, by the error container's recipe, so the sharing pill and the
 # camera's, on `error_container`, read as equals.
+# The on-air line: by night the neon tone; by day the burning tone itself, a graphic held to 3:1 on
+# the window and on a wallpaper dark or light, where the text role's fit would take it darker.
+sharing_line = { dark = { from = "sharing" }, light = { from = "burn_sharing" } }
 sharing_container = { dark = { from = "burn_sharing", lightness = 0.5, chroma = 1.2 }, light = { from = "burn_sharing", at_lightness = 0.93 } }
 on_sharing_container = { dark = { mix = "burn_sharing", white = 0.85, text_on = ["sharing_container"] }, light = { from = "burn_sharing", lightness = 0.4, text_on = ["sharing_container"] } }
 
@@ -1401,7 +1408,7 @@ cold_glass = { dark = { from = "cold_unlit" }, light = { from = "cold" } }
 error_glass = { dark = { from = "error_unlit" }, light = { from = "error" } }
 success_glass = { dark = { from = "success_unlit" }, light = { from = "success" } }
 warning_glass = { dark = { from = "warning_unlit" }, light = { from = "warning" } }
-sharing_glass = { dark = { from = "sharing_unlit" }, light = { from = "sharing" } }
+sharing_glass = { dark = { from = "sharing_unlit" }, light = { from = "sharing_line" } }
 microphone_glass = { dark = { from = "microphone_unlit" }, light = { from = "microphone" } }
 recording_glass = { dark = { from = "recording_unlit" }, light = { from = "recording" } }
 primary_lit = { dark = { from = "primary_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
@@ -1548,6 +1555,9 @@ pairs = [
   { fg = "sharing", bg = "surface_container_high", need = "graphic", use = "The sharing tube and dot, on a dialog or panel card" },
   { fg = "sharing", bg = "surface_container_highest", need = "graphic", use = "The sharing tube and dot, on the highest container" },
   { fg = "on_sharing_container", bg = "sharing_container", need = "text", use = "The sharing pill's symbol and its count" },
+  { fg = "sharing_line", bg = "surface", need = "graphic", use = "An on-air mark: a shared window's border on its surface" },
+  { fg = "sharing_line", bg = "surface_container_lowest", need = "graphic", use = "An on-air mark beside the lowest container" },
+  { fg = "sharing_line", bg = "surface_container_highest", need = "graphic", use = "An on-air mark beside the highest container" },
   { fg = "microphone", bg = "surface", need = "text", use = "A listening microphone's words, on a page" },
   { fg = "microphone", bg = "surface_container_lowest", need = "text", use = "A listening microphone's words, on the lock screen" },
   { fg = "microphone", bg = "surface_container_low", need = "text", use = "A listening microphone's words, on a well" },
