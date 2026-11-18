@@ -1,0 +1,4 @@
+# The media player mockup's songs to try on this machine only: their licences may not
+# allow redistributing the files, so they never reach the repo. The player plays
+# whatever is there and is complete without it (README.md, beside this file).
+/local/
