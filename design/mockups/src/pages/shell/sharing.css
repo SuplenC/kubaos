@@ -6,9 +6,10 @@
   --share-pane: calc(5 * var(--size-row) + 4 * var(--space-s4) + 2 * var(--space-s8));
 }
 
+/* The screens sit under the tabs, as the windows' list does, the pane's room left under them. */
 .share-pane {
   display: grid;
-  align-content: center;
+  align-content: start;
   height: var(--share-pane);
   border-radius: var(--radius-content);
   outline: none;
@@ -18,8 +19,9 @@
   min-width: 0;
 }
 
-.share-region-pane {
-  height: 100%;
+/* A region's words fill the pane, centred in it as an EmptyState is in its room. */
+.share-pane[data-kind="region"] {
+  align-content: stretch;
 }
 
 /* A window on the desktop: draft part, proposed. */

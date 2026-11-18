@@ -66,7 +66,7 @@ export default page<State>({
   slug: "on-air-marks",
   title: "On-air marks",
   lede: "What is shared, marked in violet for the person alone, never in the stream.",
-  code: { unbuilt: "Not built yet: Hyprland and the shell" },
+  code: { unbuilt: "Not built: Hyprland, the shell" },
   stage: { live, hint: "click a window: the shared one's tube burns violet", daylight: true },
   variants: [
     { name: "A window, not focused", for: "its border violet; nothing else", sample: shown({ shared: { kind: "window", index: 1 }, focused: 0 }) },

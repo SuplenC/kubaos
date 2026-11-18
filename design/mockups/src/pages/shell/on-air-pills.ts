@@ -42,8 +42,8 @@ function live(): HTMLElement {
   let open: "sharing" | "camera" | null = null;
   const draw = () => {
     const share = shareOf(pick, MEET);
-    const sharing = sharingPill(share, open === "sharing" ? "lit" : "rest");
-    const camera = cameraPill(CAMERA, open === "camera" ? "lit" : "rest");
+    const sharing = sharingPill(share);
+    const camera = cameraPill(CAMERA);
     sharing.addEventListener("click", () => toggle("sharing"));
     camera.addEventListener("click", () => toggle("camera"));
     const bar = [sharing, camera, mutePill({ input: { recording: true } }), bellPill(), statusPill()];
@@ -53,7 +53,7 @@ function live(): HTMLElement {
             pick,
             onPick: (next) => {
               pick = next;
-              const fresh = sharingPill(shareOf(pick, MEET), "lit");
+              const fresh = sharingPill(shareOf(pick, MEET));
               fresh.addEventListener("click", () => toggle("sharing"));
               holder.querySelector(".shell-on-air[data-on-air=sharing]")?.replaceWith(fresh);
             },
@@ -202,7 +202,7 @@ export default page<State>({
       rest: "its symbol in its colour on its tint",
       lit: "pointer: its tube in its colour, glow at night, hint",
       pressed: "the tube white-hot",
-      open: "its panel under it, the pill held lit",
+      open: "its panel under it; the pill rests, its hint off the title",
     },
   },
   focus: {

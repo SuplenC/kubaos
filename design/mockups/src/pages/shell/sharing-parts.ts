@@ -378,11 +378,14 @@ export function shareOf(pick: Pick, who: Asker, options: { displays?: readonly D
 
 // The panels the pills open.
 
-/** The bar over a panel on the screen's corner: the on-air pills, the mute pill, the bell, status. */
-function cornerBar(sharing?: Share, camera?: CameraUse, open?: "sharing" | "camera"): Element[] {
+/**
+ * The bar over a panel on the screen's corner: the on-air pills, the mute pill, the bell, status.
+ * The pill whose panel is open rests: lit, its hint would lie over the panel's title.
+ */
+function cornerBar(sharing?: Share, camera?: CameraUse): Element[] {
   return [
-    ...(sharing ? [sharingPill(sharing, open === "sharing" ? "lit" : "rest")] : []),
-    ...(camera ? [cameraPill(camera, open === "camera" ? "lit" : "rest")] : []),
+    ...(sharing ? [sharingPill(sharing)] : []),
+    ...(camera ? [cameraPill(camera)] : []),
     mutePill(),
     bellPill(),
     statusPill(),
@@ -473,12 +476,12 @@ export function cameraPanel(options: CameraPanelOptions = {}): HTMLElement {
 /** The sharing panel open under its pill, the camera's pill beside it. */
 export function sharingShot(options: SharingPanelOptions = {}, camera = true): HTMLElement {
   const pick = { ...FIRST, ...options.pick };
-  return onCorner(sharingPanel(options), cornerBar(shareOf(pick, options.asker ?? MEET), camera ? { who: DISCORD.app } : undefined, "sharing"));
+  return onCorner(sharingPanel(options), cornerBar(shareOf(pick, options.asker ?? MEET), camera ? { who: DISCORD.app } : undefined));
 }
 
 /** The camera panel open under its pill, the sharing pill beside it. */
 export function cameraShot(options: CameraPanelOptions = {}, sharing = true): HTMLElement {
-  return onCorner(cameraPanel(options), cornerBar(sharing ? shareOf(FIRST, MEET) : undefined, { who: (options.who ?? DISCORD).app }, "camera"));
+  return onCorner(cameraPanel(options), cornerBar(sharing ? shareOf(FIRST, MEET) : undefined, { who: (options.who ?? DISCORD).app }));
 }
 
 // Draft parts, proposed for the library: a window on the desktop, the on-air marks, the region's drawing.
