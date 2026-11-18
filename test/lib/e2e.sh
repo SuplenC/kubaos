@@ -1556,7 +1556,8 @@ c_notifications() {
 # stub_screenshot_tools DIR: stand-ins for what dot-hypr-screenshot calls, in DIR. Two monitors
 # (1920x1200 at scale 1.5, 1920x1080 at 1), so grim's frame is 5760x1800 with a red 150x75 box at
 # pixel 300,150. Every call is logged to DIR/calls; slurp answers 200,100 100x50 (that box in
-# logical coordinates) or cancels when DIR/cancel exists.
+# logical coordinates) or cancels when DIR/cancel exists. socat is Hyprland's event stream: a
+# `openlayer>>hyprpicker` a monitor once hyprpicker runs, after a moment.
 stub_screenshot_tools() {
   local d=$1 tool
   for tool in notify-send xdg-user-dir; do printf '#!/bin/sh\nexit 0\n' >"$d/$tool"; done
@@ -1565,18 +1566,23 @@ stub_screenshot_tools() {
 D=$(dirname "$0")
 case "$*" in
   "-j monitors") echo '[{"x":0,"y":0,"scale":1.5},{"x":1920,"y":0,"scale":1}]' ;;
-  "-j layers")
-    if [[ -e $D/picker.pid ]]; then
-      echo '{"A":{"levels":{"3":[{"namespace":"hyprpicker"}]}},"B":{"levels":{"3":[{"namespace":"hyprpicker"}]}}}'
-    else
-      echo '{}'
-    fi ;;
 esac
+STUB
+  cat >"$d/socat" <<'STUB'
+#!/bin/bash
+D=$(dirname "$0")
+echo "activewindow>>foot,~"
+until [[ -e $D/picker.pid ]]; do sleep 0.02; done
+sleep 0.2
+echo "openlayer>>hyprpicker"
+echo "openlayer>>hyprpicker"
+echo "maps seen" >>"$D/calls"
 STUB
   cat >"$d/grim" <<'STUB'
 #!/bin/bash
 D=$(dirname "$0")
 echo "grim $*" >>"$D/calls"
+! grep -q '^maps seen$' "$D/calls" || echo "grim saw the freeze" >>"$D/calls"
 magick -size 5760x1800 xc:white -fill red -draw 'rectangle 300,150 449,224' "${@: -1}"
 STUB
   cat >"$d/hyprpicker" <<'STUB'
@@ -1622,6 +1628,8 @@ c_screenshot() {
   [[ -n $shot ]] && [[ "$(magick "$shot" -format '%wx%h %[pixel:p{0,0}] %[pixel:p{149,74}]' info:)" == "150x75 srgb(255,0,0) srgb(255,0,0)" ]] \
     && echo "ok   region crops the selection at scale 1.5 from the frame taken before slurp" \
     || { echo "FAIL region crop: ${shot:-no file}"; bad=1; }
+  grep -q 'grim saw the freeze' "$t/bin/calls" \
+    && echo "ok   the frame is taken once the freeze is on every monitor" || { echo "FAIL frame taken before the freeze showed"; bad=1; }
   grep -q 'hyprpicker --render-inactive --no-zoom' "$t/bin/calls" && grep -q 'slurp saw the freeze' "$t/bin/calls" \
     && echo "ok   hyprpicker's overlay is up when slurp starts" || { echo "FAIL freeze not up before slurp"; bad=1; }
   wait_for_file "$t/bin/picker.ended" && echo "ok   the trap ended the freeze" || { echo "FAIL hyprpicker was left running"; bad=1; }

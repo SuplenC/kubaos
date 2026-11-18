@@ -13,9 +13,8 @@
 # it to the clipboard (Enter or Ctrl+C; Ctrl+S saves).
 #
 # A region shot freezes the screen the moment the key is pressed, as macOS does: what moves, or
-# shows only while focused (a menu, a hover), stays as it was, and the selection cuts from that
-# frame. The freeze ends with the selection, on Esc and on any error.
-# Needs: grim, slurp, wl-clipboard, imagemagick (apt), hyprpicker, jq, satty (Nix), hyprctl.
+# shows only while focused (a menu, a hover), stays as it was, and the shot is that frozen frame. The freeze ends with the selection, on Esc and on any error.
+# Needs: grim, slurp, wl-clipboard, imagemagick, socat (apt), hyprpicker, jq, satty (Nix), hyprctl.
 set -euo pipefail
 
 # satty runs the copy command through `sh -c` and writes a PNG to its stdin. wl-copy without a type
@@ -25,15 +24,10 @@ edit() {
     --copy-command 'wl-copy --type image/png' --actions-on-enter save-to-clipboard,save-to-file --early-exit
 }
 
-# Waits until hyprpicker has a layer on every monitor, so its frozen frame is on screen before
-# slurp starts. Gives up after 2 s and goes on: the freeze is then late, not missing.
-wait_for_freeze() {
-  local want i
-  want=$(hyprctl -j monitors | jq length)
-  for ((i = 0; i < 40; i++)); do
-    [[ $(hyprctl -j layers | jq '[.[].levels[][] | select(.namespace == "hyprpicker")] | length') -ge $want ]] && return
-    sleep 0.05
-  done
+# Hyprland's event stream, for at most 2 s: the freeze's wait gives up then and goes on, the shot
+# then a moment late, not missing.
+events() {
+  timeout 2 socat -U - "UNIX-CONNECT:${XDG_RUNTIME_DIR:-}/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket2.sock"
 }
 
 # Crops the region "X,Y WxH" (logical coordinates) of the full capture $1 into $2. grim draws the
@@ -51,23 +45,31 @@ crop() {
 
 # Freezes the screen and cuts the selection out of the frozen frame into $1; exits 0 on Esc.
 #
-# The full grim capture is taken before slurp starts and cropped afterwards. A `grim -g` after
-# the selection would shoot whatever is on screen then: slurp's box while it is still up, and the
-# overlay hyprpicker repaints from its own copy of the frame. The capture taken first has neither
-# slurp's box nor the cursor and is the compositor's own pixels; hyprpicker only shows the frozen
-# frame to select on. The trap ends the freeze however the script ends.
+# The full capture is taken once the freeze is on every monitor and before slurp starts, so it is
+# the frame the selection is made on: hyprpicker draws its copy of the screen pixel for pixel,
+# fractional scale included, and nothing over it with --no-zoom. A capture before the freeze would
+# be of an earlier moment than the one shown, and a `grim -g` after the selection would have
+# slurp's box in it. The trap ends the freeze however the script ends.
+#
+# HAZARD: wait for `openlayer>>hyprpicker`, which Hyprland sends when the layer maps with the
+# frame drawn; `hyprctl layers` lists it from its creation, before. And hyprpicker's layer has no
+# animation (config/hypr/rules.lua): a capture taken while it fades in has the live screen in it.
 #
 # That capture spans every monitor at the highest scale, tens of megapixels, so it is a raw PPM:
-# a PNG would take about a second to compress before the freeze shows, and as long again to
-# decode for the crop. Only the cropped selection is compressed, into the saved PNG.
+# a PNG would take about a second to compress, and as long again to decode for the crop. Only the
+# cropped selection is compressed, into the saved PNG.
 capture_region() {
-  local geometry
+  local geometry want
   scratch=$(mktemp -d)
   trap '[[ -z $picker ]] || kill "$picker" 2>/dev/null || true; rm -rf "$scratch"' EXIT
-  grim -t ppm "$scratch/full.ppm"
+  want=$(hyprctl -j monitors | jq length)
+  # Listening before hyprpicker starts, so no map is missed.
+  exec 3< <(events)
   hyprpicker --render-inactive --no-zoom --quiet >/dev/null 2>&1 &
   picker=$!
-  wait_for_freeze
+  grep -m "$want" -x 'openlayer>>hyprpicker' <&3 >/dev/null || true
+  exec 3<&-
+  grim -t ppm "$scratch/full.ppm"
   geometry=$(slurp -d) || exit 0
   kill "$picker" 2>/dev/null || true
   crop "$scratch/full.ppm" "$1" "$geometry"

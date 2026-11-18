@@ -112,7 +112,9 @@ hl.window_rule({
 
 hl.layer_rule({ match = { namespace = "^launcher$" }, blur = true, animation = "popin 90%" }) -- fuzzel
 hl.layer_rule({ match = { namespace = "^selection$" }, animation = "fade" })                -- slurp
-hl.layer_rule({ match = { namespace = "^hyprpicker$" }, animation = "fade" })
+-- The region screenshot's freeze is there at once, as it shows the frame being shot; the shot is
+-- taken as it appears (scripts/dot-hypr-screenshot), so a fade would put the live screen in it.
+hl.layer_rule({ match = { namespace = "^hyprpicker$" }, no_anim = true })
 
 -- Quickshell (config/quickshell). The shell animates its own surfaces, so
 -- Hyprland must not animate them too. The frame (bar, border and panels) is
