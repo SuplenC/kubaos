@@ -13,10 +13,12 @@
 //! logind also looks at a closed lid again while it stays closed, so a laptop closed plugged in
 //! and then unplugged suspends. The holder does the same with [`Recheck`], which is also how a lid
 //! closed when a lid-holding Keep awake ends gets its action: the holder stays while the lid is
-//! closed.
+//! closed. A closed lid whose action turns from nothing to something (the dock pulled, the Keep
+//! awake ended) locks at once, as closing it there would have.
 //!
 //! ```text
-//! Lid held, lid closed ─▶ nothing ─Keep awake ends─▶ the setting, once closed HOLDOFF awake
+//! Lid closed docked ─▶ nothing ─dock pulled─▶ lock ─▶ suspend, if set, once closed HOLDOFF
+//! Lid held, lid closed ─▶ nothing ─Keep awake ends─▶ the same
 //! ```
 //!
 //! # Owns
@@ -68,28 +70,45 @@ pub fn holder_ends(settings: &Settings, lid_held: bool, closed: bool) -> bool {
     !closed && !needs_holder(settings, lid_held)
 }
 
+/// What the holder does with a lid that stays closed, at one of its ticks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Step {
+    Wait,
+    Lock,
+    Suspend,
+}
+
 /// The holder's recheck of a lid that stays closed, fed every [`TICK`] with the time awake.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Recheck {
     /// When the lid was first seen closed, or the last suspend it asked for, whichever is later.
     since: Option<Duration>,
+    /// The lid's action at the last tick it was closed; none at the first, whose closing the lid
+    /// bind has already acted on.
+    last: Option<LidAction>,
 }
 
 impl Recheck {
-    /// Whether to suspend now, `now` being the time awake (a monotonic clock, which stands still
-    /// while suspended). Only a suspend is rechecked: a lock, like logind's, is for the moment the
-    /// lid closes.
-    pub fn tick(&mut self, now: Duration, closed: bool, action: LidAction) -> bool {
+    /// What to do now, `now` being the time awake (a monotonic clock, which stands still while
+    /// suspended). A suspend comes once the lid has been closed [`HOLDOFF`]; a lock comes at once
+    /// when the action turns from nothing to something, since an undocked closed lid is never left
+    /// unlocked.
+    pub fn tick(&mut self, now: Duration, closed: bool, action: LidAction) -> Step {
         if !closed {
             self.since = None;
-            return false;
+            self.last = None;
+            return Step::Wait;
         }
         let since = *self.since.get_or_insert(now);
+        let was = self.last.replace(action);
         if action == LidAction::Suspend && now.saturating_sub(since) >= HOLDOFF {
             self.since = Some(now);
-            return true;
+            return Step::Suspend;
         }
-        false
+        if was == Some(LidAction::Nothing) && action != LidAction::Nothing {
+            return Step::Lock;
+        }
+        Step::Wait
     }
 }
 

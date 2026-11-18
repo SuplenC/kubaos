@@ -42,45 +42,117 @@ fn logind_keeps_the_lid_while_the_settings_are_its_own() {
 fn a_lid_closed_plugged_in_then_unplugged_suspends_after_the_holdoff() {
     let mut recheck = Recheck::default();
 
-    assert!(!recheck.tick(secs(0), true, LidAction::Nothing));
-    assert!(!recheck.tick(secs(600), true, LidAction::Nothing));
-    assert!(recheck.tick(secs(605), true, LidAction::Suspend));
+    assert_eq!(Step::Wait, recheck.tick(secs(0), true, LidAction::Nothing));
+    assert_eq!(Step::Wait, recheck.tick(secs(600), true, LidAction::Nothing));
+    assert_eq!(Step::Suspend, recheck.tick(secs(605), true, LidAction::Suspend));
 }
 
 #[test]
 fn a_lid_just_closed_waits_the_holdoff_before_a_recheck_suspends() {
     let mut recheck = Recheck::default();
 
-    assert!(!recheck.tick(secs(100), true, LidAction::Suspend));
-    assert!(!recheck.tick(secs(125), true, LidAction::Suspend));
-    assert!(recheck.tick(secs(130), true, LidAction::Suspend));
+    assert_eq!(Step::Wait, recheck.tick(secs(100), true, LidAction::Suspend));
+    assert_eq!(Step::Wait, recheck.tick(secs(125), true, LidAction::Suspend));
+    assert_eq!(Step::Suspend, recheck.tick(secs(130), true, LidAction::Suspend));
 }
 
 #[test]
 fn after_a_suspend_it_waits_the_holdoff_again_and_an_open_lid_starts_over() {
     let mut recheck = Recheck::default();
-    recheck.tick(secs(0), true, LidAction::Suspend);
-    assert!(recheck.tick(secs(30), true, LidAction::Suspend));
+    let _ = recheck.tick(secs(0), true, LidAction::Suspend);
+    assert_eq!(Step::Suspend, recheck.tick(secs(30), true, LidAction::Suspend));
 
-    assert!(!recheck.tick(secs(35), true, LidAction::Suspend));
-    assert!(recheck.tick(secs(60), true, LidAction::Suspend));
+    assert_eq!(Step::Wait, recheck.tick(secs(35), true, LidAction::Suspend));
+    assert_eq!(Step::Suspend, recheck.tick(secs(60), true, LidAction::Suspend));
 
-    assert!(!recheck.tick(secs(65), false, LidAction::Suspend));
-    assert!(!recheck.tick(secs(70), true, LidAction::Suspend));
+    assert_eq!(Step::Wait, recheck.tick(secs(65), false, LidAction::Suspend));
+    assert_eq!(Step::Wait, recheck.tick(secs(70), true, LidAction::Suspend));
 }
 
 #[test]
-fn a_recheck_never_locks_and_docked_never_suspends() {
+fn a_recheck_leaves_a_lid_its_bind_locked_and_docked_never_suspends() {
     let mut recheck = Recheck::default();
 
     for now in [0, 30, 60, 90] {
-        assert!(!recheck.tick(secs(now), true, LidAction::Lock));
+        assert_eq!(Step::Wait, recheck.tick(secs(now), true, LidAction::Lock));
     }
     let settings = Settings::default();
     let mut docked = Recheck::default();
     for now in [0, 30, 60, 90] {
-        assert!(!docked.tick(secs(now), true, action(&settings, true, Power::Battery, false)));
+        assert_eq!(
+            Step::Wait,
+            docked.tick(secs(now), true, action(&settings, true, Power::Battery, false))
+        );
     }
+}
+
+#[test]
+fn a_dock_pulled_under_a_closed_lid_locks_at_once() {
+    let mut settings = Settings::default();
+    settings.ac.lid = LidAction::Lock;
+    let mut recheck = Recheck::default();
+
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(0), true, action(&settings, true, Power::Ac, false))
+    );
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(600), true, action(&settings, true, Power::Ac, false))
+    );
+    assert_eq!(
+        Step::Lock,
+        recheck.tick(secs(605), true, action(&settings, false, Power::Ac, false))
+    );
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(610), true, action(&settings, false, Power::Ac, false))
+    );
+}
+
+#[test]
+fn a_dock_pulled_under_a_closed_lid_on_battery_locks_at_once_and_suspends_after_the_holdoff() {
+    let settings = Settings::default();
+    let mut recheck = Recheck::default();
+
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(0), true, action(&settings, true, Power::Ac, false))
+    );
+    let undocked = action(&settings, false, Power::Battery, false);
+    assert_eq!(Step::Lock, recheck.tick(secs(5), true, undocked));
+    assert_eq!(Step::Wait, recheck.tick(secs(25), true, undocked));
+    assert_eq!(Step::Suspend, recheck.tick(secs(30), true, undocked));
+}
+
+#[test]
+fn a_lid_docked_again_then_pulled_again_locks_again() {
+    let mut settings = Settings::default();
+    settings.ac.lid = LidAction::Lock;
+    let docked = action(&settings, true, Power::Ac, false);
+    let undocked = action(&settings, false, Power::Ac, false);
+    let mut recheck = Recheck::default();
+
+    assert_eq!(Step::Wait, recheck.tick(secs(0), true, docked));
+    assert_eq!(Step::Lock, recheck.tick(secs(5), true, undocked));
+    assert_eq!(Step::Wait, recheck.tick(secs(10), true, docked));
+    assert_eq!(Step::Lock, recheck.tick(secs(15), true, undocked));
+}
+
+#[test]
+fn an_open_lid_never_locks_docked_or_not() {
+    let mut settings = Settings::default();
+    settings.ac.lid = LidAction::Lock;
+    let mut recheck = Recheck::default();
+
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(0), false, action(&settings, true, Power::Ac, false))
+    );
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(5), false, action(&settings, false, Power::Ac, false))
+    );
 }
 
 #[test]
@@ -124,22 +196,28 @@ fn a_lid_closed_while_held_suspends_once_the_keep_awake_ends() {
 
     for now in [0, 30, 600] {
         let kept = action(&settings, false, Power::Battery, true);
-        assert!(!recheck.tick(secs(now), true, kept));
+        assert_eq!(Step::Wait, recheck.tick(secs(now), true, kept));
     }
     assert!(!holder_ends(&settings, false, true));
-    assert!(recheck.tick(secs(605), true, action(&settings, false, Power::Battery, false)));
+    assert_eq!(
+        Step::Suspend,
+        recheck.tick(secs(605), true, action(&settings, false, Power::Battery, false))
+    );
 }
 
 #[test]
-fn a_lid_closed_just_before_the_keep_awake_ends_waits_the_holdoff() {
+fn a_lid_closed_just_before_the_keep_awake_ends_locks_and_waits_the_holdoff_to_suspend() {
     let settings = Settings::default();
     let mut recheck = Recheck::default();
     let over = action(&settings, false, Power::Battery, false);
 
-    assert!(!recheck.tick(secs(100), true, action(&settings, false, Power::Battery, true)));
-    assert!(!recheck.tick(secs(105), true, over));
-    assert!(!recheck.tick(secs(125), true, over));
-    assert!(recheck.tick(secs(130), true, over));
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(100), true, action(&settings, false, Power::Battery, true))
+    );
+    assert_eq!(Step::Lock, recheck.tick(secs(105), true, over));
+    assert_eq!(Step::Wait, recheck.tick(secs(125), true, over));
+    assert_eq!(Step::Suspend, recheck.tick(secs(130), true, over));
 }
 
 /// Whether the lid is held, as the state file of each form of Keep awake says.
@@ -199,8 +277,14 @@ fn a_holder_the_settings_need_keeps_working_under_a_plain_keep_awake() {
     assert!(needs_holder(&settings, plain));
     assert!(!holder_ends(&settings, plain, false));
     assert_eq!(action(&settings, false, Power::Ac, plain), LidAction::Suspend);
-    assert!(!recheck.tick(secs(0), true, action(&settings, false, Power::Ac, plain)));
-    assert!(recheck.tick(secs(30), true, action(&settings, false, Power::Ac, plain)));
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(0), true, action(&settings, false, Power::Ac, plain))
+    );
+    assert_eq!(
+        Step::Suspend,
+        recheck.tick(secs(30), true, action(&settings, false, Power::Ac, plain))
+    );
 }
 
 #[test]
@@ -210,7 +294,13 @@ fn a_lid_closed_under_a_keep_awake_turned_plain_suspends_after_the_holdoff() {
     let plain = lid_held(awake::State::on(0));
     let mut recheck = Recheck::default();
 
-    assert!(!recheck.tick(secs(0), true, action(&settings, false, Power::Battery, held)));
+    assert_eq!(
+        Step::Wait,
+        recheck.tick(secs(0), true, action(&settings, false, Power::Battery, held))
+    );
     assert!(!holder_ends(&settings, plain, true));
-    assert!(recheck.tick(secs(30), true, action(&settings, false, Power::Battery, plain)));
+    assert_eq!(
+        Step::Suspend,
+        recheck.tick(secs(30), true, action(&settings, false, Power::Battery, plain))
+    );
 }
