@@ -236,26 +236,30 @@ export function shareChoice(options: ChoiceOptions = {}): Choice {
   }
 
   function windowList(): HTMLElement {
+    // The list counts its app labels among its items, so each window's row has an item index of its own.
     const items: ListItem[] = [];
-    let at = 0;
+    const rowOf: number[] = [];
     for (const [index, app] of apps.entries()) {
       items.push(listLabel(app.app, index > 0));
       for (const title of app.titles) {
+        rowOf.push(items.length);
         items.push({
           title,
           named: true,
           tile: true,
           icon: "app_window",
           ...(app.picture ? { picture: app.picture } : { initial: app.app }),
-          checked: at === pick.window,
+          checked: rowOf.length - 1 === pick.window,
         });
-        at += 1;
       }
     }
     return scrollingList(items, {
       height: "var(--share-pane)",
-      ...(keyboard ? { current: pick.window } : {}),
-      onTake: (index) => set({ window: index }),
+      ...(keyboard ? { current: rowOf[pick.window] ?? 1 } : {}),
+      onTake: (item) => {
+        const window = rowOf.indexOf(item);
+        if (window >= 0) set({ window });
+      },
     });
   }
 
