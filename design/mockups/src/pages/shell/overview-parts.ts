@@ -1460,7 +1460,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     }
     carry = null;
     delete root.dataset.carrying;
-    delete was.element.dataset.held;
+    // Let go in the zone it keeps its lift: it vanishes from exactly how it is drawn.
+    if (target?.kind !== "bin") delete was.element.dataset.held;
     delete was.element.dataset.refused;
     if (pull) cancelAnimationFrame(pull.frame);
     pull = null;
@@ -1733,7 +1734,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     reach.dataset.shown = "";
   }
 
-  /** The round's middle, in world points, where a thing dropped there goes. */
+  /** The round's middle, in world points, where a carried thing in the reach is held. */
   function binCentre(): Point {
     const on = viewOf(binOn ?? desk.focused) ?? views[0]!;
     const box = binBox(on);
@@ -1747,46 +1748,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function intoBin(what: Carried, element: HTMLElement): void {
     if (pending) confirm();
     const { taken } = model.take(desk, what);
-    const goal = binCentre();
-    const size = L("type-button-icon");
-    if ("window" in what) {
-      const style = getComputedStyle(element);
-      // As drawn now, the lift aside, which eases out of its own accord: its scale and its shrink.
-      const k = (Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1) * (Number.parseFloat(style.getPropertyValue("--ov-shrink")) || 1);
-      const scale = settings().scale;
-      const at = { x: Number.parseFloat(style.getPropertyValue("--ov-tx")) / scale, y: Number.parseFloat(style.getPropertyValue("--ov-ty")) / scale };
-      const grab = { x: Number.parseFloat(style.getPropertyValue("--ov-gx")) / scale, y: Number.parseFloat(style.getPropertyValue("--ov-gy")) / scale };
-      const w = Number.parseFloat(style.getPropertyValue("--ov-tw")) / scale;
-      const h = Number.parseFloat(style.getPropertyValue("--ov-th")) / scale;
-      glide(element, "none");
-      element.style.setProperty("--ov-gx", "0px");
-      element.style.setProperty("--ov-gy", "0px");
-      element.style.setProperty("--ov-tx", css(at.x + grab.x * (1 - k)));
-      element.style.setProperty("--ov-ty", css(at.y + grab.y * (1 - k)));
-      element.style.setProperty("--ov-sx", String(k));
-      element.style.setProperty("--ov-sy", String(k));
-      element.style.setProperty("--ov-shrink", "1");
-      commit(element);
-      const into = size / Math.max(w, h);
-      bins(element);
-      element.style.setProperty("--ov-tx", css(goal.x - (w * into) / 2));
-      element.style.setProperty("--ov-ty", css(goal.y - (h * into) / 2));
-      element.style.setProperty("--ov-sx", String(into));
-      element.style.setProperty("--ov-sy", String(into));
-    } else {
-      const made = spaceEls.get(what.space)!;
-      const style = getComputedStyle(made.desk);
-      const w = Number.parseFloat(style.getPropertyValue("--ov-dw")) / settings().scale;
-      const h = Number.parseFloat(style.getPropertyValue("--ov-dh")) / settings().scale;
-      const into = size / Math.max(w, h);
-      for (const part of [made.root, made.desk, made.tag]) bins(part);
-      made.root.dataset.binned = "";
-      // Its shrink in the round eases out as its desktop takes the symbol's size.
-      made.root.style.setProperty("--ov-shrink", "1");
-      made.root.style.setProperty("--ov-x", css(goal.x - (w * into) / 2));
-      made.root.style.setProperty("--ov-y", css(goal.y - (h * into) / 2));
-      made.desk.style.setProperty("--ov-s", String(into));
-    }
+    vanish("window" in what ? "window" : "space", element);
     element.dataset.binned = "";
     pending = { taken, what, element, drain: null };
     sweepGone();
@@ -1794,6 +1756,42 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     dressBin();
     showBin();
     drain(1);
+  }
+
+  /**
+   * A thing let go in the delete zone's reach shrinks to nothing and fades where it is drawn, from
+   * its size at that instant, settled in the round or mid-flight. Its origin moves to its own middle
+   * with its place made up for, and everything it is drawn with is held as it is first, so the first
+   * frame is the last frame of the carry: nothing grows, nothing jumps.
+   */
+  function vanish(kind: "window" | "space", element: HTMLElement): void {
+    const style = getComputedStyle(element);
+    const px = settings().scale;
+    const read = (name: string): number => Number.parseFloat(style.getPropertyValue(name));
+    const [x, y, w, h] = kind === "window" ? ["--ov-tx", "--ov-ty", "--ov-tw", "--ov-th"] : ["--ov-x", "--ov-y", "--ov-w", "--ov-h"];
+    const at = { x: read(x!) / px, y: read(y!) / px };
+    const size = { w: read(w!) / px, h: read(h!) / px };
+    const origin = { x: read("--ov-gx") / px, y: read("--ov-gy") / px };
+    const sx = kind === "window" ? read("--ov-sx") : 1;
+    const sy = kind === "window" ? read("--ov-sy") : 1;
+    const shrink = read("--ov-shrink");
+    const lift = 1 + (number("scale-lift") - 1) * read("--ov-held");
+    const s = { x: sx * lift * shrink, y: sy * lift * shrink };
+    element.style.transition = "none";
+    element.style.setProperty(x!, css(at.x + (origin.x - size.w / 2) * (1 - s.x)));
+    element.style.setProperty(y!, css(at.y + (origin.y - size.h / 2) * (1 - s.y)));
+    element.style.setProperty("--ov-gx", css(size.w / 2));
+    element.style.setProperty("--ov-gy", css(size.h / 2));
+    if (kind === "window") {
+      element.style.setProperty("--ov-sx", String(sx));
+      element.style.setProperty("--ov-sy", String(sy));
+    }
+    element.style.setProperty("--ov-shrink", String(shrink));
+    commit(element);
+    element.style.removeProperty("transition");
+    bins(element);
+    element.dataset.binned = "";
+    element.style.setProperty("--ov-shrink", "0");
   }
 
   /** Sets an element's glide into the zone: things leaving, over `medium`. */
@@ -1852,6 +1850,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     was.drain?.cancel();
     model.restore(desk, was.taken);
     delete was.element.dataset.binned;
+    delete was.element.dataset.held;
     if ("window" in was.what) {
       // From the zone, as a carried window lands.
       was.element.dataset.lifted = "";
@@ -1862,6 +1861,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         arriving(part, "arrive");
         part.style.setProperty("--ov-arrive", "1");
       }
+      glide(was.element, "land");
+      was.element.style.setProperty("--ov-shrink", "1");
       landSpace(was.what.space, was.element);
     }
     delete bin.dataset.pending;

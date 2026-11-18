@@ -216,7 +216,7 @@ const ZONE_ARRIVES: Move = {
 
 const INTO_ZONE: Move = {
   name: "Into the delete zone",
-  what: "Let go anywhere in the reach: from the round it shrinks into the symbol's place and fades over `medium`.",
+  what: "Let go anywhere in the reach: from its size that instant it shrinks to nothing and fades where it is, over `medium`.",
   tracks: [{ part: "the window", on: "the terminal", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
   reduced: [{ part: "the window", on: "a fade", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
   back: "cuts",
