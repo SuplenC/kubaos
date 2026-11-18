@@ -92,6 +92,7 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::MarqueePace => "Scrolling words travelling `space.s32`.",
         Duration::Toast => "A toast staying once it has arrived.",
         Duration::LockIdle => "The awake lock left alone until it goes back to rest.",
+        Duration::ControllerRest => "A player's controller over a playing picture, the pointer still, until it goes.",
     }
 }
 

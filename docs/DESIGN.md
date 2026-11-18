@@ -157,7 +157,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | five roles, small 4, row 8, control 12, content 16, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, three-line row 72, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the disk passphrase prompt's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264, its find box 320; a canvas page's settings beside its canvas 400, from a page 1000 wide; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 392 and bar 40; the lock's wallpaper's blur once it is awake, 8; a wallpaper's thumbnail 256 × 160; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, three-line row 72, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 28, compact 24, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; a collapsible's rail's strip 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the disk passphrase prompt's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264, its find box 320; a canvas page's settings beside its canvas 400, from a page 1000 wide; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 392 and bar 40; the lock's wallpaper's blur once it is awake, 8; a wallpaper's thumbnail 256 × 160; an audio file's cover in the media player at its largest, 400; sparkline 48; the mockups' motion plot, from 0 to 1, 160 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
 | Aspect ratios (`[aspect]`) | wallpaper 16:10, dialog 5:2 (its least height), a canvas page's canvas 50:21 (42% of its width tall) |
 
@@ -255,6 +255,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `toast` | 3600 | A toast staying once it has arrived, long enough to read its line twice. Not a move: reduce motion doesn't cap it. |
 | `hold` | 1100 | A held button held until it acts, its timed bar filling meanwhile: Kōbō's Install, the hold that erases a disk, a held menu item. Not a move: reduce motion doesn't cap it. *Not built yet: Kōbō times its hold with a constant of its own.* |
 | `lock_idle` | 20000 | The awake lock left alone until it goes back to rest: time to find a key or a finger, short enough that an empty field doesn't sit lit. Not a move: reduce motion doesn't cap it. |
+| `controller_rest` | 2000 | A player's controller over a playing picture, the pointer still on it, until it goes and the pointer with it, as mpv's does; the pointer leaving the window takes it at once. Not a move: reduce motion doesn't cap it. |
 
 | Curve (`[easing.*]`) | Bézier | For |
 |---|---|---|
@@ -268,7 +269,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `spring` | 0.34, 1.25, 0.64, 1 | Something gliding into place with a small overshoot, over `long`: the wallpaper carousel's step. *Not enforced yet: nothing moves on it.* |
 | `gather` | 0.11, 0, 0.5, 0 | A colour change gathering speed: the theme change and the dark ⇄ light switch. *Not built yet: only the mockups move on it.* |
 
-- **A surface that steps back shrinks to `scale.behind`** (0.96) round its middle as it fades, and grows back from it: the desktop's windows as the lock comes up and gives way. A wallpaper that comes toward you grows to `scale.push` (1.025) round the middle of the screen's bottom edge, and its city, where it has depth, further, to `scale.near` (1.05), so the city stands off the sky: the lock's picture as it comes up, back to 1:1 as it gives way. The lock's clock, awake, stands `scale.clock_awake` (0.2) of the way along its flight to the bar's clock, its size, its place and its colour together. A scale factor, and a share of a flight, is a token of `[scale]`, never a number of its own.
+- **A surface that steps back shrinks to `scale.behind`** (0.96) round its middle as it fades, and grows back from it: the desktop's windows as the lock comes up and gives way. A wallpaper that comes toward you grows to `scale.push` (1.025) round the middle of the screen's bottom edge, and its city, where it has depth, further, to `scale.near` (1.05), so the city stands off the sky: the lock's picture as it comes up, back to 1:1 as it gives way. The lock's clock, awake, stands `scale.clock_awake` (0.2) of the way along its flight to the bar's clock, its size, its place and its colour together. A play or pause symbol a press sets in the middle of a picture blooms to `scale.bloom` (1.4) round its middle as it fades: the media player's. A scale factor, and a share of a flight, is a token of `[scale]`, never a number of its own.
 - **Arriving is slower than leaving** (`long` in, `medium` out): you look at what arrives, and what leaves is already done with.
 - **A surface a key summons to act and go is one step quicker**: the Command menu arrives over `short` and leaves over `micro`, its Action panel the same, and its Views slide in over `medium`. A key opens and closes it many times an hour, and what it runs waits for it to be gone, so a panel's `long` and `medium` would be felt on every run.
 - **A panel swapped for its twin keeps its surface** (the system monitor, the notifications panel and the control center, `docs/design/components/sheet.md`): only the content moves, `space.s24` sideways. What leaves goes over `micro`, what arrives comes over `short` half a `micro` later (`swap_lag`, 50) and fades in over `swap_fade` (150) once the other is gone, about 250 ms in all, so switching straight from one to the other feels like one surface changing its mind, not two panels passing.
@@ -634,6 +635,11 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 - **A toast** for a short confirmation of something just done that left no other trace on screen ("Copied. Evidence secured."). It goes by itself and never carries an action the user must take.
 - **A notification** only when the user is elsewhere, or the news outlives the view that started it: a download finished, an update is ready, the battery is low. It is worth an interruption, or it isn't sent.
 - **Never both** for one event. The same fact twice is noise.
+
+### Pictures that follow sound
+
+- **A picture drawn from music follows the song, never a timer of its own**: the media player's visualisers read an analysis of the song at the audio clock's time, every level against the song's own range, so every song fills them alike. How they are calculated, from the samples to the pixels, and the cases every build is held to, are in `docs/design/visualiser.md`.
+- **A visualiser answers the music as hard as it is drawn to**, flashes included: who would rather not see light flash turns it off. With reduce motion on, Water stays as calm water travelling slowly, and the others give way to the song's cover.
 
 ## Settings
 
