@@ -20,7 +20,8 @@ One of a few views or values, picked along a rail of neon. It is the segmented c
 
 **States.**
 
-- **Under the pointer**, a choice that isn't picked brightens its words to `on_surface` over `short`. The rail doesn't change.
+- **Lit** (the pointer over the well, the keyboard in it, or the list row it ends lit: whenever a field in its place would light its edge), the rail lights as a field's edge does, over `short` on `standard`: the picked stretch flares, its core with a lit control's glow round it, near (`focus.near` at `focus.near_opacity`) and far (`focus.far` at `focus.far_opacity`), over its resting content glow; the rest of the rail steps up from `opacity.spinner_track` to `opacity.track_lit` in the same tone and doesn't glow. The flare follows the stretch as it travels and swells with its flash. By day, and with the signs off, nothing glows: the lit well shows as the brighter rail alone. Disabled, nothing lights.
+- **Under the pointer**, a choice that isn't picked brightens its words to `on_surface` over `short`.
 - **Pressed**, a choice's words go to the picked colour over `micro`; letting go picks it.
 - **The keyboard:** the row is one stop for Tab, on the picked choice, and while it has the keyboard the focus tube lights the whole well's edge, with its glow, under the rail; the lit stretch already says which choice is picked. ← and → (or h and l) pick the neighbour, round from either end, and the keyboard moves with the pick (the owner moves the pick in iced; `Tabs` in QML does it). Space and Enter do nothing more.
 - **Signs off** (by day always, at night while a power change has the lights out), the focus tube and the lit stretch are solid glass, `primary_glass`, with no glow; the picked words keep `primary_lit`, with no glow round them.

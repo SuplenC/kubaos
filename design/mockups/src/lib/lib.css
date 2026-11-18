@@ -145,6 +145,67 @@
   border-radius: var(--radius-full);
 }
 
+/* A held button's fill (`hold` in `lib/button.ts`): its body filling from its start to `--hold` of
+   its width, in the kind's hold fill, rounded as the button is with a straight edge, over the
+   button's content: its own copy of the content in the fill's label colour, laid out as the
+   button's is, so the label reads on either side of the edge. Empty, it is cut away entirely. */
+.k-button-hold {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  padding: inherit;
+  border-radius: inherit;
+  background: var(--hold-fill);
+  clip-path: inset(0 calc((1 - var(--hold)) * 100%) 0 0);
+  pointer-events: none;
+}
+
+/* A held icon button's ring (`lib/icon-button.ts`): the Spinner's unlit ring and lit arc, `stroke.thin`
+   in whole device pixels, inside the circle's edge, the arc running clockwise from the top as the
+   hold fills, in place of the lit tube. It shows only while the button is held. */
+.k-hold-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
+  opacity: 0;
+}
+
+.k-button[data-holding] > .k-hold-ring {
+  opacity: 1;
+}
+
+/* Held, the ring takes the lit tube's place on the same edge: the tube and its glow give way, so the
+   light is the arc running round. */
+.k-button[data-holding] > .k-ring > :is(.k-tube, .k-glow) {
+  opacity: 0;
+}
+
+.k-hold-ring circle {
+  cx: 50%;
+  cy: 50%;
+  r: calc(var(--height) / 2 - var(--thin) / 2);
+  fill: none;
+  stroke-width: var(--thin);
+}
+
+.k-hold-track {
+  stroke: rgb(from var(--color-primary) r g b / var(--opacity-spinner_track));
+}
+
+.k-hold-arc {
+  stroke: color-mix(in srgb, var(--color-primary), var(--color-primary_core) calc((1 - var(--day)) * 100%));
+  stroke-linecap: round;
+  stroke-dasharray: calc(360 * var(--hold, 0)) 360;
+  transform-origin: 50% 50%;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
+}
+
 .k-icon-slot {
   display: block;
   flex: none;
@@ -1143,7 +1204,8 @@
   --sunken-line: rgb(from var(--sunken-tone) r g b / var(--sunken-strength));
 }
 
-/* A field (`lib/field.ts`): `size.control_md` tall at the control radius, filling its room, its
+/* A field (`lib/field.ts`): `size.control_md` tall at the control radius (small, `size.control_sm`,
+   its value and icons `body`'s), filling its room, its
    sunken edge in `outline` at full, or `error` while invalid. Lit, hovered or with the
    keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
    tube is drawn over the hairline. Its value is clipped to its room, `space.s12` in at each side
@@ -1155,10 +1217,13 @@
   flex: none;
   box-sizing: border-box;
   width: 100%;
-  height: var(--field-height, var(--size-control_md));
+  height: var(--field-height);
   border-radius: var(--radius-control);
   outline: none;
   cursor: text;
+  --field-height: var(--size-control_md);
+  --field-line: var(--type-body_large-line);
+  --field-icon: var(--type-body_large-icon);
   /* The field draws its own selection, so the browser's never shows. */
   user-select: none;
   --lit: 0;
@@ -1184,12 +1249,18 @@
   --caret-reach: calc(var(--thin) / 2);
 }
 
+.k-field[data-size="Sm"] {
+  --field-height: var(--size-control_sm);
+  --field-line: var(--type-body-line);
+  --field-icon: var(--type-body-icon);
+}
+
 .k-field[data-icon] {
-  --start: calc(var(--space-s12) + var(--type-body_large-icon) + var(--space-s8));
+  --start: calc(var(--space-s12) + var(--field-icon) + var(--space-s8));
 }
 
 .k-field[data-trailing] {
-  --end: calc(var(--space-s12) + var(--type-body_large-icon) + var(--space-s8));
+  --end: calc(var(--space-s12) + var(--field-icon) + var(--space-s8));
 }
 
 .k-field::before {
@@ -1237,8 +1308,8 @@
   left: 0;
   display: block;
   box-sizing: border-box;
-  height: var(--field-height, var(--size-control_md));
-  padding: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-icon)) / 2), 1px) var(--space-s12) 0;
+  height: var(--field-height);
+  padding: round(nearest, calc((var(--field-height) - var(--field-icon)) / 2), 1px) var(--space-s12) 0;
 }
 
 /* The trailing icon's slot, at the far side, its icon in its own role (`--trailing`) unless the
@@ -1252,8 +1323,8 @@
   position: absolute;
   left: var(--start);
   right: var(--end);
-  top: round(down, calc((var(--field-height, var(--size-control_md)) - var(--type-body_large-line)) / 2), 1px);
-  height: var(--type-body_large-line);
+  top: round(down, calc((var(--field-height) - var(--field-line)) / 2), 1px);
+  height: var(--field-line);
   overflow: hidden;
 }
 
@@ -1311,7 +1382,7 @@
 .k-field-caret {
   display: none;
   position: absolute;
-  top: round(nearest, calc((var(--field-height, var(--size-control_md)) - var(--caret-height)) / 2), 1px);
+  top: round(nearest, calc((var(--field-height) - var(--caret-height)) / 2), 1px);
   height: var(--caret-height);
   width: var(--thin);
   left: round(
@@ -1399,6 +1470,50 @@
   border: var(--stroke-hairline_device_px) solid var(--key-edge);
   border-radius: inherit;
   background: var(--color-surface_container_highest);
+}
+
+/* A sentence naming keys (`sentence` in `lib/keycap.ts`): each key a keycap standing in the line,
+   its middle on the words' middle, and the lines a keycap and `space.s4` apart, whether a line holds
+   a key or not. */
+.k-said {
+  line-height: calc(var(--size-keycap) + var(--space-s4));
+}
+
+/* A keyed sentence's box: a block across its room, its runs wrapping between them. */
+.k-said {
+  display: block;
+  min-width: 0;
+}
+
+/* Each key stands at the top of its line and down half the room the line has round it, on a whole
+   device pixel: the line is a keycap and `space.s4` tall, so the key's middle is the line's, which
+   is the middle of the words' capitals to a tenth of a pixel, and its edges fall on the grid at
+   every scale, where a key set on the baseline would follow the font's fractional ascent. */
+.k-said > .k-keycap {
+  display: inline-block;
+  position: relative;
+  top: round(nearest, calc(var(--space-s4) / 2), 1px);
+  vertical-align: top;
+  text-indent: 0;
+}
+
+/* Each word, the same: at the top of its line and down half the room round its own line height. */
+.k-said > .k-said-word {
+  display: inline-block;
+  position: relative;
+  top: round(nearest, calc((var(--size-keycap) + var(--space-s4) - var(--t-line)) / 2), 1px);
+  vertical-align: top;
+  text-indent: 0;
+}
+
+/* A Banner Line's symbol (`lib/banner.ts`): centred in a slot two device pixels shorter than a keyed
+   sentence's line, from its top, so it stands a device pixel above the line's middle: its ink is
+   heaviest at its foot, and set dead on the middle it looks low beside the words. */
+.k-said-symbol {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: calc(var(--size-keycap) + var(--space-s4) - 2 * var(--stroke-hairline_device_px));
 }
 
 .k-keycap-label {
@@ -2186,7 +2301,11 @@
    is lit, under its words, square at both ends: the core at night with the content glow round it,
    as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
    signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
-   pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
+   pixels. Lit (the pointer over the well, the keyboard in it, or the list row it ends lit), as a
+   field's edge lights, over `short` on `standard`: the picked stretch flares with a lit control's
+   glow round it, near and far, and the rest of the rail steps up to `opacity.track_lit` with no
+   glow; by day and with the signs off nothing glows, so the lit well shows as the stronger rail.
+   The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
    `opacity.disabled_content`, with no glow. A choice can be disabled alone; when that choice is
    the pick, the well itself takes the keyboard, so it draws no outline of its own.
    The well is as wide as the room it is given: the whole width across a stack, a page or a
@@ -2207,6 +2326,16 @@
   --rail-signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
   background: rgb(from var(--color-surface_container_highest) r g b / calc(var(--opacity-track) * var(--dim)));
+  --lit: 0;
+  transition: --lit var(--motion-short) var(--easing-standard);
+}
+
+.k-tabs:not([aria-disabled="true"]):is(:hover, :has(> .k-tab:focus-visible), [data-stranded]:focus-visible, [data-pinned], [data-pointed]) {
+  --lit: 1;
+}
+
+.k-tabs:is([data-pinned], [data-pointed]) {
+  transition: none;
 }
 
 .k-tabs:is([data-pinned="signs-off"], [aria-disabled="true"]) {
@@ -2257,7 +2386,7 @@
 .k-tabs-rail {
   left: calc(var(--size-control_sm) / 2);
   right: calc(var(--size-control_sm) / 2);
-  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-spinner_track) * var(--dim)));
+  background: rgb(from var(--color-primary) r g b / calc((var(--opacity-spinner_track) + (var(--opacity-track_lit) - var(--opacity-spinner_track)) * var(--lit)) * var(--dim)));
 }
 
 /* The lit stretch between where it was and the pick: travelling right its right edge leads, left
@@ -2274,7 +2403,11 @@
   --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--flash) * 100%));
   background: rgb(from var(--flashed) r g b / var(--dim));
   --glow: calc(var(--focus-content_glow) * var(--rail-signs) * (1 + (var(--focus-pressed_glow) - 1) * var(--flash)));
-  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)));
+  --flare: calc(var(--lit) * var(--rail-signs) * (1 + (var(--focus-pressed_glow) - 1) * var(--flash)));
+  filter:
+    drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)))
+    drop-shadow(0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--flare))))
+    drop-shadow(0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * var(--flare))));
 }
 
 .k-tabs[data-toward="left"] > .k-tabs-lit {
@@ -2701,9 +2834,17 @@
   display: block;
   flex: none;
   align-self: stretch;
-  height: var(--size-control_md);
+  height: var(--select-height);
+  --select-height: var(--size-control_md);
+  --select-icon: var(--type-body_large-icon);
   --drop: calc(var(--rows) * var(--select-option, var(--size-control_sm)) + 2 * var(--space-s4));
   transition: --select-open var(--motion-short) var(--easing-emphasized_accel);
+}
+
+/* Small, a list row's: `size.control_sm` tall, its pick and symbols `body`'s; the list is the same. */
+.k-select-room[data-size="Sm"] {
+  --select-height: var(--size-control_sm);
+  --select-icon: var(--type-body-icon);
 }
 
 .k-select-room[data-open] {
@@ -2716,7 +2857,7 @@
 }
 
 .k-select-room[data-shown] {
-  height: calc(var(--size-control_md) + var(--drop));
+  height: calc(var(--select-height) + var(--drop));
 }
 
 .k-select-room[data-shown],
@@ -2737,7 +2878,7 @@
   top: 0;
   display: block;
   box-sizing: border-box;
-  height: calc(var(--size-control_md) + var(--drop) * var(--select-open));
+  height: calc(var(--select-height) + var(--drop) * var(--select-open));
   border-radius: var(--radius-control);
   outline: none;
   cursor: pointer;
@@ -2800,7 +2941,7 @@
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  height: var(--size-control_md);
+  height: var(--select-height);
   padding: 0 var(--space-s12);
   border-radius: var(--radius-control);
 }
@@ -2844,7 +2985,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: var(--size-control_md);
+  top: var(--select-height);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -2856,7 +2997,7 @@
 
 .k-select-room[data-up] .k-select-list {
   top: auto;
-  bottom: var(--size-control_md);
+  bottom: var(--select-height);
 }
 
 .k-select-list > .k-menu-item[data-taken] {
@@ -2879,14 +3020,14 @@
   position: absolute;
   left: var(--space-s12);
   right: var(--space-s12);
-  top: var(--size-control_md);
+  top: var(--select-height);
   height: var(--stroke-hairline_device_px);
   background: rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
 }
 
 .k-select-room[data-up] .k-select-rule {
   top: auto;
-  bottom: var(--size-control_md);
+  bottom: var(--select-height);
 }
 
 /* The value row's symbol, the pick's: as wide as the symbol. */
@@ -3591,6 +3732,23 @@
   width: var(--room);
   height: var(--tall);
   padding: 0;
+}
+
+/* A dialog over a window (`dialogOver` in `lib/dialog.ts`): the live room laid over the whole
+   window, above all it holds, with no fill or padding of its own, so the scrim dims the window to
+   its rounded edge and the dialog is centred in it. */
+:has(> .k-dialog-room[data-over]) {
+  position: relative;
+}
+
+.k-dialog-room[data-over] {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: auto;
+  height: auto;
+  border-radius: inherit;
+  background: none;
 }
 
 .k-dialog-room[data-live] > .k-dialog {

@@ -9,6 +9,7 @@ import { type SidebarPageOptions, sidebarPage, sidebarRow } from "../../lib/side
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, nonEmpty, type Track, page } from "../../site/page.ts";
 import { fewer, outline } from "./settings.ts";
+import { turnMoves } from "./sidebar-turns.ts";
 import { resizable, still } from "./window.ts";
 
 /** The template drawn from Settings' outline, `options` saying where it stands. */
@@ -52,13 +53,6 @@ const ROWS = [
 
 type MatrixState = "rest" | "lit" | "pressed" | "selected";
 
-/** The page's change of section: the page fading in and rising `space.s8`. */
-function rising(reduced: boolean): [Track<Easing>, ...Track<Easing>[]] {
-  return reduced
-    ? [{ part: "the page", on: "the section's page", target: ".k-sp-rise", property: "--section-rise", from: 0, to: 1, duration: "instant", curve: "linear" }]
-    : [{ part: "the page", on: "the section's page", target: ".k-sp-rise", property: "--section-rise", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }];
-}
-
 /** The find box arriving or going: `--find-shown` from `from` to `to`. */
 function showing(from: 0 | 1, to: 0 | 1): [Track<Easing>, ...Track<Easing>[]] {
   return [{ part: "the find box", on: "the find box", target: ".k-sp-find", property: "--find-shown", from, to, duration: "short", curve: "standard" }];
@@ -69,8 +63,9 @@ function barSample(): HTMLElement {
   const window = small({ section: 3 });
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      const bar = window.querySelector<HTMLElement>(".k-sp-bar");
-      const subs = [...window.querySelectorAll<HTMLElement>(".k-sp-row[data-kind='sub']")];
+      const open = window.querySelector<HTMLElement>(".k-sp-subs:not([data-folded])");
+      const bar = open?.querySelector<HTMLElement>(".k-sp-bar");
+      const subs = [...(open?.querySelectorAll<HTMLElement>(".k-sp-row[data-kind='sub']") ?? [])];
       if (!bar || subs.length < 3) return;
       bar.dataset.still = "";
       bar.style.setProperty("--bar-from", `${subs[0]!.offsetTop}px`);
@@ -81,13 +76,29 @@ function barSample(): HTMLElement {
 }
 
 const MOVES: Move[] = [
+  ...turnMoves({ section: () => small({ section: 3 }), home: () => small(), landed: () => small({ section: 3, landed: 2 }) }),
   {
-    name: "Changing section",
-    what: "A section picked: the new page fades in and rises, the bar already on its first sub-section.",
-    tracks: rising(false),
-    reduced: rising(true),
+    name: "The selection glides",
+    what: "Power to Notifications: the highlight slides, tube and all; Power's list folds as Notifications' unfolds, the rows sliding.",
+    tracks: [
+      { part: "the highlight", on: "the current section", target: ".k-sp-highlight", property: "--highlight-at", from: 0, to: 1, duration: "medium", curve: "standard" },
+      { part: "the lists", on: "the sub-sections", target: ".k-sp-subs[data-folding]", property: "--fold-at", from: 0, to: 1, duration: "medium", curve: "standard" },
+      { part: "the row's words", on: "the current section", target: ".k-sp-row[data-kind='section'][data-current]", property: "--current", from: 0, to: 1, duration: "medium", curve: "standard" },
+    ],
+    reduced: [{ part: "the highlight", on: "the current section", target: ".k-sp-highlight", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
     back: "cuts",
-    sample: () => small({ section: 3 }),
+    sample: () => small({ section: 4, glideFrom: 3 }),
+  },
+  {
+    name: "The selection glides far",
+    what: "Appearance to Updates: the same glide over the whole sidebar, on the same clock.",
+    tracks: [
+      { part: "the highlight", on: "the current section", target: ".k-sp-highlight", property: "--highlight-at", from: 0, to: 1, duration: "medium", curve: "standard" },
+      { part: "the lists", on: "the sub-sections", target: ".k-sp-subs[data-folding]", property: "--fold-at", from: 0, to: 1, duration: "medium", curve: "standard" },
+    ],
+    reduced: [{ part: "the highlight", on: "the current section", target: ".k-sp-highlight", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+    back: "cuts",
+    sample: () => small({ section: 9, glideFrom: 0 }),
   },
   {
     name: "The bar glides",
@@ -112,14 +123,6 @@ const MOVES: Move[] = [
     reduced: "same",
     back: "cuts",
     sample: () => small({ section: 3, find: "" }),
-  },
-  {
-    name: "Landed",
-    what: "A setting opened from Home: its row is lit by the highlight, which fades.",
-    tracks: [{ part: "the landed highlight", on: "the row landed on", target: ".k-list-row[data-landed]", property: "--landed", from: 1, to: 0, duration: "slow", curve: "standard" }],
-    reduced: "same",
-    back: "cuts",
-    sample: () => small({ section: 3, landed: 2 }),
   },
   {
     name: "A sidebar row lights up",
@@ -236,9 +239,12 @@ export default page({
       { part: "A section's row", token: "size-row" },
       { part: "A sub-section's row", token: "size-control_sm" },
       { part: "A row's corners", token: "radius-control" },
+      { part: "The highlight's height", token: "size-row" },
+      { part: "Its corners", token: "radius-control" },
       { part: "Bar's length", token: "type-small-line" },
       { part: "Bar's thickness", token: "tabs-rail" },
       { part: "Page's parts; the lead line", token: "space-s32" },
+      { part: "A page turn's travel", token: "space-s24" },
       { part: "Home's column", token: "size-column" },
       { part: "Find box's width", token: "size-find" },
       { part: "Find box below the top", token: "space-s16" },

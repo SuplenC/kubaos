@@ -1,7 +1,31 @@
 /* SidebarPage (`lib/sidebar-page.ts`): the sidebar band beside the page, in the room it is given,
    a window's. */
 
-@property --section-rise {
+@property --page-shift {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --page-shown {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --current {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --highlight-at {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --fold-at {
   syntax: "<number>";
   inherits: false;
   initial-value: 1;
@@ -52,9 +76,49 @@
 }
 
 .k-sp-rows {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
   padding: var(--space-s12);
+}
+
+/* The sidebar of a SidebarPage (`data-glides`): the current section's look is one highlight that
+   travels between the rows (`.k-sp-highlight`), not each row's own fill, and its words and symbol
+   cross-fade (`--current`) as it goes, over `medium` on `standard`. */
+.k-sp-rows[data-glides] > .k-sp-row[data-current] {
+  background: transparent;
+}
+
+/* The highlight: the current section's fill, `surface_container_high` at the control radius, a
+   section row tall, `space.s12` in; it carries the row's tube while the row is lit (hovered, or the
+   keyboard on it), so the tube travels with it rather than going out on one row and lighting on
+   the next. Its place is `--highlight-y`, the current row's top. */
+.k-sp-highlight {
+  position: absolute;
+  top: 0;
+  left: var(--space-s12);
+  right: var(--space-s12);
+  height: var(--size-row);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+  /* Gliding, it goes from `--highlight-from` to `--highlight-y` as `--highlight-at` goes 0 to 1. */
+  translate: 0 calc(var(--highlight-from, var(--highlight-y, 0px)) + (var(--highlight-y, 0px) - var(--highlight-from, var(--highlight-y, 0px))) * var(--highlight-at));
+  pointer-events: none;
+}
+
+.k-sp-rows:has(> .k-sp-row[data-kind="section"][data-current]:not(:disabled):is(:focus-visible, [data-pinned])) > .k-sp-highlight.k-control,
+.k-sp-side:not([data-still]) .k-sp-rows:has(> .k-sp-row[data-kind="section"][data-current]:hover) > .k-sp-highlight.k-control {
+  --lit: 1;
+}
+
+/* The current row's own tube gives way to the highlight's; it fades out as the row becomes current. */
+.k-sp-rows[data-glides] > .k-sp-row[data-kind="section"][data-current].k-control {
+  --lit: 0;
+}
+
+/* The rows moved under a pointer that stayed: what it is over now isn't lit until it moves. */
+.k-sp-side[data-still] .k-sp-row.k-control:not(:focus-visible, [data-pinned]) {
+  --lit: 0;
 }
 
 /* The hairline under Home: `space.s8` clear of the rows on either side, with the rows' own
@@ -91,9 +155,22 @@
   max-width: 100%;
   border-radius: var(--radius-control);
   cursor: pointer;
-  --words: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(var(--lit) * 100%));
+  --current: 0;
+  --words: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(max(var(--lit), var(--current)) * 100%));
   --glyph: var(--words);
   background: transparent;
+}
+
+/* A section's symbol goes to `primary` as it becomes current. */
+.k-sp-row[data-kind="section"] {
+  --glyph: color-mix(in srgb, var(--words), var(--color-primary) calc(var(--current) * 100%));
+}
+
+.k-sp-row.k-control {
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard),
+    --current var(--motion-medium) var(--easing-standard);
 }
 
 .k-sp-row > .k-row {
@@ -113,11 +190,10 @@
 }
 
 .k-sp-row[data-current] {
-  --words: var(--color-on_surface);
+  --current: 1;
 }
 
 .k-sp-row[data-kind="section"][data-current] {
-  --glyph: var(--color-primary);
   background: var(--color-surface_container_high);
 }
 
@@ -132,13 +208,52 @@
   align-self: stretch;
 }
 
+/* A section's sub-sections folded away under its row while it isn't current. A change of section
+   folds the old list and unfolds the new over `medium` on `standard`, their height and opacity, so
+   the rows under them slide; the bar goes and comes with its list. */
+.k-sp-subs[data-folded] {
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* At rest a folded list is out of the layout altogether, so the rows round it keep the stack's gap;
+   it is laid out, at no height, only to be measured or while it folds. */
+.k-sp-subs[data-folded]:not([data-folding], [data-measuring]) {
+  display: none;
+}
+
+/* Folding or unfolding, a list's height and opacity go from their `-from` to their `-to` as
+   `--fold-at` goes 0 to 1. */
+.k-sp-subs[data-folding] {
+  overflow: hidden;
+  height: calc(var(--fold-from) + (var(--fold-to) - var(--fold-from)) * var(--fold-at));
+  opacity: calc(var(--fade-from) + (var(--fade-to) - var(--fade-from)) * var(--fold-at));
+}
+
+/* While it folds, or is measured to fold, a list carries the `space.s4` gap above it inside itself,
+   so a folded list takes no room at all and its fold moves the gap with it. At rest an open list
+   stands in the stack with its gap as any row does. */
+.k-sp-rows > .k-sp-subs:is([data-folding], [data-measuring]) {
+  margin-top: calc(-1 * var(--space-s4));
+}
+
+.k-sp-rows > .k-sp-subs:is([data-folding], [data-measuring])::before {
+  content: "";
+  flex: none;
+  height: var(--space-s4);
+}
+
 .k-sp-bar {
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
   position: absolute;
   z-index: 2;
   left: round(nearest, calc(var(--space-s12) + (var(--type-body-icon) - var(--rail)) / 2), 1px);
-  top: round(nearest, calc(var(--bar-from, 0px) + (var(--bar-to, 0px) - var(--bar-from, 0px)) * var(--bar-at) + (var(--size-control_sm) - var(--type-small-line)) / 2), 1px);
+  /* How far into its row's box the bar sits: a glide's start is read from where the bar is drawn, and
+     takes this off again. */
+  --bar-inset: calc((var(--size-control_sm) - var(--type-small-line)) / 2);
+  top: round(nearest, calc(var(--bar-from, 0px) + (var(--bar-to, 0px) - var(--bar-from, 0px)) * var(--bar-at) + var(--bar-inset)), 1px);
   width: var(--rail);
   height: var(--type-small-line);
   background: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--signs) * 100%));
@@ -173,25 +288,35 @@
   box-sizing: border-box;
 }
 
-/* A change of section: the page fades in and rises `space.s8` over `short` on `emphasized_decel`
-   (`--section-rise`, 0 to 1). With reduced motion it is a plain swap. */
+/* A page turn (`lib/sidebar-page.ts`): the page, its title with it, `--page-shift` travels of
+   `space.s24` along the sidebar's axis (`y`) or sideways into a page of its own (`x`), at
+   `--page-shown`'s opacity. While it moves the page's room clips it, so the scroll's extent and its
+   thumb hold still. */
 .k-sp-rise {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
-  opacity: var(--section-rise);
-  translate: 0 calc((1 - var(--section-rise)) * var(--space-s8));
-  transition: --section-rise var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.k-sp-rise[data-moving] {
+  overflow: clip;
+}
+
+/* A section's page reads in a column `size.canvas_wide` wide at most, at its start: on a wide
+   screen a name and its control stay a glance apart. Home has a column of its own. */
+.k-sp-pane:not([data-home]) .k-sp-rise > .k-page > * {
+  max-width: var(--size-canvas_wide);
 }
 
 .k-sp-rise > .k-page {
   flex: 1 0 auto;
   height: auto;
+  opacity: var(--page-shown);
+  translate: 0 calc(var(--page-shift) * var(--space-s24));
 }
 
-[data-reduced] .k-sp-rise,
-[data-sequence] .k-sp-rise {
-  transition: none;
+.k-sp-rise[data-axis="x"] > .k-page {
+  translate: calc(var(--page-shift) * var(--space-s24)) 0;
 }
 
 /* Home: a centred column `size.column` wide at most. */

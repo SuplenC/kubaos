@@ -1,0 +1,38 @@
+/* Keyboard's organisms (`keyboard-parts.ts`). */
+
+/* The control center's layouts well in a sub-section is as tall as what it holds, the rows then
+   the toolbar, where the panel gives it a fixed room to scroll in. */
+.kb-layouts > .k-list[data-scrolls] {
+  height: auto;
+}
+
+.kb-layouts .k-list-pane {
+  position: static;
+}
+
+.kb-layouts .cc-keys {
+  height: auto;
+}
+
+/* The chord field types no text, so it has no caret; its keys are keycaps, centred down
+   the value's line. */
+.kb-chord .k-field-caret {
+  visibility: hidden;
+}
+
+.kb-chord-keys {
+  height: 100%;
+}
+
+/* What is wrong with the keys, or the keys the field takes, in a room a keycap tall, so one
+   turning into the other moves nothing under it. */
+.kb-chord-note {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-keycap);
+}
+
+/* The new shortcut's room takes no gap while the card is shut. */
+.kb-shortcuts > [hidden] {
+  display: none;
+}

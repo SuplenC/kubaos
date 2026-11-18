@@ -780,6 +780,9 @@ danger_edge = 0.60
 # A progress bar's track, and a spinner's faint full ring.
 track = 0.90
 spinner_track = 0.18
+# The tabs' unlit rail while the well is lit: the faint ring's tone a clear step
+# brighter, still no glow, so the picked stretch's flare stays the one that burns.
+track_lit = 0.45
 # A skeleton, glass of the accent warming up: its fill at rest and at its
 # breath's peak, at night and by day, and at night the faint glow that comes
 # in at the peak, fading out over `focus.near`. Subtle: it stands back from
@@ -1453,6 +1456,8 @@ pairs = [
   { fg = "on_error", bg = "error_pressed", need = "text", use = "A danger menu item's label, pressed" },
   { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued_text", use = "A critical notification's body" },
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
+  { fg = "cold", bg = "surface_container", need = "text", use = "A tip's title on its compact banner" },
+  { fg = "cold", bg = "surface_container_high", need = "text", use = "A tip's title on a panel's card" },
   { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
   { fg = "warning", bg = "surface", need = "text", use = "A reading close to its limit, a warning chip's label" },
   { fg = "warning", bg = "surface_container_high", need = "graphic", use = "A warning banner's symbol and hairline" },
@@ -1476,6 +1481,7 @@ pairs = [
   { fg = "cold", bg = "surface_container_low", need = "graphic", use = "The cold focus tube in a well" },
   { fg = "cold", bg = "surface_container", need = "graphic", use = "The cold focus tube on a panel or window card" },
   { fg = "cold", bg = "secondary_container", need = "graphic", use = "The cold focus tube on a picked card's fill" },
+  { fg = "cold", bg = "surface_container_high", need = "graphic", use = "A tip's symbol and rail on a panel's card" },
   { fg = "error", bg = "surface_container_low", need = "graphic", use = "An invalid field's focus tube in a well" },
   { fg = "error", bg = "surface_container", need = "graphic", use = "An invalid field's focus tube on a panel or window card" },
   { fg = "error", bg = "surface_container_high", need = "graphic", use = "An invalid field's focus tube in a dialog, and on its fill" },
@@ -1692,6 +1698,7 @@ keyboard_option_key = { tabler = "option" }
 lan = { tabler = "network" }
 language = { tabler = "world" }
 light_mode = { tabler = "sun" }
+lightbulb = { tabler = "bulb" }
 list_alt = { tabler = "list-details" }
 lock = { tabler = "lock" }
 lock_open = { tabler = "lock-open" }

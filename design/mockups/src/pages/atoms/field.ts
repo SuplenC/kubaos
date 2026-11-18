@@ -10,6 +10,7 @@ import { row, stack } from "../../lib/layout.ts";
 import { label } from "../../site/dom.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { rowOfControls } from "../row-sample.ts";
 
 const VALUE: Words = { short: "tuxedo", long: "tuxedo-workstation-in-the-living-room" };
 const PLACEHOLDER: Words = { short: "Name", long: "Your full name, as it appears on your ID" };
@@ -184,7 +185,12 @@ export default page({
       sample: () => fieldRoom(ROOM, labelled("Proxy", field({ value: "proxy.example.com:3128", icon: "lan", state: "Disabled" }), { note: "Turn the proxy on to set it." })),
     },
   ],
-  sizes: doesntApply("one height, `size.control_md`, a regular button's; its width is its room's."),
+  sizes: [
+    { name: "md", for: "a form's, a dialog's, a search's: `control_md`, `body_large`", sample: () => boxed({ value: "tuxedo", icon: "search" }) },
+    { name: "sm", for: "a list row's: `control_sm`, `body`", sample: () => boxed({ value: "tuxedo", icon: "search", size: "Sm" }) },
+    { name: "Side by side", for: "md over sm, the same room", sample: () => fieldRoom(ROOM, stack("s16", "start", field({ value: "tuxedo" }), field({ value: "tuxedo", size: "Sm" }))) },
+    { name: "In a list row", for: "sm beside a slider, a switch, a choice", sample: rowOfControls },
+  ],
   states: {
     shown: ["rest", "lit", "disabled", "error"],
     absent: {
@@ -291,11 +297,14 @@ export default page({
     ]),
     measures: [
       { part: "Height", token: "size-control_md" },
+      { part: "Height, sm", token: "size-control_sm" },
       { part: "Corner", token: "radius-control" },
       { part: "Hairline", token: "stroke-hairline_device_px" },
       { part: "Value and placeholder line", token: "type-body_large-line" },
+      { part: "Value line, sm", token: "type-body-line" },
       { part: "Text and icon inset", token: "space-s12" },
       { part: "Icon", token: "type-body_large-icon" },
+      { part: "Icon, sm", token: "type-body-icon" },
       { part: "Icon → text", token: "space-s8" },
       { part: "Caret width", token: "stroke-thin" },
       { part: "Caret height", token: "caret-height" },

@@ -371,8 +371,8 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Badge` | `count` or `dot`; `accent` | height | full |
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |
 | `ListRow` | `one-line` or `two-line`; `icon` or `tile` | height | row, nested 8 in a content box |
-| `Field` | `icon` | height | control |
-| `Select` | `icon`, `two-line` | height | control |
+| `Field` | size `Md`, `Sm`; `icon` | height | control |
+| `Select` | size `Md`, `Sm`; `icon`, `two-line` | height | control |
 | `Popover` | none | none, holds content | control |
 | `Tooltip` | none | width | control, its popover's |
 | `Menu` | none | none | none |
@@ -396,7 +396,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Sparkline` | none | height | none |
 | `Sheet` | none | none, holds content | surface |
 | `Dialog` | tone `Normal`, `Danger` | width | content |
-| `Banner` | tone `Info`, `Warning`, `Danger` | none | surface |
+| `Banner` | tone `Info`, `Warning`, `Danger`, `Tip`; size `Regular`, `Small`, `Line` | none | surface; `Small` content; `Line` none |
 | `Step` | `todo`, `current`, `done` or `action`; `icon`; `mark` | none | control, nested 12 in a surface |
 | `DescriptionList` | none | none | none |
 | `ErrorBlock` | `long` | none | surface |
@@ -635,6 +635,7 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 ## Settings
 
 - **Every setting is a Command menu Item**, and is written to the User layer, so it can be found, changed and kept like any other. A feature ships with its Items (`CLAUDE.md`).
+- **Settings holds the system's settings, never an app's own.** What changes how the system behaves is in the Settings app; what changes how one app behaves stays in that app, in its own settings, so no kind of setting is ever half in one place and half in the other. The test for a row: does it change how the system behaves, or how one app behaves? A row about an app belongs in Settings only when what it sets is the system's behaviour toward that app: notifications are the system's, so each app's notification rules are in Settings › Notifications, as starting on login, default apps, where the system's proxy reaches and what an app may do are.
 - **A Settings app**, on `kubaos-ui`, groups them: Appearance, Displays, Keyboard, Phone, Updates and the rest. *Not enforced yet:* there is no Settings app (#269).
 
 ## Terminals, boot and the rest

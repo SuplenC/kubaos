@@ -17,6 +17,22 @@ const SAMPLES: Record<Kind, { words: Words; icon: string; trailing: boolean }> =
   Warning: { words: { short: "Restart now", long: "Restart now and lose the open windows" }, icon: "warning", trailing: false },
 };
 
+/** The held kinds the page shows: a quiet reset, a Tonal step, a Danger one; live, or `held` of the way. */
+const HELD: readonly { readonly kind: Kind; readonly label: string; readonly icon: string }[] = [
+  { kind: "Text", label: "Reset", icon: "restart_alt" },
+  { kind: "Tonal", label: "Forget", icon: "delete" },
+  { kind: "Danger", label: "Erase", icon: "delete" },
+];
+
+/** The held kinds side by side, sm, live or drawn `held` of the way through their hold. */
+function heldRow(held?: number): HTMLElement {
+  return row(
+    "s16",
+    "centre",
+    ...HELD.map(({ kind, label, icon }) => button({ label, icon, kind, size: "Sm", ...(held === undefined ? { hold: () => {} } : { held }) })),
+  );
+}
+
 function sample(kind: Kind, size: Size, state: Pinned | "rest" | "disabled" = "rest"): HTMLButtonElement {
   const { words, icon, trailing } = SAMPLES[kind];
   return button({
@@ -73,6 +89,8 @@ export default page({
   variants: nonEmpty([
     ...KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") })),
     { name: "Holding its alternatives' width", for: "Show and Hide one width: it never moves", sample: () => row("s16", "centre", button({ label: "Show", kind: "Text", size: "Sm", alternatives: ["Show", "Hide"], disclosure: false }), button({ label: "Hide", kind: "Text", size: "Sm", alternatives: ["Show", "Hide"], disclosure: true })) },
+    { name: "Held", for: "acts once held for `duration.hold`; its body fills meanwhile", sample: () => heldRow() },
+    { name: "Held, halfway", for: "filled to half; the label reads either side", sample: () => heldRow(0.5) },
     { name: "Disclosing", for: "a chevron that turns with what it opens", sample: () => row("s16", "centre", button({ label: "More", kind: "Tonal", size: "Sm", disclosure: false }), button({ label: "More", kind: "Tonal", size: "Sm", disclosure: true })) },
   ]),
   sizes: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
@@ -122,6 +140,14 @@ export default page({
     leaves: doesntApply("it goes with its surface or page."),
     between: [
       {
+        name: "The hold fills",
+        what: "Held: its body fills from the start over `hold`, on `linear`; let go early, it empties over `short`.",
+        tracks: [{ part: "the fill", on: "a held button", target: ".k-button[data-hold]", property: "--hold", from: 0, to: 1, duration: "hold", curve: "linear" }],
+        reduced: "same",
+        back: "cuts",
+        sample: () => heldRow(0),
+      },
+      {
         name: "Focus arrives",
         what: "A fade over `short` on `standard`, never the flicker: fill, label, line and glow move together.",
         tracks: lights(".k-button", on(KINDS), 0, 1),
@@ -154,6 +180,7 @@ export default page({
       { keys: ["Enter"], does: "presses it, never on key repeat" },
       { keys: ["Space"], does: "presses it" },
       { keys: ["Esc"], does: "nothing of the button's" },
+      { keys: ["Enter", "Space"], does: "a held one: kept down, its hold; let go, it empties" },
     ],
     order: "One stop in reading order; a disabled one is skipped.",
     lands: "Where its surface puts it: a screen's Filled, a Danger dialog's Cancel.",
@@ -162,6 +189,7 @@ export default page({
     samples: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
     measures: [
       { part: "Height, sm", token: "size-control_sm" },
+      { part: "A held one's fill", token: "radius-control" },
       { part: "Height, md", token: "size-control_md" },
       { part: "Height, lg", token: "size-control_lg" },
       { part: "Label line, sm", token: "type-button_small-line" },

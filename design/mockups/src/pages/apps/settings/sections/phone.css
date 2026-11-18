@@ -1,0 +1,13 @@
+/* Phone's organisms (`phone-parts.ts`). */
+
+/* The pairing with nothing to show takes no room, so the sub-section's gap isn't spent on it. */
+.ph-pairing[data-none] {
+  display: none;
+}
+
+/* A row's quiet button keeps its own width at the control column's end. */
+.ph-row-action {
+  display: flex;
+  justify-content: flex-end;
+}
+

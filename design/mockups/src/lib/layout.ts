@@ -280,11 +280,21 @@ export interface HeaderOptions {
   readonly subtitle?: string;
   /** Buttons beside the header, centred on its title and subtitle. */
   readonly actions?: readonly Element[];
+  /**
+   * A small button at the end of the title's line, centred on the title, its end on the page's:
+   * a Settings page's hold to reset it all.
+   */
+  readonly trailing?: Element;
+}
+
+/** `heading`, a heading's words, with `trailing` at the end of its line, centred on it, `space.s16` clear. */
+function withTrailing(heading: HTMLElement, trailing: Element | undefined): HTMLElement {
+  return trailing ? filling(row("s16", "centre", filling(heading), trailing)) : heading;
 }
 
 /** The title and the line under it, one block. */
 function titled(options: HeaderOptions): HTMLElement[] {
-  const title = wrapped(options.title, "title");
+  const title = withTrailing(wrapped(options.title, "title"), options.trailing);
   if (options.subtitle === undefined) return [title];
   const line = options.subtitle === "" ? text("", "body", "on_surface_variant") : wrapped(options.subtitle, "body", "on_surface_variant");
   return [title, gap("s8"), line];
@@ -307,9 +317,25 @@ function componentBox(className: string, content: HTMLElement, name: string, hol
   return probe(box, { role: "component", name, variant: "", fixed: holds ? { width: false, height: false, holds: true } : { width: false, height: false } });
 }
 
-/** A titled part of a page: its heading, an optional line `space.s4` under it, the content `space.s16` below. */
-export function section(heading: string, body: string | undefined, ...content: Element[]): HTMLElement {
-  const lines = [wrapped(heading, "heading"), ...(body === undefined ? [] : [wrapped(body, "body", "on_surface_variant")])];
-  const view = stack("s16", "start", filling(stack("s4", "start", ...lines)), ...content.map((part) => (part instanceof HTMLElement ? filling(part) : part)));
+/** A section's heading with a small button at the end of its line: a Settings sub-section's hold to reset it. */
+export interface Heading {
+  readonly words: string;
+  readonly trailing?: Element;
+  /** A tip about the whole part (`tip` in `lib/banner.ts`): the first of its content. */
+  readonly tip?: Element;
+}
+
+/**
+ * A titled part of a page: its heading, with a small button at the end of its line if it has one,
+ * an optional line `space.s4` under it, then its content `space.s16` below, a tip about the whole
+ * part first, `space.s16` from what follows.
+ */
+export function section(heading: string | Heading, body: string | undefined, ...content: Element[]): HTMLElement {
+  const named = typeof heading === "string" ? { words: heading } : heading;
+  const lines = [
+    withTrailing(wrapped(named.words, "heading"), named.trailing),
+    ...(body === undefined ? [] : [wrapped(body, "body", "on_surface_variant")]),
+  ];
+  const view = stack("s16", "start", filling(stack("s4", "start", ...lines)), ...[...(named.tip ? [named.tip] : []), ...content].map((part) => (part instanceof HTMLElement ? filling(part) : part)));
   return componentBox("k-section", view, "Section", true);
 }

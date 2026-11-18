@@ -58,6 +58,14 @@ function samplesWidth(inner: HTMLElement): number {
 /** Every stage's fitting, again: after the page is laid out anew. */
 const fitting = new Set<() => void>();
 
+/**
+ * Whether every one of `drawn` is, or holds, an app's window: as wide as a screen's half or more,
+ * so side by side each pane would show it small or cut, and the stage stands them as it does screens.
+ */
+function allWindows(drawn: readonly Element[]): boolean {
+  return drawn.length > 0 && drawn.every((each) => each.matches(".t-window") || each.querySelector(".t-window") !== null);
+}
+
 /** Fits every stage's samples to their panes again, as the page was laid out anew. */
 export function refitStages(): void {
   for (const fit of fitting) fit();
@@ -108,7 +116,7 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     panes.forEach((pane, i) => {
       const drawn = pick.draw(modes[i]!);
       pane.inner.replaceChildren(...drawn);
-      screen = allScreens(drawn);
+      screen = allScreens(drawn) || allWindows(drawn);
       if (pane.full) pane.full.hidden = !isScreen(drawn);
     });
     // `?all` stacks every stage's panes already, and the shots keep its corners.

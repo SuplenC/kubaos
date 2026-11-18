@@ -1,0 +1,41 @@
+/* Network's organisms (`network-parts.ts`). */
+
+/* The networks in range, a sub-section's lead part: its well across the page's column. Under the
+   connection form the well keeps the list's height (`--nw-held`, measured), so nothing under it
+   moves while the form shows. */
+.nw-range {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.nw-range > .k-list {
+  min-height: var(--nw-held, auto);
+}
+
+/* The connection form, centred down the well and as wide as it is in the control center's panel,
+   so its field and buttons read the same in both. */
+.nw-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: calc(var(--nw-held, 0px) - 2 * var(--space-s8));
+}
+
+.nw-form > .cc-form {
+  align-self: center;
+  width: min(100%, calc(var(--size-panel) - 2 * var(--container-0-padding)));
+  min-height: 0;
+}
+
+/* Wi-Fi off, airplane mode, no card: the empty state with room above and below it in the well. */
+.nw-empty {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-s24);
+}
+
+/* A row's way to another section keeps its own width at the control column's end. */
+.st-control > .nw-link {
+  flex: none;
+}

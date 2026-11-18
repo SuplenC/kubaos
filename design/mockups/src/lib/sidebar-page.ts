@@ -34,6 +34,8 @@ import { settings } from "../site/settings.ts";
 export interface SubSection {
   readonly title: string;
   readonly body?: string;
+  /** A tip about the whole sub-section, keys as `[Key]`: Home's search finds the sub-section by it. */
+  readonly tip?: string;
   readonly wells: readonly (readonly ListRowSpec[])[];
 }
 
@@ -47,6 +49,13 @@ export interface RegionHost {
   readonly enter: (index: number) => void;
   /** Reads the region's rows again, after it drew a sub-section anew: the selection changed. */
   readonly refresh: () => void;
+  /**
+   * Turns the page sideways to a page of the region's own: `deeper` into one (it comes in from the
+   * end, at its top), or back out (from the start, scrolled where it was). `swap` draws it once the
+   * page left has gone; `arrived` runs once it is in. Going deeper from sub-section `from`, the
+   * sidebar's bar stays beside it while the page is open.
+   */
+  readonly turn: (deeper: boolean, swap: () => void, arrived?: () => void, from?: number) => void;
 }
 
 /** A section: its row in the sidebar, its page's header and its sub-sections. */
@@ -56,6 +65,8 @@ export interface Section {
   readonly accent: string;
   readonly lede: string;
   readonly subs: readonly SubSection[];
+  /** A small button at the end of the page's title, as the page is drawn: Settings' hold to reset the section. */
+  readonly trailing?: () => HTMLElement;
   /** A region of its own in place of the sub-sections' wells, below the header: CanvasPage. */
   readonly region?: (host: RegionHost) => HTMLElement;
 }
@@ -75,6 +86,11 @@ export interface SidebarPageOptions {
   readonly section?: number;
   /** The sub-section the page is scrolled to. */
   readonly sub?: number;
+  /**
+   * The sub-section a page of the region's own, open as it is drawn, was opened from: the bar is
+   * held beside it, as a turn deeper holds it.
+   */
+  readonly heldSub?: number;
   /** What is typed in Home's field. */
   readonly query?: string;
   /** The find box open on the section's page with this typed, on its match `findAt`. */
@@ -86,6 +102,11 @@ export interface SidebarPageOptions {
   readonly row?: number;
   /** The sidebar's row the keyboard is on, by its index among the sidebar's rows. */
   readonly sidebarRow?: number;
+  /**
+   * The section the sidebar glides from to `section`: drawn at the glide's end, with its start set,
+   * for a move's player to play.
+   */
+  readonly glideFrom?: number;
   /** The page's row, by its index, Home's search just landed on: its highlight fading. */
   readonly landed?: number;
   /** The keyboard put in Home's field as the template is drawn: the live window opening. */
@@ -109,6 +130,8 @@ interface Found {
   readonly sub: number;
   readonly row: number;
   readonly runs: readonly Run[];
+  /** Found by its sub-section's tip: the result is the sub-section, landing on its first row. */
+  readonly heading?: boolean;
 }
 
 /**
@@ -136,6 +159,49 @@ export function matchRuns(words: string, query: string): Run[] | null {
     from = found + 1;
   }
   return runs;
+}
+
+/**
+ * Where `query` finds the row `spec`: by its name, its letters lit, as `matchRuns` does; else as a
+ * whole run in its line or its tip, each `[Key]` read as the key's name ("super tab"), with nothing
+ * in its name to light; null where it doesn't.
+ */
+export function findRow(spec: ListRowSpec, query: string): Run[] | null {
+  const named = matchRuns(spec.title, query);
+  if (named) return named;
+  const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ");
+  const needle = fold(query.trim());
+  const said = [spec.subtitle, spec.tip?.replace(/\[([^\]]+)\]/g, "$1")].filter((each): each is string => each !== undefined);
+  return said.some((each) => fold(each).includes(needle)) ? [] : null;
+}
+
+/** Which way a page turn goes: along the sidebar (`y`) or deeper (`x`), the new page coming from the `sign` side. */
+interface Way {
+  readonly axis: "x" | "y";
+  readonly sign: 1 | -1;
+}
+
+/** A page turn asked for: the page to draw once the old one has gone, and what follows its arrival. */
+interface Turn {
+  readonly way: Way;
+  readonly swap: () => void;
+  readonly arrived: (() => void) | undefined;
+}
+
+/** A duration token in milliseconds under the speed setting, whatever reduced motion says. */
+function played(name: string): number {
+  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+}
+
+/** The easing token `name` as a CSS timing function. */
+function easing(name: string): string {
+  return `cubic-bezier(${cubic(`easing-${name}`).join(", ")})`;
+}
+
+/** Animates a page's `--page-shift` and `--page-shown` from `from` to `to`, held at its end. */
+function moving(element: HTMLElement, from: readonly [number, number], to: readonly [number, number], duration: number, curve: string): Animation {
+  const frame = ([shift, shown]: readonly [number, number]) => ({ "--page-shift": String(shift), "--page-shown": String(shown) });
+  return element.animate([frame(from), frame(to)], { duration, easing: easing(curve), fill: "both" });
 }
 
 /** The duration token `name` in milliseconds, as the page plays it: none with reduced motion. */
@@ -169,9 +235,13 @@ function topIn(element: Element, view: HTMLElement): number {
 /** Each scroll's latest glide: a newer one, or the wheel, takes over from the one before. */
 const glides = new WeakMap<HTMLElement, number>();
 
+/** The scrolls with a glide in flight. */
+const gliding = new WeakSet<HTMLElement>();
+
 /** Stops `view`'s glide where it is: the wheel took over. */
 function stopGlide(view: HTMLElement): void {
   glides.set(view, (glides.get(view) ?? 0) + 1);
+  gliding.delete(view);
 }
 
 /** Glides `view`'s scroll to `to` over `medium` on `standard`, or jumps with reduced motion. */
@@ -187,11 +257,13 @@ function glideScroll(view: HTMLElement, to: number): void {
   }
   const curve = eased("standard");
   const start = performance.now();
+  gliding.add(view);
   const frame = (now: number) => {
     if (glides.get(view) !== glide) return;
     const t = Math.min(1, (now - start) / duration);
     view.scrollTop = Math.round(from + (target - from) * curve(t));
     if (t < 1) requestAnimationFrame(frame);
+    else gliding.delete(view);
   };
   requestAnimationFrame(frame);
 }
@@ -281,7 +353,7 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
   root.dataset.whole = "";
 
   let current = options.section ?? -1;
-  let sub = options.sub ?? 0;
+  let sub = options.heldSub ?? options.sub ?? 0;
   /** The sub-section a press in the sidebar went to, held while the page stays where it went. */
   let pressed: { sub: number; top: number } | null = null;
   const names = sections.map((each) => each.subs.map((s) => s.title));
@@ -296,7 +368,18 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
   let items: Item[] = [];
   let itemRows: HTMLButtonElement[] = [];
   let sideAt = options.sidebarRow ?? 0;
-  const bar = subBar();
+  // The sidebar's parts, made once: a row a section (Home's first), each section's list of
+  // sub-sections with its bar, and the highlight that travels between the sections' rows.
+  let homeRow: HTMLButtonElement | null = null;
+  const sectionRows: HTMLButtonElement[] = [];
+  const subLists: (HTMLElement | null)[] = [];
+  const subRows: HTMLButtonElement[][] = [];
+  const bars: HTMLElement[] = [];
+  const highlight = document.createElement("span");
+  /** The section the sidebar shows as current: what its highlight and its open list are on. */
+  let shownSection: number | null = null;
+  /** The highlight's glide and the lists' folds, running. */
+  let glides: Animation[] = [];
 
   // The page: what scrolls, the rise a change of section plays on, and the find box over it.
   const rise = document.createElement("span");
@@ -340,38 +423,165 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     return list;
   }
 
-  function drawSidebar(): void {
-    items = buildItems();
-    itemRows = [];
-    const parts: Element[] = [];
-    const home = sidebarRow("section", outline.home.name, "manage_search", current === -1);
-    itemRows.push(home);
+  /** The section's row by its index, Home's at -1. */
+  function sectionRow(index: number): HTMLButtonElement {
+    return index === -1 ? homeRow! : sectionRows[index]!;
+  }
+
+  /**
+   * Makes the sidebar's rows once: Home, the hairline, then each section's row and the list of its
+   * sub-sections under it, folded but the current one's. A change of section moves what is
+   * already there, so no row is drawn again: hover and focus stay where they are.
+   */
+  function buildSidebar(): void {
+    highlight.className = "k-sp-highlight k-control";
+    highlight.setAttribute("aria-hidden", "true");
+    focusRing(highlight, "control", "accent", false);
+    homeRow = sidebarRow("section", outline.home.name, "manage_search", false);
     const rule = document.createElement("span");
     rule.className = "k-sp-rule";
     rule.append(divider());
-    parts.push(home, rule);
+    const parts: Element[] = [highlight, homeRow, rule];
     for (const [index, each] of sections.entries()) {
-      const head = sidebarRow("section", each.title, each.icon, index === current);
-      itemRows.push(head);
+      const head = sidebarRow("section", each.title, each.icon, false);
+      sectionRows.push(head);
       parts.push(head);
-      if (index !== current || names[index]!.length === 0) continue;
-      const subs = document.createElement("span");
-      subs.className = "k-sp-subs";
-      for (const [s, title] of names[index]!.entries()) {
-        const line = sidebarRow("sub", title, null, s === sub);
-        itemRows.push(line);
-        subs.append(line);
+      const lines = names[index]!.map((title) => sidebarRow("sub", title, null, false));
+      subRows.push(lines);
+      if (lines.length === 0) {
+        subLists.push(null);
+        bars.push(subBar());
+        continue;
       }
-      subs.append(bar);
-      parts.push(subs);
+      const list = document.createElement("span");
+      list.className = "k-sp-subs";
+      list.dataset.folded = "";
+      list.inert = true;
+      const own = subBar();
+      list.append(...lines, own);
+      subLists.push(list);
+      bars.push(own);
+      parts.push(list);
     }
+    sideRows.dataset.glides = "";
     sideRows.replaceChildren(...parts);
-    itemRows.forEach((button, at) => {
-      button.addEventListener("click", () => pick(items[at]!, false));
+    for (const button of [homeRow, ...sectionRows, ...subRows.flat()]) {
+      button.addEventListener("click", () => {
+        const at = itemRows.indexOf(button);
+        if (at >= 0) pick(items[at]!, false);
+      });
+    }
+  }
+
+  /**
+   * Shows the section now current in the sidebar: its row current, its list open and the others
+   * folded, the highlight on its row. With `glide` the highlight travels there and the lists fold
+   * and unfold over `medium` on `standard`, on one clock, so the rows under them slide and the
+   * highlight lands on the row as the row lands; a change asked for meanwhile carries on from
+   * where everything is. With reduced motion the lists change at once and the highlight fades in
+   * on its row over `short`.
+   */
+  function drawSidebar(glide = false, play = true): void {
+    items = buildItems();
+    itemRows = items.map((item) => (item.kind === "home" ? homeRow! : item.kind === "section" ? sectionRows[item.index]! : subRows[current]![item.index]!));
+    const from = shownSection;
+    shownSection = current;
+    for (const [index, row] of [[-1, homeRow!] as const, ...sectionRows.map((row, at) => [at, row] as const)]) {
+      row.toggleAttribute("data-current", index === current);
+      if (index === current) row.setAttribute("aria-current", "page");
+      else row.removeAttribute("aria-current");
+    }
+    const moving = glide && from !== null && from !== current && root.isConnected;
+    const reduced = settings().reduced;
+    const duration = played("medium");
+
+    // Read everything first, to the fraction of a pixel a fold leaves mid-way: each list's height
+    // as drawn now, its full height, the rows' places, the highlight's.
+    // A folded list at rest is out of the layout: laid out at no height while it is measured.
+    for (const list of subLists) list?.setAttribute("data-measuring", "");
+    const box = sideRows.getBoundingClientRect();
+    // The page's zoom, from the rows' width: their height is mid-fold, and `offsetHeight` rounds it.
+    const ratio = sideRows.offsetWidth / Math.max(1, box.width);
+    const topOf = (element: Element) => (element.getBoundingClientRect().top - box.top) * ratio;
+    const heights = subLists.map((list) => (list ? list.getBoundingClientRect().height * ratio : 0));
+    // A list's full height is its rows': the bar, placed out of the flow, may reach past them.
+    const full = subLists.map((list, index) => {
+      const last = subRows[index]?.at(-1);
+      return list && last ? last.offsetTop + last.offsetHeight : 0;
     });
+    const highlightAt = moving ? currentY() : null;
+    const target = sectionRow(current);
+    // Where the row will stand once every list has its new height: the lists above it change by
+    // the difference.
+    const targetTop = topOf(target);
+    let targetY = targetTop;
+    subLists.forEach((list, index) => {
+      if (!list || topOf(list) >= targetTop) return;
+      const end = index === current ? full[index]! : 0;
+      targetY -= heights[index]! - end;
+    });
+    for (const list of subLists) list?.removeAttribute("data-measuring");
+
+    for (const each of glides) each.cancel();
+    glides = [];
+    // A glide's ends are custom properties and its progress one number each (`--fold-at`,
+    // `--highlight-at`), so a move's player plays the same thing from its recipe.
+    const runs = (element: HTMLElement, property: string, done?: () => void) => {
+      if (!play) {
+        element.style.setProperty(property, "1");
+        return;
+      }
+      const run = element.animate([{ [property]: "0" }, { [property]: "1" }], { duration, easing: easing("standard") });
+      glides.push(run);
+      run.finished.then(
+        () => done?.(),
+        () => {},
+      );
+    };
+    subLists.forEach((list, index) => {
+      if (!list) return;
+      const open = index === current;
+      list.toggleAttribute("data-folded", !open);
+      list.inert = !open;
+      const end = open ? full[index]! : 0;
+      if (!moving || reduced || Math.abs(heights[index]! - end) < 0.01) {
+        delete list.dataset.folding;
+        return;
+      }
+      list.dataset.folding = "";
+      list.style.setProperty("--fold-from", `${heights[index]}px`);
+      list.style.setProperty("--fold-to", `${end}px`);
+      list.style.setProperty("--fade-from", String(heights[index]! / Math.max(1, full[index]!)));
+      list.style.setProperty("--fade-to", open ? "1" : "0");
+      runs(list, "--fold-at", () => {
+        delete list.dataset.folding;
+        // At rest the list gives its gap back to the stack: its bar is placed again, unmoved on screen.
+        if (open) placeBar(false);
+      });
+    });
+    highlight.style.setProperty("--highlight-y", `${targetY}px`);
+    if (moving && reduced) {
+      if (play) glides.push(highlight.animate([{ opacity: 0 }, { opacity: 1 }], { duration: played("short"), easing: easing("standard") }));
+    } else if (moving && highlightAt !== null) {
+      highlight.style.setProperty("--highlight-from", `${highlightAt}px`);
+      runs(highlight, "--highlight-at");
+    }
+
     sideAt = Math.max(0, Math.min(items.length - 1, sideAt));
     rove();
-    requestAnimationFrame(() => placeBar(false));
+    placeBar(false);
+    if (moving) {
+      // The rows move under a pointer that stays where it was: the row it is over now isn't
+      // pointed at, so nothing lights under it until the pointer moves again.
+      side.dataset.still = "";
+    }
+  }
+
+  /** The highlight's place as drawn now, mid-glide included, in the rows' own pixels. */
+  function currentY(): number {
+    const translate = getComputedStyle(highlight).translate.split(" ");
+    const y = Number.parseFloat(translate[1] ?? translate[0] ?? "0");
+    return Number.isFinite(y) ? y : 0;
   }
 
   /** The sidebar's one stop for Tab: the row the keyboard is on. */
@@ -381,7 +591,8 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
 
   /** The bar beside the current sub-section: gliding there, or put there at once. */
   function placeBar(glide: boolean): void {
-    const subs = itemRows.filter((_, at) => items[at]?.kind === "sub");
+    const bar = bars[current] ?? subBar();
+    const subs = subRows[current] ?? [];
     subs.forEach((each, s) => {
       each.toggleAttribute("data-current", s === sub);
       if (s === sub) each.setAttribute("aria-current", "location");
@@ -397,7 +608,9 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     const drawn = getComputedStyle(bar).top;
     delete bar.dataset.still;
     bar.style.transition = "none";
-    bar.style.setProperty("--bar-from", drawn);
+    // Where it is drawn is its row's top and its inset in the row: the start is the row's top alone,
+    // or the glide would begin a step lower and come back.
+    bar.style.setProperty("--bar-from", `calc(${drawn} - var(--bar-inset))`);
     bar.style.setProperty("--bar-to", to);
     bar.style.setProperty("--bar-at", "0");
     void bar.offsetTop;
@@ -425,14 +638,13 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     }
     delete pane.dataset.home;
     const each = sections[current]!;
-    const head = header({ accent: each.accent, title: each.title, subtitle: each.lede });
+    const head = header({ accent: each.accent, title: each.title, subtitle: each.lede, ...(each.trailing ? { trailing: each.trailing() } : {}) });
     const host: RegionHost = {
       rename: (index, title) => {
         const list = names[current];
         if (!list || list[index] === title) return;
         list[index] = title;
-        const subs = itemRows.filter((_, at) => items[at]?.kind === "sub");
-        const words = subs[index]?.querySelector(".k-text");
+        const words = subRows[current]?.[index]?.querySelector(".k-text");
         if (words) words.textContent = title;
       },
       spyOn: (box, lead) => {
@@ -442,6 +654,24 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
       },
       enter: (index) => enterPage(index),
       refresh: () => collectRows(),
+      turn: (deeper, swap, arrived, from) => {
+        const kept = deeper ? view.scrollTop : (depths.pop() ?? 0);
+        if (deeper) depths.push(kept);
+        // A page of the region's own belongs to the sub-section it was opened from: the bar stays there.
+        heldSub = deeper && from !== undefined ? from : null;
+        if (heldSub !== null && heldSub !== sub) {
+          sub = heldSub;
+          placeBar(true);
+        }
+        turnPage(
+          { axis: "x", sign: deeper ? 1 : -1 },
+          () => {
+            swap();
+            view.scrollTop = deeper ? 0 : kept;
+          },
+          arrived,
+        );
+      },
     };
     const body = each.region ? each.region(host) : stack("s32", "start", ...each.subs.map((s, index) => filling(subSection(s, index))));
     rise.replaceChildren(page(stack("s32", "start", filling(head), filling(body))));
@@ -461,7 +691,10 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
   /** The page's rows and wells, in order, wired to the pointer and the keyboard. */
   function collectRows(): void {
     rows = [];
-    wells = [...rise.querySelectorAll<HTMLElement>(".k-list")];
+    // The page's rows are its settings' wells' (`settingsWell`): a list of the page's own that a
+    // region draws beside them (the networks in range, the layouts) keeps its own keys, and isn't
+    // counted, so search and a landing find the setting they name.
+    wells = [...rise.querySelectorAll<HTMLElement>(".k-list")].filter((box) => [...box.querySelectorAll(".k-list-row")].some((row) => specs.has(row as HTMLElement)));
     const boxes = subBoxes();
     for (const box of wells) {
       const subOf = boxes.findIndex((each) => each.contains(box));
@@ -469,8 +702,8 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
       if (!wired.has(box)) box.addEventListener("keydown", pageKeys);
       wired.add(box);
       for (const element of box.querySelectorAll<HTMLElement>(".k-list-row")) {
-        const spec = specs.get(element) ?? { title: element.querySelector(".k-list-title")?.textContent ?? "" };
-        rows.push({ spec, sub: Math.max(0, subOf), element });
+        const spec = specs.get(element);
+        if (spec) rows.push({ spec, sub: Math.max(0, subOf), element });
       }
     }
     for (const each of rows) wire(each);
@@ -552,13 +785,16 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
         let at = 0;
         for (const specs of s.wells) {
           for (const spec of specs) {
-            const runs = matchRuns(spec.title, query);
+            const runs = findRow(spec, query);
             if (runs) found.push({ spec, section, sub: subIndex, row: at, runs });
             at++;
           }
         }
+        if (s.tip !== undefined && findRow({ title: "", tip: s.tip }, query)) found.push({ spec: { title: s.title }, section, sub: subIndex, row: 0, runs: [], heading: true });
       });
     });
+    // What its name matches first, then what its line or tip does, each in the sidebar's order.
+    found.sort((a, b) => Number(a.runs.length === 0) - Number(b.runs.length === 0));
     if (found.length === 0) {
       results = null;
       const none = document.createElement("span");
@@ -569,8 +805,8 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     const elements = found.map((each) =>
       listRow({
         title: each.spec.title,
-        matched: each.runs,
-        subtitle: `${sections[each.section]!.title} › ${sections[each.section]!.subs[each.sub]!.title}`,
+        ...(each.runs.length ? { matched: each.runs } : {}),
+        subtitle: each.heading ? sections[each.section]!.title : `${sections[each.section]!.title} › ${sections[each.section]!.subs[each.sub]!.title}`,
         ...(each.spec.detail !== undefined ? { detail: each.spec.detail } : each.spec.toggle !== undefined ? { detail: each.spec.toggle ? "On" : "Off" } : {}),
       }),
     );
@@ -599,25 +835,31 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
 
   /** Goes to a setting found from Home: its section, scrolled to its row, the row landed on. */
   function land(found: Found): void {
+    const from = current;
     current = found.section;
     sub = found.sub;
-    change(true);
-    const at = rows.findIndex((each) => each.sub === found.sub) + found.row;
-    const element = rows[at]?.element;
-    if (!element) return;
-    pageAt = at;
-    requestAnimationFrame(() => {
+    let element: HTMLElement | undefined;
+    // The page turns in already scrolled to the row; the highlight plays once it has arrived.
+    const drawn = () => {
+      const at = rows.findIndex((each) => each.sub === found.sub) + found.row;
+      element = rows[at]?.element;
+      if (!element) return;
+      pageAt = at;
       const top = topIn(element, view) - length("space-s32") * scaleOf(root) - length(`type-heading-line`) * scaleOf(root);
       view.scrollTop = Math.round(Math.max(0, top));
       pressed = { sub: found.sub, top: view.scrollTop };
       placeBar(false);
       showRow(false);
       wellOf(at)?.focus({ preventScroll: true });
+      spy();
+    };
+    const arrived = () => {
+      if (!element) return;
       element.removeAttribute("data-landed");
       void element.offsetTop;
       element.dataset.landed = "";
-      spy();
-    });
+    };
+    change(true, along(from, current), drawn, arrived);
   }
 
   function homeKeys(event: KeyboardEvent): void {
@@ -637,34 +879,163 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     event.stopPropagation();
   }
 
-  /** Changes what the page shows to the section now current: the rise, at the top, the bar in place. */
-  function change(rises: boolean): void {
+  // A page turn, as a panel swapped for its twin moves: the page shown leaves `space.s24` toward one
+  // side and fades over `micro` on `emphasized_accel`, then the next is drawn and comes in from the
+  // other side over `short` on `emphasized_decel`. A turn asked for meanwhile retargets it: a page still leaving goes on
+  // leaving and the latest turn's page comes in; a page coming in leaves from where it is. With
+  // reduced motion the page left goes at once and the next fades in over `short` on `standard`.
+  let turning: "idle" | "leaving" | "arriving" = "idle";
+  let latest: Turn | null = null;
+  let animations: Animation[] = [];
+  /** Each turn's own count: a stopped animation's end tells nobody. */
+  let turnCount = 0;
+
+  /** The page element the turn moves: the section's or Home's page, its title with it. */
+  function pageShown(): HTMLElement | null {
+    return rise.firstElementChild as HTMLElement | null;
+  }
+
+  /** Where the page is in its move now: its shift and how much it shows. */
+  function standing(element: HTMLElement): [number, number] {
+    const style = getComputedStyle(element);
+    const read = (name: string, otherwise: number) => {
+      const value = Number.parseFloat(style.getPropertyValue(name));
+      return Number.isFinite(value) ? value : otherwise;
+    };
+    return [read("--page-shift", 0), read("--page-shown", 1)];
+  }
+
+  function stopAnimations(): void {
+    for (const each of animations) each.cancel();
+    animations = [];
+  }
+
+  /** Plays `turn`: the page shown leaves, then `turn`'s is drawn and arrives. */
+  function turnPage(way: Way, swap: () => void, arrived?: () => void): void {
+    latest = { way, swap, arrived };
+    if (turning === "leaving") return;
+    const page = pageShown();
+    const caught = turning === "arriving";
+    const from: [number, number] = page && caught ? standing(page) : [0, 1];
+    stopAnimations();
+    const count = ++turnCount;
+    if (!page || settings().reduced || !root.isConnected) {
+      bringIn(count);
+      return;
+    }
+    turning = "leaving";
+    rise.dataset.moving = "";
+    // A page caught coming in leaves along the way it came, so it never jumps sideways.
+    if (!caught) rise.dataset.axis = way.axis;
+    const leave = moving(page, from, [-way.sign, 0], played("micro") * from[1], "emphasized_accel");
+    animations = [leave];
+    leave.finished.then(
+      () => count === turnCount && bringIn(count),
+      () => {},
+    );
+  }
+
+  /** The latest turn's page drawn, then coming in. */
+  function bringIn(count: number): void {
+    const turn = latest;
+    latest = null;
+    if (!turn) return;
+    stopAnimations();
+    turn.swap();
+    const page = pageShown();
+    if (!page || !root.isConnected) {
+      settle();
+      turn.arrived?.();
+      return;
+    }
+    turning = "arriving";
+    rise.dataset.moving = "";
+    rise.dataset.axis = turn.way.axis;
+    // The new page waits hidden where its arrival starts until it has been drawn once: a page drawn
+    // for the first time costs a frame's style, layout and paint, and an arrival started before it
+    // would spend its first frames unseen while that frame is made.
+    const reduced = settings().reduced;
+    const from: [number, number] = reduced ? [0, 0] : [turn.way.sign, 0];
+    page.style.setProperty("--page-shift", String(from[0]));
+    page.style.setProperty("--page-shown", "0");
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (count !== turnCount) return;
+        const arrive = reduced ? moving(page, from, [0, 1], played("short"), "standard") : moving(page, from, [0, 1], played("short"), "emphasized_decel");
+        animations = [arrive];
+        arrive.finished.then(
+          () => {
+            if (count !== turnCount) return;
+            settle();
+            turn.arrived?.();
+          },
+          () => {},
+        );
+      }),
+    );
+  }
+
+  /** The turn done: the page at rest, its animation let go. */
+  function settle(): void {
+    stopAnimations();
+    turning = "idle";
+    delete rise.dataset.moving;
+    const page = pageShown();
+    page?.style.removeProperty("--page-shift");
+    page?.style.removeProperty("--page-shown");
+  }
+
+  /** The way from section `from` to `to` (Home, -1, the top): down the list rises in from below. */
+  function along(from: number, to: number): Way {
+    return { axis: "y", sign: to > from ? 1 : -1 };
+  }
+
+  /** The scroll a page turned deeper left, for Back to put it back. */
+  const depths: number[] = [];
+  /** The sub-section a page of the region's own was opened from, the bar held beside it, or none. */
+  let heldSub: number | null = options.heldSub ?? null;
+
+  /**
+   * Changes what the page shows to the section now current. The sidebar follows at once; with
+   * `turns`, the page turns along `way`, else it is drawn at once. `drawn` runs as the new page is
+   * drawn, at its top; `arrived` once it is in.
+   */
+  function change(turns: boolean, way: Way = { axis: "y", sign: 1 }, drawn?: () => void, arrived?: () => void): void {
     if (find.open) closeFind(false);
-    drawSidebar();
-    drawPage();
-    view.scrollTop = 0;
-    pressed = null;
-    if (!rises || ms("short") === 0) return;
-    rise.style.transition = "none";
-    rise.style.setProperty("--section-rise", "0");
-    void rise.offsetTop;
-    rise.style.transition = "";
-    rise.style.setProperty("--section-rise", "1");
+    drawSidebar(turns);
+    depths.length = 0;
+    heldSub = null;
+    const swap = () => {
+      drawPage();
+      view.scrollTop = 0;
+      pressed = null;
+      drawn?.();
+    };
+    if (turns) turnPage(way, swap, arrived);
+    else {
+      swap();
+      arrived?.();
+    }
   }
 
   /** Goes to section `index` (-1 Home), its first sub-section current. */
-  function go(index: number, keyboard = false): void {
+  function go(index: number, keyboard = false, drawn?: () => void): void {
     if (index === current) return;
+    const from = current;
     current = index;
     sub = 0;
     pageAt = -1;
-    change(true);
+    const home = index === -1 && !keyboard;
+    change(true, along(from, index), () => {
+      // Home pressed puts the keyboard in Home's field, where the window opens, once it is drawn.
+      if (home) homeField?.focus({ preventScroll: true });
+      drawn?.();
+    });
     sideAt = items.findIndex((item) => (index === -1 ? item.kind === "home" : item.kind === "section" && item.index === index));
     rove();
     // The sidebar is drawn again, so the row pressed is a new one: the keyboard goes onto it,
-    // quietly for a press. Home pressed puts it in Home's field, where the window opens.
-    if (index === -1 && !keyboard) homeField?.focus({ preventScroll: true });
-    else itemRows[sideAt]?.focus({ preventScroll: true });
+    // quietly for a press.
+    if (!home) itemRows[sideAt]?.focus({ preventScroll: true });
   }
 
   /** Scrolls the page to sub-section `index`, its heading at the lead line, the bar gliding there. */
@@ -688,11 +1059,14 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
 
   /** Follows the page's scroll: the current sub-section is the last whose heading reached the lead line. */
   function spy(): void {
-    if (current === -1) return;
+    if (current === -1 || heldSub !== null) return;
     const boxes = subBoxes();
     if (boxes.length === 0) return;
     // A page shorter than where a press sent it stops at its end: the press still holds there.
     const end = spyView.scrollHeight - spyView.clientHeight;
+    // On its way to where a press sent it, the page passes other headings: the press holds through
+    // them, or the bar would turn back to each before going on.
+    if (pressed && gliding.has(spyView)) return;
     if (pressed && Math.abs(spyView.scrollTop - Math.min(pressed.top, end)) <= 1) {
       if (sub !== pressed.sub) {
         sub = pressed.sub;
@@ -852,8 +1226,8 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     find.matches = [];
     const blank = query.trim() === "";
     rows.forEach((each, index) => {
-      const runs = blank ? null : matchRuns(each.spec.title, query);
-      const fresh = listRow(runs ? { ...each.spec, matched: runs } : each.spec);
+      const runs = blank ? null : findRow(each.spec, query);
+      const fresh = listRow(runs?.length ? { ...each.spec, matched: runs } : each.spec);
       specs.set(fresh, each.spec);
       each.element.replaceWith(fresh);
       each.element = fresh;
@@ -950,8 +1324,9 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
       const next = ((current + 1 + (key === "PageDown" ? 1 : -1)) % count + count) % count - 1;
       // The keyboard stays on its side: in the sidebar, or in the new page.
       const inSidebar = document.activeElement instanceof HTMLElement && side.contains(document.activeElement);
-      go(next, inSidebar);
-      if (!inSidebar && next !== -1) enterPage(0);
+      go(next, inSidebar, () => {
+        if (!inSidebar && next !== -1) enterPage(0);
+      });
     } else if ((key === "/" && !isTyping(event)) || (ctrl && key.toLowerCase() === "f")) {
       if (current === -1) homeField?.focus({ preventScroll: true });
       else openFind(find.query);
@@ -982,12 +1357,46 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     if (next.classList.contains("k-sp-row") && !active?.classList.contains("k-sp-row")) itemRows[sideAt]?.focus({ preventScroll: true });
   }
 
+  buildSidebar();
   drawSidebar();
+  // A move's sample marks its two lists as folding at once, so its player finds them; their
+  // measured ends are set once the sample is laid out, below.
+  if (options.glideFrom !== undefined) {
+    for (const index of [options.glideFrom, current]) {
+      const list = subLists[index];
+      if (!list) continue;
+      list.dataset.folding = "";
+      for (const [name, value] of [["--fold-from", "0px"], ["--fold-to", "0px"], ["--fade-from", "0"], ["--fade-to", "0"], ["--fold-at", "1"]] as const) list.style.setProperty(name, value);
+    }
+  }
   drawPage();
+  // Laid out once it is in its window: the highlight on the current row, the bar beside its sub-section.
+  requestAnimationFrame(() => {
+    highlight.style.setProperty("--highlight-y", `${sectionRow(current).offsetTop}px`);
+    placeBar(false);
+    if (options.glideFrom === undefined) return;
+    // A move's sample: drawn at the section glided from, then at the glide's end, unplayed.
+    const to = current;
+    current = options.glideFrom;
+    drawSidebar();
+    highlight.style.setProperty("--highlight-y", `${sectionRow(current).offsetTop}px`);
+    current = to;
+    drawSidebar(true, false);
+  });
+  // The pointer moving again, after the rows moved under it, may light what it is over.
+  let pointer: { x: number; y: number } | null = null;
+  side.addEventListener("pointermove", (event) => {
+    if (side.dataset.still === undefined) pointer = { x: event.clientX, y: event.clientY };
+    else if (!pointer || Math.abs(event.clientX - pointer.x) + Math.abs(event.clientY - pointer.y) > 0) {
+      delete side.dataset.still;
+      pointer = { x: event.clientX, y: event.clientY };
+    }
+  });
+  side.addEventListener("pointerleave", () => delete side.dataset.still);
   if (options.find !== undefined) openFind(options.find, options.focus ?? false);
   if (options.landed !== undefined) rows[options.landed]?.element.setAttribute("data-landed", "");
   requestAnimationFrame(() => {
-    if (options.sub && current !== -1) {
+    if (options.sub && current !== -1 && heldSub === null) {
       const box = subBoxes()[options.sub];
       if (box) view.scrollTop = Math.round(topIn(box, view) - spyLead());
       sub = options.sub;

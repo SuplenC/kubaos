@@ -209,6 +209,41 @@
   height: var(--size-row_two_line);
 }
 
+/* A lit row lights the control at its end that the keys on the row reach, as the keyboard in the
+   control itself would: a field's or a select's edge, a choice's picked stretch. One shut, its own
+   rules win: an open select lights nothing. */
+.k-list-row[data-current]:not([aria-disabled="true"]) :where(.k-field.k-control, .k-select.k-control, .k-tabs):where(:not([aria-disabled="true"])) {
+  --lit: 1;
+}
+
+/* A row with a tip (`ListRowSpec.tip`): its own line at its height with its control in its place,
+   and under it a line of its own, the tip across the row inside its padding, whatever leads the
+   row; under the tip the row keeps what its line keeps under its words, `space.s8` in a two-line
+   row and `space.s12` in a one-line one. */
+.k-list-row[data-tip] {
+  flex-direction: column;
+  align-items: stretch;
+  height: auto;
+  padding-bottom: var(--space-s12);
+}
+
+.k-list-row[data-tip][data-lines="two"] {
+  padding-bottom: var(--space-s8);
+}
+
+.k-list-row[data-tip] > .k-row:first-child {
+  flex: none;
+  min-height: var(--size-row);
+}
+
+.k-list-row[data-tip][data-lines="two"] > .k-row:first-child {
+  min-height: var(--size-row_two_line);
+}
+
+.k-list-row > .k-list-tip {
+  cursor: default;
+}
+
 .k-list-row[data-danger] {
   --rest-ink: var(--color-error);
   --rest-muted: var(--color-error);

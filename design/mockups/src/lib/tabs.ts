@@ -66,6 +66,8 @@ export interface TabsOptions {
    * and the move's player takes them to the picked one.
    */
   readonly from?: number;
+  /** Drawn lit as the pointer over the well lights it, with no focus tube: a sample of it. */
+  readonly pointed?: boolean;
   /** The choice whose tip is drawn shown, as under the pointer: a sample of it. */
   readonly tipShown?: number;
   /** What a pick does besides picking: the view it shows. */
@@ -109,6 +111,7 @@ export function tabs(options: TabsOptions): HTMLElement {
   if (options.disabled) well.setAttribute("aria-disabled", "true");
   well.style.setProperty("--count", String(count));
   if (options.pinned !== "pressed") pin(well, options.pinned);
+  if (options.pointed) well.dataset.pointed = "";
   focusRing(well, "full", "accent", false);
 
   const buttons = options.choices.map((choice, index) => {

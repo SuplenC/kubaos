@@ -28,4 +28,6 @@ Rust `dialog::scrim`; QML `Scrim`.
 
 Everything behind a dialog, dimmed (`scrim` at `opacity.scrim`), with the dialog in its middle on whole device pixels. It takes every press, hover and scroll, and a press on it does nothing.
 
+**Over an app's window** (`dialogOver`), a question an app asks of its own (Settings' "Keep this?", Forget, a channel's change): the scrim lies over the whole window to its rounded corners, above all it holds, the dialog centred in it on whole device pixels as the window resizes, and the rest of the window is out of the keyboard's reach until it is answered. Answered, both fade out as a dialog does and the keyboard goes back where it was.
+
 *Not built yet: both libraries draw the dialog 32 inside at the surface radius (24), not the content radius, with a 32 icon and a `headline` title over the body and the buttons 32 under it, and lay its buttons out themselves rather than in a button bar; they cast `shadow.dialog` with an edge of `primary` at `opacity.dialog_edge` instead of the ladder's step 3 and its rim, neither moves as it opens or closes, and neither keeps a least or a most height or scrolls its middle. The mockup draws the rule.*

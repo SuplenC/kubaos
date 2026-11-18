@@ -9,6 +9,7 @@ import { type SelectOptions, select } from "../../lib/select.ts";
 import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { rowOfControls } from "../row-sample.ts";
 
 const COUNTRIES = ["None", "Germany", "Italy", "Poland"];
 const MANY = ["None", "Austria", "Belgium", "Czechia", "Denmark", "Finland", "France", "Germany", "Greece", "Italy", "Netherlands", "Poland", "Portugal", "Spain"];
@@ -162,7 +163,13 @@ export default page({
     { name: "A long list", for: "eight in view, the pick three rows down", sample: () => boxed(many({ open: true })) },
     { name: "Growing upward", for: "too near its room's foot", sample: () => boxed(holidays({ open: true, up: true })) },
   ],
-  sizes: doesntApply("one height, a field's, filling the room it is given."),
+  sizes: [
+    { name: "md", for: "a form's: `control_md`, `body_large`", sample: () => boxed(holidays()) },
+    { name: "sm", for: "a list row's: `control_sm`, `body`", sample: () => boxed(holidays({ size: "Sm" })) },
+    { name: "sm, open", for: "the same list as md's", sample: () => boxed(holidays({ size: "Sm", open: true })) },
+    { name: "Side by side", for: "md over sm, the same room", sample: () => within(ROOM, stack("s16", "start", select(holidays()), select(holidays({ size: "Sm" })))) },
+    { name: "In a list row", for: "sm beside a slider, a switch, a choice", sample: rowOfControls },
+  ],
   states: {
     shown: ["rest", "lit", "pressed", "open", "disabled"],
     absent: {
@@ -232,10 +239,12 @@ export default page({
     ]),
     measures: [
       { part: "Height", token: "size-control_md" },
+      { part: "Height, sm", token: "size-control_sm" },
       { part: "Inset, rule inset", token: "space-s12" },
       { part: "Symbol → words → chevron", token: "space-s8" },
       { part: "Symbol, chevron", token: "type-body_large-icon" },
       { part: "Value line", token: "type-body_large-line" },
+      { part: "Value line, sm", token: "type-body-line" },
       { part: "Corner", token: "radius-control" },
       { part: "Option corner", token: "radius-row" },
       { part: "Hairline, rim, rule", token: "stroke-hairline_device_px" },

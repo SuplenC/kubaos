@@ -8,7 +8,7 @@
 
 import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
-import { stack, within } from "../../lib/layout.ts";
+import { flow, stack, within } from "../../lib/layout.ts";
 import { setTabDisabled, type Tab, tabs } from "../../lib/tabs.ts";
 import { text, wrapped } from "../../lib/text.ts";
 import { tooltip } from "../../lib/tooltip.ts";
@@ -55,6 +55,11 @@ function tipped(shown: number): HTMLElement {
   room.setAttribute("aria-hidden", "true");
   for (const each of [room, ...room.querySelectorAll<HTMLElement | SVGElement>("[data-probe]")]) delete each.dataset.probe;
   return within(PANEL, stack("s8", "start", room, tabs({ choices: TIPPED, tipShown: shown })));
+}
+
+/** Motion's three choices at rest, then lit as the pointer over the well lights them. */
+function litLooks(): HTMLElement {
+  return flow("s32", ...[false, true].map((pointed) => within(PANEL, tabs({ choices: MOTION, picked: 1, ...(pointed ? { pointed } : {}) }))));
 }
 
 /** The control center's sections with the view each shows under them, which follows the pick. */
@@ -138,6 +143,7 @@ export default page({
     { name: "Segmented control", for: "a setting's few values side by side", sample: () => row(MOTION, 1) },
     { name: "A tip, first choice", for: "what Calls means, from its choice's start", sample: () => tipped(0) },
     { name: "A tip, last choice", for: "what Music means, from its choice's end", sample: () => tipped(1) },
+    { name: "Lit", for: "rest, then lit: the pick flares, the rail brightens", sample: litLooks },
     { name: "A choice disabled", for: "a view that can't open now: Input in Music mode", sample: () => row(MUSIC_SIDES, 0) },
     {
       name: "Nothing picked",
@@ -157,7 +163,7 @@ export default page({
     rows: nonEmpty(ROWS.map(({ name, choices, picked }) => ({ name, cell: (state: MatrixState) => row(choices, picked, state) }))),
     looks: {
       rest: "unlit rail, the pick's stretch lit; words `primary_lit`",
-      lit: "focus tube round the well; a pointed choice brightens its words",
+      lit: "the pick flares, the rail brightens; keyboard: the focus tube",
       pressed: "the next open choice's words go to the picked colour",
       disabled: "every part at `opacity.disabled_content`, the pick still shown",
     },

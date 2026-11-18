@@ -164,11 +164,39 @@
   flex: none;
   align-self: stretch;
   box-sizing: border-box;
-  padding: var(--space-s16) var(--space-s16) var(--space-s16) calc(2 * var(--space-s12) + var(--space-s4));
-  border-radius: var(--radius-content);
+  padding: var(--inset) var(--inset) var(--inset) calc(var(--lane-in) + var(--space-s4) + var(--past));
+  border-radius: var(--corner);
   background: var(--status-fill);
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--sunken-line);
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --inset: var(--space-s16);
+  --lane-in: var(--space-s12);
+  --past: var(--space-s12);
+  --corner: var(--radius-content);
+  --rail-night: var(--banner-rail);
+  --rail-day: var(--banner-rail_day);
+}
+
+/* Small, outside a card: `space.s12` inside, the lane `space.s8` in and the words `space.s8` past
+   it, so they start 20 in, at the content radius of the cards beside it. Its rail is the tabs'
+   own, `tabs.rail` at night and `tabs.rail_day` by day: a banner's thinned a step for a box this
+   size. */
+.k-status[data-size="small"],
+.k-status[data-size="line"] {
+  --inset: var(--space-s12);
+  --lane-in: var(--space-s8);
+  --past: var(--space-s8);
+  --rail-night: var(--tabs-rail);
+  --rail-day: var(--tabs-rail_day);
+}
+
+/* A line, inside a card: no fill, no hairline and nothing inside but the lane at its start, the
+   words `space.s8` past it; the rail runs from its first line's top to its last's foot. */
+.k-status[data-size="line"] {
+  --inset: 0px;
+  --lane-in: 0px;
+  background: none;
+  box-shadow: none;
 }
 
 .k-status > :not(.k-status-rail) {
@@ -177,15 +205,16 @@
 }
 
 /* Its rail: down its lane from the top padding to the bottom one, centred in the lane on whole
-   device pixels, with round ends, `banner.rail` thick at night and `banner.rail_day` by day: the
-   tabs' and the collapsible's rail made thick enough to fill its lane. At night it is the tone's core with a lit control's glow round
-   it, near and far, while the signs are on, and glass while they are off; by day the tone, with no glow. */
+   device pixels, with round ends, `banner.rail` thick at night and `banner.rail_day` by day (a
+   compact box's the tabs'): the tabs' and the collapsible's rail made thick enough to fill its
+   lane. At night it is the tone's core with a lit control's glow round it, near and far, while the
+   signs are on, and glass while they are off; by day the tone, with no glow. */
 .k-status-rail {
   position: absolute;
-  top: var(--space-s16);
-  bottom: var(--space-s16);
-  --rail: max(1px, round(nearest, calc(var(--banner-rail) + (var(--banner-rail_day) - var(--banner-rail)) * var(--day)), 1px));
-  left: calc(var(--space-s12) + round(nearest, calc((var(--space-s4) - var(--rail)) / 2), 1px));
+  top: var(--inset);
+  bottom: var(--inset);
+  --rail: max(1px, round(nearest, calc(var(--rail-night) + (var(--rail-day) - var(--rail-night)) * var(--day)), 1px));
+  left: calc(var(--lane-in) + round(nearest, calc((var(--space-s4) - var(--rail)) / 2), 1px));
   width: var(--rail);
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--status-glass), var(--status-core) calc(var(--signs) * 100%));

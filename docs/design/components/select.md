@@ -10,7 +10,7 @@ Rust `select::select`; QML `Select`.
 
 One of a list too long for radio rows or tabs. A row of tabs that would run past its room is a Select instead. The clock's holidays.
 
-**Shut**, it has a field's look: 40 (`control_md`) tall at the control radius, filling its room, `surface_container_high` with a field's sunken edge, a hairline of `outline` inside its edge, 12 inside. The pick is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional 20 symbol (`icon`) leads it and a chevron ends it, both `on_surface_variant`, 8 from the words. With nothing picked it shows its placeholder in `on_surface_variant`.
+**Shut**, it has a field's look: 40 (`control_md`) tall at the control radius, filling its room, `surface_container_high` with a field's sunken edge, a hairline of `outline` inside its edge, 12 inside. The pick is `body_large` in `on_surface` on one line, ending in an ellipsis where it doesn't fit; an optional 20 symbol (`icon`) leads it and a chevron ends it, both `on_surface_variant`, 8 from the words. With nothing picked it shows its placeholder in `on_surface_variant`. **Sizes:** md (`Md`, above) is a form's; sm (`Sm`) is a list row's control (`List`'s rule, [list.md](list.md)), a small field's look: 32 tall (`control_sm`), the pick in `body`, its symbol and chevron `body`'s 20, 8 from the words, 12 inside. Open, its list is the same at both sizes, its rows already `control_sm` with `body` words, so a small select's open list continues its value row without a step.
 
 *Not built yet: both libraries draw the shut select's hairline in `outline_variant`, and its edge open in `primary`; the mockup draws the rule.*
 

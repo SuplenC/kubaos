@@ -36,7 +36,7 @@ Kuba reviews the inventory. Nothing is sketched until he agrees what is new and 
 
 ### 2. Sketch with Kuba
 
-Every new part and every change to an existing one is sketched with Kuba, as the mockup skill says, until he explicitly approves the idea. Then the app's own screens are sketched as the approved parts put together, so the layout is agreed before anything is mocked up.
+Every new part and every change to an existing one is sketched with Kuba, as the mockup skill says, until he explicitly approves the idea. Then the app's own screens are sketched as the approved parts put together, so the layout is agreed before anything is mocked up. An app's own preferences are sketched inside the app, never as rows in Settings, which holds only what changes how the system behaves ([DESIGN.md, "Settings"](../DESIGN.md#settings)).
 
 ### 3. Mock it up
 

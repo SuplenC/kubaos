@@ -1,8 +1,10 @@
 // One of a list too long for radio rows or tabs: `kubaos-ui`'s `select::select`,
 // `KubaOS.Components`' `Select` (`docs/design/components/select.md`). Shut, a field's look:
 // `size.control_md` tall at the control radius with a hairline inside its edge, the picked option
-// in `body_large`, an optional `body_large` symbol before it and a chevron at its end. It is a
-// control in the state model (`.k-control` in `lib.css`), lit as a field is.
+// in `body_large`, an optional `body_large` symbol before it and a chevron at its end. Small (`Sm`),
+// a list row's, it is `size.control_sm` tall and its pick and symbols `body`'s, as a small field's;
+// its open list is the same at both sizes. It is a control in the state model (`.k-control` in
+// `lib.css`), lit as a field is.
 //
 // Open, the select's own box grows into its list: one surface raised to the ladder's step 2, the
 // value row where it was and the options under it, past a faint rule, or over it where the room
@@ -27,6 +29,7 @@
 
 import { pin, type Pinned } from "./control.ts";
 import { raise } from "./elevation.ts";
+import { type ControlSize, VALUE_TYPE } from "./field.ts";
 import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { filling, row } from "./layout.ts";
@@ -57,6 +60,8 @@ export interface SelectOptions {
   readonly look?: SelectLook;
   /** Its options are names that vary (devices'), cut with an ellipsis where they don't fit. */
   readonly variable?: boolean;
+  /** `Md` by default; `Sm` in a list row (`ROW_CONTROL` in `lib/list.ts`). */
+  readonly size?: ControlSize;
   /** Drawn open in the sample's flow, the room taking the open surface's height. */
   readonly open?: boolean;
   /** The highlighted option of a select drawn open; the pick by default. */
@@ -83,8 +88,10 @@ export function select(options: SelectOptions): HTMLElement {
   let picked = options.picked ?? -1;
   const disabled = options.disabled ?? false;
 
+  const size = options.size ?? "Md";
   const room = document.createElement("span");
   room.className = "k-select-room";
+  room.dataset.size = size;
   room.style.setProperty("--rows", String(Math.max(1, Math.min(MOST, options.options.length))));
   const described = Boolean(options.descriptions);
   if (described) room.style.setProperty("--select-option", "var(--size-row_two_line)");
@@ -105,7 +112,7 @@ export function select(options: SelectOptions): HTMLElement {
 
   const value = document.createElement("span");
   value.className = "k-select-value";
-  const markSize = inline ? "var(--type-small-icon)" : "var(--type-body_large-icon)";
+  const markSize = inline ? "var(--type-small-icon)" : "var(--select-icon)";
   const chevron = icon("expand_more", markSize, "var(--mark)");
   chevron.classList.add("k-select-chevron");
   // The value row's symbol, swapped as the pick changes.
@@ -184,12 +191,12 @@ export function select(options: SelectOptions): HTMLElement {
   /** Shows the pick: its words in the value row and its option marked picked. */
   function showPick(): void {
     const words = options.options[picked] ?? options.placeholder ?? "";
-    const text = clamped(words, inline ? "small" : "body_large");
+    const text = clamped(words, inline ? "small" : VALUE_TYPE[size]);
     if (options.variable) declare(text, { variable: true });
     text.style.color = "var(--value)";
     value.replaceChildren(text);
     const symbol = iconOf(picked);
-    lead.replaceChildren(...(symbol ? [icon(symbol, "var(--type-body_large-icon)", "var(--mark)")] : []));
+    lead.replaceChildren(...(symbol ? [icon(symbol, "var(--select-icon)", "var(--mark)")] : []));
     lead.hidden = !symbol;
     surface.toggleAttribute("data-placeholder", picked < 0);
     items.forEach((item, index) => {
@@ -227,7 +234,7 @@ export function select(options: SelectOptions): HTMLElement {
   probe(surface, {
     role: "component",
     name: "Select",
-    variant: variant(inline && "inline", hasIcon && "icon", described && "two-line", options.open && "open"),
+    variant: variant(inline && "inline", hasIcon && "icon", described && "two-line", options.open && "open", size === "Sm" && "Sm"),
     fixed: { width: false, height: inline || !options.open },
   });
 

@@ -20,13 +20,13 @@ Rust `layout::header`; QML `Header`.
 
 A page's Japanese accent (`accent`, in `primary`), title (`title`), and its subtitle (`body`, `on_surface_variant`) 8 below; the title and the subtitle wrap between words.
 
-**A header has a subtitle always or never.** A surface decides once whether its headers have one (every Settings page, every Kōbō step, every right-edge panel does). Given, the line keeps its height even with no words, so the title, the subtitle and the buttons beside them never move. The subtitle is where the surface's attitude goes, a pun in `docs/BRAND.md`'s voice; counts and status stay in the body. Buttons beside a header sit at its end, 16 from the title's room and 8 apart, centred on the title-and-subtitle block, not on the accent. *Not built yet: both libraries always draw the line (an empty one keeps its height), so neither has a header without one, and neither takes buttons; the mockups draw the rule.*
+**A header has a subtitle always or never.** A surface decides once whether its headers have one (every Settings page, every Kōbō step, every right-edge panel does). Given, the line keeps its height even with no words, so the title, the subtitle and the buttons beside them never move. The subtitle is where the surface's attitude goes, a pun in `docs/BRAND.md`'s voice; counts and status stay in the body. Buttons beside a header sit at its end, 16 from the title's room and 8 apart, centred on the title-and-subtitle block, not on the accent. One small button may instead sit at the end of the title's own line (`trailing`), 16 from the title's room and centred on it, its end on the page's: a Settings page's hold to reset the section. *Not built yet: both libraries always draw the line (an empty one keeps its height), so neither has a header without one, and neither takes buttons; the mockups draw the rule.*
 
 ## `Section`
 
 Rust `layout::section`; QML `Section`.
 
-A titled part of a page: `heading`, an optional `body` line 4 under it in `on_surface_variant`, the content 16 below. A group with no name is no section; a section is never a card, and a card never holds one.
+A titled part of a page: `heading`, an optional `body` line 4 under it in `on_surface_variant`, the content 16 below. One small button may sit at the end of the heading's line (`trailing`), 16 from the heading's room and centred on it, its end on the content's: a Settings sub-section's hold to reset it. A tip about the whole part (`tip`, a titled Small `Tip` [Banner](banner.md)) is the first of its content, across it, 16 under the heading and 16 above what follows. A group with no name is no section; a section is never a card, and a card never holds one.
 
 ## `Stack`
 

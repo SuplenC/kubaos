@@ -2,7 +2,8 @@
 // `field::note`, `KubaOS.Components`' `Field`, `Labelled` and `Note` (`docs/design/components/
 // field.md`). A field is `size.control_md` tall at the control radius, a hairline inside its edge,
 // its value in `body_large` `space.s12` in, or past a leading `body_large` icon and `space.s8`
-// more, and ending as far before a trailing one, and it fills the room it is given.
+// more, and ending as far before a trailing one, and it fills the room it is given. Small (`Sm`),
+// the size a list row's control takes, it is `size.control_sm` tall, its value and icons `body`'s.
 //
 // It is a control in the state model (`.k-control` in `lib.css`): hovered or with the keyboard in
 // it, it is lit, the tube over its hairline in its tone (the accent, or the error's on an invalid
@@ -21,13 +22,20 @@ import { pin, type Pinned } from "./control.ts";
 import { focusRing, glowMask } from "./focus.ts";
 import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
-import { FIXED_HEIGHT, probe } from "./probe.ts";
-import { advance, clamped, text, wrapped } from "./text.ts";
+import { declare, FIXED_HEIGHT, probe, variant } from "./probe.ts";
+import { advance, clamped, text, type TypeStyle, wrapped } from "./text.ts";
 import { length, number, raw } from "./tokens.ts";
 
 /** How a field shows its value: editable, wrong, read-only, or not usable now. */
 export const FIELD_STATES = ["Normal", "Invalid", "Locked", "Disabled"] as const;
 export type FieldState = (typeof FIELD_STATES)[number];
+
+/** A field's and a select's sizes: a form's, a dialog's and a search's (`Md`), and a list row's (`Sm`). */
+export const CONTROL_SIZES = ["Md", "Sm"] as const;
+export type ControlSize = (typeof CONTROL_SIZES)[number];
+
+/** The value's type at each size. */
+export const VALUE_TYPE: Record<ControlSize, TypeStyle> = { Md: "body_large", Sm: "body" };
 
 /** Where the caret is and what is selected, in characters: `anchor` at `pos` selects nothing. */
 export interface Caret {
@@ -49,6 +57,8 @@ export interface FieldOptions {
   /** One bullet per character instead of the value: a password. */
   readonly secret?: boolean;
   readonly state?: FieldState;
+  /** `Md` by default; `Sm` in a list row (`ROW_CONTROL` in `lib/list.ts`). */
+  readonly size?: ControlSize;
   /** A state the field is pinned in: lit, with the keyboard in it unless `pointer`, or signs off. */
   readonly pinned?: Pinned;
   /** Pinned lit under the pointer rather than with the keyboard in it: no caret. */
@@ -62,17 +72,17 @@ export interface FieldOptions {
 /** `words`' characters, so a position counts what a person sees, not UTF-16 units. */
 const chars = (words: string) => [...words];
 
-/** `words`' first `n` characters' advance in the value's type, in logical pixels. */
-function upTo(words: string, n: number): number {
-  return n <= 0 ? 0 : advance("body_large", chars(words).slice(0, n).join(""));
+/** `words`' first `n` characters' advance in `style`, the value's type, in logical pixels. */
+function upTo(words: string, n: number, style: TypeStyle): number {
+  return n <= 0 ? 0 : advance(style, chars(words).slice(0, n).join(""));
 }
 
-/** The character position nearest `x` logical pixels into `words`. */
-function nearest(words: string, x: number): number {
+/** The character position nearest `x` logical pixels into `words`, set in `style`. */
+function nearest(words: string, x: number, style: TypeStyle): number {
   const count = chars(words).length;
   for (let n = 1; n <= count; n++) {
-    const before = upTo(words, n - 1);
-    const after = upTo(words, n);
+    const before = upTo(words, n - 1, style);
+    const after = upTo(words, n, style);
     if (x < (before + after) / 2) return n - 1;
   }
   return count;
@@ -207,9 +217,12 @@ export function field(options: FieldOptions = {}): HTMLElement {
   const state = options.state ?? "Normal";
   const inert = state === "Disabled";
   const locked = state === "Locked";
+  const size = options.size ?? "Md";
+  const style = VALUE_TYPE[size];
   const element = document.createElement("span");
   element.className = "k-field k-sunken";
   element.dataset.state = state;
+  element.dataset.size = size;
   element.setAttribute("role", "textbox");
   element.style.setProperty("--invalid", state === "Invalid" ? "1" : "0");
   if (state === "Disabled") element.setAttribute("aria-disabled", "true");
@@ -218,7 +231,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     element.dataset.icon = "";
     const mark = document.createElement("span");
     mark.className = "k-field-mark";
-    mark.append(icon(options.icon, "var(--type-body_large-icon)", "var(--mark)"));
+    mark.append(icon(options.icon, "var(--field-icon)", "var(--mark)"));
     element.append(probe(mark, { role: "box" }));
   }
   if (options.trailing) {
@@ -226,7 +239,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     const mark = document.createElement("span");
     mark.className = "k-field-mark k-field-trailing";
     mark.style.setProperty("--trailing", `var(--color-${options.trailing.color})`);
-    mark.append(icon(options.trailing.icon, "var(--type-body_large-icon)", "var(--trailing-mark, var(--trailing))"));
+    mark.append(icon(options.trailing.icon, "var(--field-icon)", "var(--trailing-mark, var(--trailing))"));
     element.append(probe(mark, { role: "box" }));
   }
   const clip = document.createElement("span");
@@ -248,10 +261,10 @@ export function field(options: FieldOptions = {}): HTMLElement {
     const shown = shownText();
     const [from, to] = [Math.min(caret.pos, caret.anchor), Math.max(caret.pos, caret.anchor)];
     element.toggleAttribute("data-selecting", from !== to);
-    element.style.setProperty("--caret-at", String(upTo(shown, caret.pos)));
+    element.style.setProperty("--caret-at", String(upTo(shown, caret.pos, style)));
     if (shown === "") {
       // One line across the room, ending in an ellipsis where the field is narrower than it.
-      const placeholder = clamped(options.placeholder ?? "", "body_large");
+      const placeholder = clamped(options.placeholder ?? "", style);
       placeholder.style.color = "var(--placeholder)";
       placeholder.classList.add("k-field-placeholder");
       room.replaceChildren(...(options.placeholder ? [placeholder] : []));
@@ -261,9 +274,10 @@ export function field(options: FieldOptions = {}): HTMLElement {
     line.className = "k-field-line";
     const selection = document.createElement("span");
     selection.className = "k-field-selection";
-    selection.style.setProperty("--from", String(upTo(shown, from)));
-    selection.style.setProperty("--to", String(upTo(shown, to)));
-    const words = text(shown, "body_large");
+    selection.style.setProperty("--from", String(upTo(shown, from, style)));
+    selection.style.setProperty("--to", String(upTo(shown, to, style)));
+    // What is typed varies, and a value longer than the field scrolls within it: never a clip.
+    const words = declare(text(shown, style), { variable: true });
     words.style.color = "var(--value)";
     line.append(selection, words);
     room.replaceChildren(line);
@@ -355,7 +369,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
       const box = room.getBoundingClientRect();
       const start = room.querySelector(".k-field-line")?.getBoundingClientRect().left ?? box.left;
       const ratio = box.width / room.offsetWidth || 1;
-      const at = (x: number) => nearest(shownText(), (x - start) / ratio / scaleOf(element));
+      const at = (x: number) => nearest(shownText(), (x - start) / ratio / scaleOf(element), style);
       const pos = at(event.clientX);
       element.focus({ preventScroll: true });
       event.preventDefault();
@@ -394,7 +408,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     draw();
   });
   draw();
-  return probe(element, { role: "component", name: "Field", variant: options.icon ? "icon" : "", fixed: FIXED_HEIGHT });
+  return probe(element, { role: "component", name: "Field", variant: variant(options.icon && "icon", size === "Sm" && "Sm"), fixed: FIXED_HEIGHT });
 }
 
 /** Shows `field`'s value as bullets, or as itself. */
