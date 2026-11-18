@@ -413,7 +413,7 @@ export interface PickingOptions {
   readonly phase?: "picking" | "shared";
   /** The pill in the bars while still picking, shut: the sample the move to sharing plays on. */
   readonly pill?: boolean;
-  /** The right-button tip under each bar's row. */
+  /** The right-button tip under each bar's row; shown unless said otherwise, as nothing else teaches the drag. */
   readonly tip?: boolean;
   readonly handlers?: PickHandlers;
 }
@@ -427,7 +427,7 @@ export function pickBar(asker: Asker, options: { lit?: "screen" | "region"; tip?
   who.classList.add("share-pick-who");
   const share = button({ label: WORDS.screen, kind: "Tonal", size: "Sm", icon: SHARE_ICONS.screen, ...(options.lit === "screen" ? { pinned: "lit" as const } : {}) });
   const region = button({ label: WORDS.region, kind: "Text", size: "Sm", icon: SHARE_ICONS.region, ...(options.lit === "region" ? { pinned: "pressed" as const } : {}) });
-  const cancel = iconButton({ icon: "close", label: WORDS.cancel, size: "Sm" });
+  const cancel = iconButton({ icon: "close", label: WORDS.cancel, size: "Sm", kind: "Text" });
   if (options.onScreen) share.addEventListener("click", options.onScreen);
   if (options.onPoint) {
     const point = options.onPoint;
@@ -514,7 +514,7 @@ export function pickingScreen(monitor: Monitor, index: number, options: PickingO
     element.append(
       pickBar(asker, {
         ...(here && (lit.kind === "screen" || lit.kind === "region") ? { lit: lit.kind } : {}),
-        ...(options.tip ? { tip: true } : {}),
+        ...(options.tip === false ? {} : { tip: true }),
         onScreen: () => handlers.onShare?.({ kind: "screen", screen: index }),
         onPoint: (on) => handlers.onLight?.(on ? { kind: "screen", screen: index } : NOTHING),
         onRegion: () => handlers.onLight?.({ kind: "region", screen: index }),
@@ -633,7 +633,7 @@ function cameraCard(view: CameraView, index: number, options: CameraPanelOptions
         text(WORDS.cameraNote, "small", "on_surface_variant"),
       ),
     ],
-    actions: close,
+    actions: row("s8", "centre", close),
   });
 }
 

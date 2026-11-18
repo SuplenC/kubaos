@@ -197,14 +197,14 @@ export default page<Shown>({
     { name: "A region being drawn", for: "clear inside its on-air line; its size", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
     { name: "The keyboard on a window", for: "lit as pointed; the label says Enter", sample: screen(() => both({ lit: { kind: "window", screen: 1, index: 0, keyboard: true } })) },
     { name: "An app asks", for: "the app's name in each bar", sample: screen(() => both({ asker: DISCORD })) },
-    { name: "With the tip", for: "the right-button drag, under each bar's row", sample: screen(() => both({ tip: true })) },
+    { name: "Without the tip", for: "the bar's row alone, were the tip dropped", sample: screen(() => both({ tip: false })) },
     { name: "Another workspace", for: "switched while picking: dim and bar follow", sample: screen(() => both({ monitors: [DP10_THIRD, EDP1] })) },
     { name: "Shared", for: "the dim and the bars gone; mark and pill stay", sample: screen(() => both({ lit: { kind: "window", screen: 0, index: 1 }, phase: "shared" })) },
   ],
   sizes: [
     { name: "Two screens, two sizes", for: "DP-10 1600 by 1000, eDP-1 1440 by 900", sample: screen(() => both()) },
     { name: "The narrowest screen", for: "720 by 480: who asks gives way", sample: screen(() => picking({ monitors: [NARROW], asker: LONG_ASKER })) },
-    { name: "The bar alone", for: "as wide as its row", sample: () => pickBar(MEET) },
+    { name: "The bar alone", for: "as wide as its row", sample: () => pickBar(MEET, { tip: true }) },
   ],
   states: {
     shown: ["rest", "lit"],

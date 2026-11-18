@@ -17,6 +17,11 @@
   z-index: 1;
 }
 
+/* The dim lies over the windows but is no target: the pointer picks the window under it. */
+.k-screen[data-picking] > .k-screen-dim {
+  pointer-events: none;
+}
+
 /* Drawing a region: the screen's own dim gives way to the drawing's, which leaves the box clear. */
 .k-screen.share-screen[data-drawing] > .k-screen-dim {
   --panel-dim: 0;
