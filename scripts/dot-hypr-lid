@@ -53,7 +53,12 @@ lid_closed() {
 other_monitor_active() {
   # `hyprctl monitors` lists enabled monitors only, one "Monitor NAME (ID n):"
   # header each.
-  hyprctl monitors | awk -v laptop="$laptop" '$1 == "Monitor" && $2 != laptop { found = 1 } END { exit !found }'
+  # HAZARD: skip FALLBACK, the output Hyprland adds while no screen is plugged
+  # in. Counted as a monitor, it keeps the panel disabled once a dock is pulled
+  # under a closed lid, so a lock taken then has no screen to draw on and the
+  # panel wakes up to Hyprland's "lockscreen missing" picture.
+  hyprctl monitors | awk -v laptop="$laptop" \
+    '$1 == "Monitor" && $2 != laptop && $2 != "FALLBACK" { found = 1 } END { exit !found }'
 }
 
 # Takes whether the lid is closed, 1 or 0.

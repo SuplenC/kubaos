@@ -201,8 +201,9 @@ t_the_last_monitor_going_under_a_closed_lid_enables_the_panel_then_powers_it_off
   monitors eDP-1 DP-2
   run_lid close
   asked >/dev/null
-  # The panel is disabled, so with the external gone Hyprland lists nothing.
-  : >"$T/monitors"
+  # The panel is disabled, so with the external gone Hyprland lists only the output it adds
+  # while no screen is plugged in.
+  monitors FALLBACK
 
   run_lid sync
 
