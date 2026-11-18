@@ -94,6 +94,11 @@ hl.config({
     -- Lets a restarted Quickshell take over a session lock its crashed
     -- predecessor held, instead of leaving a red "locked" screen.
     allow_session_lock_restore = true,
+    -- A screen that appears while the session is locked (the laptop panel waking after the dock
+    -- was pulled under a closed lid) gets Quickshell's lock surface a few seconds later. Hyprland
+    -- draws its "lockscreen missing" picture on any screen without one after this delay, so
+    -- the default 1 s shows that picture on every such wake-up.
+    lockdead_screen_delay = 5000,
   },
 
   -- XWayland apps stay upscaled by the compositor (slightly soft on the 1.5x
