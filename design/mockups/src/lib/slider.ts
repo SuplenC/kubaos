@@ -77,6 +77,12 @@ export interface SliderOptions {
    * keeps `icon` on every stop.
    */
   readonly icons?: readonly string[];
+  /**
+   * A continuous slider's symbol by its level, lowest first, each taking an even share of the
+   * track: the volume's speaker gaining its waves as it rises. The circle's symbol steps as the
+   * value crosses a share. None keeps `icon` at every level.
+   */
+  readonly levels?: readonly string[];
   /** Each stop's name, the one nearest the value shown. */
   readonly names?: readonly string[];
   /** The number shown in place of the percentage, as the owner reads the value. */
@@ -116,6 +122,18 @@ export interface SliderOptions {
 
 /** Each slider's own way of being set from outside, by its root. */
 const setters = new WeakMap<Element, (value: number) => void>();
+
+/** Each toggling slider's own way of turning Toggled on or off from outside, by its root. */
+const togglers = new WeakMap<Element, (on: boolean) => void>();
+
+/**
+ * Turns `element`'s Toggled on or off from outside, as its owner does it some other way (a mute
+ * key): it draws itself so, telling `toggle.changed` as a press would. A slider with no toggle
+ * ignores it.
+ */
+export function setSliderToggled(element: Element, on: boolean): void {
+  togglers.get(element)?.(on);
+}
 
 /**
  * Sets `element`'s value from outside, as its owner moves what it stands for some other way: a
@@ -247,10 +265,23 @@ export function slider(options: SliderOptions): HTMLElement {
   /** Draws what Toggled changes: the fill's tone, the icon, and the button's name and hint. */
   function drawToggle(): void {
     root.style.setProperty("--toggled", toggled ? "1" : "0");
-    const symbol = toggled && toggle ? toggle.icon : stepping && options.icons?.[index] ? options.icons[index]! : options.icon;
+    const symbol = toggled && toggle ? toggle.icon : stepping && options.icons?.[index] ? options.icons[index]! : levelSymbol();
+    // Drawn again only when the symbol changes: a level crossing a share, Toggled turning.
+    if (glyph.dataset.symbol === symbol) {
+      nameIcon();
+      return;
+    }
+    glyph.dataset.symbol = symbol;
     glyph.replaceChildren(icon(symbol, "var(--type-label-icon)", knobbed ? "var(--on-track)" : "var(--on-fill)"));
     if (toggle && button) button.setAttribute("aria-pressed", String(toggled));
     nameIcon();
+  }
+
+  /** The symbol for the level the value is at: its share of `levels`, or `icon`. */
+  function levelSymbol(): string {
+    const levels = options.levels;
+    if (stepping || !levels || levels.length === 0) return options.icon;
+    return levels[Math.min(levels.length - 1, Math.floor(value * levels.length))]!;
   }
 
   /**
@@ -315,6 +346,8 @@ export function slider(options: SliderOptions): HTMLElement {
    * since whether a dot shows depends on the label's width and the fill's end.
    */
   function draw(): void {
+    // A level slider's symbol follows the value as it moves.
+    if (options.levels && !stepping && !toggled) drawToggle();
     const scale = scaleOf(root);
     const px = (name: string) => length(name) * scale;
     const width = root.offsetWidth;
@@ -330,6 +363,9 @@ export function slider(options: SliderOptions): HTMLElement {
     }
     const widest = numeric() ? Math.max(advance(kind, said), advance(kind, options.widest ?? "100%")) : advance(kind, said);
     const labelLeft = width - px("space-s12") - widest * scale;
+    // A label goes only where it fits between the icon and the far end: a slider folded to its icon
+    // (the media player's volume, at rest) shows its icon alone, never a word over it.
+    root.toggleAttribute("data-cramped", labelLeft < side + px("space-s4"));
     root.style.setProperty("--slider-shown", String(shown));
     root.setAttribute("aria-valuenow", stepping ? String(index) : String(Math.round(value * 100)));
     root.setAttribute("aria-valuetext", said);
@@ -530,6 +566,7 @@ export function slider(options: SliderOptions): HTMLElement {
     });
   }
 
+  togglers.set(root, (on) => setToggled(on));
   setters.set(root, (to) => {
     if (dragging) return;
     for (const running of root.getAnimations()) running.cancel();

@@ -286,6 +286,9 @@ halo = 6
 # A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are.
 thumbnail_width = 256
 thumbnail_height = 160
+# An audio file's cover in the media player at its largest: square, as covers are, never cropped
+# and never blown up past this however big the window; smaller where the window is.
+cover = 400
 # A slider is a pill: the fill is the pill, its round end marks the value, the
 # icon sits in the circle at its start and the value or its name at its end.
 # Regular, as tall as a compact row, and compact for a dense panel (the control
@@ -703,6 +706,12 @@ use = "A held control until it acts: Install, erasing a disk, a held menu item."
 ms = 20000
 use = "The awake lock left alone, until it goes back to rest."
 
+# How long a player's controller stays over a playing picture once the pointer is still on it,
+# before it goes, the pointer with it, as mpv's does. Not a move: reduce motion doesn't cap it.
+[duration.controller_rest]
+ms = 2000
+use = "A player's controller over a playing picture, the pointer still, until it goes."
+
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
 curve = [0.2, 0.0, 0.0, 1.0]
@@ -889,6 +898,9 @@ push = 1.025
 # is what the city uncovers of the plate behind it, a band along the city's outline on the side
 # facing the origin, at most about 20 logical pixels at the screen's far corners.
 near = 1.05
+# A play or pause symbol blooming in the middle of a picture as a press starts or stops it: how big
+# it grows as it fades, round its middle.
+bloom = 1.4
 # How far along its flight to the bar's clock the lock's clock stands once the lock is awake, a
 # share of the path: its size, its place and its colour all that far from the rest clock's toward
 # the bar's time, so it stays big, keeps most of the picture's tint, and unlocking flies the rest.

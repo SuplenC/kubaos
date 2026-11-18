@@ -20,6 +20,7 @@
 // the signs off, the copy is out and the content is its own tone. Its glow is a mask worked out per device
 // pixel from a distance field of the content drawn on a canvas.
 
+import { morphShapes } from "./icon.ts";
 import { settings } from "../site/settings.ts";
 import { length, number } from "./tokens.ts";
 
@@ -208,6 +209,22 @@ async function rasterise(lit: HTMLElement, context: CanvasRenderingContext2D, re
     const style = getComputedStyle(symbol);
     const size = Number.parseFloat(style.width);
     const { left, top } = offsetIn(slot, lit);
+    const inset = (value: string) => Number.parseFloat(value) || 0;
+    // A morphing symbol is no drawing: its shapes, where they stand now, are filled instead.
+    if (symbol.matches(".k-morph")) {
+      context.fillStyle = "#000";
+      for (const shape of morphShapes(symbol)) {
+        context.beginPath();
+        shape.forEach(([x, y], i) => {
+          const at = [reach + left + inset(style.left) + (x! * size) / 24, reach + top + inset(style.top) + (y! * size) / 24] as const;
+          if (i === 0) context.moveTo(...at);
+          else context.lineTo(...at);
+        });
+        context.closePath();
+        context.fill();
+      }
+      continue;
+    }
     const copy = symbol.cloneNode(true) as SVGSVGElement;
     copy.removeAttribute("style");
     copy.removeAttribute("class");
@@ -221,7 +238,6 @@ async function rasterise(lit: HTMLElement, context: CanvasRenderingContext2D, re
     await picture.decode();
     // Where the symbol sits in its slot: a slot beside a label holds it at its left edge, an icon
     // button's centres it.
-    const inset = (value: string) => Number.parseFloat(value) || 0;
     context.drawImage(picture, reach + left + inset(style.left), reach + top + inset(style.top), size, size);
   }
 }

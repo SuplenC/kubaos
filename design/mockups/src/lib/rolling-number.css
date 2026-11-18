@@ -13,7 +13,7 @@
   flex: none;
   justify-content: flex-end;
   --slot: round(up, calc(var(--figure) * var(--px) - 0.001px), 1px);
-  width: calc(var(--slots) * var(--slot));
+  width: calc(var(--slots) * var(--slot) + var(--marks, 0px));
   height: var(--t-line);
 }
 
@@ -25,6 +25,12 @@
   width: var(--slot);
   height: var(--t-line);
   overflow: clip;
+}
+
+/* A mark between figures (a clock's colon): as wide as its own advance, rounded up to a whole
+   device pixel, never rolling. */
+.k-roll-slot[data-mark] {
+  width: round(up, calc(var(--mark) * var(--px) - 0.001px), 1px);
 }
 
 /* Tabular whatever its style, as its slot is: a narrow figure (a 1) sits in a figure's room, never

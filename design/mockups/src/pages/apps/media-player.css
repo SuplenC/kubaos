@@ -1,0 +1,989 @@
+/* The media player's window and its controller (`media-player-parts.ts`), a DRAFT. Every colour
+   is drawn in the night scheme, set on the window, whatever the desktop's mode. */
+
+/* How far the controller shows, 0 to 1. */
+@property --mp-shown {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far one of the controller's rows has arrived, 0 to 1: its own beat in the arrival's stagger. */
+@property --mp-in {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far the seek bar has grown and lit under the pointer, 0 to 1. */
+@property --mp-grow {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far a message has come down from the window's top edge, 0 to 1. */
+@property --mp-up {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far the volume's slider has unfolded from its circle, 0 to 1. */
+@property --mp-unfold {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How far the playlist's sidebar has slid in from the right edge, 0 to 1. */
+@property --mp-side {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* How much the level strip moves, 0 at rest (paused) to 1 (playing). */
+@property --mp-energy {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Where a level bar is in its wave, 0 to 1. */
+@property --mp-wave {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+/* The window: Hyprland's, its outer edge at `radius.content` and the active window's tube,
+   `stroke.thin`, round what mpv draws. Its background is mpv's: the scrim's black. The glass's
+   inset from its edges, and its padding, are `space.s16`, `space.s8` and `space.s12` narrow. */
+.mp-window {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: clip;
+  border: var(--stroke-thin) solid var(--color-primary);
+  border-radius: var(--radius-content);
+  background: var(--color-scrim);
+  color: var(--color-on_surface);
+  outline: none;
+  --mp-inset: var(--space-s16);
+  --mp-glass-pad: var(--space-s16);
+  --mp-shown: 0;
+  --mp-up: 0;
+  --mp-side: 0;
+  /* Leaving: a fade over `medium`, speeding up, while the picture is watched. */
+  transition:
+    --mp-shown var(--motion-medium) var(--easing-standard_accel),
+    --mp-side var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.mp-window[data-narrow] {
+  --mp-inset: var(--space-s8);
+  --mp-glass-pad: var(--space-s12);
+}
+
+.mp-window[data-shown] {
+  --mp-shown: 1;
+  /* Arriving: over `short`, as soon as the pointer moves. */
+  transition:
+    --mp-shown var(--motion-short) var(--easing-emphasized_decel),
+    --mp-side var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.mp-window[data-sidebar] {
+  --mp-side: 1;
+  transition:
+    --mp-shown var(--motion-short) var(--easing-emphasized_decel),
+    --mp-side var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.mp-window[data-said] {
+  --mp-up: 1;
+}
+
+/* The pointer goes with the controller, as mpv hides it over a playing picture. */
+.mp-window:not([data-shown]) {
+  cursor: none;
+}
+
+.mp-window[data-full] {
+  border: none;
+  border-radius: 0;
+}
+
+.mp-screen {
+  position: relative;
+  display: block;
+  flex: 1 1 0;
+  min-height: 0;
+  /* Clipped, never scrolled: a menu keeping its item in view must not move the picture. */
+  overflow: clip;
+}
+
+.mp-frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The picture's own light (`ambience`): a film's edges' colours lighting the letterbox from each
+   side at `opacity.lamp_light`; a song's corners washing the whole window at `opacity.halo`. It
+   comes up over `slow` once the colours are known. */
+.mp-ambient {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0;
+  transition: opacity var(--motion-slow) var(--easing-standard);
+  background:
+    radial-gradient(farthest-side at 0% 50%, rgb(var(--mp-left, 0 0 0) / var(--opacity-lamp_light)), transparent),
+    radial-gradient(farthest-side at 100% 50%, rgb(var(--mp-right, 0 0 0) / var(--opacity-lamp_light)), transparent),
+    radial-gradient(farthest-side at 50% 0%, rgb(var(--mp-top, 0 0 0) / var(--opacity-lamp_light)), transparent),
+    radial-gradient(farthest-side at 50% 100%, rgb(var(--mp-bottom, 0 0 0) / var(--opacity-lamp_light)), transparent);
+}
+
+.mp-window[data-lit] .mp-ambient {
+  opacity: 1;
+}
+
+.mp-window[data-song] .mp-ambient {
+  background:
+    radial-gradient(farthest-corner at 0% 0%, rgb(var(--mp-corner-0, 0 0 0) / var(--opacity-halo)), transparent),
+    radial-gradient(farthest-corner at 100% 0%, rgb(var(--mp-corner-1, 0 0 0) / var(--opacity-halo)), transparent),
+    radial-gradient(farthest-corner at 0% 100%, rgb(var(--mp-corner-2, 0 0 0) / var(--opacity-halo)), transparent),
+    radial-gradient(farthest-corner at 100% 100%, rgb(var(--mp-corner-3, 0 0 0) / var(--opacity-halo)), transparent),
+    radial-gradient(closest-side at 50% 45%, rgb(var(--mp-middle, 0 0 0) / var(--opacity-halo)), transparent);
+}
+
+/* A song with no picture, idle, and a broken file light the window in their own tone. */
+.mp-window[data-song]:not([data-lit]) .mp-ambient,
+.mp-window[data-idle] .mp-ambient {
+  opacity: 1;
+  background: radial-gradient(circle closest-side at 50% 45%, rgb(from var(--color-primary) r g b / var(--opacity-tint)), transparent);
+}
+
+.mp-window[data-broken] .mp-ambient {
+  opacity: 1;
+  background: radial-gradient(circle closest-side at 50% 50%, rgb(from var(--color-error) r g b / var(--opacity-tint)), transparent);
+}
+
+/* What fills the middle: idle, buffering, a broken file. */
+.mp-centred {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--mp-pad);
+}
+
+.mp-centred > * {
+  align-self: center;
+}
+
+/* Waiting, the frozen picture is dimmed as a dialog dims the desktop. */
+.mp-buffering {
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+}
+
+.mp-error > .k-error-block {
+  flex: none;
+  width: min(100%, var(--size-dialog));
+}
+
+/* Nothing playing: a ring of the accent's tube, burning with its glow, round the film's symbol in
+   the core; the words under it. */
+.mp-idle-sign {
+  display: grid;
+  place-items: center;
+  width: var(--size-thumbnail_height);
+  height: var(--size-thumbnail_height);
+  border-radius: var(--radius-full);
+  box-shadow:
+    inset 0 0 0 var(--stroke-thin) var(--color-primary),
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / var(--focus-near_opacity)),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-far_opacity)),
+    inset 0 0 var(--focus-near) rgb(from var(--color-primary) r g b / var(--focus-near_opacity));
+}
+
+.mp-idle-sign > .k-icon {
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--focus-content_glow)));
+}
+
+.mp-idle-words {
+  max-width: var(--size-column);
+  text-align: center;
+}
+
+/* Subtitles: mpv's own, styled by its options; lifted over the controller while it shows. The
+   line is centred in a room as wide as the window inside its padding, which puts it on whole
+   device pixels as every centred box is (`lib/centre.ts`). */
+.mp-subtitle-room {
+  position: absolute;
+  inset-inline: var(--mp-pad);
+  bottom: calc(var(--space-s48) + (var(--mp-controller, 0px) + var(--mp-inset) - var(--space-s32)) * var(--mp-shown));
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.mp-subtitle {
+  max-width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  paint-order: stroke fill;
+  -webkit-text-stroke: calc(var(--stroke-thin) * 2) var(--color-scrim);
+}
+
+/* The controller: the library's glass, `surface` at `opacity.glass` over the picture blurred by
+   `size.lock_blur`, at the surface radius, raised to step 2 (its rim and shadow), inset from the
+   window's edges. It rises `space.s16` as it fades in. */
+.mp-controller {
+  position: absolute;
+  left: var(--mp-inset);
+  /* With the playlist's panel open it draws its end in beside it, so seek and play stay whole. */
+  right: calc(var(--mp-inset) + var(--mp-side) * var(--mp-panel));
+  bottom: var(--mp-inset);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--mp-glass-pad);
+  border-radius: var(--radius-surface);
+  opacity: var(--mp-shown);
+  translate: 0 calc((1 - var(--mp-shown)) * var(--space-s16));
+}
+
+/* Over a song's visualiser it sinks out through the window's foot as it goes, its own height and
+   its inset, fading, and rises back the same way: the song's corner rides on its top. */
+.mp-window:not([data-visual="off"]) .mp-controller {
+  translate: 0 calc((1 - var(--mp-shown)) * (var(--mp-controller, 0px) + var(--mp-inset)));
+}
+
+/* Glass: the controller, the top corner's pill, the playlist's panel and the bloom. */
+.mp-controller,
+.mp-corner::before,
+.mp-sidebar,
+.mp-bloom {
+  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
+  backdrop-filter: blur(var(--size-lock_blur));
+  box-shadow:
+    inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim)),
+    0 var(--elevation-2-contact-y) var(--elevation-2-contact-blur) rgb(from var(--color-shadow) r g b / var(--elevation-contact-opacity)),
+    0 var(--elevation-2-ambient-y) var(--elevation-2-ambient-blur) rgb(from var(--color-shadow) r g b / var(--elevation-ambient-opacity));
+}
+
+.mp-window:not([data-shown]) :is(.mp-controller, .mp-corner) {
+  pointer-events: none;
+}
+
+/* The controller's rows arrive a `swap_lag` apart: the title, the bar, the buttons, each rising
+   `space.s8` as it fades in; they leave together. */
+.mp-title-row,
+.mp-bar-row,
+.mp-buttons {
+  --mp-in: 0;
+  opacity: var(--mp-in);
+  translate: 0 calc((1 - var(--mp-in)) * var(--space-s8));
+  transition: --mp-in var(--motion-medium) var(--easing-standard_accel);
+}
+
+.mp-window[data-shown] :is(.mp-title-row, .mp-bar-row, .mp-buttons) {
+  --mp-in: 1;
+  transition: --mp-in var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.mp-window[data-shown] .mp-bar-row {
+  transition-delay: var(--motion-swap_lag);
+}
+
+.mp-window[data-shown] .mp-buttons {
+  transition-delay: calc(var(--motion-swap_lag) * 2);
+}
+
+.mp-title-row {
+  min-width: 0;
+}
+
+.mp-title {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.mp-title-row > .k-text:not(.mp-title) {
+  flex: none;
+}
+
+/* A chapter's name arriving as the time crosses into it: it fades in over `medium`. */
+.mp-chapter[data-fresh] {
+  animation: mp-fade-in var(--motion-medium) var(--easing-standard);
+}
+
+.mp-chapter:empty {
+  display: none;
+}
+
+.mp-time {
+  flex: none;
+}
+
+/* The time played starts on the rows' shared edge; its box keeps the widest time's width. */
+.mp-bar-row > .mp-time > .k-rolling {
+  justify-content: flex-start;
+}
+
+/* The length, or the time left: a press swaps them. */
+.mp-length {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  cursor: pointer;
+}
+
+/* The buttons: the volume at the start, the three of the transport on the middle, the tools at
+   the end; the transport stays centred however wide the sides. */
+.mp-buttons:not(.k-row) {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: var(--space-s8);
+}
+
+.mp-left {
+  justify-self: start;
+  /* Room kept for the volume to unfold into, so nothing moves as it does. */
+  min-width: var(--size-bar_label);
+}
+
+.mp-window[data-r1] .mp-left {
+  min-width: 0;
+}
+
+.mp-right {
+  justify-self: end;
+  /* A Text icon button at the end lets its circle overhang the edge, so its symbol, the part
+     seen, sits on it: by a whole device pixel, the odd half one inside. */
+  margin-inline-end: round(up, calc((var(--type-button-icon) - var(--size-control_md)) / 2), 1px);
+}
+
+/* The volume: the compact slider folded to its circle, the mute button, unfolding to
+   `size.bar_label` under the pointer, with the keyboard on it, or held. */
+.mp-volume {
+  display: flex;
+  flex: none;
+  --mp-unfold: 0;
+  width: calc(var(--size-slider_compact) + (var(--size-bar_label) - var(--size-slider_compact)) * var(--mp-unfold));
+  transition: --mp-unfold var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.mp-volume > .k-slider {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mp-volume:is(:hover, :focus-within, [data-open]),
+.mp-volume:has(.k-slider[data-dragging]) {
+  --mp-unfold: 1;
+  transition: --mp-unfold var(--motion-medium) var(--easing-emphasized_decel);
+}
+
+.mp-window[data-r1] .mp-volume {
+  --mp-unfold: 0;
+}
+
+/* The seek bar (a draft part): a small control's room for the pointer, its tube `size.scrollbar`
+   at rest and `size.progress` lit. */
+.mp-seek {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--size-control_sm);
+  min-width: 0;
+  cursor: pointer;
+  --mp-grow: 0;
+  transition: --mp-grow var(--motion-short) var(--easing-standard);
+}
+
+.mp-seek:hover,
+.mp-seek[data-lit],
+.mp-seek[data-held] {
+  --mp-grow: 1;
+}
+
+.mp-seek-track {
+  display: flex;
+  gap: var(--space-s4);
+  width: 100%;
+  height: calc(var(--size-scrollbar) + (var(--size-progress) - var(--size-scrollbar)) * var(--mp-grow));
+}
+
+.mp-seek-part {
+  position: relative;
+  display: block;
+  flex-basis: 0;
+  min-width: 0;
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface_container_highest) r g b / var(--opacity-track));
+}
+
+.mp-seek-read,
+.mp-seek-played {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  border-radius: var(--radius-full);
+}
+
+.mp-seek-read {
+  width: calc(var(--read) * 100%);
+  background: var(--color-outline);
+}
+
+/* What has played: the accent, a lit tube's glow round it. */
+.mp-seek-played {
+  width: calc(var(--played) * 100%);
+  background: var(--color-primary);
+  box-shadow:
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / var(--focus-near_opacity)),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-far_opacity));
+}
+
+/* The head: the played part's end, lit to the core under the pointer, its glow brighter held. */
+.mp-seek-head {
+  position: absolute;
+  top: 50%;
+  left: var(--head, calc(var(--position, 0) * 100%));
+  width: var(--size-slider_anchor);
+  height: var(--size-slider_anchor);
+  translate: -50% -50%;
+  scale: var(--mp-grow);
+  border-radius: var(--radius-full);
+  background: var(--color-primary_lit);
+  box-shadow:
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / var(--focus-near_opacity)),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / var(--focus-far_opacity));
+  pointer-events: none;
+}
+
+.mp-seek[data-held] .mp-seek-head {
+  box-shadow:
+    0 0 calc(var(--focus-near) * var(--focus-pressed_glow)) rgb(from var(--color-primary) r g b / var(--focus-near_opacity)),
+    0 0 calc(var(--focus-far) * var(--focus-pressed_glow)) rgb(from var(--color-primary) r g b / var(--focus-far_opacity));
+}
+
+/* What the pointer over the bar shows: over the point it is at, held inside the bar's ends, rising
+   `space.s4` into place as it fades in over `short`. Its start edge is put on the whole pixel
+   nearest, as the pointer moves between them. */
+.mp-seek-tip {
+  position: absolute;
+  bottom: calc(100% + var(--space-s4));
+  left: round(nearest, clamp(0px, calc(var(--at) * 100% - var(--tip-half, 0px)), calc(100% - 2 * var(--tip-half, 0px))), 1px);
+  display: flex;
+  pointer-events: none;
+  animation: mp-rise-in var(--motion-short) var(--easing-emphasized_decel);
+}
+
+.mp-preview-frame {
+  display: block;
+  width: var(--size-thumbnail_width);
+  height: var(--size-thumbnail_height);
+  object-fit: cover;
+  border-radius: var(--radius-row);
+}
+
+@keyframes mp-rise-in {
+  from {
+    opacity: 0;
+    translate: 0 var(--space-s4);
+  }
+}
+
+@keyframes mp-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* What a button opens, by it (`anchorPopover`): fading in over `short`, as the library's does. */
+.mp-popover {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  animation: mp-fade-in var(--motion-short) var(--easing-emphasized_decel);
+}
+
+/* A group's heading stands clear of its first item's words as a list's section label stands clear of
+   its first row's: `space.s12` under it, before the item's own room round its words. A second group
+   sits further off than any two items, `space.s16` above its heading. */
+.mp-menu-heading {
+  padding: var(--space-s8) var(--space-s8) var(--space-s12);
+}
+
+.mp-popover .k-stack > .k-stack,
+.mp-popover .k-stack > .k-stack > .k-menu {
+  align-self: stretch;
+}
+
+/* While a button's menu is open the menu says what it is: its hint stays away. */
+.mp-window:has(.mp-popover) [data-opens] > .k-hint,
+.mp-window[data-sidebar] [data-opens="sidebar"] > .k-hint {
+  opacity: 0;
+}
+
+/* The playlist's button, at the window's top end corner on a pill of glass, shown with the
+   controller. With the panel open it stands in the panel's head, where it was, its pill's glass
+   fading into the panel's as the panel slides under it. */
+.mp-corner {
+  position: absolute;
+  top: var(--mp-inset);
+  right: var(--mp-inset);
+  z-index: 4;
+  isolation: isolate;
+  display: flex;
+  padding: var(--space-s4);
+  border-radius: var(--radius-full);
+  opacity: var(--mp-shown);
+  translate: 0 calc((var(--mp-shown) - 1) * var(--space-s8));
+}
+
+.mp-corner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: calc(1 - var(--mp-side));
+}
+
+/* The playlist's panel: the controller's glass docked to the window's end edge, its whole height,
+   flush with its edges and corners, over the picture. It slides in from the end edge over `long`
+   and back over `medium`; `size.panel` wide, and the whole window below `size.app_min_width`. Its
+   head row is as tall as the corner's pill, which stands at its end; its files fill the rest. */
+.mp-window {
+  --mp-panel: min(var(--size-panel), 100%);
+}
+
+.mp-window[data-narrow] {
+  --mp-panel: 0px;
+}
+
+.mp-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s12);
+  width: min(var(--size-panel), 100%);
+  padding: var(--mp-inset) var(--space-s16) var(--mp-inset);
+  border-radius: 0 calc(var(--radius-content) - var(--stroke-thin)) calc(var(--radius-content) - var(--stroke-thin)) 0;
+  translate: calc((1 - var(--mp-side)) * 100%) 0;
+  visibility: hidden;
+}
+
+.mp-window[data-sidebar] .mp-sidebar,
+.mp-sidebar:is([data-moving]) {
+  visibility: visible;
+}
+
+/* Sliding out, it stays seen until it is gone. */
+.mp-window:not([data-sidebar]) .mp-sidebar {
+  transition: visibility 0s linear var(--motion-medium);
+}
+
+.mp-window[data-narrow] .mp-sidebar {
+  width: 100%;
+  border-radius: calc(var(--radius-content) - var(--stroke-thin));
+}
+
+.mp-sidebar-head {
+  flex: none;
+  box-sizing: border-box;
+  height: calc(var(--size-control_md) + var(--space-s4) * 2);
+  padding-inline-end: calc(var(--size-control_md) + var(--space-s4) * 2 + var(--space-s8));
+}
+
+/* The files fill the panel's height below its head, scrolling only when they don't fit. */
+.mp-sidebar-room {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Play or pause blooming in the picture's middle: a disc of glass, `size.control_lg` twice across,
+   the symbol of the state entered. */
+.mp-bloom {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: calc(var(--size-control_lg) * 2);
+  height: calc(var(--size-control_lg) * 2);
+  margin: calc(var(--size-control_lg) * -1) 0 0 calc(var(--size-control_lg) * -1);
+  border-radius: var(--radius-full);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mp-bloom > * {
+  grid-area: 1 / 1;
+}
+
+.mp-bloom:not([data-pause]) > :nth-child(2),
+.mp-bloom[data-pause] > :first-child {
+  display: none;
+}
+
+/* A song: the cover large, its title and artist, its levels, centred in the room over the
+   controller. The words' and the levels' room is kept, so the cover is what gives way. */
+.mp-song {
+  position: absolute;
+  inset: var(--mp-inset) var(--mp-inset) calc(var(--mp-controller, 0px) + var(--mp-inset) * 2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-s16);
+  container-type: size;
+  --mp-song-words: calc(var(--type-title-line) + var(--space-s4) + var(--type-body_large-line) + var(--size-control_sm) + var(--space-s16) * 2);
+}
+
+/* The cover: never cropped and never past `size.cover`, its shape kept (`--ratio`), as big as the
+   room allows, down to whole device pixels; raised to step 3 with its rim. */
+.mp-cover {
+  --side: max(0px, min(var(--size-cover), 100cqw, 100cqh - var(--mp-song-words)));
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: round(down, calc(var(--side) * min(1, var(--ratio, 1))), 1px);
+  height: round(down, calc(var(--side) * min(1, 1 / var(--ratio, 1))), 1px);
+  overflow: clip;
+  border-radius: var(--radius-content);
+  box-shadow:
+    inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim)),
+    0 var(--elevation-3-contact-y) var(--elevation-3-contact-blur) rgb(from var(--color-shadow) r g b / var(--elevation-contact-opacity)),
+    0 var(--elevation-3-ambient-y) var(--elevation-3-ambient-blur) rgb(from var(--color-shadow) r g b / var(--elevation-ambient-opacity));
+}
+
+.mp-cover > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mp-cover[data-bare] {
+  background: var(--color-surface_container);
+}
+
+.mp-song-words {
+  max-width: 100%;
+  text-align: center;
+}
+
+/* The levels: bars rising and falling while it plays, settling to a stub when it pauses. */
+.mp-bars {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s4);
+  height: var(--size-control_sm);
+  --mp-energy: 0;
+  transition: --mp-energy var(--motion-medium) var(--easing-standard);
+}
+
+.mp-window[data-playing] .mp-bars {
+  --mp-energy: 1;
+}
+
+/* A bar's room stands still, a whole `size.scrollbar` by `size.control_sm`: what rises and falls is
+   drawn in it, scaled, so the wave moves no box and lays nothing out again. */
+.mp-bar {
+  display: block;
+  flex: none;
+  width: var(--size-scrollbar);
+  height: 100%;
+}
+
+.mp-bar::before {
+  content: "";
+  display: block;
+  /* The library registers `--reach` as kept to its own box (`lib/feedback.css`): the bar's is passed down. */
+  --reach: inherit;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  box-shadow: 0 0 var(--focus-near) rgb(from var(--color-primary) r g b / var(--focus-near_opacity));
+  --rest: calc(var(--size-scrollbar) / var(--size-control_sm));
+  scale: 1 calc(var(--rest) + (var(--reach) * var(--mp-wave) - var(--rest)) * var(--mp-energy));
+  animation: mp-wave var(--motion-hum) var(--easing-standard) calc(var(--beat) * var(--motion-swap_lag) * -1) infinite alternate;
+  animation-play-state: paused;
+}
+
+.mp-window[data-playing] .mp-bar::before {
+  animation-play-state: running;
+}
+
+@keyframes mp-wave {
+  from {
+    --mp-wave: 0.3;
+  }
+
+  to {
+    --mp-wave: 1;
+  }
+}
+
+/* A message from a key: the shell's OSD strip, hung from the window's top edge, coming down and
+   fading in over `long`, going back up fading over `medium`. */
+.mp-message-room {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.mp-message {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--size-rail);
+  padding: var(--space-s16);
+  border-radius: 0 0 var(--radius-surface) var(--radius-surface);
+  background: var(--color-surface);
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+  opacity: var(--mp-up);
+  translate: 0 calc((var(--mp-up) - 1) * 100%);
+  transition: --mp-up var(--motion-long) var(--easing-emphasized_decel);
+}
+
+@starting-style {
+  .mp-message {
+    --mp-up: 0;
+  }
+}
+
+.mp-message[data-words] {
+  width: auto;
+  min-width: var(--size-rail);
+}
+
+/* Reduce motion: every move a fade, nothing rising, sliding or blooming. */
+[data-reduced] :is(.mp-controller, .mp-corner, .mp-title-row, .mp-bar-row, .mp-buttons) {
+  translate: none;
+}
+
+[data-reduced] .mp-sidebar {
+  translate: none;
+  opacity: var(--mp-side);
+}
+
+[data-reduced] .mp-message {
+  translate: none;
+}
+
+[data-reduced] .mp-bar::before {
+  animation: none;
+}
+
+[data-reduced] .mp-seek-tip {
+  animation-name: mp-fade-in;
+}
+
+/* Where a sample puts the window: tiled in the frame's hole, as Hyprland tiles it alone, or
+   covering the screen. */
+.mp-tiled {
+  position: absolute;
+  inset: calc(var(--size-bar) + var(--space-s8)) var(--space-s16) var(--space-s16);
+  display: flex;
+}
+
+.mp-whole {
+  position: relative;
+  display: flex;
+  flex: none;
+  width: var(--screen-width);
+  height: var(--screen-height);
+  overflow: hidden;
+}
+
+.mp-room {
+  display: flex;
+  flex: none;
+}
+
+.mp-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s12);
+  align-items: start;
+}
+
+.mp-live-room {
+  display: flex;
+  flex: none;
+  width: var(--size-app_width);
+  height: calc(var(--size-app_width) / (var(--aspect-wallpaper)));
+  min-width: var(--size-control_lg);
+  min-height: var(--size-thumbnail_height);
+  max-width: calc(1920 * var(--px));
+  resize: both;
+  overflow: hidden;
+  border-radius: var(--radius-content);
+}
+
+/* Full screen, the live room is the screen: its corners square, nothing to drag. */
+.mp-live-room:fullscreen {
+  border-radius: 0;
+  resize: none;
+}
+
+.mp-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s12) var(--space-s24);
+}
+
+/* The control center's widget, sharing the controller's layout: a card of the panel's width. */
+.mp-widget {
+  box-sizing: border-box;
+  flex: none;
+  width: var(--size-panel);
+  padding: var(--space-s16);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container);
+}
+
+.mp-widget > * {
+  align-self: stretch;
+}
+
+.mp-widget > .k-row:last-child {
+  align-self: center;
+}
+
+.mp-widget-art {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-control_lg);
+  height: var(--size-control_lg);
+  overflow: hidden;
+  border-radius: var(--radius-row);
+  background: var(--color-surface_container_highest);
+}
+
+.mp-widget-art > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The ladder: each window under the rung it has reached. */
+.mp-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: var(--space-s24);
+  max-width: calc(1920 * var(--px));
+}
+
+.mp-ladder-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+/* The controller's rows are as wide as it. */
+.mp-controller > .k-stack,
+.mp-controller > .k-stack > * {
+  align-self: stretch;
+}
+
+/* The rungs taken (`data-r1`… on the window): each part goes at its rung. */
+.mp-window[data-r2] [data-gone="2"],
+.mp-window[data-r3] [data-gone="3"],
+.mp-window[data-r4] [data-gone="4"],
+.mp-window[data-r5] [data-gone="5"],
+.mp-window[data-r6] [data-gone="6"],
+.mp-window[data-r7] [data-gone="7"] {
+  display: none;
+}
+
+/* A song's visualiser (`media-player-gl.ts`): the whole window behind the controller, the playlist
+   and the message, which stay glass over it. On, it takes the level strip's job and the ambient
+   wash's: both give way to it. */
+.mp-visual {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.mp-visual-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mp-window:not([data-visual="off"]) :is(.mp-bars, .mp-ambient) {
+  display: none;
+}
+
+/* With a visualiser on, the song stands small in the bottom start corner, the words beside the
+   cover, over the controller while it shows and in the window's own corner while it is gone: its
+   foot rides the controller's own `--mp-shown`, so the two travel as one, on one timing. It takes
+   no pointer: the light under it is what is watched. With none, it is in the middle, large. */
+.mp-window:not([data-visual="off"]) .mp-song {
+  inset: auto auto calc(var(--mp-inset) + (var(--mp-controller, 0px) + var(--mp-inset)) * var(--mp-shown)) var(--mp-inset);
+  flex-direction: row;
+  align-items: center;
+  justify-content: start;
+  max-width: calc(100% - var(--mp-inset) * 2);
+  container-type: normal;
+  pointer-events: none;
+}
+
+.mp-window:not([data-visual="off"]) .mp-cover {
+  --side: calc(var(--size-control_lg) * 2);
+}
+
+.mp-window:not([data-visual="off"]) .mp-song-words {
+  min-width: 0;
+  text-align: start;
+}
+
+/* Over a visualiser the song's words stand on the lock's halo: `surface` round each letter, a
+   tight one at `opacity.halo_edge` and a soft one at `opacity.halo`, so they read over any light. */
+.mp-window:not([data-visual="off"]) .mp-song-words .k-text {
+  text-shadow:
+    0 0 var(--size-halo_edge) rgb(from var(--color-surface) r g b / var(--opacity-halo_edge)),
+    0 0 var(--size-halo) rgb(from var(--color-surface) r g b / var(--opacity-halo)),
+    0 0 calc(var(--size-halo) * 3) rgb(from var(--color-surface) r g b / var(--opacity-halo));
+}
+
+/* The playlist's sidebar open: the song's corner keeps clear of it, and gives way under it where
+   the sidebar takes the whole window. */
+.mp-window[data-sidebar]:not([data-visual="off"]) .mp-song {
+  max-width: calc(100% - var(--size-panel) - var(--mp-inset) * 3);
+}
+
+.mp-window[data-sidebar][data-narrow]:not([data-visual="off"]) .mp-song {
+  opacity: 0;
+}

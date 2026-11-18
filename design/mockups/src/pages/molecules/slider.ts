@@ -224,6 +224,11 @@ export default page({
     { name: "Continuous", for: "any value: volume, brightness; reads as a percentage", sample: () => boxed(volume()) },
     { name: "With stops", for: "one of a few named choices in order: power profiles", sample: () => boxed(profiles()) },
     { name: "A symbol per stop", for: "each stop's own in the circle: the power stops", sample: () => within(ROOM, stack("s16", "start", ...[0, 2, 4].map((index) => slider(profiles("Regular", { index }))))) },
+    {
+      name: "A symbol by level",
+      for: "the circle's symbol steps as the value rises: volume's waves",
+      sample: () => within(ROOM, stack("s16", "start", ...[0.12, 0.5, 0.88].map((value) => slider(volume("Regular", { value, levels: ["volume_mute", "volume_down", "volume_up"] }))))),
+    },
     { name: "With a sticky point", for: "a volume boost to 150%, holding at 100%", sample: () => boxed(boosted()) },
     {
       name: "Toggled",
