@@ -211,16 +211,22 @@
 }
 
 /* The bar's steps: each bar at its own size, scrolling sideways in its row where it is wider than
-   the page. */
+   the page. The browser's own scrollbars are never drawn: they are no part of the bar, and on a
+   desktop that shows them always they stand in the stage as if they were. A row scrolls sideways
+   only, so a bar's glow reaching past its height adds no second bar down its side. */
 .shell-steps {
   width: 100%;
   max-height: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
 }
 
 .shell-steps-live {
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
 }
 
 /* The clock's time, centred in a slot as wide as the widest time it shows (`clockTime`). */
