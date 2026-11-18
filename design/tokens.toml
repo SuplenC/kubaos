@@ -703,6 +703,13 @@ use = "A toast staying: long enough to read twice."
 ms = 1100
 use = "A held control until it acts: Install, erasing a disk, a held menu item."
 
+# How long a window or a workspace dropped on the Overview's delete zone waits before it is closed for
+# good: long enough to see what went and press it back, short enough that a second drop rarely
+# comes first. Not a move: reduce motion doesn't cap it.
+[duration.undo]
+ms = 5000
+use = "A deletion that can still be undone: the Overview's delete zone."
+
 # How long the awake lock waits for a key, a press or a touch of the reader
 # before it goes back to rest. Not a move: reduce motion doesn't cap it.
 [duration.lock_idle]

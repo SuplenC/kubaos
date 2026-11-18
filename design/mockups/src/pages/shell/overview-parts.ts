@@ -15,13 +15,14 @@
 // whole-desk view, where every screen stands as it does on the desk and the world is scaled to fit.
 
 import "./overview.css";
+import { tipLine, banner } from "../../lib/banner.ts";
+import { button } from "../../lib/button.ts";
 import { focusRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { text } from "../../lib/text.ts";
 import { length, raw } from "../../lib/tokens.ts";
-import { picker } from "../../site/parts/picker.ts";
 import { settings } from "../../site/settings.ts";
 import { barScreen } from "./bar-parts.ts";
 import { BADGED, face, ICONS } from "./overview-apps.ts";
@@ -46,7 +47,9 @@ export type Target =
   | { readonly kind: "space"; readonly space: string }
   | { readonly kind: "between"; readonly group: string; readonly index: number }
   | { readonly kind: "plus"; readonly group: string }
-  | { readonly kind: "refused"; readonly group: string };
+  | { readonly kind: "refused"; readonly group: string }
+  /** The delete zone: dropped there, it goes, with a few seconds to bring it back. */
+  | { readonly kind: "bin" };
 
 /** A still state drawn on the overview for a sample: the same moves a hand makes, finished. */
 export type Pin =
@@ -55,7 +58,19 @@ export type Pin =
   | { readonly kind: "space"; readonly space: string; readonly to: Target }
   | { readonly kind: "delete"; readonly space: string; readonly held: number }
   /** A held delete let go of once it filled, drawn `at` milliseconds on. */
-  | { readonly kind: "collapsing"; readonly space: string; readonly at: number };
+  | { readonly kind: "collapsing"; readonly space: string; readonly at: number }
+  /** A window or a workspace carried toward the delete zone, or over it. */
+  | { readonly kind: "binning"; readonly what: Carried; readonly over: boolean }
+  /**
+   * Something dropped on the delete zone, `left` of its time to undo left; with `next`, a second
+   * thing carried over the zone meanwhile, or, `confirmed`, the first one gone and `what` pending.
+   */
+  | { readonly kind: "pending"; readonly what: Carried; readonly left: number; readonly next?: Carried; readonly confirmed?: Carried }
+  /** A window dropped on the delete zone and brought back, drawn `share` of its way home. */
+  | { readonly kind: "undoing"; readonly window: string; readonly share: number };
+
+/** A window or a workspace, by its id. */
+export type Carried = { readonly window: string } | { readonly space: string };
 
 export interface OverviewOptions {
   readonly desk: model.DeskName;
@@ -65,8 +80,6 @@ export interface OverviewOptions {
   readonly closed?: boolean;
   /** The screen the keyboard is on, when not the primary. */
   readonly focus?: string;
-  /** The stage's switches of desk and view: the mockup's, not the overview's. */
-  readonly switches?: boolean;
   readonly pin?: Pin;
   /** Groups renamed, by id: a long name's sample. */
   readonly names?: Readonly<Record<string, string>>;
@@ -89,8 +102,11 @@ export interface Driver {
   readonly isOpen: () => boolean;
   /** Every element's place the overview is gliding it to, by its id: a script holds the glide to it. */
   readonly element: (id: string) => HTMLElement | null;
-  /** Holds every move running in the world at `at` milliseconds after it started: a capture's frame. */
-  readonly freeze: (at: number) => void;
+  /**
+   * Holds every move running in the world at `at` milliseconds after it started: a capture's frame.
+   * `commit` writes the moment into the elements and ends the moves, so a page clock can't run them on.
+   */
+  readonly freeze: (at: number, commit?: boolean) => void;
   /** Lets go of the frozen moves, finished. */
   readonly thaw: () => void;
   /** Draws the overview again with other options: another desk, view or fill. */
@@ -321,13 +337,13 @@ export interface Overview {
   readonly driver: Driver;
 }
 
-const DESKS: readonly { readonly desk: model.DeskName; readonly name: string }[] = [
+export const DESKS: readonly { readonly desk: model.DeskName; readonly name: string }[] = [
   { desk: "three", name: "Three screens" },
   { desk: "laptop", name: "Laptop alone" },
   { desk: "ultrawide", name: "Ultrawide alone" },
 ];
 
-const VIEWS: readonly { readonly view: View; readonly name: string }[] = [
+export const VIEWS: readonly { readonly view: View; readonly name: string }[] = [
   { view: "screen", name: "This screen" },
   { view: "desk", name: "Whole desk" },
 ];
@@ -427,6 +443,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   const room = span("ov-room");
   const slit = span("ov-slit");
   marks.append(room, slit, aim, select);
+
+  // How both drags go, once, on the focused screen: a tip on the frame's glass in the bottom
+  // margin's left end, under every miniature, the delete zone's corner left free.
+  const tip = span("ov-tip", tipLine("Drag a window with the left button, a whole workspace with the right."));
+  marks.append(tip);
 
   const views: ScreenView[] = [];
   const spaceEls = new Map<string, SpaceEl>();
@@ -629,6 +650,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     readonly fromIndex: number;
     /** Its scale where it was lifted: a window's workspace's, a workspace's own. */
     readonly scale: number;
+    /** Its longer side as drawn now, in world points: a window's at the scale it is drawn at. */
+    extent: number;
     target: Target | null;
     point: Point;
     /** Each screen's grid without the workspace carried, from which a carried workspace's place is found. */
@@ -687,6 +710,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     showRoom();
     showAim();
     showSelect();
+    showTip();
+  }
+
+  function showTip(): void {
+    const on = viewOf(desk.focused) ?? views[0]!;
+    tip.style.setProperty("--ov-x", css(on.at.x + L("space-s48")));
+    tip.style.setProperty("--ov-y", css(on.at.y + on.size.h - L("space-s48") / 2));
   }
 
   /** Sets a box's place and size, in its parent's logical pixels. */
@@ -833,6 +863,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** A box's place in the world: a workspace's miniature, a group's new-workspace slot. */
   function worldBox(target: Target): (model.Rect & { s: number }) | null {
+    if (target.kind === "bin") return null;
     for (const each of views) {
       for (const section of each.layout.sections) {
         if (target.kind === "space") {
@@ -1032,6 +1063,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** Where a carried window would land at `point`. */
   function windowTarget(point: Point): Target | null {
+    if (overBin(point)) return { kind: "bin" };
     const gap = L("space-s24");
     for (const each of views) {
       const local = { x: point.x - each.at.x, y: point.y - each.at.y };
@@ -1064,6 +1096,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    */
   function spaceTarget(point: Point): Target | null {
     if (!carry) return null;
+    if (overBin(point)) return { kind: "bin" };
     const gap = L("space-s24");
     for (const each of views) {
       const bare = carry.bare.get(each.screen.id);
@@ -1091,7 +1124,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** The scale a carried window is drawn at over `target`: the workspace's it would join. */
   function scaleOver(target: Target | null): number {
     if (!carry) return 1;
-    if (!target || target.kind === "refused") return carry.scale;
+    if (!target || target.kind === "refused" || target.kind === "bin") return carry.scale;
     if (target.kind === "space") return worldBox(target)?.s ?? carry.scale;
     for (const each of views) {
       const section = each.layout.sections.find((s) => s.group === target.group);
@@ -1122,7 +1155,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-badge", String(1 / slot.s));
     commit(element);
     const index = model.groupOf(desk, space).spaces.indexOf(space);
-    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, target: { kind: "space", space }, point, bare: new Map() };
+    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, extent: Math.max(rect.w, rect.h) * slot.s, target: { kind: "space", space }, point, bare: new Map() };
     root.dataset.carrying = "window";
     element.dataset.held = "";
     place("reflow");
@@ -1135,7 +1168,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!on || !slot || !made) return;
     const grab = { x: point.x - on.at.x - slot.x, y: point.y - on.at.y - slot.y };
     const group = model.groupOf(desk, id);
-    carry = { kind: "space", id, element: made.root, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: slot.s, target: null, point, bare: new Map() };
+    carry = { kind: "space", id, element: made.root, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: slot.s, extent: Math.max(slot.w, slot.h), target: null, point, bare: new Map() };
     for (const each of views) carry.bare.set(each.screen.id, arrange(each.size.w, each.size.h, specsOf(each.screen)));
     lift.append(made.root);
     made.root.dataset.lifted = "";
@@ -1161,16 +1194,26 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       element.style.setProperty("--ov-x", css(point.x - carry.grab.x));
       element.style.setProperty("--ov-y", css(point.y - carry.grab.y));
     }
+    showBin(point);
     const target = carry.kind === "window" ? windowTarget(point) : spaceTarget(point);
     if (sameTarget(target, carry.target)) return;
     carry.target = target;
     if (carry.kind === "window") {
       const scale = scaleOver(target);
+      const rect = tiles.get(carry.id);
+      if (rect) carry.extent = Math.max(rect.w, rect.h) * scale;
       element.style.setProperty("--ov-sx", String(scale));
       element.style.setProperty("--ov-sy", String(scale));
       element.style.setProperty("--ov-badge", String(1 / scale));
     }
+    // Over the delete zone it shrinks round the pointer to the zone's height, so the lit zone shows.
+    element.style.setProperty("--ov-shrink", target?.kind === "bin" ? String(Math.min(1, binBox(viewOf(binOn!)!).h / carriedSize())) : "1");
     place("reflow");
+  }
+
+  /** The carried thing's longer side as it is drawn, in world points. */
+  function carriedSize(): number {
+    return carry?.extent ?? 1;
   }
 
   function sameTarget(a: Target | null, b: Target | null): boolean {
@@ -1183,11 +1226,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const was = carry;
     const target = cancelled ? null : was.target;
     let landed = false;
-    if (was.kind === "window" && target && target.kind !== "refused") {
+    if (was.kind === "window" && target && target.kind !== "refused" && target.kind !== "bin") {
       const landingAt: model.Landing = target.kind === "space" ? { space: target.space } : target.kind === "between" ? { group: target.group, index: target.index } : { group: target.group, index: model.groupById(desk, target.group).spaces.length };
       landed = model.moveWindow(desk, was.id, landingAt) !== null;
     }
-    if (was.kind === "space" && target && target.kind !== "refused" && target.kind !== "space") {
+    if (was.kind === "space" && target && target.kind !== "refused" && target.kind !== "space" && target.kind !== "bin") {
       const at = roomOf(target)!;
       landed = model.moveSpace(desk, was.id, at.group, at.index) !== null;
     }
@@ -1195,11 +1238,17 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     delete root.dataset.carrying;
     delete was.element.dataset.held;
     delete was.element.dataset.refused;
+    was.element.style.setProperty("--ov-shrink", "1");
     delete landing.dataset.shown;
+    if (target?.kind === "bin") {
+      intoBin(was.kind === "window" ? { window: was.id } : { space: was.id }, was.element);
+      return;
+    }
     if (was.kind === "window") landWindow(was.id, was.element);
     else landSpace(was.id, was.element);
     sweepGone();
     place("reflow");
+    showBin();
     root.toggleAttribute("data-landed", landed);
   }
 
@@ -1302,7 +1351,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** Workspaces the model no longer has collapse where they stand, and go. */
   function sweepGone(): void {
     for (const [id, made] of spaceEls) {
-      if (desk.spaces.has(id) || made.root.hasAttribute("data-gone")) continue;
+      if (desk.spaces.has(id) || made.root.hasAttribute("data-gone") || made.root.hasAttribute("data-binned")) continue;
       collapse(id, made, "0s");
     }
   }
@@ -1347,6 +1396,224 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     showSelect();
   }
 
+
+  // ── The delete zone ──
+
+  /**
+   * What waits in the delete zone: the thing taken, its element (kept, drawn into the zone), and its
+   * timer, the Undo button's fill draining over `duration.undo`.
+   */
+  interface Pending {
+    readonly taken: model.Taken;
+    readonly what: Carried;
+    readonly element: HTMLElement;
+    readonly drain: Animation | null;
+  }
+  let pending: Pending | null = null;
+  /** The screen the zone stands on, by id. */
+  let binOn: string | null = null;
+
+  const bin = span("ov-bin");
+  const binRing = focusRing(bin, "content", "burn_error", false);
+  marks.append(bin);
+  bin.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || carry || !pending) return;
+    event.stopPropagation();
+    event.preventDefault();
+    undo();
+  });
+
+  /** The zone's words: what a drop there does, or what waits there and its way back. */
+  function dressBin(left = 1): void {
+    if (pending) {
+      const name = "window" in pending.what ? (desk.windows.get(pending.what.window)?.title ?? "") : spaceName(pending.taken);
+      const back = button({ label: "Undo", kind: "Tonal", size: "Sm", held: left });
+      back.tabIndex = -1;
+      bin.replaceChildren(banner({ tone: "Danger", size: "Small", icon: "delete", title: "window" in pending.what ? "Close" : "Remove", body: name, actions: back }));
+      bin.dataset.pending = "";
+    } else {
+      const window = carry?.kind === "window";
+      bin.replaceChildren(banner({ tone: "Danger", size: "Small", icon: "delete", title: window ? "Close" : "Remove", body: "" }));
+      delete bin.dataset.pending;
+    }
+    bin.append(binRing);
+  }
+
+  /** A taken workspace's name: its number in its group, and its windows. */
+  function spaceName(taken: model.Taken): string {
+    const count = taken.space.windows.length;
+    const number = taken.kind === "space" ? taken.index + 1 : 0;
+    if (count === 0) return `Workspace ${number}`;
+    if (count === 1) return `Workspace ${number} and its window`;
+    return `Workspace ${number} and its ${count} windows`;
+  }
+
+  /** The zone's place: the bottom right corner of screen `on`, `space.s16` in. */
+  function binBox(on: ScreenView): model.Rect {
+    const w = L("size-panel");
+    const h = bin.offsetHeight > 0 ? bin.offsetHeight / settings().scale : L("size-row_two_line") + L("size-control_sm");
+    const inset = L("space-s16");
+    return { x: on.at.x + on.size.w - inset - w, y: on.at.y + on.size.h - inset - h, w, h };
+  }
+
+  /** Shows the zone on the screen under `point` while something is carried, or where it waits. */
+  function showBin(point?: Point): void {
+    const showing = carry !== null || pending !== null;
+    if (!showing) {
+      delete bin.dataset.shown;
+      binOn = null;
+      return;
+    }
+    const under = point ? views.find((each) => inside(point, { x: each.at.x, y: each.at.y, w: each.size.w, h: each.size.h })) : undefined;
+    const on = (pending && binOn ? viewOf(binOn) : undefined) ?? under ?? viewOf(binOn ?? desk.focused) ?? views[0]!;
+    const first = !bin.hasAttribute("data-shown");
+    if (first) dressBin();
+    const moved = on.screen.id !== binOn;
+    binOn = on.screen.id;
+    // It stands on its foot: grown with what it holds, it rises from the corner.
+    const box = binBox(on);
+    glide(bin, first || moved ? "none" : "reflow");
+    bin.style.setProperty("--ov-x", css(box.x));
+    bin.style.setProperty("--ov-y", css(box.y));
+    bin.style.setProperty("--ov-w", css(box.w));
+    bin.dataset.shown = "";
+    bin.toggleAttribute("data-pinned", carry?.target?.kind === "bin");
+  }
+
+  function overBin(point: Point): boolean {
+    if (!bin.hasAttribute("data-shown") || !binOn) return false;
+    const on = viewOf(binOn);
+    return on ? inside(point, binBox(on)) : false;
+  }
+
+  /** The zone's middle, in world points, where a thing dropped there goes. */
+  function binCentre(): Point {
+    const on = viewOf(binOn ?? desk.focused) ?? views[0]!;
+    const box = binBox(on);
+    return { x: box.x + L("space-s16") + L("type-label-icon") / 2, y: box.y + L("space-s16") + L("type-label-icon") / 2 };
+  }
+
+  /**
+   * Takes `what` into the zone: out of the overview at once, drawn shrinking into the zone's symbol
+   * as it fades, and kept until its timer ends. Something still waiting there goes for good first.
+   */
+  function intoBin(what: Carried, element: HTMLElement): void {
+    if (pending) confirm();
+    const { taken } = model.take(desk, what);
+    const goal = binCentre();
+    const size = L("type-label-icon");
+    if ("window" in what) {
+      const style = getComputedStyle(element);
+      const k = Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1;
+      const scale = settings().scale;
+      const at = { x: Number.parseFloat(style.getPropertyValue("--ov-tx")) / scale, y: Number.parseFloat(style.getPropertyValue("--ov-ty")) / scale };
+      const grab = { x: Number.parseFloat(style.getPropertyValue("--ov-gx")) / scale, y: Number.parseFloat(style.getPropertyValue("--ov-gy")) / scale };
+      const w = Number.parseFloat(style.getPropertyValue("--ov-tw")) / scale;
+      const h = Number.parseFloat(style.getPropertyValue("--ov-th")) / scale;
+      glide(element, "none");
+      element.style.setProperty("--ov-gx", "0px");
+      element.style.setProperty("--ov-gy", "0px");
+      element.style.setProperty("--ov-tx", css(at.x + grab.x * (1 - k)));
+      element.style.setProperty("--ov-ty", css(at.y + grab.y * (1 - k)));
+      commit(element);
+      const into = size / Math.max(w, h);
+      bins(element);
+      element.style.setProperty("--ov-tx", css(goal.x - (w * into) / 2));
+      element.style.setProperty("--ov-ty", css(goal.y - (h * into) / 2));
+      element.style.setProperty("--ov-sx", String(into));
+      element.style.setProperty("--ov-sy", String(into));
+    } else {
+      const made = spaceEls.get(what.space)!;
+      const style = getComputedStyle(made.desk);
+      const w = Number.parseFloat(style.getPropertyValue("--ov-dw")) / settings().scale;
+      const h = Number.parseFloat(style.getPropertyValue("--ov-dh")) / settings().scale;
+      const into = size / Math.max(w, h);
+      for (const part of [made.root, made.desk, made.tag]) bins(part);
+      made.root.dataset.binned = "";
+      made.root.style.setProperty("--ov-x", css(goal.x - (w * into) / 2));
+      made.root.style.setProperty("--ov-y", css(goal.y - (h * into) / 2));
+      made.desk.style.setProperty("--ov-s", String(into));
+    }
+    element.dataset.binned = "";
+    pending = { taken, what, element, drain: null };
+    sweepGone();
+    place("reflow");
+    dressBin();
+    showBin();
+    drain(1);
+  }
+
+  /** Sets an element's glide into the zone: things leaving, over `medium`. */
+  function bins(element: HTMLElement): void {
+    if (settings().reduced) return glide(element, "none");
+    element.style.setProperty("--ov-pt", "var(--motion-medium)");
+    element.style.setProperty("--ov-pe", "var(--easing-emphasized_accel)");
+    element.style.setProperty("--ov-pd", "0s");
+  }
+
+  /**
+   * Runs the waiting thing's timer from `left` of it: the Undo button's fill drains on `linear` over
+   * what is left of `duration.undo`, as a held button's fills; empty, the deletion is final.
+   */
+  function drain(left: number): void {
+    const back = bin.querySelector<HTMLElement>(".k-button");
+    if (!pending || !back) return;
+    const total = Number.parseFloat(raw("duration-undo")) / settings().speed;
+    const running = back.animate([{ "--hold": left }, { "--hold": 0 }], { duration: total * left, easing: "linear", fill: "forwards" });
+    pending = { ...pending, drain: running };
+    running.finished.then(
+      () => {
+        if (pending?.drain === running) confirm();
+      },
+      () => {},
+    );
+  }
+
+  /** The waiting thing goes for good: its windows close, its elements go, and the zone with it. */
+  function confirm(): void {
+    if (!pending) return;
+    const was = pending;
+    pending = null;
+    was.drain?.cancel();
+    model.forget(desk, was.taken);
+    const windows = was.taken.kind === "window" ? [was.taken.window] : [...was.taken.space.windows];
+    for (const id of windows) {
+      winEls.get(id)?.remove();
+      winEls.delete(id);
+    }
+    if (was.taken.kind === "space") {
+      spaceEls.get(was.taken.space.id)?.root.remove();
+      spaceEls.delete(was.taken.space.id);
+    }
+    was.element.remove();
+    dressBin();
+    showBin();
+  }
+
+  /** One press on the zone: the waiting thing flies back where it was. */
+  function undo(): void {
+    if (!pending) return;
+    const was = pending;
+    pending = null;
+    was.drain?.cancel();
+    model.restore(desk, was.taken);
+    delete was.element.dataset.binned;
+    if ("window" in was.what) {
+      // From the zone, as a carried window lands.
+      was.element.dataset.lifted = "";
+      landWindow(was.what.window, was.element);
+    } else {
+      const made = spaceEls.get(was.what.space)!;
+      for (const part of [made.root, made.desk, made.tag]) {
+        arriving(part, "arrive");
+        part.style.setProperty("--ov-arrive", "1");
+      }
+      landSpace(was.what.space, was.element);
+    }
+    dressBin();
+    showBin();
+  }
+
   // ── Timers that belong to the world: gone with it ──
 
   const timers = new Set<number>();
@@ -1360,14 +1627,18 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   // ── The pointer ──
 
-  let press: { id: number; at: Point; client: Point; on: ReturnType<typeof hit> } | null = null;
+  /** A press not yet a drag: the left button carries a window, the right one its workspace. */
+  let press: { id: number; at: Point; client: Point; on: ReturnType<typeof hit>; right: boolean } | null = null;
   const threshold = (): number => L("space-s8");
 
+  // The right button carries a workspace, so the browser's own menu never opens over the overview.
+  root.addEventListener("contextmenu", (event) => event.preventDefault());
+
   world.addEventListener("pointerdown", (event) => {
-    if (event.button !== 0 || !open || carry) return;
-    if (event.target instanceof Element && event.target.closest(".ov-ws-remove, .ov-switches")) return;
+    if ((event.button !== 0 && event.button !== 2) || !open || carry) return;
+    if (event.target instanceof Element && event.target.closest(".ov-ws-remove, .ov-bin")) return;
     const at = toWorld(event.clientX, event.clientY);
-    press = { id: event.pointerId, at, client: { x: event.clientX, y: event.clientY }, on: hit(at) };
+    press = { id: event.pointerId, at, client: { x: event.clientX, y: event.clientY }, on: hit(at), right: event.button === 2 };
     world.setPointerCapture(event.pointerId);
     root.focus({ preventScroll: true });
     event.preventDefault();
@@ -1380,8 +1651,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       const box = world.getBoundingClientRect();
       const moved = (Math.hypot(event.clientX - press.client.x, event.clientY - press.client.y) / box.width) * worldSize.w * fitOf();
       if (moved < threshold()) return;
-      if (press.on.kind === "window") liftWindow(press.on.id, press.at);
-      else if (press.on.kind === "space") liftSpace(press.on.id, press.at);
+      const on = press.on;
+      if (press.right && (on.kind === "window" || on.kind === "space")) liftSpace(on.kind === "window" ? on.space : on.id, press.at);
+      else if (!press.right && on.kind === "window") liftWindow(on.id, press.at);
       else return;
       keyed = false;
     }
@@ -1396,6 +1668,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       drop(event.type === "pointercancel");
       return;
     }
+    if (was.right) return;
     if (was.on.kind === "window") setOpen(false, was.on.space, was.on.id);
     else if (was.on.kind === "space") setOpen(false, was.on.id);
     else if (was.on.kind === "plus") newSpace(was.on.group);
@@ -1472,7 +1745,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   let holding: HTMLButtonElement | null = null;
 
   root.addEventListener("keydown", (event) => {
-    if (event.target instanceof Element && event.target.closest(".ov-switches")) return;
     const key = event.key;
     if (!open) {
       if (key.toLowerCase() === "w") {
@@ -1528,16 +1800,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     holding = null;
   });
 
-  // ── The stage's switches ──
-
-  if (options.switches) {
-    const desks = picker(DESKS.map((each) => each.name), DESKS.findIndex((each) => each.desk === options.desk), (index) => redraw({ ...options, desk: DESKS[index]!.desk }), "Desk");
-    const views = picker(VIEWS.map((each) => each.name), VIEWS.findIndex((each) => each.view === options.view), (index) => redraw({ ...options, view: VIEWS[index]!.view }), "View");
-    root.append(span("ov-switches", desks.element, views.element));
-  }
-
   // ── Drawn ──
 
+  // A still sample moves nothing: its pin is drawn where each move ends, or at its moment.
+  root.toggleAttribute("data-still", options.pin !== undefined && options.pin.kind !== "collapsing");
   place("none");
   setLook(open, "none");
   applyPin();
@@ -1552,7 +1818,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       showSelect();
       return;
     }
-    if (pin.kind === "collapsing") return;
+    if (pin.kind === "collapsing" || pin.kind === "undoing" || pin.kind === "binning" || pin.kind === "pending") return;
     if (pin.kind === "delete") {
       selected = pin.space;
       keyed = true;
@@ -1582,6 +1848,56 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     settle();
   }
 
+  /** A pin on the delete zone, which is measured, so played once the sample is on the page. */
+  function applyZonePin(pin: Pin): void {
+    if (pin.kind === "binning") {
+      const from = liftThing(pin.what);
+      const goal = binPoint();
+      moveCarry(pin.over ? goal : { x: from.x + (goal.x - from.x) / 2, y: from.y + (goal.y - from.y) / 2 });
+      settle();
+      return;
+    }
+    if (pin.kind === "pending") {
+      if (pin.confirmed) dropInBin(pin.confirmed);
+      dropInBin(pin.what);
+      // A still sample's timer stands where it is drawn.
+      if (pending) {
+        pending.drain?.cancel();
+        pending = { ...pending, drain: null };
+      }
+      dressBin(pin.left);
+      if (pin.next) {
+        liftThing(pin.next);
+        moveCarry(binPoint());
+      }
+      settle();
+      return;
+    }
+  }
+
+  /** Lifts a window by its middle, or a workspace by its miniature's middle; returns where it was taken. */
+  function liftThing(what: Carried): Point {
+    const at = "window" in what ? centreOf({ window: what.window }) : centreOf({ space: what.space });
+    if ("window" in what) liftWindow(what.window, at);
+    else liftSpace(what.space, at);
+    return at;
+  }
+
+  /** Carries `what` onto the delete zone and lets go there. */
+  function dropInBin(what: Carried): void {
+    liftThing(what);
+    moveCarry(binPoint());
+    drop();
+  }
+
+  /** The middle of the delete zone on the focused screen, or where it stands. */
+  function binPoint(): Point {
+    if (!bin.hasAttribute("data-shown")) dressBin();
+    const on = viewOf(binOn ?? desk.focused) ?? views[0]!;
+    const box = binBox(on);
+    return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+  }
+
   /** On its way from its workspace to `goal`, `share` of the way: crossing a screen's edge. */
   function crossingPoint(_window: string, goal: Point, share: number): Point {
     const from = carry?.point ?? goal;
@@ -1590,6 +1906,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** Every glide finished at once: a still sample's state as it stands once it has moved. */
   function settle(): void {
+    void root.offsetWidth;
     for (const animation of root.getAnimations({ subtree: true })) animation.finish();
   }
 
@@ -1597,6 +1914,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (target.kind === "space") return centreOf({ space: target.space });
     if (target.kind === "plus") return centreOf({ plus: target.group });
     if (target.kind === "between") return betweenPoint(target.group, target.index);
+    if (target.kind === "bin") return binPoint();
     const box = views.flatMap((each) => each.layout.sections.filter((s) => s.group === target.group).map((s) => ({ x: each.at.x + s.box.x + s.box.w / 2, y: each.at.y + s.box.y + s.box.h / 2 })))[0];
     return box ?? { x: 0, y: 0 };
   }
@@ -1631,12 +1949,20 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     lifted: () => carry?.id ?? null,
     isOpen: () => open,
     element: (id) => spaceEls.get(id)?.root ?? winEls.get(id) ?? null,
-    freeze(at) {
+    freeze(at, commit = false) {
+      // Transitions set just now start with the next style pass: run it, so they are caught too.
+      void root.offsetWidth;
       for (const timer of timers) clearTimeout(timer);
       timers.clear();
-      for (const animation of root.getAnimations({ subtree: true })) {
+      const running = root.getAnimations({ subtree: true });
+      for (const animation of running) {
         animation.pause();
         animation.currentTime = at;
+      }
+      if (!commit) return;
+      for (const animation of running) {
+        animation.commitStyles();
+        animation.cancel();
       }
     },
     thaw: settle,
@@ -1644,13 +1970,34 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   };
 
   // A pin drawn mid-move plays the move once the sample is on the page, held at its moment.
-  if (options.pin?.kind === "collapsing") {
-    const pin = options.pin;
+  const moving = options.pin?.kind === "collapsing" || options.pin?.kind === "undoing" || options.pin?.kind === "binning" || options.pin?.kind === "pending" ? options.pin : null;
+  if (moving) {
     const seen = new ResizeObserver(() => {
       if (!root.isConnected) return;
       seen.disconnect();
-      removeSpace(pin.space);
-      driver.freeze(pin.at);
+      if (moving.kind === "binning" || moving.kind === "pending") {
+        applyZonePin(moving);
+        return;
+      }
+      if (moving.kind === "collapsing") {
+        removeSpace(moving.space);
+        driver.freeze(moving.at, true);
+        return;
+      }
+      // Its way home drawn where it stands `share` along: from the zone to its tile.
+      dropInBin({ window: moving.window });
+      const element = winEls.get(moving.window)!;
+      const props = ["--ov-tx", "--ov-ty", "--ov-sx", "--ov-sy"] as const;
+      const style = getComputedStyle(element);
+      const from = props.map((name) => Number.parseFloat(style.getPropertyValue(name)));
+      undo();
+      const to = props.map((name) => Number.parseFloat(getComputedStyle(element).getPropertyValue(name)));
+      for (const timer of timers) clearTimeout(timer);
+      timers.clear();
+      props.forEach((name, i) => {
+        const value = from[i]! + (to[i]! - from[i]!) * moving.share;
+        element.style.setProperty(name, i < 2 ? `${value}px` : String(value));
+      });
     });
     seen.observe(root);
   }

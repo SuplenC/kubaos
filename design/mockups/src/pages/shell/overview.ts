@@ -5,7 +5,7 @@
 
 import type { Words } from "../../lib/content.ts";
 import { doesntApply, type Move, nonEmpty, page, screen, type Track } from "../../site/page.ts";
-import { type OverviewOptions, overview, type Pin } from "./overview-parts.ts";
+import { DESKS, type OverviewOptions, overview, type Pin, VIEWS } from "./overview-parts.ts";
 
 type Shown = "rest" | "lit" | "pressed" | "selected" | "empty";
 
@@ -16,10 +16,19 @@ function still(options: Partial<OverviewOptions> & { pin?: Pin } = {}): HTMLElem
 
 const at = (options: Partial<OverviewOptions> = {}) => screen(() => still(options));
 
-/** The live stage: the centre screen at its true size, with the desk and view switches. */
-function live(): HTMLElement {
-  return overview({ desk: "three", view: "screen", switches: true }).element;
+/**
+ * The live stage, on the desk and in the view the stage's switches pick: which screens are plugged
+ * in, and the focused screen alone or every screen as it stands. Both are the mockup's, not the
+ * Overview's: it runs on every screen at once.
+ */
+function live(picked: readonly number[] = []): HTMLElement {
+  return overview({ desk: DESKS[picked[0] ?? 0]!.desk, view: VIEWS[picked[1] ?? 0]!.view }).element;
 }
+
+/** The terminal, carried toward the delete zone, or over it. */
+const TERMINAL = { window: "w-term" } as const;
+/** The game's workspace, the centre's third. */
+const GAME = { space: "s8" } as const;
 
 /** The terminal on the centre's first workspace, carried over its third, the game. */
 const WINDOW_OVER: Pin = { kind: "window", window: "w-term", to: { kind: "space", space: "s8" } };
@@ -129,9 +138,16 @@ export default page<Shown>({
   code: { unbuilt: "a draft: not built" },
   from: ["icon-tile", "icon-button", "hint", "text", "workspaces"],
   stage: {
-    live: screen(live),
-    hint: "drag windows and workspaces; hold a delete; arrows, Enter, Esc, W",
+    live: screen(() => live()),
+    hint: "left-drag a window, right-drag a workspace; arrows, Enter, Esc, W",
     daylight: true,
+    switches: {
+      each: [
+        { label: "Desk", choices: nonEmpty(DESKS.map((each) => each.name)) },
+        { label: "View", choices: nonEmpty(VIEWS.map((each) => each.name)) },
+      ],
+      live: screen(live),
+    },
   },
   variants: [
     { name: "Three screens, the whole desk", for: "each screen its own group", sample: at({ view: "desk" }) },
@@ -147,6 +163,13 @@ export default page<Shown>({
     { name: "The delete, held halfway", for: "its ring half full", sample: at({ pin: { kind: "delete", space: "s7", held: 0.5 } }) },
     { name: "A workspace collapsing", for: "its windows gone, folding back", sample: at({ pin: { kind: "collapsing", space: "s7", at: 480 } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
+    { name: "The delete zone, carrying", for: "a window on its way to it", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
+    { name: "Over the delete zone", for: "lit: let go, and it closes", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
+    { name: "A workspace over the zone", for: "right-dragged: Remove", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
+    { name: "Waiting to close", for: "three fifths of its time left", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }) },
+    { name: "A second one over it", for: "let go, the first goes for good", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
+    { name: "The second dropped", for: "the first gone, the second waiting", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
+    { name: "Brought back", for: "pressed: flying home", sample: at({ pin: { kind: "undoing", window: "w-term", share: 0.5 } }) },
   ],
   sizes: doesntApply("one size: the screen's; the miniatures take what the screen has."),
   states: {
@@ -191,6 +214,9 @@ export default page<Shown>({
   keyboard: {
     keys: [
       { keys: ["Super+W"], does: "opens it; again, or Esc, closes" },
+      { keys: ["Left button"], does: "on a window, dragged: carries the window" },
+      { keys: ["Right button"], does: "on a workspace, dragged: carries the workspace" },
+      { keys: ["Left button"], does: "pressed: goes there; on the delete zone, brings it back" },
       { keys: ["←", "→", "↑", "↓"], does: "the next workspace that way, across screens" },
       { keys: ["Shift+←", "Shift+→", "Shift+↑", "Shift+↓"], does: "carries its focused window that way" },
       { keys: ["Enter"], does: "goes there: it grows into the screen" },

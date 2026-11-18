@@ -27,6 +27,7 @@
 @property --ov-held { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-hover { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
 
 /* The sample: a whole screen, the size the stage or the full screen gives it. */
 .ov {
@@ -123,7 +124,7 @@
   opacity: var(--ov-arrive);
   scale: calc(var(--scale-behind) + (1 - var(--scale-behind)) * var(--ov-arrive));
   transform-origin: 50% 50%;
-  transform: translateY(calc(-1 * var(--space-s4) * var(--ov-hover))) scale(calc(1 + (var(--scale-lift) - 1) * var(--ov-held)));
+  transform: translateY(calc(-1 * var(--space-s4) * var(--ov-hover))) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -132,7 +133,8 @@
     --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
     --ov-hover var(--motion-short) var(--easing-standard),
-    --ov-held var(--motion-short) var(--easing-standard);
+    --ov-held var(--motion-short) var(--easing-standard),
+    --ov-shrink var(--motion-short) var(--easing-standard);
 }
 
 /* The screen's own desktop flies over the others, shrinking into its place and growing out of it. */
@@ -274,7 +276,7 @@
   overflow: hidden;
   border-radius: calc(var(--radius-surface) - var(--space-s8));
   background: var(--color-surface);
-  transform: scale(calc(1 + (var(--scale-lift) - 1) * var(--ov-held)));
+  transform: scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   box-shadow:
     inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
     0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
@@ -306,7 +308,8 @@
     --ov-sx var(--motion-short) var(--easing-standard),
     --ov-sy var(--motion-short) var(--easing-standard),
     opacity var(--motion-short) var(--easing-standard),
-    --ov-held var(--motion-short) var(--easing-standard);
+    --ov-held var(--motion-short) var(--easing-standard),
+    --ov-shrink var(--motion-short) var(--easing-standard);
 }
 
 .ov-win[data-held] {
@@ -493,16 +496,78 @@
   opacity: 1;
 }
 
-/* ── The stage's switches: the mockup's, not the overview's ──────────────────────────────────── */
+/* ── The tip and the delete zone ─────────────────────────────────────────────────────────────── */
 
-.ov-switches {
+/* The tip on the frame's glass, as the numbers are, so its line reads on any picture: centred down
+   the bottom margin, under every miniature. It comes and goes with the miniatures. */
+.ov-tip {
   position: absolute;
-  left: var(--space-s16);
-  bottom: var(--space-s8);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-s16);
-  z-index: 2;
+  left: 0;
+  top: 0;
+  display: block;
+  padding: var(--space-s4) var(--space-s12);
+  border-radius: var(--radius-control);
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+  translate: var(--ov-x) calc(var(--ov-y) - 50%);
+  opacity: 0;
+  transition: opacity var(--motion-medium) var(--easing-standard);
+}
+
+.ov[data-open] .ov-tip {
+  opacity: 1;
+  transition-delay: var(--motion-medium);
+}
+
+/* The delete zone: in the corner while something is carried, or while a deletion waits. It rises
+   `space.s24` into place and fades in over `medium`, and leaves the same way, faster. */
+.ov-bin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--ov-w);
+  border-radius: var(--radius-content);
+  translate: var(--ov-x) calc(var(--ov-y) + var(--space-s24));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    translate var(--motion-short) var(--easing-emphasized_accel),
+    opacity var(--motion-short) var(--easing-emphasized_accel);
+}
+
+.ov-bin[data-shown] {
+  translate: var(--ov-x) var(--ov-y);
+  opacity: 1;
+  transition:
+    translate var(--motion-medium) var(--easing-emphasized_decel),
+    opacity var(--motion-medium) var(--easing-emphasized_decel),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear);
+}
+
+.ov-bin[data-pending] {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* A thing gone into the zone: it shrinks into its symbol as it fades, over `medium`. */
+.ov-win[data-binned],
+.ov-ws[data-binned] {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    --ov-tx var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-ty var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-sx var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-sy var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear),
+    opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+/* A still sample: every value is drawn where it is set, nothing glides to it. */
+.ov[data-still],
+.ov[data-still] * {
+  transition: none !important;
 }
 
 /* ── Reduced motion: places change at once, only fades play ──────────────────────────────────── */

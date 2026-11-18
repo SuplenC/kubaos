@@ -189,7 +189,7 @@ export interface Content {
 }
 
 /** A duration token's name. */
-export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene" | "recolour" | "settle" | "strike" | "caret_glow" | "caret_hold" | "caret_fade" | "peak_hold" | "peak_fall" | "hum" | "swap_lag" | "swap_fade" | "hold" | "marquee_hold" | "marquee_pace";
+export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene" | "recolour" | "settle" | "strike" | "caret_glow" | "caret_hold" | "caret_fade" | "peak_hold" | "peak_fall" | "hum" | "swap_lag" | "swap_fade" | "hold" | "marquee_hold" | "marquee_pace" | "undo";
 /** An easing token's name. */
 export type Easing =
   | "standard"
@@ -347,12 +347,29 @@ export interface Code {
 }
 
 /**
+ * A choice of the world the live sample is drawn in that isn't the part's own: which screens are
+ * plugged in. The stage draws it in its bar, at the site's size, and draws Live again in it.
+ */
+export interface Switch {
+  readonly label: Label;
+  readonly choices: NonEmpty<Label>;
+}
+
+/** The worlds Live can be drawn in, and Live drawn in each switch's pick, by its place; the first at first. */
+export interface Switches {
+  readonly each: NonEmpty<Switch>;
+  readonly live: (picked: readonly number[]) => Element;
+}
+
+/**
  * The stage, which leads the page: the thing itself, live and large, by night and by day, under a
  * bar of the states' chips with a hint on how to try it. The panes stand side by side where the
  * sample fits half the stage, else one under the other.
  */
 export interface Stage {
   readonly live: Sample;
+  /** The worlds Live can be drawn in, each a row of chips in the bar while Live is shown. */
+  readonly switches?: Switches;
   /** How to try the live sample, a few words: click it, or Tab and ↓. */
   readonly hint: Cell;
   /** The day pane, or why it doesn't apply: a lock drawn in its wallpaper's night scheme. */

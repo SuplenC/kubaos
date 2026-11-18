@@ -312,6 +312,72 @@ export function go(desk: Desk, space: string): Change {
   return { added: [], removed: sweep(desk), closed: [] };
 }
 
+// ── Deleting with a way back ──────────────────────────────────────────────────────────────────
+
+/**
+ * A window or a workspace dropped on the delete zone: out of the overview, but kept as it was until
+ * its timer ends, so undoing it never reopens an app. A workspace keeps its windows with it.
+ */
+export type Taken =
+  | { readonly kind: "window"; readonly window: string; readonly space: Space; readonly group: string; readonly spaceIndex: number; readonly index: number }
+  | { readonly kind: "space"; readonly space: Space; readonly group: string; readonly index: number };
+
+/** Takes `what` out of the overview into the delete zone. A screen left showing nothing shows a neighbour. */
+export function take(desk: Desk, what: { readonly window: string } | { readonly space: string }): { taken: Taken; change: Change } {
+  if ("window" in what) {
+    const space = spaceOf(desk, what.window);
+    const group = groupOf(desk, space.id);
+    const taken: Taken = { kind: "window", window: what.window, space, group: group.id, spaceIndex: group.spaces.indexOf(space.id), index: space.windows.indexOf(what.window) };
+    space.windows = space.windows.filter((each) => each !== what.window);
+    if (space.focused === what.window) space.focused = space.windows.at(-1) ?? null;
+    return { taken, change: { added: [], removed: sweep(desk), closed: [] } };
+  }
+  const space = desk.spaces.get(what.space)!;
+  const group = groupOf(desk, what.space);
+  const taken: Taken = { kind: "space", space, group: group.id, index: group.spaces.indexOf(what.space) };
+  const holder = holderOf(desk, group);
+  group.spaces = group.spaces.filter((each) => each !== what.space);
+  desk.spaces.delete(what.space);
+  const added: string[] = [];
+  if (desk.shown.get(holder.id) === what.space) {
+    let next = groupsOn(desk, holder).flatMap((each) => each.spaces)[0];
+    if (next === undefined) {
+      const fresh: Space = { id: freshSpace(desk), windows: [], focused: null };
+      desk.spaces.set(fresh.id, fresh);
+      group.spaces.push(fresh.id);
+      added.push(fresh.id);
+      next = fresh.id;
+    }
+    desk.shown.set(holder.id, next);
+  }
+  return { taken, change: { added, removed: [what.space, ...sweep(desk)], closed: [] } };
+}
+
+/** Puts a taken thing back where it was: a window on its workspace, made again if it had gone. */
+export function restore(desk: Desk, taken: Taken): Change {
+  const group = groupById(desk, taken.group);
+  const added: string[] = [];
+  let space = desk.spaces.get(taken.space.id);
+  if (!space) {
+    space = taken.kind === "space" ? taken.space : { id: taken.space.id, windows: [], focused: null };
+    desk.spaces.set(space.id, space);
+    group.spaces.splice(Math.min(taken.kind === "space" ? taken.index : taken.spaceIndex, group.spaces.length), 0, space.id);
+    added.push(space.id);
+  }
+  if (taken.kind === "window") {
+    space.windows.splice(Math.min(taken.index, space.windows.length), 0, taken.window);
+    space.focused = taken.window;
+  }
+  return { added, removed: sweep(desk), closed: [] };
+}
+
+/** The timer has ended: the windows taken close for real. */
+export function forget(desk: Desk, taken: Taken): readonly string[] {
+  const closed = taken.kind === "window" ? [taken.window] : [...taken.space.windows];
+  for (const window of closed) desk.windows.delete(window);
+  return closed;
+}
+
 // ── The samples ───────────────────────────────────────────────────────────────────────────────
 
 interface Seed {

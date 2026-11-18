@@ -438,6 +438,29 @@ body {
   text-align: right;
 }
 
+.page-stage-bar:has(> .page-stage-switches:not([hidden])) {
+  flex-wrap: wrap;
+}
+
+/* The world Live is drawn in: a row of its own under the chips, each switch named before its chips. */
+.page-stage-switches {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s12) var(--space-s32);
+}
+
+.page-stage-switches[hidden] {
+  display: none;
+}
+
+.page-stage-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s12);
+}
+
 .page-hero > .page-na {
   padding: var(--space-s12) var(--space-s16);
   border-top: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
