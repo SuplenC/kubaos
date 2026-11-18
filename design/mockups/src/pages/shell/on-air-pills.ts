@@ -6,10 +6,11 @@
 import type { Shown as ControlShown } from "../../lib/control.ts";
 import { hint } from "../../lib/hint.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { lights, powerMoves, press } from "../../site/moves.ts";
+import { pillChanging } from "../../lib/pill.ts";
+import { lights, pillSwap, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
 import { mutePill } from "./bar-audio-parts.ts";
-import { barStrip, bellPill, type CameraUse, cameraPill, EVERYDAY, ON_AIR_WORDS, type Share, sharingPill, statusPill } from "./bar-parts.ts";
+import { barStrip, bellPill, type CameraUse, cameraPill, EVERYDAY, ON_AIR_WORDS, onAirOptions, type Share, sharingContent, sharingPill, statusPill } from "./bar-parts.ts";
 import { SCREEN_WIDTH } from "./screen-parts.ts";
 import { CAMERAS, cameraPanel, cameraShot, NO_ICON, onCorner, SHARES, sharingPanel, sharingShot } from "./sharing-parts.ts";
 
@@ -80,17 +81,15 @@ function live(): HTMLElement {
 
 const PILL = ".shell-on-air";
 
-/** A pill drawn with its room shut, so its arrival opens it: its width eased from nothing to a circle's. */
-function shutPill(make: () => HTMLElement): () => HTMLElement {
-  return () => {
-    const made = make();
-    made.style.setProperty("--from", "0px");
-    made.style.setProperty("--to", "var(--size-control_sm)");
-    return row("s8", "centre", made, mutePill({ input: { recording: true } }), bellPill(), statusPill());
-  };
+/** A pill beside the bar's right end, as it stands while it arrives or leaves. */
+function besideEnd(make: () => HTMLElement): () => HTMLElement {
+  return () => row("s8", "centre", make(), mutePill({ input: { recording: true } }), bellPill(), statusPill());
 }
 
-/** The room opening, the pill striking on, then lit for a beat so the eye finds it, and back to rest. */
+/**
+ * The pill striking on where it stands, then lit for a beat so the eye finds it, and back to rest.
+ * The bar's right side is laid from its end, so the pill takes its room at once and moves no other.
+ */
 function arrival(power: Strike | Easing, reduced: boolean): NonEmpty<Track> {
   if (reduced) {
     return [
@@ -100,53 +99,42 @@ function arrival(power: Strike | Easing, reduced: boolean): NonEmpty<Track> {
     ];
   }
   return [
-    { part: "the room", on: "the pill", target: PILL, property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
-    { part: "the power", on: "the pill", target: PILL, property: "opacity", from: 0, to: 1, duration: "medium", cue: "medium", curve: power },
-    { part: "the beat lit", on: "the pill", target: PILL, property: "--lit", from: 0, to: 1, duration: "short", cue: ["medium", "medium"], curve: "standard" },
-    { part: "the beat lit", on: "the pill", target: PILL, property: "--lit", from: 1, to: 0, duration: "long", cue: ["medium", "medium", "short", "scene"], curve: "standard" },
+    { part: "the power", on: "the pill", target: PILL, property: "opacity", from: 0, to: 1, duration: "medium", curve: power },
+    { part: "the beat lit", on: "the pill", target: PILL, property: "--lit", from: 0, to: 1, duration: "short", cue: "medium", curve: "standard" },
+    { part: "the beat lit", on: "the pill", target: PILL, property: "--lit", from: 1, to: 0, duration: "long", cue: ["medium", "short", "scene"], curve: "standard" },
   ];
 }
 
 function departure(power: Strike | Easing, reduced: boolean): NonEmpty<Track> {
-  if (reduced) return [{ part: "the pill", on: "the pill", target: PILL, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }];
-  return [
-    { part: "the power", on: "the pill", target: PILL, property: "opacity", from: 1, to: 0, duration: "medium", curve: power },
-    { part: "the room", on: "the pill", target: PILL, property: "--grown", from: 1, to: 0, duration: "medium", cue: "medium", curve: "standard_accel" },
-  ];
+  return [{ part: "the power", on: "the pill", target: PILL, property: "opacity", from: 1, to: 0, duration: reduced ? "short" : "medium", curve: power }];
 }
 
 /** Only easings: what reduced motion and the flicker off play. */
 const eased = (tracks: NonEmpty<Track>) => tracks as NonEmpty<Track<Easing>>;
 
 function arrives(name: string, what: string, make: () => HTMLElement): Move {
-  return { name, what, tracks: arrival("neon.strike", false), reduced: eased(arrival("standard", true)), unflickered: eased(arrival("standard", false)), back: "cuts", sample: shutPill(make) };
+  return { name, what, tracks: arrival("neon.strike", false), reduced: eased(arrival("standard", true)), unflickered: eased(arrival("standard", false)), back: "cuts", sample: besideEnd(make) };
 }
 
 function leaves(name: string, make: () => HTMLElement): Move {
   return {
     name,
-    what: "Stopped or closed: the pill flickers out, then its room closes; the pills beyond it stay put.",
+    what: "Stopped or closed: the pill flickers out; the pills beyond it stay put.",
     tracks: departure("neon.strike.reversed", false),
     reduced: eased(departure("standard", true)),
     unflickered: eased(departure("standard", false)),
     back: "cuts",
-    sample: shutPill(make),
+    sample: besideEnd(make),
   };
 }
 
-/** A second share arriving: the pill eases wider for its count, as any pill whose words widen. */
+/** A second share: the symbol stays solid and the count fades in, in its own room, as any pill's content changes. */
 const COUNTED: Move = {
   name: "A second share",
-  what: "The count joins the symbol; the pill eases to its new width over `medium`.",
-  tracks: [{ part: "the width", on: "the sharing pill", target: PILL, property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
-  reduced: [{ part: "the width", on: "the sharing pill", target: PILL, property: "--grown", from: 0, to: 1, duration: "instant", curve: "standard_decel" }],
+  what: "The symbol stays; the count fades in as its room opens, over `medium`.",
+  ...pillSwap("the sharing pill", "in"),
   back: "plays",
-  sample: () => {
-    const made = sharingPill(TWO_SHARES);
-    made.style.setProperty("--from", "var(--size-control_sm)");
-    made.style.setProperty("--to", "calc(var(--size-control_sm) + var(--space-s16))");
-    return made;
-  },
+  sample: () => pillChanging({ ...onAirOptions("sharing"), interactive: true }, sharingContent(SHARES.screen), sharingContent(TWO_SHARES)),
 };
 
 type State = "rest" | "lit" | "pressed" | "open";
@@ -176,7 +164,7 @@ export default page<State>({
   ],
   sizes: [
     { name: "A pill, one", for: "a circle a pill tall", sample: () => sharingPill(SHARES.screen) },
-    { name: "A pill, counted", for: "symbol and count, `space.s12` at the ends", sample: () => sharingPill(TWO_SHARES) },
+    { name: "A pill, counted", for: "symbol and count, `space.s8` at the ends still", sample: () => sharingPill(TWO_SHARES) },
     { name: "A panel", for: "`size.panel` wide, as every panel", sample: screen(() => sharingShot()) },
   ],
   groups: [
@@ -276,8 +264,7 @@ export default page<State>({
     ]),
     measures: [
       { part: "Pill's height", token: "size-control_sm" },
-      { part: "Pill's ends, alone", token: "space-s8" },
-      { part: "Pill's ends, counted", token: "space-s12" },
+      { part: "Pill's ends, alone or counted", token: "space-s8" },
       { part: "Symbol to count", token: "space-s4" },
       { part: "Panel's width", token: "size-panel" },
       { part: "Between cards", token: "space-s16" },

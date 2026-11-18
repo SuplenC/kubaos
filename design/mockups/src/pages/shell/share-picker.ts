@@ -77,10 +77,6 @@ function live(): HTMLElement {
   const share = (picked: Lit) => {
     if (picked.kind === "none") return;
     const shown = picking({ lit: picked, pill: true });
-    for (const pill of shown.querySelectorAll<HTMLElement>(".shell-on-air")) {
-      pill.style.setProperty("--from", "0px");
-      pill.style.setProperty("--to", "var(--size-control_sm)");
-    }
     again(shown);
     if (!ALL) playShared(shown);
   };
@@ -151,26 +147,20 @@ function onAir(power: Strike | Easing, reduced: boolean): NonEmpty<Track> {
     { part: "the label", on: "the window", target: ".share-pick-label", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
     { part: BARS, on: "every screen", target: ".share-pick-bar", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the pill's room", on: "every bar", target: pill, property: "--grown", from: 0, to: 1, duration: "medium", cue: "medium", curve: "standard_decel" },
-    { part: "the pill's power", on: "every bar", target: pill, property: "opacity", from: 0, to: 1, duration: "medium", cue: ["medium", "medium"], curve: power },
-    { part: "the pill's beat lit", on: "every bar", target: pill, property: "--lit", from: 0, to: 1, duration: "short", cue: ["medium", "medium", "medium"], curve: "standard" },
-    { part: "the pill's beat lit", on: "every bar", target: pill, property: "--lit", from: 1, to: 0, duration: "long", cue: ["medium", "medium", "medium", "short", "scene"], curve: "standard" },
+    { part: "the pill's power", on: "every bar", target: pill, property: "opacity", from: 0, to: 1, duration: "medium", cue: "medium", curve: power },
+    { part: "the pill's beat lit", on: "every bar", target: pill, property: "--lit", from: 0, to: 1, duration: "short", cue: ["medium", "medium"], curve: "standard" },
+    { part: "the pill's beat lit", on: "every bar", target: pill, property: "--lit", from: 1, to: 0, duration: "long", cue: ["medium", "medium", "short", "scene"], curve: "standard" },
   ];
 }
 
-/** Picking with a window lit and the pill shut in every bar: what the move to sharing plays on. */
+/** Picking with a window lit and the pill in every bar: what the move to sharing plays on, the pill out at its start. */
 function aboutToShare(): HTMLElement {
-  const shown = both({ lit: { kind: "window", screen: 0, index: 1 }, pill: true });
-  for (const pill of shown.querySelectorAll<HTMLElement>(".shell-on-air")) {
-    pill.style.setProperty("--from", "0px");
-    pill.style.setProperty("--to", "var(--size-control_sm)");
-  }
-  return shown;
+  return both({ lit: { kind: "window", screen: 0, index: 1 }, pill: true });
 }
 
 const SHARED: Move = {
   name: "Picked, then on air",
-  what: "A click: the label, bars and dim go; the violet edge stays; the pill opens, strikes and burns a beat.",
+  what: "A click: the label, bars and dim go; the violet edge stays; the pill strikes on and burns a beat.",
   tracks: onAir("neon.strike", false),
   reduced: onAir("standard", true) as NonEmpty<Track<Easing>>,
   unflickered: onAir("standard", false) as NonEmpty<Track<Easing>>,

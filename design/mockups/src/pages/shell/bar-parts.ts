@@ -228,30 +228,57 @@ const COUNT = new Intl.NumberFormat("en-GB");
 type OneOrMore<T> = T | readonly T[];
 const all = <T>(each: OneOrMore<T>): readonly T[] => (Array.isArray(each) ? (each as readonly T[]) : [each as T]);
 
+/** Which on-air pill: the screen shared, or the camera in use. */
+export type OnAirTone = "sharing" | "camera";
+
+const ON_AIR_INK: Record<OnAirTone, string> = { sharing: "on_sharing_container", camera: "on_error_container" };
+
 /**
- * An on-air pill: its symbol on its container, in the container's ink, a circle a pill tall; with
- * more than one, the count after the symbol, `space.s12` at each end as any pill with a value.
+ * An on-air pill's content: its symbol, then past one the count, `space.s4` after it as a value
+ * after its symbol. The symbol is the same element either way, so as the count comes and goes the
+ * Pill keeps the symbol solid and only the count fades, in its own room.
  */
-function onAirPill(symbol: string, count: number, tip: string, state: Shown, tone: "sharing" | "camera", ink: string): HTMLElement {
+export function onAirContent(tone: OnAirTone, symbol: string, count: number): Element[] {
+  const ink = ON_AIR_INK[tone];
   const glyph = icon(symbol, "var(--icon-s16)", `var(--color-${ink})`);
-  const content = count > 1 ? [paired(glyph, text(COUNT.format(count), "label_number", ink))] : [glyph];
-  const made = control(content, tip, state, { tone, lone: count === 1 });
+  return count > 1 ? [glyph, text(COUNT.format(count), "label_number", ink)] : [glyph];
+}
+
+/**
+ * An on-air pill's options: on its meaning's container, `space.s8` at each end whether or not a
+ * count is in it, so the count arriving never moves the pill's ends; the gap `space.s4`.
+ */
+export function onAirOptions(tone: OnAirTone): Omit<PillOptions, "content"> {
+  return { tone, lone: false, end: "s8", gap: "s4" };
+}
+
+function onAirPill(tone: OnAirTone, content: Element[], tip: string, state: Shown): HTMLElement {
+  const made = pill({ ...onAirOptions(tone), content, interactive: true, tooltip: tip, ...stateOptions(state) });
   made.classList.add("shell-on-air");
   made.dataset.onAir = tone;
   made.setAttribute("aria-haspopup", "dialog");
   return made;
 }
 
-/**
- * The sharing pill: on `sharing_container`, the kind's symbol in `on_sharing_container`, the
- * screen's where shares of several kinds run, and their count past one. Its hint says what and
- * with whom, for each; a press opens its panel.
- */
-export function sharingPill(shares: OneOrMore<Share>, state: Shown = "rest"): HTMLElement {
+/** The sharing pill's content: the kind's symbol, the screen's where shares of several kinds run, and the count past one. */
+export function sharingContent(shares: OneOrMore<Share>): Element[] {
   const list = all(shares);
   const kinds = new Set(list.map((each) => each.kind));
-  const symbol = SHARE_ICONS[kinds.size === 1 ? list[0]!.kind : "screen"];
-  return onAirPill(symbol, list.length, LISTED.format(list.map((each) => ON_AIR_WORDS.sharing(each.what, each.who))), state, "sharing", "on_sharing_container");
+  return onAirContent("sharing", SHARE_ICONS[kinds.size === 1 ? list[0]!.kind : "screen"], list.length);
+}
+
+/** The camera pill's content: the camera's symbol, and the count past one. */
+export function cameraContent(cameras: OneOrMore<CameraUse>): Element[] {
+  return onAirContent("camera", "video", all(cameras).length);
+}
+
+/**
+ * The sharing pill: on `sharing_container`, the kind's symbol in `on_sharing_container`, and the
+ * count past one. Its hint says what and with whom, for each; a press opens its panel.
+ */
+export function sharingPill(shares: OneOrMore<Share>, state: Shown = "rest"): HTMLElement {
+  const tip = LISTED.format(all(shares).map((each) => ON_AIR_WORDS.sharing(each.what, each.who)));
+  return onAirPill("sharing", sharingContent(shares), tip, state);
 }
 
 /**
@@ -259,8 +286,7 @@ export function sharingPill(shares: OneOrMore<Share>, state: Shown = "rest"): HT
  * screen recording's pill is, and the count past one. Its hint names the app, for each camera.
  */
 export function cameraPill(cameras: OneOrMore<CameraUse>, state: Shown = "rest"): HTMLElement {
-  const list = all(cameras);
-  return onAirPill("video", list.length, LISTED.format(list.map((each) => ON_AIR_WORDS.camera(each.who))), state, "camera", "on_error_container");
+  return onAirPill("camera", cameraContent(cameras), LISTED.format(all(cameras).map((each) => ON_AIR_WORDS.camera(each.who))), state);
 }
 
 /** The on-air pills in their order: the shares, then the cameras. */
