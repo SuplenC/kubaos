@@ -89,11 +89,11 @@ function widestSample(inner: HTMLElement): number {
 const fitting = new Set<() => void>();
 
 /**
- * The least scale side by side may show a sample at and still stand the panes so: a few percent off
- * reads as its own size, and a sample a hair wider than a half-width pane is not worth the stage's
- * whole height twice over.
+ * The least scale side by side may show a sample at and still stand the panes so: a little under
+ * its size still reads as its own size, and a sample somewhat wider than a half-width pane is not
+ * worth the stage's whole height twice over, each pane half empty.
  */
-const SIDE_BY_SIDE_LEAST = 0.95;
+const SIDE_BY_SIDE_LEAST = 0.85;
 
 /** The scale that fits a sample `natural` wide into `room`, 1 where it fits as it is. */
 function fitScale(natural: number, room: number): number {
