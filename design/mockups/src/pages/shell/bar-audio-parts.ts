@@ -1,11 +1,12 @@
 // The bar's audio pills, as `config/quickshell/modules/bar/` is to draw them: the mute pill (the
 // output's and the input's symbols, each a press target that mutes its side, the wheel over it its
-// level, a right-click the Audio panel) and now playing (the active player's icon, which opens the
-// players Menu under it, then previous, play or pause on the accent's fill, next). Each press target
-// is a circle a chip tall in a pill `space.s4` in, `space.s4` apart, lit by its state layer as the
-// tray's circles are; the pill itself takes no tube. Each of the mute pill's circles says where its
-// side stands in a Hint under it while it is lit, as the bar's pills do. The data is the shots'
-// stand-ins'.
+// level, a right-click the Audio panel), on the bar's right, and now playing (the active player's
+// icon, which opens the players Menu under it, the song and its artist in a fixed room, then
+// previous, play or pause on the accent's fill, next), on its left beside the clock. Each press
+// target is a circle a chip tall in a pill `space.s4` in, `space.s4` apart, lit by its state layer
+// as the tray's circles are; the pill itself takes no tube. Each of the mute pill's circles says
+// where its side stands in a Hint under it while it is lit, as the bar's pills do. The data is the
+// shots' stand-ins'.
 
 import "./bar.css";
 import { badgedIcon } from "../../lib/badge.ts";
@@ -13,7 +14,8 @@ import { icon } from "../../lib/icon.ts";
 import { smallInitial } from "../../lib/icon-tile.ts";
 import { withHint } from "../../lib/hint.ts";
 import { type MenuEntry, menu } from "../../lib/menu.ts";
-import { pill } from "../../lib/pill.ts";
+import { marquee, type Marquee, type MarqueePart } from "../../lib/marquee.ts";
+import { makePill, pill } from "../../lib/pill.ts";
 import { popover } from "../../lib/tooltip.ts";
 import discord from "../../assets/apps/discord.svg?url";
 import firefox from "../../assets/apps/firefox.svg?url";
@@ -161,16 +163,33 @@ export const LONG_PLAYER: Player = { app: "Strawberry Music Player (Flatpak)", p
 /** Which circle of now playing is pinned: its icon, previous, play or pause, next. */
 export type PlayingPart = "icon" | "previous" | "play" | "next";
 
+/** What plays: the song's title and its artist, as MPRIS gives them. */
+export interface Song {
+  readonly title: string;
+  readonly artist: string;
+}
+
+/** A song and its artist that fit the room whole, and a pair that runs far past it. */
+export const SONG: Song = { title: "Into the Light", artist: "BerryDeep" };
+export const LONG_SONG: Song = { title: "Everything You Wanted, Nothing You Needed (Live at the Roundhouse)", artist: "The Lanterns" };
+/** Another short one, for a song change. */
+export const NEXT_SONG: Song = { title: "Paper Moons", artist: "Halcyon Drive" };
+
 export interface PlayingOptions {
   readonly players?: readonly Player[];
   /** The active player, by its index. */
   readonly active?: number;
   readonly playing?: boolean;
-  /** Given way in a narrow bar: the icon and play or pause alone. */
-  readonly compact?: boolean;
+  readonly song?: Song;
+  /** Given way in a narrow bar: the icon and the controls, no words. */
+  readonly folded?: boolean;
+  /** The song's words pinned this many `space.s32` along their pass, for a still sample. */
+  readonly scrolled?: number;
   readonly pinned?: { readonly part: PlayingPart; readonly state: CirclePinned };
   readonly onIcon?: () => void;
   readonly onPlay?: () => void;
+  readonly onPrevious?: () => void;
+  readonly onNext?: () => void;
 }
 
 /** An app's picture at the bar's 16, as the tray draws one; with none, the app's initial in its place. */
@@ -183,22 +202,72 @@ function appPicture(player: Player): Element {
   return image;
 }
 
-/** The active player's icon, then previous, play or pause on the accent's fill, next; none with no player. */
-export function nowPlaying(options: PlayingOptions = {}): HTMLElement {
+/** The song in `body` and `on_surface`, then its artist after a middle dot, `on_surface_variant`. */
+export function songParts(song: Song): MarqueePart[] {
+  return [
+    { words: song.title, style: "body", color: "on_surface" },
+    { words: " · ", style: "body", color: "on_surface_variant" },
+    { words: song.artist, style: "body", color: "on_surface_variant" },
+  ];
+}
+
+/** Now playing as it lives: folding and unfolding, a new song, play and pause. */
+export interface NowPlaying {
+  readonly element: HTMLElement;
+  /** Folds it to its controls or opens it to its words, its width easing between the two. */
+  readonly fold: (folded: boolean) => void;
+  readonly change: (song: Song) => void;
+  readonly play: (playing: boolean) => void;
+}
+
+/**
+ * The active player's icon, the song and its artist in a `size.now_playing` room, then previous,
+ * play or pause on the accent's fill, next; folded, the icon and the controls alone. Two widths,
+ * whatever plays. Paused, the words hold at their start.
+ */
+export function makeNowPlaying(options: PlayingOptions = {}): NowPlaying {
   const players = options.players ?? PLAYERS;
   const active = players[options.active ?? 0] ?? players[0]!;
-  const playing = options.playing ?? true;
+  let playing = options.playing ?? true;
+  let folded = options.folded ?? false;
   const pinnedOf = (part: PlayingPart) => (options.pinned?.part === part ? { pinned: options.pinned.state } : {});
   const icon_ = pillCircle(appPicture(active), { label: `Players: ${active.app}`, ...pinnedOf("icon"), ...(options.onIcon ? { onPress: options.onIcon } : {}) });
   icon_.setAttribute("aria-haspopup", "menu");
-  const play = pillCircle(glyph(playing ? "pause" : "play_arrow", "on_primary"), { label: playing ? "Pause" : "Play", filled: true, ...pinnedOf("play"), ...(options.onPlay ? { onPress: options.onPlay } : {}) });
-  const made = circlesPill(
-    options.compact
-      ? [icon_, play]
-      : [icon_, pillCircle(glyph("skip_previous", "on_surface_variant"), { label: "Previous", ...pinnedOf("previous") }), play, pillCircle(glyph("skip_next", "on_surface_variant"), { label: "Next", ...pinnedOf("next") })],
-  );
-  made.classList.add("shell-playing-pill");
-  return made;
+  const playGlyph = () => glyph(playing ? "pause" : "play_arrow", "on_primary");
+  const play = pillCircle(playGlyph(), { label: playing ? "Pause" : "Play", filled: true, ...pinnedOf("play"), ...(options.onPlay ? { onPress: options.onPlay } : {}) });
+  const previous = pillCircle(glyph("skip_previous", "on_surface_variant"), { label: "Previous", ...pinnedOf("previous"), ...(options.onPrevious ? { onPress: options.onPrevious } : {}) });
+  const next = pillCircle(glyph("skip_next", "on_surface_variant"), { label: "Next", ...pinnedOf("next"), ...(options.onNext ? { onPress: options.onNext } : {}) });
+  const words: Marquee = marquee({
+    parts: songParts(options.song ?? SONG),
+    room: "now_playing",
+    held: !playing,
+    ...(options.scrolled === undefined ? {} : { pinned: options.scrolled }),
+  });
+  const content = () => (folded ? [icon_, previous, play, next] : [icon_, words.element, previous, play, next]);
+  const made = makePill({ lone: false, end: "s4", gap: "s4", content: content() });
+  made.element.classList.add("shell-audio-pill", "shell-playing-pill");
+  made.element.toggleAttribute("data-folded", folded);
+  return {
+    element: made.element,
+    fold: (next_) => {
+      if (next_ === folded) return;
+      folded = next_;
+      made.element.toggleAttribute("data-folded", folded);
+      made.change(content());
+    },
+    change: (song) => words.change(songParts(song)),
+    play: (next_) => {
+      playing = next_;
+      play.replaceChildren(playGlyph());
+      play.setAttribute("aria-label", playing ? "Pause" : "Play");
+      words.hold(!playing);
+    },
+  };
+}
+
+/** Now playing as a still element: see `makeNowPlaying`. */
+export function nowPlaying(options: PlayingOptions = {}): HTMLElement {
+  return makeNowPlaying(options).element;
 }
 
 /** The players Menu's entries: every player with its icon, the active one checked, then Show <app>. */
@@ -233,12 +302,12 @@ export function playersMenu(options: PlayersMenuOptions = {}): { readonly card: 
  * Now playing with its players Menu open `space.s12` under the icon's circle, its start on the
  * circle's, the icon pinned pressed and the keyboard on the item `current`: the active one.
  */
-export function nowPlayingOpen(options: { players?: readonly Player[]; active?: number; current?: number; playing?: boolean } = {}): HTMLElement {
+export function nowPlayingOpen(options: { players?: readonly Player[]; active?: number; current?: number; playing?: boolean; folded?: boolean } = {}): HTMLElement {
   const players = options.players ?? PLAYERS;
   const active = options.active ?? 0;
   const room = document.createElement("span");
   room.className = "shell-tray-room";
-  const bar = nowPlaying({ players, active, playing: options.playing ?? true, pinned: { part: "icon", state: "lit" } });
+  const bar = nowPlaying({ players, active, playing: options.playing ?? true, folded: options.folded ?? false, pinned: { part: "icon", state: "lit" } });
   const { card } = playersMenu({ players, active, current: options.current ?? active });
   room.append(bar, card);
   requestAnimationFrame(() => {

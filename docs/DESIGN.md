@@ -442,6 +442,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Keycap, KeyHints and KeyPrompt](design/components/keycap.md)
 - [Shortcuts](design/components/shortcuts.md)
 - [RollingNumber](design/components/rolling-number.md)
+- [Marquee](design/components/marquee.md)
 
 **Inputs**
 

@@ -27,6 +27,11 @@
   flex: 0 1 auto;
 }
 
+/* Now playing ends the left, beside the clock, the title between the pills and it. */
+.shell-bar-left > .shell-playing-pill {
+  margin-left: auto;
+}
+
 .shell-bar-right {
   display: flex;
   align-items: center;
@@ -150,6 +155,12 @@
   background:
     linear-gradient(rgb(from var(--color-on_primary) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0))), rgb(from var(--color-on_primary) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0)))),
     var(--color-primary);
+}
+
+/* The song's room, `space.s4` more each side than the pill's gap, so its words stand `space.s12`
+   from the icon's picture, as a pill's words stand from its curve. */
+.shell-playing-pill .k-marquee {
+  margin-inline: var(--space-s4);
 }
 
 /* A symbol with the microphone's dot takes the dot's overhang on both sides: inside its circle. */
