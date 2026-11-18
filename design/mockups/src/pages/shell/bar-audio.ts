@@ -27,18 +27,13 @@ import {
   type Song,
   songParts,
 } from "./bar-audio-parts.ts";
-import { bellPill, clockPill, statusPill } from "./bar-parts.ts";
+import { bellPill, statusPill } from "./bar-parts.ts";
 
 type State = "rest" | "lit" | "pressed" | "open";
 
 /** The bar's right end: the mute pill, the bell, status. */
 function end(mute: MuteOptions = {}): HTMLElement {
   return row("s8", "centre", mutePill(mute), bellPill(), statusPill());
-}
-
-/** Now playing at the left's end, `space.s40` clear of the clock, as the bar lays them. */
-function besideClock(playing: Parameters<typeof nowPlaying>[0] = {}): HTMLElement {
-  return row("s40", "centre", nowPlaying(playing), clockPill());
 }
 
 /** Opens the Audio panel's page, as a press on a side with no device opens the panel. */
@@ -62,10 +57,11 @@ function hinted(mute: MuteOptions, words: string): HTMLElement {
 const SONGS: readonly Song[] = [SONG, LONG_SONG, NEXT_SONG];
 
 /**
- * The stage: each circle does what it will. Now playing beside the clock: its icon opens the players
- * Menu, whose pick makes that player active; play and pause turn, the words holding while paused;
- * ⏮ and ⏭ change the song in its fixed room. On the right, the output's and the mic's mute; the
- * wheel over one changes its level, its symbol following; a right-click opens the Audio panel's page.
+ * The stage: each circle does what it will. Now playing, which the Bar page sets beside the clock:
+ * its icon opens the players Menu, whose pick makes that player active; play and pause turn, the
+ * words holding while paused; ⏮ and ⏭ change the song in its fixed room. Then the mute pill: the
+ * output's and the mic's mute; the wheel over one changes its level, its symbol following; a
+ * right-click opens the Audio panel's page.
  */
 function live(): HTMLElement {
   const room = document.createElement("span");
@@ -163,7 +159,7 @@ function live(): HTMLElement {
       },
       { passive: false },
     );
-    line.replaceChildren(row("s40", "centre", np.element, clockPill()), mp, bellPill(), statusPill());
+    line.replaceChildren(np.element, mp, bellPill(), statusPill());
   }
   draw();
   return room;
@@ -268,7 +264,6 @@ export default page<State>({
     { name: "Paused", for: "play on the fill; the words hold still", sample: () => nowPlaying({ playing: false, song: LONG_SONG }) },
     { name: "A long song", for: "scrolling in its fixed room", sample: () => nowPlaying({ song: LONG_SONG }) },
     { name: "A long song, mid-scroll", for: "cut at both ends, both faded", sample: () => nowPlaying({ song: LONG_SONG, scrolled: 3 }) },
-    { name: "Beside the clock", for: "the left's end, `space.s40` clear", sample: () => besideClock() },
     { name: "The right's end", for: "mute, bell, status", sample: () => end({ input: { recording: true } }) },
   ],
   sizes: [

@@ -83,7 +83,7 @@ export default page({
   title: "Pill",
   lede: "A group in the bar: symbols and short words side by side in a pill, the shell's alone.",
   code: { qml: "Pill", unbuilt: "QML only; neon not built yet" },
-  stage: { live, hint: "point at one; press PL to see it ease", daylight: true },
+  stage: { live, hint: "point at one; press PL to see it change", daylight: true },
   variants: nonEmpty(TONES.map(({ name, tone, for: what, content }) => ({ name, for: what, sample: () => pill({ content: content(), lone: false, tone }) }))),
   sizes: [
     { name: "Symbols and words", for: "`space.s12` at each end", sample: () => pill({ content: STATUS(), lone: false }) },
