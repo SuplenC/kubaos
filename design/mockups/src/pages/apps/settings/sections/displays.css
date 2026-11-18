@@ -1,0 +1,10 @@
+/* Displays' organisms (`displays-parts.ts`). */
+
+/* The canvas as a sub-section's part: across the page, `aspect.canvas` of its width tall, as
+   CanvasPage draws it under `size.canvas_wide`, and never so short that its screens have no room
+   between its bands: at least a menu's height. */
+.dp-canvas.k-cv {
+  aspect-ratio: var(--aspect-canvas);
+  min-height: var(--size-menu);
+}
+

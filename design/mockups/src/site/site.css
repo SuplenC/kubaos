@@ -356,8 +356,9 @@ body {
   --panes: 2;
 }
 
-/* A stage of whole screens stands its panes one under the other, each across the stage, so they
-   are drawn about twice as large as side by side; the night pane above takes both top corners. */
+/* A stage of whole screens or of apps' windows stands its panes one under the other, each across
+   the stage, so they are drawn about twice as large as side by side; the night pane above takes
+   both top corners. */
 .page-hero[data-screen] .page-panes {
   grid-template-columns: minmax(0, 1fr);
 }

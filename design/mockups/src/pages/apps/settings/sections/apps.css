@@ -1,0 +1,6 @@
+/* Apps & updates' organisms (`apps-parts.ts`). */
+
+/* What the update last said, under its bar: one line, cut at its end. */
+.ap-said {
+  max-width: 100%;
+}

@@ -1,0 +1,71 @@
+/* The Settings app's organisms (`settings-parts.ts`). */
+
+/* A setting's control at its row's end, in one column the width of a menu, so the controls of a
+   page line up whatever their words, and a select's open list is a menu wide. */
+.st-control {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  width: var(--size-menu);
+}
+
+.st-control > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* A switch keeps its own width at the column's end. */
+.st-control > .k-switch {
+  flex: none;
+}
+
+/* Back sits at the sub-page's start, its words in line with the page's. */
+.st-back {
+  align-self: flex-start;
+}
+
+/* A row whose select is open stands over the rows after it, so its list covers their controls. */
+.k-list-row:has(.st-control [aria-expanded="true"]) {
+  z-index: 3;
+}
+
+/* A setting's reset (`settings-parts.ts`): a held Text sm IconButton in a room of its own, kept while
+   it is gone so the control beside it never moves. It fades out over `short` on `standard` once there
+   is nothing to put back, and in again when there is. */
+.st-reset {
+  display: flex;
+  flex: none;
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    visibility var(--motion-short) var(--easing-standard);
+}
+
+.st-reset[data-gone] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* A row too narrow for its name beside its control (`fit` in `settings-parts.ts`): the words take
+   the first line, and the control, its reset before it, a line of its own under them at the row's
+   end, `space.s8` below; the row grows to hold both, `space.s8` above and below. */
+.k-list-row[data-stacked] {
+  height: auto;
+  padding-block: var(--space-s8);
+}
+
+.k-list-row[data-stacked] > .k-row:first-child {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-s8);
+}
+
+/* The words across the row; the second line, a reset and the control, at its end. */
+.k-list-row[data-stacked] > .k-row:first-child > :first-child {
+  align-self: stretch;
+}
+
+/* A stacked row's tip comes after its control's line, `space.s8` under it as that line is under the
+   words. */
+.k-list-row[data-stacked] > .k-list-tip {
+  margin-top: var(--space-s8);
+}
