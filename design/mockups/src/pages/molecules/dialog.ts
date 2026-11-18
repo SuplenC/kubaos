@@ -8,9 +8,11 @@
 
 import { button } from "../../lib/button.ts";
 import type { Words } from "../../lib/content.ts";
-import { centreIn, type DialogOptions, dialog, scrim } from "../../lib/dialog.ts";
+import { centreIn, type DialogOptions, dialog, dialogOver, scrim } from "../../lib/dialog.ts";
+import { list } from "../../lib/list.ts";
+import { still as window } from "../templates/window.ts";
 import { field, labelled } from "../../lib/field.ts";
-import { row } from "../../lib/layout.ts";
+import { page as pageOf, row } from "../../lib/layout.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
 const TITLE: Words = { short: "Restart now?", long: "Restart now to finish installing the updates you downloaded?" };
@@ -209,6 +211,20 @@ const LEAVES: Move = {
   sample: () => still(QUESTION),
 };
 
+/** An app's window at its least, its rows behind the question it asks over itself. */
+function overWindow(): HTMLElement {
+  const frame = window(
+    pageOf(
+      list([
+        { title: "Samsung SSD 990 PRO", subtitle: "nvme0n1, 2 TB, Windows 11", opens: true },
+        { title: "Install beside Windows", subtitle: "KubaOS takes the free space and leaves the rest", toggle: false },
+      ]),
+    ),
+  );
+  dialogOver(frame, DANGER, () => {}, true);
+  return frame;
+}
+
 export default page({
   level: "molecules",
   slug: "dialog",
@@ -225,6 +241,7 @@ export default page({
     { name: "Short", for: "keeps its least height, `aspect.dialog`", sample: () => still(SHORT) },
     { name: "Long", for: "its middle scrolls; title and buttons stay", sample: () => capped(LONG, 0.5) },
     { name: "Danger", for: "before destroying: `error` edge, the keyboard on Cancel", sample: () => still(DANGER) },
+    { name: "Over an app's window", for: "the scrim to the window's corners, the rest out of reach", sample: overWindow },
     { name: "A prompt", for: "what only you can type", sample: () => still(prompt()) },
     { name: "A prompt, answered wrong", for: "the field Invalid; the dialog and keyboard stay", sample: () => still(prompt(true)) },
     { name: "Waiting", for: "the action disabled until it can be taken", sample: () => still(prompt(false, true)) },

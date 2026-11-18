@@ -283,8 +283,9 @@ export default page({
       { name: "No stops", for: "no dots, the value anywhere", sample: () => boxed(volume()) },
       { name: "Two stops", for: "the fewest: each end", sample: () => boxed({ icon: "bedtime", stops: 2, index: 0, names: ["Off", "On"] }) },
       { name: "Five stops", for: "the power profiles", sample: () => boxed(profiles()) },
-      { name: "Many stops", for: "dots too close to icon, label or fill aren't drawn", sample: () => boxed({ icon: "brightness_medium", stops: 11, index: 6 }) },
       { name: "Knob at either end", for: "it covers the icon, or the words", sample: () => within(ROOM, stack("s16", "start", slider(balance("Regular", { value: 0 })), slider(balance("Regular", { value: 1 })))) },
+      { name: "Eight stops", for: "the most that draw dots", sample: () => boxed({ icon: "brightness_medium", stops: 8, index: 5 }) },
+      { name: "More than eight stops", for: "no dots, no mark: a plain slider that settles on stops", sample: () => boxed({ icon: "brightness_medium", stops: 11, index: 6 }) },
     ],
   },
   motion: {

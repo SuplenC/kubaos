@@ -46,7 +46,8 @@ import { divider, filling, gap, row, stack } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
 import { captionedBar, progressBar } from "./progress.ts";
 import { markup, text, wrapped } from "./text.ts";
-import { length } from "./tokens.ts";
+import { settings } from "../site/settings.ts";
+import { length, raw } from "./tokens.ts";
 
 export type { Action, Tone } from "./button-bar.ts";
 
@@ -273,4 +274,57 @@ export function scrim(...content: Element[]): HTMLElement {
 export function centreIn(room: HTMLElement, shown: HTMLElement): void {
   shown.style.left = `${Math.floor((room.clientWidth - shown.offsetWidth) / 2)}px`;
   shown.style.top = `${Math.floor((room.clientHeight - shown.offsetHeight) / 2)}px`;
+}
+
+/** A dialog laid over a window, and how to answer it from outside, as a timer that runs out does. */
+export interface DialogOver {
+  readonly room: HTMLElement;
+  readonly dialog: Dialog;
+  /** Answers it as its button labelled `answer` would, or "Esc". */
+  readonly answer: (answer: string) => void;
+}
+
+/**
+ * `options`' dialog over the window `frame`, as an app asks a question of its own: the scrim across
+ * the whole window to its rounded edge and the dialog centred in it, on whole device pixels as the
+ * window resizes, and everything else the window holds out of the keyboard's reach until it is
+ * answered. Answered, both fade out, the keyboard goes back where it was, and `answered` hears the
+ * button's label, or "Esc". Drawn `still`, it is already there with the keyboard where it lands: a
+ * sample's picture.
+ */
+export function dialogOver(frame: HTMLElement, options: DialogOptions, answered: (answer: string) => void, still = false): DialogOver {
+  const room = document.createElement("span");
+  room.className = "k-dialog-room";
+  room.dataset.live = "";
+  room.dataset.over = "";
+  const dim = scrim();
+  const asked = dialog(still ? { ...options, landed: true } : options);
+  room.append(dim, asked.element);
+  if (still) for (const each of [dim, asked.element]) each.dataset.atRest = "";
+  const behind = [...frame.children].filter((each): each is HTMLElement => each instanceof HTMLElement);
+  for (const each of behind) each.inert = true;
+  frame.append(room);
+  // The room has no size until it is on the page, and its size follows the window's.
+  const centring = new ResizeObserver(() => centreIn(room, asked.element));
+  centring.observe(room);
+  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  let done = false;
+  const answer = (said: string) => {
+    if (done) return;
+    done = true;
+    centring.disconnect();
+    for (const each of behind) each.inert = false;
+    for (const each of [dim, asked.element]) each.dataset.leaving = "";
+    // Gone once it has faded, or at once where nothing fades.
+    const gone = () => room.remove();
+    asked.element.addEventListener("transitionend", (event) => {
+      if (event.propertyName === "opacity") gone();
+    });
+    setTimeout(gone, Number.parseFloat(raw("duration-medium")) / settings().speed);
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+    answered(said);
+  };
+  asked.onAnswer = answer;
+  if (!still) requestAnimationFrame(() => asked.land());
+  return { room, dialog: asked, answer };
 }

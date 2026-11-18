@@ -23,7 +23,8 @@
 //
 // Steps show as dots on both sides of the fill, each in its side's colour; the mark the value rests
 // on, a stop or a sticky point it holds at, turns solid and pops in. No dot is drawn under the icon
-// or the label, `space.s4` clear of each.
+// or the label, `space.s4` clear of each. A slider of more than eight stops draws neither dots nor
+// the resting mark: it still settles on its stops, and reads as a plain slider.
 //
 // It is a control in the state model (`.k-control` in `lib.css`): lit under the pointer or with the
 // keyboard on it, its fill brightening by `opacity.press` toward the palette's bright end, the tube
@@ -40,6 +41,9 @@ import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
 import { advance, centreFor, shaped, text, type TypeStyle, typeset } from "./text.ts";
 import { length, raw } from "./tokens.ts";
+
+/** The most stops a slider marks with dots. */
+const MOST_MARKED = 8;
 
 export const SLIDER_SIZES = ["Regular", "Compact"] as const;
 export type SliderSize = (typeof SLIDER_SIZES)[number];
@@ -199,7 +203,10 @@ export function slider(options: SliderOptions): HTMLElement {
   onFill.append(overFill);
   const dots = document.createElement("span");
   dots.className = "k-slider-dots";
-  const points = stepping ? Array.from({ length: stops }, (_, i) => i / last) : sticky !== undefined ? [sticky] : [];
+  // A few stops are places to see and aim at; many are a scale, where a dot a stop is noise and the
+  // fill's end says where it stands.
+  const marked = stepping && stops <= MOST_MARKED;
+  const points = marked ? Array.from({ length: stops }, (_, i) => i / last) : sticky !== undefined ? [sticky] : [];
   const dotOf = points.map((point) => {
     const dot = document.createElement("span");
     dot.className = "k-slider-dot";
@@ -344,7 +351,8 @@ export function slider(options: SliderOptions): HTMLElement {
       dot.toggleAttribute("data-hidden", !(clear(x, stop) && !anchored && free));
       dot.toggleAttribute("data-passed", !knobbed && x < fillEnd);
     });
-    const showsAnchor = rest !== undefined && (knobbed || clear(centre(rest), anchorSide));
+    // A knob carries its own mark; past eight stops a stepping slider draws none.
+    const showsAnchor = rest !== undefined && (marked || !stepping) && (knobbed || clear(centre(rest), anchorSide));
     if (showsAnchor) anchor.style.setProperty("--at", String(rest));
     const was = anchor.hasAttribute("data-shown");
     anchor.toggleAttribute("data-shown", showsAnchor);

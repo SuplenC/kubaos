@@ -107,7 +107,8 @@ export function canvas(options: CanvasOptions): Canvas {
     ["← →", "Pick"],
     ["Shift+← →", "Move to the next snap"],
     ["Enter", "Its settings"],
-  ]);
+    // In a narrow room the hints that don't fit are left out, never run past the canvas's edge.
+  ], { room: "100%" });
   const foot = row(0, "centre", hints);
   foot.classList.add("k-cv-band");
   const guideX = document.createElement("span");

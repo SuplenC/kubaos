@@ -29,7 +29,7 @@ export function long(message: string): boolean {
 export function errorBlock(options: ErrorBlockOptions): HTMLElement {
   const words = stack("s4", "start", wrapped(options.message, long(options.message) ? "body_strong" : "subheading"), wrapped(options.hint, "body", "on_surface_variant"));
   const said = row("s16", "centre", icon("error", "var(--type-subheading-icon)", "var(--color-error)"), filling(words));
-  const box = statusBox("error", "rgb(from var(--color-error_container) r g b / var(--opacity-error_fill))", filling(said));
+  const box = statusBox("error", "rgb(from var(--color-error_container) r g b / var(--opacity-error_fill))", "regular", filling(said));
   box.classList.add("k-error-block");
   return probe(box, { role: "component", name: "ErrorBlock", variant: long(options.message) ? "long" : "", fixed: { width: false, height: false } });
 }

@@ -46,6 +46,13 @@ const SIZE_FOR: Record<Size, string> = {
   Lg: "beside a big page's lg button",
 };
 
+/** A held Text sm button, as a settings row's reset: `held` of the way through its hold, or live. */
+function heldSample(held?: number): HTMLElement {
+  const label = "Hold to reset to 10 min";
+  const made = iconButton({ icon: "restart_alt", label, kind: "Text", size: "Sm", ...(held === undefined ? { hold: () => {} } : { held, pinned: "lit" }) });
+  return roomy(made, "Sm");
+}
+
 /** Every kind at md, at rest: what each move plays on. */
 function kinds(): HTMLElement {
   return row("s16", "start", ...ICON_KINDS.map((kind) => sample(kind, "Md", "rest", false)));
@@ -72,7 +79,11 @@ export default page({
     hint: "hover it, or Tab to it",
     daylight: true,
   },
-  variants: nonEmpty(ICON_KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => roomy(sample(kind, "Md"), "Md") }))),
+  variants: nonEmpty([
+    ...ICON_KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => roomy(sample(kind, "Md"), "Md") })),
+    { name: "Held", for: "acts once held for `duration.hold`: a reset", sample: () => heldSample() },
+    { name: "Held, halfway", for: "the ring's arc half round, from the top", sample: () => heldSample(0.5) },
+  ]),
   sizes: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => roomy(sample("Filled", size), size) }))),
   states: {
     shown: ["rest", "lit", "pressed", "disabled"],
@@ -149,6 +160,14 @@ export default page({
         back: "plays",
         sample: litKinds,
       },
+      {
+        name: "The hold fills",
+        what: "Held: the ring's arc runs round from the top over `hold`; let go early, it empties at once.",
+        tracks: [{ part: "the arc", on: "a held button", target: ".k-button[data-hold]", property: "--hold", from: 0, to: 1, duration: "hold", curve: "linear" }],
+        reduced: "same",
+        back: "cuts",
+        sample: () => heldSample(1),
+      },
       ...powerMoves(litKinds),
     ],
   },
@@ -156,6 +175,7 @@ export default page({
     keys: [
       { keys: ["Tab", "Shift+Tab"], does: "to the icon button, or on; its hint shows" },
       { keys: ["Enter", "Space"], does: "presses it, never on key repeat" },
+      { keys: ["Enter", "Space"], does: "a held one: held down, its hold; let go, it empties" },
       { keys: ["Esc"], does: "nothing of the icon button's; never presses a burning one" },
     ],
     order: "One stop in reading order; a disabled one is skipped.",
@@ -178,6 +198,7 @@ export default page({
       { part: "Text symbol's glow", token: "focus-content_near" },
       { part: "Filled symbol's glow", token: "focus-label_near" },
       { part: "Gap to its hint", token: "space-s8" },
+      { part: "A held one's ring", token: "stroke-thin" },
     ],
     reflow: doesntApply("its size's side at every window size; it never stretches."),
   },

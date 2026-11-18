@@ -8,6 +8,8 @@ Rust `keycap::keycap(look, key)`; QML `Keycap`.
 
 A key drawn as a key: 20 tall (`keycap`), as a line of body text, so it sits inline with body and caption text without making the line taller. The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the bottom, so the key stands on the page, the small radius (4), 4 either side of the key and never narrower than tall, so a one-letter key is square; the key is centred across it on a whole device pixel. A keycap is a picture of a key, not a control: it has no states of its own, never lights and takes no focus, and a power change only recolours it. On a lit menu item its key and its edge take the item's light, in `primary` (`menu.md`).
 
+**In a sentence** (`sentence` in the mockups' `lib/keycap.ts`), keys stand where the words name them ("Hold Super and drag…", written `[Super]`): the sentence is a line of runs, each word with the space after it and each key laid out on its own, so every one starts on a whole device pixel, and the lines break between them. Every line is a keycap and 4 tall (24) whether it names a key or not; each key stands at the top of its line and 2 down, its middle on the line's, and the words share one baseline. A [Banner](banner.md)'s lines name keys this way, a tip's most of all.
+
 ## `KeyHints`
 
 Rust `keycap::key_hints(look, hints)`; QML `KeyHints`.

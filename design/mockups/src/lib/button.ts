@@ -11,6 +11,7 @@
 
 import { type Pinned, pin } from "./control.ts";
 import { focusRing, type Tone, toneColour } from "./focus.ts";
+import { heldByKeys, holdable } from "./hold.ts";
 import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe, variant } from "./probe.ts";
@@ -161,7 +162,28 @@ export interface ButtonOptions {
    * discloses is open (`--disclosed`, 0 to 1), with it over `medium` on `standard`.
    */
   readonly disclosure?: boolean;
+  /**
+   * Held, not pressed: what it does once held for `duration.hold` (`lib/hold.ts`). Its body fills
+   * from its start meanwhile, in its kind's hold fill, its label and symbol readable either side of
+   * the fill's edge.
+   */
+  readonly hold?: () => void;
+  /** A held button drawn this far through its hold, 0 to 1: a sample's. */
+  readonly held?: number;
 }
+
+/**
+ * What a held button fills with, and its label over the fill: the accent for the quiet kinds, the
+ * core for the filled and burning ones, so the fill always stands off the button's own fill.
+ */
+const HOLD_FILL: Record<Kind, { readonly fill: string; readonly label: string }> = {
+  Filled: { fill: "primary_fill_line", label: "on_primary_fill" },
+  Tonal: { fill: "primary", label: "on_primary" },
+  Text: { fill: "primary", label: "on_primary" },
+  Danger: { fill: "burn_error_line", label: "on_burn_error" },
+  Success: { fill: "burn_success_line", label: "on_burn_success" },
+  Warning: { fill: "burn_warning_line", label: "on_burn_warning" },
+};
 
 /** A symbol in a box as wide as itself and as tall as the label's line beside it. */
 export function iconInLine(name: string, style: TypeStyle, color: string): HTMLElement {
@@ -235,6 +257,23 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   const children = glyph ? (options.trailing || disclosing ? [label, glyph] : [glyph, label]) : [label];
   const content = row(m.gap, "start", ...children);
   element.append(content);
+  if (options.hold || options.held !== undefined) {
+    // The fill holds the same content in the fill's own label colour, cut to how far it has gone,
+    // so the words read on either side of its edge, as a held menu item's sweep does.
+    const fill = document.createElement("span");
+    fill.className = "k-button-hold";
+    fill.setAttribute("aria-hidden", "true");
+    fill.style.setProperty("--hold-fill", role(HOLD_FILL[kind].fill));
+    fill.style.setProperty("--shown", role(HOLD_FILL[kind].label));
+    const copy = content.cloneNode(true) as HTMLElement;
+    // The button's own content is what the geometry check reads; the fill's copy is paint.
+    for (const each of [copy, ...copy.querySelectorAll<HTMLElement | SVGElement>("[data-probe]")]) delete each.dataset.probe;
+    fill.append(copy);
+    element.append(fill);
+    element.dataset.hold = "";
+    if (options.held !== undefined) element.style.setProperty("--hold", String(options.held));
+    if (options.hold) heldByKeys(element, holdable(element, options.hold, { empties: true }));
+  }
   lightKind(element, kind, "control", content);
   const placement = disclosing ? "disclosure" : !options.icon ? "" : options.trailing ? "trailing-icon" : "leading-icon";
   return probe(element, { role: "component", name: "Button", variant: variant(kind, size, placement), fixed: FIXED_HEIGHT });

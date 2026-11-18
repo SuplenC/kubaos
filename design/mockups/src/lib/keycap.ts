@@ -17,7 +17,7 @@ import { milliseconds } from "../site/recipe.ts";
 import { settings } from "../site/settings.ts";
 import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
-import { advance, text } from "./text.ts";
+import { advance, centreFor, text, type TypeStyle, wrapped } from "./text.ts";
 import { cubic } from "./tokens.ts";
 
 /** `key`, as it is written on the keyboard (`Esc`, `K`, `↵`), on a keycap. */
@@ -129,4 +129,34 @@ export function pressKeys(prompt: HTMLElement): void {
 /** `parts` on one line, `space.s4` apart, centred down it: a keycap inline with words. */
 export function inline(...parts: Element[]): HTMLElement {
   return row("s4", "centre", ...parts);
+}
+
+/**
+ * A sentence that names keys as it goes, wrapping: `words` with each `[Key]` drawn as a keycap where
+ * it stands, in the line (`Hold [Super] and drag`). A sentence with keys in it sets its lines a
+ * keycap and `space.s4` apart, so every line is as tall whether it holds a key or not, and two keys
+ * on lines one over the other never touch; one without is plain wrapped text. Its words are a text
+ * each, as wide as the text rounds them, so every word and key starts on a whole device pixel, as
+ * the libraries lay a line of runs; the line breaks between them.
+ */
+export function sentence(words: string, style: TypeStyle, color = "on_surface"): HTMLElement {
+  const parts = words.split(/\[([^\]]+)\]/);
+  if (parts.length === 1) return wrapped(words, style, color);
+  // A part holding its runs, each a text or a key measured alone, as the libraries hold a line of
+  // runs: what it holds is its words, so two sentences are never the same parts.
+  const element = probe(document.createElement("span"), { role: "component", name: "Sentence", variant: "", fixed: { width: false, height: false, holds: true } });
+  element.className = "k-said";
+  parts.forEach((part, at) => {
+    if (at % 2 === 1) element.append(keycap(part));
+    else for (const word of part.match(/\S+\s*|\s+/g) ?? []) element.append(saidWord(word, style, color, words));
+  });
+  return element;
+}
+
+/** One word of a keyed sentence, with the space after it, set on the whole sentence's mass so every word shares one baseline. */
+function saidWord(word: string, style: TypeStyle, color: string, whole: string): HTMLElement {
+  const made = text(word, style, color);
+  centreFor(made, style, whole.replaceAll(/[[\]]/g, ""));
+  made.classList.add("k-said-word");
+  return made;
 }

@@ -6,6 +6,8 @@
 import type { Words } from "../../lib/content.ts";
 import { filling, flow, within } from "../../lib/layout.ts";
 import { dropLine, type ListItem, listDisclosure, listLabel, listNote, type ListOptions, type ListRowSpec, list, type RowPinned } from "../../lib/list.ts";
+import { row, stack } from "../../lib/layout.ts";
+import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
@@ -136,6 +138,29 @@ const SLIDES: Move = {
   },
 };
 
+/**
+ * Rows with a tip and one without, between them: a tip that fits its line, one that wraps, a tile's
+ * row, and a row with none; each tip with its symbol or without, `symbol` says.
+ */
+function tipped(symbol: boolean): ListRowSpec[] {
+  return [
+    { title: "Workspaces wrap around", subtitle: "Past the last, back to the first.", toggle: false, tipSymbol: symbol, tip: "[Super] [Tab] goes to the next workspace." },
+    { title: "Resize by the edges", subtitle: "Drag a window's edge or corner to resize it.", toggle: true, tipSymbol: symbol, tip: "Hold [Super] and drag with the right button to resize a window from anywhere on it; the left button moves it." },
+    { title: "Start on login", subtitle: "Files, Signal and Spotify", icon: "rocket_launch", tile: true, opens: true, tipSymbol: symbol, tip: "Press [Ctrl] [K] on an app in the Command menu to find Start on login among its actions." },
+    { title: "Swipe between workspaces", subtitle: "Three fingers sideways step through them.", toggle: true },
+  ];
+}
+
+/** Tips with their symbol and without, side by side, each in a well a column wide and a narrow one. */
+function tips(): HTMLElement {
+  return row(
+    "s32",
+    "start",
+    ...[true, false].map((symbol) =>
+      stack("s12", "start", text(symbol ? "With the symbol" : "Without", "label", "on_surface_variant"), within("var(--size-column)", list(tipped(symbol))), within("var(--size-find)", list(tipped(symbol)))),
+    ),
+  );
+}
 
 export default page({
   level: "molecules",
@@ -154,6 +179,7 @@ export default page({
     { name: "Two lines, chevrons", for: "rows that open a page; these never tick", sample: () => well(PAGES) },
     { name: "Actions, one line", for: "what can be done, danger last", sample: () => well(POWER) },
     { name: "Flowing", for: "rows in as many columns as fit", sample: () => within("var(--size-column)", list(["Firefox", "Signal", "Spotify", "Steam", "Krita", "Zed"].map((title, i): ListRowSpec => ({ title, subtitle: "One line about it", icon: "check_circle", tile: true, checked: i % 2 === 0 })), { flow: true })) },
+    { name: "With a tip", for: "a line under the row; with its symbol or without", sample: tips },
     { name: "Switches", for: "the row is the control", sample: () => well([{ title: "Bluetooth", subtitle: "2 connected", icon: "bluetooth", toggle: true }, { title: "Do not disturb", icon: "notifications_off", toggle: false }]) },
     { name: "Chips and a detail", for: "facts at a glance, then a machine's name", sample: () => well([{ title: "Samsung 990 Pro", subtitle: "2 TB · NVMe", icon: "hard_drive", chips: [{ kind: "Accent", label: "Default" }], detail: "nvme0n1" }, { title: "WD Blue", subtitle: "500 GB · SATA", icon: "hard_drive", chips: [{ kind: "Neutral", label: "Too small" }], detail: "sda" }]) },
     { name: "The Command menu's", for: "tall, clear, tight; one selection slides between rows", sample: () => well(RESULTS, { slides: true }) },

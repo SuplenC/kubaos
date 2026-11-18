@@ -29,6 +29,8 @@ import { type ChipKind, chip } from "./chip.ts";
 import { iconButton } from "./icon-button.ts";
 import { icon, missingIcon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
+import { tipLine } from "./banner.ts";
+import type { ControlSize } from "./field.ts";
 import { keycap, keys } from "./keycap.ts";
 import { filling, grid, row, stack } from "./layout.ts";
 import { declare, FIXED_HEIGHT, probe, scrolls, variant } from "./probe.ts";
@@ -111,7 +113,23 @@ export type ListRowSpec = RowTaking & {
   readonly adds?: boolean;
   /** Its title is a name that varies, a network's or a device's: cut with an ellipsis where it doesn't fit. */
   readonly named?: boolean;
+  /**
+   * A tip: how to do what it is about faster, a whole sentence naming its keys as `[Key]`. A `Tip`
+   * Banner Line (`tipLine` in `lib/banner.ts`) on a line of its own under the row's, across the row
+   * inside its padding; the row grows down to hold it while its title, its line and its control keep
+   * their places. A press on it leaves the row as it is.
+   */
+  readonly tip?: string;
+  /** Whether the tip leads with its symbol, where a sample shows the other look than `TIP_SYMBOL`. */
+  readonly tipSymbol?: boolean;
 };
+
+/**
+ * The size a Field or a Select takes in a row's control slot, the row's own rule: `size.control_sm`
+ * and `body`, a line with the row's other controls (a choice's well and a small Button are 32 too)
+ * and no larger than its title. Every row that ends in one builds it at this size.
+ */
+export const ROW_CONTROL: ControlSize = "Sm";
 
 /** A state a row is pinned in, as the specimens pin them: the keyboard on it, or pressed. */
 export type RowPinned = "lit" | "pressed";
@@ -275,9 +293,16 @@ export function listRow(spec: ListRowSpec, current = false, pinned?: RowPinned):
     // so each says the one gap it draws.
     if (first && item.hasAttribute("data-clear")) item.append(filling(row("s16", "centre", first, filling(row("s12", "centre", ...rest)))));
     else item.append(filling(row("s12", "centre", ...(first ? [first] : []), ...rest)));
+    if (spec.tip !== undefined) {
+      item.dataset.tip = "";
+      const said = tipLine(spec.tip, spec.tipSymbol);
+      said.classList.add("k-list-tip");
+      item.append(said);
+    }
   }
   if (spec.toggle !== undefined && !inert) {
-    item.addEventListener("click", () => {
+    item.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest(".k-list-tip")) return;
       const on = item.getAttribute("aria-checked") !== "true";
       item.setAttribute("aria-checked", String(on));
       item.querySelector<HTMLElement>(".k-switch")?.click();
@@ -285,7 +310,7 @@ export function listRow(spec: ListRowSpec, current = false, pinned?: RowPinned):
   }
   const shape = spec.loading ? "two-line" : twoLines(spec) ? "two-line" : "one-line";
   const symbol = spec.icon ? (spec.tile ? "tile" : "icon") : undefined;
-  return probe(item, { role: "component", name: "ListRow", variant: variant(shape, symbol, spec.danger && "danger", spec.loading && "loading"), fixed: FIXED_HEIGHT });
+  return probe(item, { role: "component", name: "ListRow", variant: variant(shape, symbol, spec.subtitleIcon && "subtitle-icon", spec.danger && "danger", spec.loading && "loading", spec.tip !== undefined && "tip"), fixed: spec.tip !== undefined ? { width: false, height: false } : FIXED_HEIGHT });
 }
 
 /** Whether a row can take the keyboard: one that isn't disabled, loading or a note. */

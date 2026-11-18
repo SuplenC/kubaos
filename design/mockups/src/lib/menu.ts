@@ -19,14 +19,13 @@
 // `opacity.tint`, so the sweep has room to show. The sweep is a timer, not a move: reduced motion
 // keeps it.
 
+import { type Holding, holdable } from "./hold.ts";
 import { icon } from "./icon.ts";
 import { smallInitial } from "./icon-tile.ts";
 import { keycap, keys } from "./keycap.ts";
 import { divider, filling, row, stack } from "./layout.ts";
 import { declare, FIXED_HEIGHT, probe, variant } from "./probe.ts";
 import { clamped } from "./text.ts";
-import { raw } from "./tokens.ts";
-import { settings } from "../site/settings.ts";
 
 export interface MenuItemSpec {
   readonly label: string;
@@ -148,56 +147,7 @@ function picture(source: string): HTMLElement {
   return image;
 }
 
-/** A duration token in milliseconds under the speed setting. */
-function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
-}
-
-/** What holds a held item: pressing starts its sweep, letting go runs it back. */
-export interface Holding {
-  readonly press: () => void;
-  readonly release: () => void;
-}
-
-/**
- * Wires `item`, a held item, to be held: `press` sweeps `--hold` on to 1 over what is left of
- * `duration.hold`, on `linear`, and calls `taken` once it gets there; `release` before then runs it
- * back to 0 over `short` on `standard`. Neither is a move reduce motion caps.
- */
-export function holdable(item: HTMLElement, taken: () => void): Holding {
-  let going: Animation | null = null;
-  const now = () => Number.parseFloat(getComputedStyle(item).getPropertyValue("--hold")) || 0;
-  const settle = (to: number) => {
-    going?.cancel();
-    going = null;
-    item.style.setProperty("--hold", String(to));
-  };
-  const press = () => {
-    const from = now();
-    settle(from);
-    item.dataset.holding = "";
-    going = item.animate([{ "--hold": from }, { "--hold": 1 }], { duration: ms("hold") * (1 - from), easing: "linear", fill: "forwards" });
-    going.finished.then(() => {
-      settle(1);
-      delete item.dataset.holding;
-      taken();
-    }, () => {});
-  };
-  const release = () => {
-    if (!item.hasAttribute("data-holding")) return;
-    delete item.dataset.holding;
-    const from = now();
-    settle(from);
-    going = item.animate([{ "--hold": from }, { "--hold": 0 }], { duration: ms("short"), easing: raw("easing-standard"), fill: "forwards" });
-    going.finished.then(() => settle(0), () => {});
-  };
-  item.addEventListener("pointerdown", (event) => {
-    if (event.button === 0) press();
-  });
-  item.addEventListener("pointerup", release);
-  item.addEventListener("pointerleave", release);
-  return { press, release };
-}
+export { type Holding, holdable };
 
 /** The hairline between two groups, `space.s4` clear of each and inset to the items' words. */
 export function menuSeparator(): HTMLElement {
