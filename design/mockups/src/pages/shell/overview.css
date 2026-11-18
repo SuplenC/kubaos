@@ -570,6 +570,28 @@
   transition: none !important;
 }
 
+/* The zone's card alone, as wide as it stands in the corner: a move's sample. */
+.ov-zone-alone {
+  display: block;
+  width: var(--size-panel);
+}
+
+/* A corner of a screen cut out at its true size, for a sample: the screen stands where it would. */
+.ov-detail {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--detail-w);
+  height: var(--detail-h);
+  overflow: hidden;
+}
+
+.ov-detail > .ov {
+  position: absolute;
+  left: var(--detail-x);
+  top: var(--detail-y);
+}
+
 /* ── Reduced motion: places change at once, only fades play ──────────────────────────────────── */
 
 [data-reduced] .ov :is(.ov-ws, .ov-ws-desk, .ov-win, .ov-plus, .ov-room, .ov-label, .ov-ring) {

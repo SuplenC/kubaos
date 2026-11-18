@@ -5,7 +5,7 @@
 
 import type { Words } from "../../lib/content.ts";
 import { doesntApply, type Move, nonEmpty, page, screen, type Track } from "../../site/page.ts";
-import { DESKS, type OverviewOptions, overview, type Pin, VIEWS } from "./overview-parts.ts";
+import { DESKS, type OverviewOptions, overview, type Pin, sizeOf, VIEWS, zoneCard } from "./overview-parts.ts";
 
 type Shown = "rest" | "lit" | "pressed" | "selected" | "empty";
 
@@ -15,6 +15,25 @@ function still(options: Partial<OverviewOptions> & { pin?: Pin } = {}): HTMLElem
 }
 
 const at = (options: Partial<OverviewOptions> = {}) => screen(() => still(options));
+
+/**
+ * A bottom corner of the centre screen cut out at its true size, `width` by `height` logical
+ * pixels: the stage draws the whole screen at half its size, where the tip and the delete zone are
+ * too small to read. The cut's size is the sample's frame, not a design value.
+ */
+function corner(options: Partial<OverviewOptions>, side: "left" | "right", width: number, height: number) {
+  return screen(() => {
+    const whole = sizeOf("three");
+    const cut = document.createElement("span");
+    cut.className = "ov-detail";
+    cut.style.setProperty("--detail-w", `calc(${width} * var(--px))`);
+    cut.style.setProperty("--detail-h", `calc(${height} * var(--px))`);
+    cut.style.setProperty("--detail-x", side === "left" ? "0px" : `calc(${width - whole.width} * var(--px))`);
+    cut.style.setProperty("--detail-y", `calc(${height - whole.height} * var(--px))`);
+    cut.append(still(options));
+    return cut;
+  });
+}
 
 /**
  * The live stage, on the desk and in the view the stage's switches pick: which screens are plugged
@@ -130,6 +149,38 @@ const ARRIVES: Move = {
   sample: () => still(),
 };
 
+const ZONE_ARRIVES: Move = {
+  name: "The delete zone arriving",
+  what: "Lifted: it rises `space.s24` into the corner and fades in over `medium`; it leaves over `short`.",
+  tracks: [{ part: "the zone", on: "a carry", target: ".ov-bin", property: "opacity", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
+  reduced: [{ part: "the zone", on: "a fade", target: ".ov-bin", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  back: "plays",
+  sample: () => still({ pin: { kind: "binning", what: TERMINAL, over: false } }),
+};
+
+const INTO_ZONE: Move = {
+  name: "Into the delete zone",
+  what: "Let go over it: the window shrinks into its symbol and fades over `medium`; the rest close up.",
+  tracks: [{ part: "the window", on: "the terminal", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
+  reduced: [{ part: "the window", on: "a fade", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
+  back: "cuts",
+  sample: () => still({ pin: { kind: "binning", what: TERMINAL, over: true } }),
+};
+
+const TIMER: Move = {
+  name: "The timer running",
+  what: "The Undo button's fill drains over `undo` on `linear`, as a held button's fills; empty, it closes.",
+  tracks: [{ part: "the fill", on: "Undo", target: ".k-button", property: "--hold", from: 1, to: 0, duration: "undo", curve: "linear" }],
+  reduced: "same",
+  back: "cuts",
+  sample: () => {
+    const zone = document.createElement("span");
+    zone.className = "ov-zone-alone";
+    zone.append(zoneCard("window", { name: "just mockups", left: 1 }));
+    return zone;
+  },
+};
+
 export default page<Shown>({
   level: "shell",
   slug: "overview",
@@ -170,6 +221,9 @@ export default page<Shown>({
     { name: "A second one over it", for: "let go, the first goes for good", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
     { name: "The second dropped", for: "the first gone, the second waiting", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
     { name: "Brought back", for: "pressed: flying home", sample: at({ pin: { kind: "undoing", window: "w-term", share: 0.5 } }) },
+    { name: "The tip, at true size", for: "the bottom left corner, 1:1", sample: corner({}, "left", 720, 160) },
+    { name: "Over the zone, at true size", for: "the bottom right corner, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: true } }, "right", 720, 280) },
+    { name: "Waiting, at true size", for: "the zone's timer and Undo, 1:1", sample: corner({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }, "right", 720, 280) },
   ],
   sizes: doesntApply("one size: the screen's; the miniatures take what the screen has."),
   states: {
@@ -209,7 +263,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING],
     leaves: [CLOSING],
-    between: [HOVER, LIFT, DELETE, ARRIVES],
+    between: [HOVER, LIFT, DELETE, ARRIVES, ZONE_ARRIVES, INTO_ZONE, TIMER],
   },
   keyboard: {
     keys: [

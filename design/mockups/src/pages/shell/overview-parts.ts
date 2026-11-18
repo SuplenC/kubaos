@@ -109,6 +109,10 @@ export interface Driver {
   readonly freeze: (at: number, commit?: boolean) => void;
   /** Lets go of the frozen moves, finished. */
   readonly thaw: () => void;
+  /** The middle of the delete zone where it stands, or would stand on the focused screen. */
+  readonly bin: () => Point;
+  /** What waits in the delete zone, or null. */
+  readonly pending: () => Carried | null;
   /** Draws the overview again with other options: another desk, view or fill. */
   readonly redraw: (options: Partial<OverviewOptions>) => void;
 }
@@ -328,6 +332,21 @@ function glide(element: HTMLElement, motion: Motion, delay = cue): void {
 /** Puts every style change so far on screen, so the next change transitions from it. */
 function commit(element: Element): void {
   void getComputedStyle(element).opacity;
+}
+
+// ── The delete zone's card ──
+
+/**
+ * What the delete zone holds: a Small Danger banner saying what a drop there does, "Close" for a
+ * window and "Remove" for a workspace; with `waiting`, the name of what waits and the Undo button,
+ * its fill `left` of the way, draining as its time runs out.
+ */
+export function zoneCard(what: "window" | "space", waiting?: { readonly name: string; readonly left: number }): HTMLElement {
+  const title = what === "window" ? "Close" : "Remove";
+  if (!waiting) return banner({ tone: "Danger", size: "Small", icon: "delete", title, body: "" });
+  const back = button({ label: "Undo", kind: "Tonal", size: "Sm", held: waiting.left });
+  back.tabIndex = -1;
+  return banner({ tone: "Danger", size: "Small", icon: "delete", title, body: waiting.name, actions: back });
 }
 
 // ── The overview ──────────────────────────────────────────────────────────────────────────────
@@ -1198,6 +1217,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const target = carry.kind === "window" ? windowTarget(point) : spaceTarget(point);
     if (sameTarget(target, carry.target)) return;
     carry.target = target;
+    bin.toggleAttribute("data-pinned", target?.kind === "bin");
     if (carry.kind === "window") {
       const scale = scaleOver(target);
       const rect = tiles.get(carry.id);
@@ -1427,13 +1447,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function dressBin(left = 1): void {
     if (pending) {
       const name = "window" in pending.what ? (desk.windows.get(pending.what.window)?.title ?? "") : spaceName(pending.taken);
-      const back = button({ label: "Undo", kind: "Tonal", size: "Sm", held: left });
-      back.tabIndex = -1;
-      bin.replaceChildren(banner({ tone: "Danger", size: "Small", icon: "delete", title: "window" in pending.what ? "Close" : "Remove", body: name, actions: back }));
+      bin.replaceChildren(zoneCard("window" in pending.what ? "window" : "space", { name, left }));
       bin.dataset.pending = "";
     } else {
-      const window = carry?.kind === "window";
-      bin.replaceChildren(banner({ tone: "Danger", size: "Small", icon: "delete", title: window ? "Close" : "Remove", body: "" }));
+      bin.replaceChildren(zoneCard(carry?.kind === "window" ? "window" : "space"));
       delete bin.dataset.pending;
     }
     bin.append(binRing);
@@ -1907,7 +1924,12 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** Every glide finished at once: a still sample's state as it stands once it has moved. */
   function settle(): void {
     void root.offsetWidth;
-    for (const animation of root.getAnimations({ subtree: true })) animation.finish();
+    for (const animation of ended()) animation.finish();
+  }
+
+  /** The moves running in the world that end: a motion player's loop on a sample runs forever. */
+  function ended(): Animation[] {
+    return root.getAnimations({ subtree: true }).filter((each) => Number.isFinite(Number(each.effect?.getComputedTiming().endTime)));
   }
 
   function pointOf(target: Target): Point {
@@ -1954,7 +1976,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       void root.offsetWidth;
       for (const timer of timers) clearTimeout(timer);
       timers.clear();
-      const running = root.getAnimations({ subtree: true });
+      const running = ended();
       for (const animation of running) {
         animation.pause();
         animation.currentTime = at;
@@ -1967,6 +1989,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     },
     thaw: settle,
     redraw: (next) => redraw({ ...options, ...next }),
+    bin: () => binPoint(),
+    pending: () => pending?.what ?? null,
   };
 
   // A pin drawn mid-move plays the move once the sample is on the page, held at its moment.

@@ -455,7 +455,7 @@ body {
   display: none;
 }
 
-.page-stage-switch {
+.page-stage-world {
   display: flex;
   align-items: center;
   gap: var(--space-s12);

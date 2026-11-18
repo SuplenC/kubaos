@@ -268,7 +268,7 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     ...(spec.switches?.each ?? []).map((each, at) =>
       el(
         "div",
-        "page-stage-switch",
+        "page-stage-world",
         label(each.label, "label", "on_surface_variant"),
         picker(
           each.choices,
