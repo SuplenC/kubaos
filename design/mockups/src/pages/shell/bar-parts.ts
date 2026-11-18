@@ -196,16 +196,21 @@ export type ShareKind = "screen" | "window" | "region";
 /** Each kind's symbol, the same in the picker's tabs and on the pill. */
 export const SHARE_ICONS: Record<ShareKind, string> = { screen: "desktop_windows", window: "app_window", region: "screenshot_region" };
 
-/** A share running: what it takes, named as the picker names it, and the app it goes to. */
+/** A share running: what it takes, named as the picker names it, the app it goes to, and since when. */
 export interface Share {
   readonly kind: ShareKind;
   readonly what: string;
   readonly who: string;
+  /** The site in the app, where the app names one. */
+  readonly site?: string;
+  readonly since?: string;
 }
 
-/** A camera in use: the app that has it. */
+/** A camera in use: the app that has it, the camera, and since when. */
 export interface CameraUse {
   readonly who: string;
+  readonly device?: string;
+  readonly since?: string;
 }
 
 /** What the on-air pills' hints say, one message each, the names as placeholders. */
@@ -214,29 +219,52 @@ export const ON_AIR_WORDS = {
   camera: (who: string) => `Camera · ${who}`,
 } as const;
 
+// The locale's list joins the hint's messages: "Sharing DP-10 · Chromium, Sharing … · Discord".
+const LISTED = new Intl.ListFormat("en-GB", { style: "narrow", type: "unit" });
+// The locale's number says the count.
+const COUNT = new Intl.NumberFormat("en-GB");
+
+/** A list of one or more: one share or camera, or several. */
+type OneOrMore<T> = T | readonly T[];
+const all = <T>(each: OneOrMore<T>): readonly T[] => (Array.isArray(each) ? (each as readonly T[]) : [each as T]);
+
 /**
- * The sharing pill: what is shared, by its kind's symbol alone, on the sharing tint in `sharing`,
- * a circle a pill tall. Its hint says what and with whom; a press opens its panel.
+ * An on-air pill: its symbol on its container, in the container's ink, a circle a pill tall; with
+ * more than one, the count after the symbol, `space.s12` at each end as any pill with a value.
  */
-export function sharingPill(share: Share, state: Shown = "rest"): HTMLElement {
-  const made = control([icon(SHARE_ICONS[share.kind], "var(--icon-s16)", "var(--color-sharing)")], ON_AIR_WORDS.sharing(share.what, share.who), state, { tone: "sharing", lone: true });
+function onAirPill(symbol: string, count: number, tip: string, state: Shown, tone: "sharing" | "camera", ink: string): HTMLElement {
+  const glyph = icon(symbol, "var(--icon-s16)", `var(--color-${ink})`);
+  const content = count > 1 ? [paired(glyph, text(COUNT.format(count), "label_number", ink))] : [glyph];
+  const made = control(content, tip, state, { tone, lone: count === 1 });
   made.classList.add("shell-on-air");
-  made.dataset.onAir = "sharing";
+  made.dataset.onAir = tone;
   made.setAttribute("aria-haspopup", "dialog");
   return made;
 }
 
-/** The camera pill: the camera's symbol alone on the camera's tint, in `recording`. Its hint names the app. */
-export function cameraPill(camera: CameraUse, state: Shown = "rest"): HTMLElement {
-  const made = control([icon("video", "var(--icon-s16)", "var(--color-recording)")], ON_AIR_WORDS.camera(camera.who), state, { tone: "camera", lone: true });
-  made.classList.add("shell-on-air");
-  made.dataset.onAir = "camera";
-  made.setAttribute("aria-haspopup", "dialog");
-  return made;
+/**
+ * The sharing pill: on `sharing_container`, the kind's symbol in `on_sharing_container`, the
+ * screen's where shares of several kinds run, and their count past one. Its hint says what and
+ * with whom, for each; a press opens its panel.
+ */
+export function sharingPill(shares: OneOrMore<Share>, state: Shown = "rest"): HTMLElement {
+  const list = all(shares);
+  const kinds = new Set(list.map((each) => each.kind));
+  const symbol = SHARE_ICONS[kinds.size === 1 ? list[0]!.kind : "screen"];
+  return onAirPill(symbol, list.length, LISTED.format(list.map((each) => ON_AIR_WORDS.sharing(each.what, each.who))), state, "sharing", "on_sharing_container");
 }
 
-/** The on-air pills in their order: the share, then the camera. */
-export function onAirPills(on: { readonly sharing?: Share; readonly camera?: CameraUse }, state: Shown = "rest"): HTMLElement[] {
+/**
+ * The camera pill: the camera's symbol on `error_container` in `on_error_container`, red as the
+ * screen recording's pill is, and the count past one. Its hint names the app, for each camera.
+ */
+export function cameraPill(cameras: OneOrMore<CameraUse>, state: Shown = "rest"): HTMLElement {
+  const list = all(cameras);
+  return onAirPill("video", list.length, LISTED.format(list.map((each) => ON_AIR_WORDS.camera(each.who))), state, "camera", "on_error_container");
+}
+
+/** The on-air pills in their order: the shares, then the cameras. */
+export function onAirPills(on: { readonly sharing?: OneOrMore<Share>; readonly camera?: OneOrMore<CameraUse> }, state: Shown = "rest"): HTMLElement[] {
   return [...(on.sharing ? [sharingPill(on.sharing, state)] : []), ...(on.camera ? [cameraPill(on.camera, state)] : [])];
 }
 
@@ -508,10 +536,10 @@ export interface BarContent {
   readonly playing: boolean;
   /** What plays, while something does. */
   readonly song?: Song;
-  /** A share runs: the sharing pill shows, first on the right, never given way. */
-  readonly sharing?: Share;
-  /** An app has the camera: the camera pill shows after the sharing pill, never given way. */
-  readonly camera?: CameraUse;
+  /** Shares run: the sharing pill shows, first on the right, never given way. */
+  readonly sharing?: Share | readonly Share[];
+  /** Apps have a camera: the camera pill shows after the sharing pill, never given way. */
+  readonly camera?: CameraUse | readonly CameraUse[];
 }
 
 /** Every pill at once, as the shots' stand-ins hold them. */

@@ -1,27 +1,54 @@
-/* The share prompt, the on-air panels and the marks on what is shared (`sharing-parts.ts`). */
+/* Picking what to share, the on-air panels and the marks on what is shared (`sharing-parts.ts`). */
 
-/* The choice's pane: five list rows tall in a well, its padding and gaps, for every kind, so the
-   picker and the panel keep their height as the kind changes. */
-.share-choice {
-  --share-pane: calc(5 * var(--size-row) + 4 * var(--space-s4) + 2 * var(--space-s8));
+/* Every screen side by side, top-aligned as Hyprland lays them out. */
+.share-screens {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-s24);
 }
 
-/* The screens sit under the tabs, as the windows' list does, the pane's room left under them. */
-.share-pane {
-  display: grid;
-  align-content: start;
-  height: var(--share-pane);
-  border-radius: var(--radius-content);
-  outline: none;
+/* While picking, the frame, the bar and the picking bar stay over the dim and over a window lifted
+   out of it; the lifted window stays over the dim. */
+.k-screen[data-picking] > :is(.k-screen-glass, .k-screen-over) {
+  z-index: 2;
 }
 
-.share-pane > * {
+.share-window[data-lifted] {
+  z-index: 1;
+}
+
+/* Drawing a region: the screen's own dim gives way to the drawing's, which leaves the box clear. */
+.k-screen.share-screen[data-drawing] > .k-screen-dim {
+  --panel-dim: 0;
+}
+
+/* The picking bar: a Popover `space.s16` in from the frame's bottom left inner corner, as wide as
+   its row, never wider than the screen less that room on both sides; who asks gives way first. */
+.share-pick-bar {
+  position: absolute;
+  z-index: 4;
+  left: calc(var(--frame-side) + var(--space-s16));
+  bottom: calc(var(--frame-side) + var(--space-s16));
+  --popover-width: max-content;
+  max-width: calc(100% - 2 * (var(--frame-side) + var(--space-s16)));
+}
+
+.share-pick-bar .k-row {
   min-width: 0;
 }
 
-/* A region's words fill the pane, centred in it as an EmptyState is in its room. */
-.share-pane[data-kind="region"] {
-  align-content: stretch;
+.share-pick-who {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* A lit window's label: a Tooltip in the middle of the window, taking no pointer. */
+.share-pick-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
 }
 
 /* A window on the desktop: draft part, proposed. */
@@ -57,9 +84,10 @@
   pointer-events: none;
 }
 
-/* A shared screen's marks: squares a privacy dot's side, square, in the screen's own corners. */
+/* A shared screen's marks: squares as tall as the bar, unrounded, in the screen's own corners. */
 .share-corners {
   position: absolute;
+  z-index: 3;
   inset: 0;
   display: block;
   pointer-events: none;
@@ -67,8 +95,8 @@
 
 .share-corner {
   position: absolute;
-  width: var(--size-badge_dot);
-  height: var(--size-badge_dot);
+  width: var(--size-bar);
+  height: var(--size-bar);
   background: var(--color-sharing);
 }
 
@@ -88,15 +116,17 @@
   right: 0;
 }
 
-/* Drawing a region: draft part, proposed. The dim is the box's own spread, so the box stays clear. */
+/* Drawing a region: draft part, proposed. Picking's dim is the box's own spread, so the box stays
+   clear, and its line is the region's on-air mark. */
 .share-draw {
   position: absolute;
+  z-index: 3;
   inset: 0;
   display: block;
   overflow: hidden;
   cursor: crosshair;
   outline: none;
-  background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-panel_scrim));
 }
 
 .share-draw[data-drawn] {
@@ -107,8 +137,8 @@
   position: absolute;
   display: none;
   box-shadow:
-    0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-primary),
-    0 0 0 calc(var(--screen-width) + var(--screen-height)) rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
+    0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing),
+    0 0 0 calc(var(--screen-width) + var(--screen-height)) rgb(from var(--color-scrim) r g b / var(--opacity-panel_scrim));
 }
 
 .share-draw[data-drawn] > .share-draw-box {

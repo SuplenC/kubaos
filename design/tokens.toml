@@ -1177,6 +1177,10 @@ warning = ""
 # shared, with `sharing_core` along its middle as `primary_core` runs along the accent's.
 burn_sharing = ""
 sharing = ""
+# The sharing pill's fill and its ink: violet as strong as a recording's red on `error_container`,
+# so the pill is found at a glance the moment the screen is on air.
+sharing_container = ""
+on_sharing_container = ""
 # The privacy dots: a microphone that is listening, in an orange clear of the warning's amber and
 # the error's red, and anything recording, the camera watching or the screen being recorded, in
 # the recording red: pure red at night, the REC light, a step deeper and purer than the error's red.
@@ -1330,6 +1334,10 @@ recording = { from = "burn_recording", text_on = ["surface", "surface_container_
 on_error = { dark = { from = "burn_error", lightness = 0.25, text_on = ["error"] }, light = { mix = "burn_error", white = 1.0 } }
 error_container = { dark = { from = "burn_error", lightness = 0.5, chroma = 1.2 }, light = { from = "burn_error", at_lightness = 0.93 } }
 on_error_container = { dark = { mix = "burn_error", white = 0.85, text_on = ["error_container"] }, light = { from = "burn_error", lightness = 0.4, text_on = ["error_container"] } }
+# Sharing's container and its label, by the error container's recipe, so the sharing pill and the
+# camera's, on `error_container`, read as equals.
+sharing_container = { dark = { from = "burn_sharing", lightness = 0.5, chroma = 1.2 }, light = { from = "burn_sharing", at_lightness = 0.93 } }
+on_sharing_container = { dark = { mix = "burn_sharing", white = 0.85, text_on = ["sharing_container"] }, light = { from = "burn_sharing", lightness = 0.4, text_on = ["sharing_container"] } }
 
 # A tone's core, the white-hot line along the middle of a lit tube: half way
 # to white.
@@ -1539,6 +1547,7 @@ pairs = [
   { fg = "sharing", bg = "surface_container", need = "graphic", use = "Sharing's tube and dot, on a panel, window card or bar pill" },
   { fg = "sharing", bg = "surface_container_high", need = "graphic", use = "The sharing tube and dot, on a dialog or panel card" },
   { fg = "sharing", bg = "surface_container_highest", need = "graphic", use = "The sharing tube and dot, on the highest container" },
+  { fg = "on_sharing_container", bg = "sharing_container", need = "text", use = "The sharing pill's symbol and its count" },
   { fg = "microphone", bg = "surface", need = "text", use = "A listening microphone's words, on a page" },
   { fg = "microphone", bg = "surface_container_lowest", need = "text", use = "A listening microphone's words, on the lock screen" },
   { fg = "microphone", bg = "surface_container_low", need = "text", use = "A listening microphone's words, on a well" },
