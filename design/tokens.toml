@@ -780,6 +780,9 @@ danger_edge = 0.60
 # A progress bar's track, and a spinner's faint full ring.
 track = 0.90
 spinner_track = 0.18
+# The tabs' unlit rail while the well is lit: the faint ring's tone a clear step
+# brighter, still no glow, so the picked stretch's flare stays the one that burns.
+track_lit = 0.45
 # A skeleton, glass of the accent warming up: its fill at rest and at its
 # breath's peak, at night and by day, and at night the faint glow that comes
 # in at the peak, fading out over `focus.near`. Subtle: it stands back from

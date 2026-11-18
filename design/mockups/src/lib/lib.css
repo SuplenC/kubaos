@@ -2301,7 +2301,11 @@
    is lit, under its words, square at both ends: the core at night with the content glow round it,
    as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
    signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
-   pixels. The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
+   pixels. Lit (the pointer over the well, the keyboard in it, or the list row it ends lit), as a
+   field's edge lights, over `short` on `standard`: the picked stretch flares with a lit control's
+   glow round it, near and far, and the rest of the rail steps up to `opacity.track_lit` with no
+   glow; by day and with the signs off nothing glows, so the lit well shows as the stronger rail.
+   The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
    `opacity.disabled_content`, with no glow. A choice can be disabled alone; when that choice is
    the pick, the well itself takes the keyboard, so it draws no outline of its own.
    The well is as wide as the room it is given: the whole width across a stack, a page or a
@@ -2322,6 +2326,16 @@
   --rail-signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
   background: rgb(from var(--color-surface_container_highest) r g b / calc(var(--opacity-track) * var(--dim)));
+  --lit: 0;
+  transition: --lit var(--motion-short) var(--easing-standard);
+}
+
+.k-tabs:not([aria-disabled="true"]):is(:hover, :has(> .k-tab:focus-visible), [data-stranded]:focus-visible, [data-pinned], [data-pointed]) {
+  --lit: 1;
+}
+
+.k-tabs:is([data-pinned], [data-pointed]) {
+  transition: none;
 }
 
 .k-tabs:is([data-pinned="signs-off"], [aria-disabled="true"]) {
@@ -2372,7 +2386,7 @@
 .k-tabs-rail {
   left: calc(var(--size-control_sm) / 2);
   right: calc(var(--size-control_sm) / 2);
-  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-spinner_track) * var(--dim)));
+  background: rgb(from var(--color-primary) r g b / calc((var(--opacity-spinner_track) + (var(--opacity-track_lit) - var(--opacity-spinner_track)) * var(--lit)) * var(--dim)));
 }
 
 /* The lit stretch between where it was and the pick: travelling right its right edge leads, left
@@ -2389,7 +2403,11 @@
   --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--flash) * 100%));
   background: rgb(from var(--flashed) r g b / var(--dim));
   --glow: calc(var(--focus-content_glow) * var(--rail-signs) * (1 + (var(--focus-pressed_glow) - 1) * var(--flash)));
-  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)));
+  --flare: calc(var(--lit) * var(--rail-signs) * (1 + (var(--focus-pressed_glow) - 1) * var(--flash)));
+  filter:
+    drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)))
+    drop-shadow(0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * var(--flare))))
+    drop-shadow(0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * var(--flare))));
 }
 
 .k-tabs[data-toward="left"] > .k-tabs-lit {
