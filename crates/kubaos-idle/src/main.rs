@@ -566,6 +566,10 @@ fn lid_closed() -> Result<(), String> {
     Ok(())
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The holder runs as a user unit: a lock it couldn't take goes to its journal, and it keeps holding."
+)]
 fn lid_hold() -> Result<(), String> {
     let awake = Instant::now();
     let mut recheck = lid::Recheck::default();
@@ -595,8 +599,14 @@ fn lid_hold() -> Result<(), String> {
             machine::power(Path::new(machine::POWER_SUPPLY)),
             held,
         );
-        if recheck.tick(awake.elapsed(), state.closed, action) {
-            suspend();
+        match recheck.tick(awake.elapsed(), state.closed, action) {
+            lid::Step::Suspend => suspend(),
+            lid::Step::Lock => {
+                if let Err(err) = lock_session() {
+                    eprintln!("kubaos-idle: locking the closed lid: {err}");
+                }
+            }
+            lid::Step::Wait => {}
         }
     }
 }
