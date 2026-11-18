@@ -1,6 +1,6 @@
 // The Overview: every workspace at once, full screen on every screen, each screen showing the
 // workspace groups it holds; windows and whole workspaces are carried by hand between workspaces
-// and across screens, and a workspace is deleted with a held button. `overview-parts.ts` draws it;
+// and across screens, and either is dropped on the delete zone to go. `overview-parts.ts` draws it;
 // a DRAFT, its parts local to the page until Kuba approves the look.
 
 import type { Words } from "../../lib/content.ts";
@@ -128,18 +128,6 @@ const LIFT: Move = {
   sample: () => still({ pin: WINDOW_OVER }),
 };
 
-const DELETE: Move = {
-  name: "Deleted",
-  what: "Held to the end: its windows fade a `swap_lag` apart, then it folds back to `scale.behind`.",
-  tracks: [
-    { part: "its windows", on: "the centre's 2", target: '.ov-ws[data-space="s7"] .ov-win', property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the miniature", on: "folding", target: parts('.ov-ws[data-space="s7"]'), property: "--ov-arrive", from: 1, to: 0, duration: "medium", cue: "medium", curve: "emphasized_accel" },
-  ],
-  reduced: [{ part: "the miniature", on: "a fade", target: parts('.ov-ws[data-space="s7"]'), property: "--ov-arrive", from: 1, to: 0, duration: "short", curve: "standard" }],
-  back: "cuts",
-  sample: () => still({ pin: { kind: "delete", space: "s7", held: 0 } }),
-};
-
 const ARRIVES: Move = {
   name: "A new workspace",
   what: "Dropped between two or on the slot: it grows in from `scale.behind` over `medium`.",
@@ -147,6 +135,18 @@ const ARRIVES: Move = {
   reduced: [{ part: "the miniature", on: "a fade", target: parts('.ov-ws[data-space="s9"]'), property: "--ov-arrive", from: 0, to: 1, duration: "short", curve: "standard" }],
   back: "cuts",
   sample: () => still(),
+};
+
+const TIP_LEAVES: Move = {
+  name: "The tip leaving",
+  what: "Both drags made: as the second ends, it sinks `space.s16` and fades over `medium`, for good.",
+  tracks: [
+    { part: "its sink", on: "the tip", target: ".ov-tip", property: "--ov-sink", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
+    { part: "its fade", on: "the tip", target: ".ov-tip", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+  ],
+  reduced: [{ part: "its fade", on: "the tip", target: ".ov-tip", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
+  back: "cuts",
+  sample: () => still({ learned: ["window"] }),
 };
 
 const ZONE_ARRIVES: Move = {
@@ -210,9 +210,6 @@ export default page<Shown>({
     { name: "Between two workspaces", for: "a window: a new workspace there", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "between", group: "g-ext2", index: 2 } } }) },
     { name: "A workspace to another screen", for: "the centre's 4 into the portrait's group", sample: at({ view: "desk", pin: { kind: "space", space: "s9", to: { kind: "between", group: "g-ext1", index: 1 } } }) },
     { name: "Refused by a full group", for: "ten in use: it dims, no room", sample: at({ view: "desk", fill: "full", pin: { kind: "space", space: "s1", to: { kind: "refused", group: "g-ext2" } } }) },
-    { name: "The delete, lit", for: "under the keyboard's workspace", sample: at({ pin: { kind: "delete", space: "s7", held: 0 } }) },
-    { name: "The delete, held halfway", for: "its ring half full", sample: at({ pin: { kind: "delete", space: "s7", held: 0.5 } }) },
-    { name: "A workspace collapsing", for: "its windows gone, folding back", sample: at({ pin: { kind: "collapsing", space: "s7", at: 480 } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
     { name: "The delete zone, carrying", for: "a window on its way to it", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
     { name: "Over the delete zone", for: "lit: let go, and it closes", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
@@ -221,10 +218,15 @@ export default page<Shown>({
     { name: "A second one over it", for: "let go, the first goes for good", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
     { name: "The second dropped", for: "the first gone, the second waiting", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
     { name: "Brought back", for: "pressed: flying home", sample: at({ pin: { kind: "undoing", window: "w-term", share: 0.5 } }) },
-    { name: "The tip, at true size", for: "the bottom left corner, 1:1", sample: corner({}, "left", 720, 160) },
-    { name: "Carrying, at true size", for: "the delete round waiting, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: false } }, "right", 720, 280) },
-    { name: "Over the zone, at true size", for: "the bottom right corner, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: true } }, "right", 720, 280) },
-    { name: "Waiting, at true size", for: "the zone's timer and Undo, 1:1", sample: corner({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }, "right", 720, 280) },
+    { name: "The tip, shown", for: "nothing learned yet: the bottom left corner, 1:1", sample: corner({}, "left", 720, 160) },
+    { name: "The tip, one drag learned", for: "a window dragged: it stays, all of it", sample: corner({ learned: ["window"] }, "left", 720, 160) },
+    { name: "The tip, both learned", for: "both drags made: gone for good", sample: corner({ learned: ["window", "space"] }, "left", 720, 160) },
+    { name: "The zone's reach", for: "dashed: a drop anywhere inside deletes", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: false } }) },
+    { name: "Just inside the reach", for: "a window, far from the round: already small, the round lit", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: "edge" } }) },
+    { name: "A workspace just inside", for: "right-dragged: small, the round lit", sample: at({ reach: true, pin: { kind: "binning", what: GAME, over: "edge" } }) },
+    { name: "Carrying, at true size", for: "the delete round waiting, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: false } }, "right", 720, 400) },
+    { name: "Over the zone, at true size", for: "the bottom right corner, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: true } }, "right", 720, 400) },
+    { name: "Waiting, at true size", for: "the zone's timer and Undo, 1:1", sample: corner({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }, "right", 720, 400) },
   ],
   sizes: doesntApply("one size: the screen's; the miniatures take what the screen has."),
   states: {
@@ -247,7 +249,7 @@ export default page<Shown>({
     tubes: [
       { name: "A workspace, by the keyboard", tone: "accent", filled: false, content: false },
       { name: "A carry's target", tone: "accent", filled: false, content: false },
-      { name: "The delete", tone: "burn_error", filled: true, content: false },
+      { name: "The delete zone, lit", tone: "burn_error", filled: false, content: false },
     ],
     looks: { lit: "the tube round the miniature, its glow outside", signsOff: "the tube as glass, no glow" },
     signsOff: () => still({ pin: { kind: "lit", space: "s7" } }),
@@ -264,7 +266,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING],
     leaves: [CLOSING],
-    between: [HOVER, LIFT, DELETE, ARRIVES, ZONE_ARRIVES, INTO_ZONE, TIMER],
+    between: [HOVER, LIFT, ARRIVES, TIP_LEAVES, ZONE_ARRIVES, INTO_ZONE, TIMER],
   },
   keyboard: {
     keys: [
@@ -275,7 +277,6 @@ export default page<Shown>({
       { keys: ["←", "→", "↑", "↓"], does: "the next workspace that way, across screens" },
       { keys: ["Shift+←", "Shift+→", "Shift+↑", "Shift+↓"], does: "carries its focused window that way" },
       { keys: ["Enter"], does: "goes there: it grows into the screen" },
-      { keys: ["Delete"], does: "held: deletes it, closing its windows" },
       { keys: ["Esc"], does: "puts a carried thing back, or closes" },
     ],
     order: "No stop for Tab: the arrows move the keyboard, across screens.",
@@ -291,7 +292,7 @@ export default page<Shown>({
       { part: "Between miniatures", token: "space-s24" },
       { part: "Between sections", token: "space-s32" },
       { part: "Number under", token: "space-s8" },
-      { part: "Number and delete row", token: "size-control_sm" },
+      { part: "Number's row", token: "size-control_sm" },
       { part: "Number", token: "size-chip" },
       { part: "Name over a section", token: "size-chip" },
       { part: "Miniature corners", token: "radius-control" },
@@ -299,6 +300,10 @@ export default page<Shown>({
       { part: "Window gaps", token: "space-s8" },
       { part: "Wallpaper blur", token: "size-lock_blur" },
       { part: "Slit between two", token: "space-s4" },
+      { part: "Delete round", token: "size-drop_target" },
+      { part: "Delete round, something over it", token: "size-drop_target_over" },
+      { part: "Round in from the corner", token: "space-s48" },
+      { part: "Drop reach, of the shorter side", token: "scale-drop_reach" },
     ],
     reflow: { note: "Its own group up to a 3 × 3 grid's size; waiting groups at half; rows centred.", sample: at({ desk: "laptop" }) },
   },

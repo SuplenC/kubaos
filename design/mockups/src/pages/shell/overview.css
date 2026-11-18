@@ -27,6 +27,7 @@
 @property --ov-held { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-hover { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-bx { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --ov-by { syntax: "<length>"; inherits: false; initial-value: 0px; }
@@ -211,23 +212,6 @@
   background: var(--color-primary);
 }
 
-.ov-ws-remove {
-  position: absolute;
-  right: 0;
-  top: 0;
-  display: flex;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-short) var(--easing-standard);
-}
-
-.ov[data-open]:not([data-carrying]) .ov-ws:is(:hover, [data-selected]) .ov-ws-remove,
-.ov-ws-remove[data-pinned],
-.ov-ws-remove:has([data-holding]) {
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* The pointer over a miniature lifts it a little. */
 .ov[data-open]:not([data-carrying]) .ov-ws:not([data-selected], [data-gone]):has(> .ov-ws-desk:hover) {
   --ov-hover: 1;
@@ -291,7 +275,7 @@
     --ov-th var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-sx var(--ov-pt, 0s) var(--ov-pe, linear),
     --ov-sy var(--ov-pt, 0s) var(--ov-pe, linear),
-    opacity var(--motion-medium) var(--easing-emphasized_accel) var(--ov-cd, 0s),
+    opacity var(--motion-medium) var(--easing-emphasized_accel),
     --ov-held var(--motion-short) var(--easing-standard);
 }
 
@@ -328,17 +312,6 @@
 
 .ov-win[data-landing] {
   z-index: 1;
-}
-
-/* Closed by a delete: it fades and steps back, its neighbours a `swap_lag` behind each other. */
-.ov-win[data-closing] {
-  opacity: 0;
-  translate: var(--ov-tx) var(--ov-ty);
-  scale: var(--scale-behind);
-  transform-origin: 50% 50%;
-  transition:
-    opacity var(--motion-medium) var(--easing-emphasized_accel) var(--ov-cd, 0s),
-    scale var(--motion-medium) var(--easing-emphasized_accel) var(--ov-cd, 0s);
 }
 
 /* The app's icon, a small tile in the window's corner, at its own size whatever the scale. */
@@ -514,7 +487,7 @@
   padding: var(--space-s4) var(--space-s12);
   border-radius: var(--radius-control);
   background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
-  translate: var(--ov-x) calc(var(--ov-y) - 50%);
+  translate: var(--ov-x) calc(var(--ov-y) - 50% + var(--space-s16) * var(--ov-sink));
   opacity: 0;
   transition: opacity var(--motion-medium) var(--easing-standard);
 }
@@ -522,6 +495,35 @@
 .ov[data-open] .ov-tip {
   opacity: 1;
   transition-delay: var(--motion-medium);
+}
+
+/* Both drags learned: it sinks `space.s16` into the margin as it fades over `medium`, for good. */
+.ov .ov-tip[data-learned] {
+  --ov-sink: 1;
+  opacity: 0;
+  transition:
+    --ov-sink var(--motion-medium) var(--easing-emphasized_accel),
+    opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+[data-reduced] .ov .ov-tip[data-learned] {
+  --ov-sink: 0;
+}
+
+/* A sample's annotation, not the Overview's: the delete zone's reach, a dashed circle in `outline`
+   round the round, the screen's edges cutting it to its corner. */
+.ov-reach {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  box-sizing: border-box;
+  width: var(--ov-w);
+  height: var(--ov-w);
+  translate: var(--ov-x) var(--ov-y);
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) dashed var(--color-outline);
+  border-radius: var(--radius-full);
+  pointer-events: none;
 }
 
 /* The delete zone: a round in the corner while something is carried, or while a deletion waits. It
@@ -560,14 +562,13 @@
   gap: var(--space-s8);
 }
 
-/* The delete round drawn the medium round's size, grown to its own, the large, under a carry. */
+/* Under a carry the delete round grows round its middle to `size.drop_target_over`, over `short`. */
 .ov-bin .ov-bin-delete {
-  scale: var(--ov-rest);
   transition: scale var(--motion-short) var(--easing-standard);
 }
 
 .ov-bin[data-over] .ov-bin-delete {
-  scale: 1;
+  scale: var(--ov-over);
 }
 
 /* A thing gone into the zone: it shrinks into its symbol as it fades, over `medium`. */

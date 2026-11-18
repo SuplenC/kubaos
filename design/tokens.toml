@@ -196,6 +196,12 @@ two_line = 24
 control_sm = 32
 control_md = 40
 control_lg = 48
+# A round you drop something on rather than press, as an IconButton's Target size: the Overview's
+# delete zone, hit at speed with a window carried in the hand. A step past the large control's 48
+# by the grid's 16, so it reads at a glance from across the screen, and while something is over it
+# a step larger again, so it answers the carried thing before it is let go.
+drop_target = 64
+drop_target_over = 80
 # A list row with one line, with a title over a subtitle, and with a title over a
 # subtitle that wraps to its second line (a menu item's or a select option's
 # description): each a `small` line taller, with the same inset at its top and foot.
@@ -902,6 +908,11 @@ behind = 0.96
 # A thing picked up to be carried, a window or a workspace in the Overview: it comes toward you by
 # this much while it is held, so it reads as lifted off the desk rather than slid along it.
 lift = 1.04
+# How far round a drop target a carried thing counts as on it, a share of its screen's shorter side,
+# measured from the target's middle: the Overview's delete zone takes a drop anywhere in the quarter
+# circle of the corner a person throws a drag at (270 on a 1080 tall screen, 360 on 1440), not only
+# on the round, which the carried thing covers.
+drop_reach = 0.25
 # The wallpaper coming toward you as the lock comes up, and going back to 1:1 as it gives way, round
 # the middle of the screen's bottom edge: the picture behind the city, its sky and its plate. A
 # gentle dolly, held still at rest and awake.

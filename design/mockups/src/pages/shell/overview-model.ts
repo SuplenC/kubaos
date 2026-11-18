@@ -276,34 +276,6 @@ export function moveSpace(desk: Desk, space: string, group: string, index: numbe
   return { added, removed: sweep(desk), closed: [] };
 }
 
-/**
- * Deletes workspace `space`: closes every window on it and takes it out of its group. A screen
- * that showed it shows its neighbour, or a new empty workspace.
- */
-export function removeSpace(desk: Desk, space: string): Change {
-  const group = groupOf(desk, space);
-  const holder = holderOf(desk, group);
-  const closed = [...desk.spaces.get(space)!.windows];
-  for (const window of closed) desk.windows.delete(window);
-  const at = group.spaces.indexOf(space);
-  group.spaces = group.spaces.filter((each) => each !== space);
-  desk.spaces.delete(space);
-  const added: string[] = [];
-  if (desk.shown.get(holder.id) === space) {
-    const left = groupsOn(desk, holder).flatMap((each) => each.spaces);
-    let next = group.spaces[Math.max(0, at - 1)] ?? left[0];
-    if (next === undefined) {
-      const fresh: Space = { id: freshSpace(desk), windows: [], focused: null };
-      desk.spaces.set(fresh.id, fresh);
-      group.spaces.push(fresh.id);
-      added.push(fresh.id);
-      next = fresh.id;
-    }
-    desk.shown.set(holder.id, next);
-  }
-  return { added, removed: [space, ...sweep(desk)], closed };
-}
-
 /** Shows `space` on its screen, which takes the keyboard. */
 export function go(desk: Desk, space: string): Change {
   const screen = screenOf(desk, space);

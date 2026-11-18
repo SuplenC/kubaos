@@ -22,7 +22,7 @@ import { icon } from "../../lib/icon.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { text } from "../../lib/text.ts";
-import { length, raw } from "../../lib/tokens.ts";
+import { length, number, raw } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 import { barScreen } from "./bar-parts.ts";
 import { BADGED, face, ICONS } from "./overview-apps.ts";
@@ -56,11 +56,9 @@ export type Pin =
   | { readonly kind: "lit"; readonly space: string }
   | { readonly kind: "window"; readonly window: string; readonly to: Target; readonly crossing?: number }
   | { readonly kind: "space"; readonly space: string; readonly to: Target }
-  | { readonly kind: "delete"; readonly space: string; readonly held: number }
-  /** A held delete let go of once it filled, drawn `at` milliseconds on. */
-  | { readonly kind: "collapsing"; readonly space: string; readonly at: number }
   /** A window or a workspace carried toward the delete zone, or over it. */
-  | { readonly kind: "binning"; readonly what: Carried; readonly over: boolean }
+  /** `over`: on the round; `edge`: just inside the reach, far from the round; neither, on its way. */
+  | { readonly kind: "binning"; readonly what: Carried; readonly over: boolean | "edge" }
   /**
    * Something dropped on the delete zone, `left` of its time to undo left; with `next`, a second
    * thing carried over the zone meanwhile, or, `confirmed`, the first one gone and `what` pending.
@@ -68,6 +66,9 @@ export type Pin =
   | { readonly kind: "pending"; readonly what: Carried; readonly left: number; readonly next?: Carried; readonly confirmed?: Carried }
   /** A window dropped on the delete zone and brought back, drawn `share` of its way home. */
   | { readonly kind: "undoing"; readonly window: string; readonly share: number };
+
+/** A drag the tip teaches: a window's with the left button, a workspace's with the right. */
+export type Learned = "window" | "space";
 
 /** A window or a workspace, by its id. */
 export type Carried = { readonly window: string } | { readonly space: string };
@@ -81,6 +82,13 @@ export interface OverviewOptions {
   /** The screen the keyboard is on, when not the primary. */
   readonly focus?: string;
   readonly pin?: Pin;
+  /**
+   * The drags the person has already made with the pointer, a window's and a workspace's: once both,
+   * the tip that teaches them is gone. The build keeps this in `~/.local/state/kubaos/overview.toml`.
+   */
+  readonly learned?: readonly Learned[];
+  /** The delete zone's reach drawn round it, dashed: a sample's annotation, not the Overview's. */
+  readonly reach?: boolean;
   /** Groups renamed, by id: a long name's sample. */
   readonly names?: Readonly<Record<string, string>>;
 }
@@ -111,6 +119,9 @@ export interface Driver {
   readonly thaw: () => void;
   /** The middle of the delete zone where it stands, or would stand on the focused screen. */
   readonly bin: () => Point;
+  /** The drags learned, and whether the tip still shows. */
+  readonly learned: () => Learned[];
+  readonly tipShown: () => boolean;
   /** What waits in the delete zone, or null. */
   readonly pending: () => Carried | null;
   /** Draws the overview again with other options: another desk, view or fill. */
@@ -273,16 +284,12 @@ function span(name: string, ...children: (Node | string)[]): HTMLElement {
   return element;
 }
 
-/** A workspace's elements: its box, the desktop scaled inside it, and its number and delete under it. */
+/** A workspace's elements: its box, the desktop scaled inside it, and its number under it. */
 interface SpaceEl {
   readonly root: HTMLElement;
   readonly desk: HTMLElement;
   readonly tag: HTMLElement;
   readonly number: HTMLElement;
-  readonly remove: HTMLElement;
-  /** The words its delete button says, so it is made again only when they change. */
-  said: string;
-  heldAt: number;
 }
 
 /** A screen drawn: the desktop with its frame and bar, and the overview's layer over it. */
@@ -310,14 +317,8 @@ const GLIDES: Record<Exclude<Motion, "none">, readonly [string, string]> = {
   arrive: ["medium", "emphasized_decel"],
 };
 
-/**
- * The cue every glide set now waits for: a delete's neighbours close its gap once its windows have
- * gone. A move sets it round the changes it makes, and puts it back.
- */
-let cue = "0s";
-
 /** Sets an element's glide for its next change of place: its timing, or none. */
-function glide(element: HTMLElement, motion: Motion, delay = cue): void {
+function glide(element: HTMLElement, motion: Motion, delay = "0s"): void {
   if (motion === "none" || settings().reduced) {
     element.style.setProperty("--ov-pt", "0s");
     element.style.setProperty("--ov-pd", "0s");
@@ -346,7 +347,7 @@ export function zoneRound(what: "window" | "space", waiting?: { readonly name: s
   const zone = document.createElement("span");
   zone.className = "ov-bin-content";
   const remove = () => {
-    const round = iconButton({ icon: "delete", label: what === "window" ? "Close" : "Remove", kind: "Danger", size: "Lg", outlined: true, hint: false });
+    const round = iconButton({ icon: "delete", label: what === "window" ? "Close" : "Remove", kind: "Danger", size: "Target", outlined: true, hint: false });
     round.classList.add("ov-bin-delete");
     return round;
   };
@@ -354,14 +355,14 @@ export function zoneRound(what: "window" | "space", waiting?: { readonly name: s
     zone.append(remove());
     return zone;
   }
-  const said = pill({ lone: false, content: [text("Undo", "button_small"), text(waiting.name, "label", "on_surface_variant")] });
+  const said = pill({ lone: false, content: [text("Undo", "body_strong"), text(waiting.name, "body", "on_surface_variant")] });
   said.classList.add("ov-bin-line");
   // Something carried while one waits: a drop on the round deletes it and the waiting one goes for good.
   if (carrying) {
     zone.append(said, remove());
     return zone;
   }
-  const back = iconButton({ icon: "undo", label: "Undo", kind: "Text", size: "Lg", outlined: true, held: waiting.left, hint: false });
+  const back = iconButton({ icon: "undo", label: "Undo", kind: "Text", size: "Target", outlined: true, held: waiting.left, hint: false });
   zone.append(said, back);
   return zone;
 }
@@ -480,10 +481,23 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   const slit = span("ov-slit");
   marks.append(room, slit, aim, select);
 
-  // How both drags go, once, on the focused screen: a tip on the frame's glass in the bottom
-  // margin's left end, under every miniature, the delete zone's corner left free.
-  const tip = span("ov-tip", tipLine("Drag a window with the left button, a whole workspace with the right."));
+  // How both drags go, on the focused screen: a tip on the frame's glass in the bottom margin's left
+  // end, under every miniature, the delete zone's corner left free. It shows every time until the
+  // person has made both drags with the pointer, and then leaves for good. Each button is a phrase
+  // of its own, which a mouse button's keycap can take the place of without the sentence changing.
+  const tip = span("ov-tip", tipLine("Drag a window with the left button, a whole workspace with the right button."));
+  const learned = new Set<Learned>(options.learned ?? []);
+  tip.toggleAttribute("data-learned", learned.size === 2);
   marks.append(tip);
+
+  /** A drag made with the pointer: learned; once both are, the tip leaves as the drag ends. */
+  function learn(drag: Learned): void {
+    learned.add(drag);
+  }
+
+  function tipLeaves(): void {
+    if (learned.size === 2 && !tip.hasAttribute("data-learned")) tip.dataset.learned = "";
+  }
 
   const views: ScreenView[] = [];
   const spaceEls = new Map<string, SpaceEl>();
@@ -614,11 +628,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     picture.draggable = false;
     desktop.append(picture);
     const number = span("ov-ws-number");
-    const remove = span("ov-ws-remove");
-    const tag = span("ov-ws-tag", number, remove);
+    const tag = span("ov-ws-tag", number);
     const element = span("ov-ws", desktop, tag);
     element.dataset.space = id;
-    made = { root: element, desk: desktop, tag, number, remove, said: "", heldAt: -1 };
+    made = { root: element, desk: desktop, tag, number };
     spaceEls.set(id, made);
     return made;
   }
@@ -641,13 +654,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return element;
   }
 
-  /** The delete's words for a workspace of `count` windows, one message per count. */
-  function removeWords(count: number): string {
-    if (count === 0) return "Hold to remove";
-    if (count === 1) return "Hold to close 1 window";
-    return `Hold to close ${count} windows`;
-  }
-
   function dressTag(id: string, made: SpaceEl, screen: model.Screen): void {
     const shown = desk.shown.get(screen.id) === id;
     const words = String(model.numberOf(desk, id));
@@ -655,21 +661,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       made.number.replaceChildren(text(words, "button_small", shown ? "on_primary" : "on_surface"));
       made.number.toggleAttribute("data-shown", shown);
     }
-    const count = desk.spaces.get(id)!.windows.length;
-    const said = removeWords(count);
-    const heldAt = options.pin?.kind === "delete" && options.pin.space === id ? options.pin.held : -1;
-    if (made.said === said && made.heldAt === heldAt) return;
-    made.said = said;
-    made.heldAt = heldAt;
-    const button = iconButton({
-      icon: "delete",
-      label: said,
-      kind: "Danger",
-      size: "Sm",
-      ...(heldAt >= 0 ? { held: heldAt, pinned: "lit" as const } : { hold: () => removeSpace(id) }),
-    });
-    made.remove.replaceChildren(button);
-    made.remove.toggleAttribute("data-pinned", heldAt >= 0);
   }
 
   // ── Where everything goes ──
@@ -1245,13 +1236,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       element.style.setProperty("--ov-sy", String(scale));
       element.style.setProperty("--ov-badge", String(1 / scale));
     }
-    // Over the delete zone it shrinks to a small round's size and stands off the round's top left
-    // edge, so the lit round shows beside it.
+    // In the delete zone's reach it shrinks to the round's size round the pointer and stands off the
+    // grown round's top left, `space.s16` clear of it, so the lit round shows beside it.
     const over = target?.kind === "bin";
     // A window's offset is drawn inside its own scale, so it is that much larger.
     const within = carry.kind === "window" ? scaleOver(target) : 1;
-    const aside = over ? css(-L("size-control_lg") / 2 / within) : "0px";
-    element.style.setProperty("--ov-shrink", over ? String(Math.min(1, L("size-control_sm") / carriedSize())) : "1");
+    const aside = over ? css(-(L("size-drop_target_over") / 2 + L("space-s16")) / within) : "0px";
+    element.style.setProperty("--ov-shrink", over ? String(Math.min(1, L("size-drop_target") / carriedSize())) : "1");
     element.style.setProperty("--ov-bx", aside);
     element.style.setProperty("--ov-by", aside);
     place("reflow");
@@ -1417,35 +1408,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     });
   }
 
-  /** Closes every window on workspace `id`, then folds it away; the others close the gap. */
-  function removeSpace(id: string): void {
-    if (!desk.spaces.has(id)) return;
-    const made = spaceEls.get(id)!;
-    const closing = [...desk.spaces.get(id)!.windows];
-    closing.forEach((win, k) => {
-      const element = winEls.get(win);
-      if (!element) return;
-      element.dataset.closing = "";
-      element.style.setProperty("--ov-cd", `calc(var(--motion-swap_lag) * ${k})`);
-    });
-    model.removeSpace(desk, id);
-    // The miniature folds once its windows have gone, and the others close the gap as it does.
-    const wait = closing.length > 0 ? `calc(var(--motion-medium) + var(--motion-swap_lag) * ${closing.length - 1})` : "0s";
-    collapse(id, made, wait);
-    cue = settings().reduced ? "0s" : wait;
-    place("reflow");
-    cue = "0s";
-    later(ms("medium") * 3 + ms("swap_lag") * closing.length, () => {
-      for (const win of closing) {
-        winEls.get(win)?.remove();
-        winEls.delete(win);
-      }
-    });
-    if (selected === id) selected = desk.shown.get(desk.focused) ?? null;
-    showSelect();
-  }
-
-
   // ── The delete zone ──
 
   /**
@@ -1463,8 +1425,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   let binOn: string | null = null;
 
   const bin = span("ov-bin");
-  // At rest the round is drawn the medium round's size, and grows to the large one under a carry.
-  bin.style.setProperty("--ov-rest", String(L("size-control_md") / L("size-control_lg")));
+  // A sample's annotation: the zone's reach, the screen clipping it to its corner.
+  const reach = options.reach ? span("ov-reach") : null;
+  // Under a carry the round grows from `size.drop_target` to `size.drop_target_over` round its middle.
+  bin.style.setProperty("--ov-over", String(L("size-drop_target_over") / L("size-drop_target")));
   marks.append(bin);
   bin.addEventListener("pointerdown", (event) => {
     if (event.button !== 0 || carry || !pending) return;
@@ -1509,9 +1473,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** The zone's place: the bottom right corner of screen `on`, `space.s16` in, as wide as it holds. */
   function binBox(on: ScreenView): model.Rect {
     const scale = settings().scale;
-    const w = bin.offsetWidth > 0 ? bin.offsetWidth / scale : L("size-control_lg");
-    const h = bin.offsetHeight > 0 ? bin.offsetHeight / scale : L("size-control_lg");
-    const inset = L("space-s16");
+    const w = bin.offsetWidth > 0 ? bin.offsetWidth / scale : L("size-drop_target");
+    const h = bin.offsetHeight > 0 ? bin.offsetHeight / scale : L("size-drop_target");
+    // As far in as the miniatures' margin, so it stands clear of the corner, not tucked into it.
+    const inset = L("space-s48");
     return { x: on.at.x + on.size.w - inset - w, y: on.at.y + on.size.h - inset - h, w, h };
   }
 
@@ -1543,19 +1508,45 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     }
     bin.dataset.shown = "";
     lightBin(carry?.target?.kind === "bin");
+    showReach();
   }
 
+  /**
+   * Whether `point` is in the zone's reach: on its screen, within `scale.drop_reach` of the screen's
+   * shorter side from the round's middle. The carried thing covers the round, so the drop counts
+   * well before the pointer is on it.
+   */
   function overBin(point: Point): boolean {
     if (!bin.hasAttribute("data-shown") || !binOn) return false;
     const on = viewOf(binOn);
-    return on ? inside(point, binBox(on)) : false;
+    if (!on || !inside(point, { x: on.at.x, y: on.at.y, w: on.size.w, h: on.size.h })) return false;
+    const centre = binCentre();
+    return Math.hypot(point.x - centre.x, point.y - centre.y) <= reachOf(on);
+  }
+
+  function reachOf(on: ScreenView): number {
+    return number("scale-drop_reach") * Math.min(on.size.w, on.size.h);
+  }
+
+  /** The reach drawn round the round, for a sample that shows it. */
+  function showReach(): void {
+    if (!reach) return;
+    const on = viewOf(binOn ?? desk.focused) ?? views[0]!;
+    const centre = binCentre();
+    const r = reachOf(on);
+    // On the screen's own layer, so the screen's edges cut it to its corner.
+    if (reach.parentElement !== on.layer) on.layer.append(reach);
+    reach.style.setProperty("--ov-x", css(centre.x - on.at.x - r));
+    reach.style.setProperty("--ov-y", css(centre.y - on.at.y - r));
+    reach.style.setProperty("--ov-w", css(2 * r));
+    reach.dataset.shown = "";
   }
 
   /** The round's middle, in world points, where a thing dropped there goes. */
   function binCentre(): Point {
     const on = viewOf(binOn ?? desk.focused) ?? views[0]!;
     const box = binBox(on);
-    return { x: box.x + box.w - L("size-control_lg") / 2, y: box.y + box.h / 2 };
+    return { x: box.x + box.w - L("size-drop_target") / 2, y: box.y + box.h / 2 };
   }
 
   /**
@@ -1702,7 +1693,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   world.addEventListener("pointerdown", (event) => {
     if ((event.button !== 0 && event.button !== 2) || !open || carry) return;
-    if (event.target instanceof Element && event.target.closest(".ov-ws-remove, .ov-bin")) return;
+    if (event.target instanceof Element && event.target.closest(".ov-bin")) return;
     const at = toWorld(event.clientX, event.clientY);
     press = { id: event.pointerId, at, client: { x: event.clientX, y: event.clientY }, on: hit(at), right: event.button === 2 };
     world.setPointerCapture(event.pointerId);
@@ -1718,9 +1709,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       const moved = (Math.hypot(event.clientX - press.client.x, event.clientY - press.client.y) / box.width) * worldSize.w * fitOf();
       if (moved < threshold()) return;
       const on = press.on;
-      if (press.right && (on.kind === "window" || on.kind === "space")) liftSpace(on.kind === "window" ? on.space : on.id, press.at);
-      else if (!press.right && on.kind === "window") liftWindow(on.id, press.at);
-      else return;
+      if (press.right && (on.kind === "window" || on.kind === "space")) {
+        liftSpace(on.kind === "window" ? on.space : on.id, press.at);
+        learn("space");
+      } else if (!press.right && on.kind === "window") {
+        liftWindow(on.id, press.at);
+        learn("window");
+      } else return;
       keyed = false;
     }
     moveCarry(at);
@@ -1732,6 +1727,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     press = null;
     if (carry) {
       drop(event.type === "pointercancel");
+      tipLeaves();
       return;
     }
     if (was.right) return;
@@ -1808,8 +1804,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     showSelect();
   }
 
-  let holding: HTMLButtonElement | null = null;
-
   root.addEventListener("keydown", (event) => {
     const key = event.key;
     if (!open) {
@@ -1851,25 +1845,12 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       setOpen(false, selected);
       return;
     }
-    if (key === "Delete" && selected && !event.repeat) {
-      event.preventDefault();
-      keyed = true;
-      showSelect();
-      holding = spaceEls.get(selected)?.remove.querySelector("button") ?? null;
-      holding?.dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true }));
-    }
-  });
-
-  root.addEventListener("keyup", (event) => {
-    if (event.key !== "Delete" || !holding) return;
-    holding.dispatchEvent(new PointerEvent("pointerup", { button: 0, bubbles: true }));
-    holding = null;
   });
 
   // ── Drawn ──
 
   // A still sample moves nothing: its pin is drawn where each move ends, or at its moment.
-  root.toggleAttribute("data-still", options.pin !== undefined && options.pin.kind !== "collapsing");
+  root.toggleAttribute("data-still", options.pin !== undefined);
   place("none");
   setLook(open, "none");
   applyPin();
@@ -1884,13 +1865,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       showSelect();
       return;
     }
-    if (pin.kind === "collapsing" || pin.kind === "undoing" || pin.kind === "binning" || pin.kind === "pending") return;
-    if (pin.kind === "delete") {
-      selected = pin.space;
-      keyed = true;
-      showSelect();
-      return;
-    }
+    if (pin.kind === "undoing" || pin.kind === "binning" || pin.kind === "pending") return;
     if (pin.kind === "window") {
       const start = centreOf({ window: pin.window });
       liftWindow(pin.window, start);
@@ -1919,7 +1894,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (pin.kind === "binning") {
       const from = liftThing(pin.what);
       const goal = binPoint();
-      moveCarry(pin.over ? goal : { x: from.x + (goal.x - from.x) / 2, y: from.y + (goal.y - from.y) / 2 });
+      if (pin.over === "edge") {
+        // Toward the round from where it was taken, a tenth of the reach inside its edge.
+        const centre = binCentre();
+        const away = Math.hypot(from.x - centre.x, from.y - centre.y);
+        const at = (reachOf(viewOf(binOn ?? desk.focused) ?? views[0]!) * 0.9) / away;
+        moveCarry({ x: centre.x + (from.x - centre.x) * at, y: centre.y + (from.y - centre.y) * at });
+      } else moveCarry(pin.over ? goal : { x: from.x + (goal.x - from.x) / 2, y: from.y + (goal.y - from.y) / 2 });
       settle();
       return;
     }
@@ -2039,22 +2020,19 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     thaw: settle,
     redraw: (next) => redraw({ ...options, ...next }),
     bin: () => binPoint(),
+    learned: () => [...learned].sort(),
+    tipShown: () => !tip.hasAttribute("data-learned"),
     pending: () => pending?.what ?? null,
   };
 
   // A pin drawn mid-move plays the move once the sample is on the page, held at its moment.
-  const moving = options.pin?.kind === "collapsing" || options.pin?.kind === "undoing" || options.pin?.kind === "binning" || options.pin?.kind === "pending" ? options.pin : null;
+  const moving = options.pin?.kind === "undoing" || options.pin?.kind === "binning" || options.pin?.kind === "pending" ? options.pin : null;
   if (moving) {
     const seen = new ResizeObserver(() => {
       if (!root.isConnected) return;
       seen.disconnect();
       if (moving.kind === "binning" || moving.kind === "pending") {
         applyZonePin(moving);
-        return;
-      }
-      if (moving.kind === "collapsing") {
-        removeSpace(moving.space);
-        driver.freeze(moving.at, true);
         return;
       }
       // Its way home drawn where it stands `share` along: from the zone to its tile.
