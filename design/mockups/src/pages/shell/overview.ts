@@ -1,11 +1,11 @@
 // The Overview: every workspace at once, full screen on every screen, each screen showing the
 // workspace groups it holds; windows and whole workspaces are carried by hand between workspaces
-// and across screens, and either is dropped on the delete zone to go. `overview-parts.ts` draws it;
+// and across screens, and either is dropped in the delete slot to go. `overview-parts.ts` draws it;
 // a DRAFT, its parts local to the page until Kuba approves the look.
 
 import type { Words } from "../../lib/content.ts";
 import { doesntApply, type Move, nonEmpty, page, screen, type Track } from "../../site/page.ts";
-import { DESKS, type OverviewOptions, overview, type Pin, sizeOf, VIEWS, zoneRound } from "./overview-parts.ts";
+import { DESKS, type OverviewOptions, overview, type Pin, sizeOf, VIEWS } from "./overview-parts.ts";
 
 type Shown = "rest" | "lit" | "pressed" | "selected" | "empty";
 
@@ -18,7 +18,7 @@ const at = (options: Partial<OverviewOptions> = {}) => screen(() => still(option
 
 /**
  * A bottom corner of the centre screen cut out at its true size, `width` by `height` logical
- * pixels: the stage draws the whole screen at half its size, where the tip and the delete zone are
+ * pixels: the stage draws the whole screen at half its size, where the tip and the delete slot are
  * too small to read. The cut's size is the sample's frame, not a design value.
  */
 function corner(options: Partial<OverviewOptions>, side: "left" | "right", width: number, height: number) {
@@ -44,7 +44,7 @@ function live(picked: readonly number[] = []): HTMLElement {
   return overview({ desk: DESKS[picked[0] ?? 0]!.desk, view: VIEWS[picked[1] ?? 0]!.view }).element;
 }
 
-/** The terminal, carried toward the delete zone, or over it. */
+/** The terminal, carried toward the delete slot, or over it. */
 const TERMINAL = { window: "w-term" } as const;
 /** The game's workspace, the centre's third. */
 const GAME = { space: "s8" } as const;
@@ -159,7 +159,7 @@ const SWIPE_CLOSES: Move = {
 
 const GAP_CLOSES: Move = {
   name: "A gap deleted",
-  what: "The empty 3 goes into the zone; the later ones close up over `medium` as their numbers roll down over `short`.",
+  what: "The empty 3 goes into the slot; the later ones close up over `medium` as their numbers roll down over `short`.",
   tracks: [
     { part: "the gap", on: "the empty 3", target: '.ov-ws[data-space="s8"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
     { part: "the later numbers", on: "4 to 3", target: '.ov-ws[data-space="s9"] .k-roll-slot', property: "--roll", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -205,27 +205,18 @@ const TIP_LEAVES: Move = {
   sample: () => still({ learned: ["window"] }),
 };
 
-const ZONE_ARRIVES: Move = {
-  name: "The delete zone arriving",
+const SLOT_ARRIVES: Move = {
+  name: "The delete slot arriving",
   what: "Lifted: it rises `space.s24` into the corner and fades in over `medium`; it leaves over `short`.",
-  tracks: [{ part: "the zone", on: "a carry", target: ".ov-bin", property: "opacity", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
-  reduced: [{ part: "the zone", on: "a fade", target: ".ov-bin", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  tracks: [{ part: "the slot", on: "a carry", target: ".ov-bin", property: "opacity", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
+  reduced: [{ part: "the slot", on: "a fade", target: ".ov-bin", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   back: "plays",
   sample: () => still({ pin: { kind: "binning", what: TERMINAL, over: false } }),
 };
 
-const INTO_ZONE: Move = {
-  name: "Into the delete zone",
-  what: "Let go anywhere in the reach: from its size that instant it shrinks to nothing and fades where it is, over `medium`.",
-  tracks: [{ part: "the window", on: "the terminal", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
-  reduced: [{ part: "the window", on: "a fade", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
-  back: "cuts",
-  sample: () => still({ pin: { kind: "binning", what: TERMINAL, over: true } }),
-};
-
 const PULLED: Move = {
-  name: "Pulled into the round",
-  what: "In the reach it leaves the pointer and flies into the round over `medium`; out of it, back to the pointer the same way.",
+  name: "Pulled into the slot",
+  what: "In the reach it leaves the pointer and flies into the slot over `medium`; out of it, back to the pointer the same way.",
   tracks: [{ part: "the carried thing", on: "the terminal", target: '[data-window="w-term"]', property: "--ov-shrink", from: 1, to: 0.25, duration: "medium", curve: "emphasized_decel" }],
   reduced: [{ part: "the carried thing", on: "there at once", target: '[data-window="w-term"]', property: "--ov-shrink", from: 0.25, to: 0.25, duration: "instant", curve: "standard" }],
   back: "plays",
@@ -233,17 +224,24 @@ const PULLED: Move = {
 };
 
 const TIMER: Move = {
-  name: "The timer running",
-  what: "The Undo round's ring drains over `undo` on `linear`, as a held round's fills; empty, it closes.",
-  tracks: [{ part: "the fill", on: "Undo", target: ".k-button", property: "--hold", from: 1, to: 0, duration: "undo", curve: "linear" }],
+  name: "Waiting in the slot",
+  what: "Let go in the reach, it stays as it sat; the bar runs down over `undo` on `linear`, reduced motion too.",
+  tracks: [{ part: "the bar", on: "the slot's foot", target: ".ov-bin", property: "--hold", from: 1, to: 0, duration: "undo", curve: "linear" }],
   reduced: "same",
   back: "cuts",
-  sample: () => {
-    const zone = document.createElement("span");
-    zone.className = "ov-zone-alone";
-    zone.append(zoneRound("window", { name: "just mockups", left: 1 }));
-    return zone;
-  },
+  sample: () => still({ pin: { kind: "pending", what: TERMINAL, left: 1 } }),
+};
+
+const TIMES_OUT: Move = {
+  name: "The time running out",
+  what: "Deleted: it shrinks to nothing and fades where it is, over `medium`, as the symbol comes back.",
+  tracks: [
+    { part: "the thing", on: "the terminal", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+    { part: "the symbol", on: "the slot", target: ".ov-slot-symbol", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+  ],
+  reduced: [{ part: "the thing", on: "gone at once", target: '[data-window="w-term"]', property: "opacity", from: 0, to: 0, duration: "instant", curve: "standard" }],
+  back: "cuts",
+  sample: () => still({ pin: { kind: "pending", what: TERMINAL, left: 0 } }),
 };
 
 export default page<Shown>({
@@ -291,24 +289,24 @@ export default page<Shown>({
     { name: "Three fingers up, half way", for: "arriving as far as the swipe has gone", sample: at({ closed: true, pin: { kind: "swiping", opening: true, progress: 0.5 } }) },
     { name: "Three fingers down, half way", for: "closing as far as the swipe has gone", sample: at({ pin: { kind: "swiping", opening: false, progress: 0.5 } }) },
     { name: "1, 2, empty 3, 4", for: "a gap: 3 holds its place, empty", sample: at({ fill: "gap" }) },
-    { name: "The empty 3, deleted", for: "right-dragged into the zone", sample: at({ fill: "gap", pin: { kind: "binning", what: { space: "s8" }, over: true } }) },
-    { name: "After it: 1, 2, 3", for: "4 rolled to 3; Undo puts the gap back", sample: at({ fill: "gap", pin: { kind: "pending", what: { space: "s8" }, left: 0.9 } }) },
-    { name: "The delete zone, carrying", for: "a window on its way to it", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
-    { name: "Over the delete zone", for: "pulled into the lit round: let go, and it closes", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
-    { name: "A workspace over the zone", for: "right-dragged: its miniature held in the round", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
-    { name: "Waiting to close", for: "three fifths of its time left", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }) },
-    { name: "A second one over it", for: "let go, the first goes for good", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
-    { name: "The second dropped", for: "the first gone, the second waiting", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
-    { name: "Brought back", for: "pressed: flying home", sample: at({ pin: { kind: "undoing", window: "w-term", share: 0.5 } }) },
+    { name: "The empty 3, deleted", for: "right-dragged into the slot", sample: at({ fill: "gap", pin: { kind: "binning", what: { space: "s8" }, over: true } }) },
+    { name: "After it: 1, 2, 3", for: "4 rolled to 3; dragged back out, the gap returns", sample: at({ fill: "gap", pin: { kind: "pending", what: { space: "s8" }, left: 0.9 } }) },
+    { name: "The delete slot, carrying", for: "a window on its way to it", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
+    { name: "Over the delete slot", for: "pulled into the lit slot: let go, and it waits", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
+    { name: "A workspace over the slot", for: "right-dragged: its miniature held in the slot", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
+    { name: "Waiting to close", for: "in the slot, three fifths of its time left", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }) },
+    { name: "A second one over it", for: "both in the slot, the first still timed", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
+    { name: "The second dropped", for: "the first deleted, the second waiting afresh", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
+    { name: "Taken back out", for: "dragged out of the slot: carried again, its timer gone", sample: at({ pin: { kind: "picked", what: TERMINAL } }) },
     { name: "The tip, shown", for: "nothing learned yet: the bottom left corner, 1:1", sample: corner({}, "left", 720, 160) },
     { name: "The tip, one drag learned", for: "a window dragged: it stays, all of it", sample: corner({ learned: ["window"] }, "left", 720, 160) },
     { name: "The tip, both learned", for: "both drags made: gone for good", sample: corner({ learned: ["window", "space"] }, "left", 720, 160) },
     { name: "The zone's reach", for: "dashed: a drop anywhere inside deletes", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: false } }) },
-    { name: "Just inside the reach", for: "a window, the pointer far off: already in the round", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: "edge" } }) },
-    { name: "A workspace just inside", for: "right-dragged, the pointer far off: held in the round", sample: at({ reach: true, pin: { kind: "binning", what: GAME, over: "edge" } }) },
-    { name: "Carrying, at true size", for: "the delete round waiting, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: false } }, "right", 720, 400) },
+    { name: "Just inside the reach", for: "a window, the pointer far off: already in the slot", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: "edge" } }) },
+    { name: "A workspace just inside", for: "right-dragged, the pointer far off: held in the slot", sample: at({ reach: true, pin: { kind: "binning", what: GAME, over: "edge" } }) },
+    { name: "Carrying, at true size", for: "the empty slot, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: false } }, "right", 720, 400) },
     { name: "Over the zone, at true size", for: "the bottom right corner, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: true } }, "right", 720, 400) },
-    { name: "Waiting, at true size", for: "the zone's timer and Undo, 1:1", sample: corner({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }, "right", 720, 400) },
+    { name: "Waiting, at true size", for: "the slot's timer, 1:1", sample: corner({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }, "right", 720, 400) },
   ],
   sizes: doesntApply("one size: the screen's; the miniatures take what the screen has."),
   states: {
@@ -331,7 +329,7 @@ export default page<Shown>({
     tubes: [
       { name: "A workspace, by the keyboard", tone: "accent", filled: false, content: false },
       { name: "A carry's target", tone: "accent", filled: false, content: false },
-      { name: "The delete zone, lit", tone: "burn_error", filled: false, content: false },
+      { name: "The delete slot, lit", tone: "burn_error", filled: false, content: false },
     ],
     looks: { lit: "the tube round the miniature, its glow outside", signsOff: "the tube as glass, no glow" },
     signsOff: () => still({ pin: { kind: "lit", space: "s7" } }),
@@ -348,7 +346,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING, SWIPE_OPENS],
     leaves: [CLOSING, SWIPE_CLOSES],
-    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, ZONE_ARRIVES, PULLED, INTO_ZONE, TIMER],
+    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, TIMER, TIMES_OUT],
   },
   keyboard: {
     keys: [
@@ -359,7 +357,8 @@ export default page<Shown>({
       { keys: ["Pointer, carrying"], does: "the closed hand, until it is let go" },
       { keys: ["Left button"], does: "on a window, dragged: carries the window" },
       { keys: ["Right button"], does: "on a workspace, dragged: carries the workspace" },
-      { keys: ["Left button"], does: "pressed: goes there; on the delete zone, brings it back" },
+      { keys: ["Left button"], does: "pressed: goes there" },
+      { keys: ["Either button"], does: "on the delete slot, dragged: takes it back out" },
       { keys: ["←", "→", "↑", "↓"], does: "the next workspace that way, across screens" },
       { keys: ["Shift+←", "Shift+→", "Shift+↑", "Shift+↓"], does: "carries its focused window that way" },
       { keys: ["Enter"], does: "goes there: it grows into the screen" },
@@ -386,10 +385,10 @@ export default page<Shown>({
       { part: "Window gaps", token: "space-s8" },
       { part: "Wallpaper blur", token: "size-lock_blur" },
       { part: "Slit between two", token: "space-s4" },
-      { part: "Delete round", token: "size-drop_target" },
-      { part: "Delete round, holding something", token: "size-drop_target_over" },
-      { part: "Held thing, clear of the ring", token: "space-s16" },
-      { part: "Round in from the corner", token: "space-s48" },
+      { part: "Delete slot, its height", token: "size-drop_slot" },
+      { part: "Held thing, clear of the edge", token: "space-s16" },
+      { part: "Slot in from the corner", token: "space-s48" },
+      { part: "Slot's timer", token: "size-progress" },
       { part: "Drop reach, of the shorter side", token: "scale-drop_reach" },
     ],
     reflow: { note: "Its own group up to a 3 × 3 grid's size; waiting groups at half; rows centred.", sample: at({ desk: "laptop" }) },

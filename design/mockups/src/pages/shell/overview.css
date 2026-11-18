@@ -519,13 +519,22 @@
   pointer-events: none;
 }
 
-/* The delete zone: a round in the corner while something is carried, or while a deletion waits. It
-   rises `space.s24` into place and fades in over `medium`, and leaves the same way, faster. */
+/* The delete slot: a workspace's miniature in small, `size.drop_slot` tall and as wide as its screen's
+   shape, on the frame's glass at the miniatures' radius, in the corner while something is carried
+   or waits in it. It rises `space.s24` into place and fades in over `medium`, and leaves the same
+   way, faster. Its line is the Danger tone's glass at rest, `focus.tube` wide; lit while something
+   is pulled in, the line burns and glows as a lit Danger control's does. It never grows, so the line
+   keeps its width. */
 .ov-bin {
   position: absolute;
   left: 0;
   top: 0;
   display: block;
+  box-sizing: border-box;
+  width: var(--ov-w);
+  height: var(--ov-h);
+  border-radius: var(--radius-control);
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
   translate: var(--ov-x) calc(var(--ov-y) + var(--space-s24));
   opacity: 0;
   pointer-events: none;
@@ -543,41 +552,74 @@
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear);
 }
 
+/* The line at rest: the tube shown as unlit glass, with no glow. */
+.ov-bin > .k-ring > .k-tube {
+  opacity: 1;
+}
+
+.ov-bin:not([data-pinned]) > .k-ring > .k-tube {
+  border-color: var(--tube-unlit);
+}
+
+/* Something waits in it: anywhere on the slot takes it back out, with the open hand. */
 .ov-bin[data-pending] {
   pointer-events: auto;
-  cursor: pointer;
+  cursor: grab;
 }
 
-/* What it holds: the line, then the round at the corner. */
-.ov-bin-content {
+/* The delete symbol, in its middle. While something sits in the slot it steps aside: it fades and
+   falls back to `scale.behind` over `short`, and comes back as the slot empties. */
+.ov-slot-symbol {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-s8);
-}
-
-/* Under a carry the delete round grows round its middle to `size.drop_target_over`, over `short`. */
-.ov-bin .ov-bin-delete {
-  transition: scale var(--motion-short) var(--easing-standard);
-}
-
-.ov-bin[data-over] .ov-bin-delete {
-  scale: var(--ov-over);
-}
-
-/* While a carried thing sits in the round, its symbol steps aside: it fades and falls back to
-   `scale.behind` over `short`, and comes back as the thing leaves. */
-.ov-bin .ov-bin-delete .k-icon-slot {
+  justify-content: center;
   transition:
     opacity var(--motion-short) var(--easing-standard),
     scale var(--motion-short) var(--easing-standard);
 }
 
-.ov-bin[data-holding] .ov-bin-delete .k-icon-slot {
+.ov-bin[data-holding] > .ov-slot-symbol {
   opacity: 0;
   scale: var(--scale-behind);
 }
 
-/* A thing gone into the zone: it shrinks into its symbol as it fades, over `medium`. */
+/* The timer: a bar along the slot's foot, `size.progress` tall, `space.s16` in from its sides and
+   `space.s8` up from its foot, under what waits, in the Danger tone, its fill the time left (`--hold`). It shows while
+   something waits and goes at once when it is taken back out. */
+.ov-slot-timer {
+  position: absolute;
+  left: var(--space-s16);
+  right: var(--space-s16);
+  bottom: var(--space-s8);
+  display: block;
+  height: var(--size-progress);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-burn_error) r g b / var(--opacity-tint));
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.ov-bin[data-pending] > .ov-slot-timer {
+  opacity: 1;
+}
+
+.ov-slot-fill {
+  display: block;
+  width: calc(var(--hold, 0) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-burn_error);
+}
+
+/* A thing waiting in the slot takes the pointer too, with the open hand. */
+.ov-lift > [data-waiting] {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+/* A thing deleted from the slot: it shrinks to nothing about its middle as it fades, over `medium`. */
 .ov-win[data-binned],
 .ov-ws[data-binned] {
   opacity: 0;
@@ -597,11 +639,6 @@
 .ov[data-still],
 .ov[data-still] * {
   transition: none !important;
-}
-
-/* The zone's round alone: a move's sample. */
-.ov-zone-alone {
-  display: block;
 }
 
 /* A corner of a screen cut out at its true size, for a sample: the screen stands where it would. */
