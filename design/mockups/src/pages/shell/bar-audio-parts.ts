@@ -246,7 +246,11 @@ export function makeNowPlaying(options: PlayingOptions = {}): NowPlaying {
     held: !playing,
     ...(options.scrolled === undefined ? {} : { pinned: options.scrolled }),
   });
-  const content = () => (folded ? [icon_, previous, play, next] : [icon_, words.element, previous, play, next]);
+  // The song's room stands `space.s4` further from the circles than they stand from each other.
+  const room = document.createElement("span");
+  room.className = "shell-playing-room";
+  room.append(words.element);
+  const content = () => (folded ? [icon_, previous, play, next] : [icon_, room, previous, play, next]);
   const made = makePill({ lone: false, end: "s4", gap: "s4", content: content() });
   made.element.classList.add("shell-audio-pill", "shell-playing-pill");
   made.element.toggleAttribute("data-folded", folded);

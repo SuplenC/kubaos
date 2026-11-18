@@ -29,12 +29,23 @@
   overflow: clip;
 }
 
-/* The words and their copy. It moves by fractions of a pixel: rounded to whole device pixels, a
-   pace of 32 a second steps visibly at every frame rate. */
+/* What the words scroll in. It never takes the pointer, so the wheel can't scroll it: only the
+   pass moves it. */
+.k-marquee-window {
+  position: relative;
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  pointer-events: none;
+}
+
+/* The words and their copy, on whole device pixels as every box is: at 32 a second that is a
+   step every frame or two, which reads as a glide. */
 .k-marquee-track {
   display: flex;
   width: max-content;
-  translate: calc(var(--marquee-x) * -1 * var(--space-s32)) 0;
+  translate: round(nearest, calc(var(--marquee-x) * -1 * var(--space-s32)), 1px) 0;
 }
 
 .k-marquee-line {
@@ -55,19 +66,19 @@
 
 .k-marquee-track[data-in] {
   opacity: var(--marquee-fade);
-  translate: calc(var(--marquee-x) * -1 * var(--space-s32)) calc(var(--space-s8) * (1 - var(--marquee-rise)));
+  translate: round(nearest, calc(var(--marquee-x) * -1 * var(--space-s32)), 1px) round(nearest, calc(var(--space-s8) * (1 - var(--marquee-rise))), 1px);
 }
 
 /* A fade `space.s16` wide only where words are cut: at the end while they run past the room, at the
    start as far as they have moved, up to `space.s16`, and back down as the copy lands. */
-.k-marquee:has(> .k-marquee-track[data-runs]:not([data-out])) {
+.k-marquee:has(> .k-marquee-window > .k-marquee-track[data-runs]:not([data-out])) {
   --marquee-cut: max(0px, min(var(--space-s16), var(--marquee-x) * var(--space-s32), (var(--marquee-end, 0) - var(--marquee-x)) * var(--space-s32)));
   mask-image: linear-gradient(to right, transparent, black var(--marquee-cut), black calc(100% - var(--space-s16)), transparent);
 }
 
 /* Reduce motion: nothing scrolls. The words stop at the room's edge, the part that crosses it ending
    in an ellipsis, and nothing is faded. */
-[data-reduced] .k-marquee:has(> .k-marquee-track[data-runs]:not([data-out])) {
+[data-reduced] .k-marquee:has(> .k-marquee-window > .k-marquee-track[data-runs]:not([data-out])) {
   mask-image: none;
 }
 

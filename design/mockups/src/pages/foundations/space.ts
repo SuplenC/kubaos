@@ -49,6 +49,7 @@ const SIZE_FOR: Record<string, { axis: Axis; for: string }> = {
   panel: { axis: "width", for: "A shell panel, a notification beside one" },
   bar: { axis: "height", for: "The shell's bar" },
   bar_label: { axis: "width", for: "The widest name in the bar" },
+  now_playing: { axis: "width", for: "Now playing's song and artist in the bar" },
   thumbnail_width: { axis: "width", for: "A wallpaper's thumbnail, 16:10" },
   thumbnail_height: { axis: "height", for: "A wallpaper's thumbnail, 16:10" },
   slider: { axis: "height", for: "A slider" },

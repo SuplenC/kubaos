@@ -99,7 +99,11 @@ export function marquee(options: MarqueeOptions): Marquee {
   let held = options.held ?? false;
   let current = track(options.parts, room);
   let scroll: Animation | null = null;
-  element.append(current.element);
+  // What the words scroll in, as a toolkit's scrollable: the room is the component's, fixed.
+  const window_ = document.createElement("span");
+  window_.className = "k-marquee-window";
+  window_.append(current.element);
+  element.append(window_);
   element.setAttribute("aria-label", options.parts.map((part) => part.words).join(""));
 
   function stop(): void {
@@ -155,7 +159,7 @@ export function marquee(options: MarqueeOptions): Marquee {
     }
     old.dataset.out = "";
     fresh.dataset.in = "";
-    element.append(fresh);
+    window_.append(fresh);
     old.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms("micro"), easing: raw("easing-standard_accel"), fill: "forwards" }).finished.then(() => old.remove(), () => {});
     const cue = ms("micro");
     fresh.animate([{ "--marquee-fade": 0 }, { "--marquee-fade": 1 }], { duration: ms("short"), delay: cue, easing: raw("easing-standard"), fill: "backwards" });
@@ -173,7 +177,8 @@ export function marquee(options: MarqueeOptions): Marquee {
     // It starts once it is on the page, where its parts are laid out and a pass can be measured.
     requestAnimationFrame(() => requestAnimationFrame(play));
   }
-  probe(element, { role: "component", name: "Marquee", variant: options.room, fixed: { width: true, height: true } });
+  // Where its words stand is theirs, scrolled, not the component's: it holds them.
+  probe(element, { role: "component", name: "Marquee", variant: options.room, fixed: { width: true, height: true, holds: true } });
   return { element, change, hold };
 }
 
@@ -187,6 +192,8 @@ export function marqueeChanging(from: readonly MarqueePart[], to: readonly Marqu
   old.dataset.out = "";
   const fresh = track(to, length(`size-${room}`)).element;
   fresh.dataset.in = "";
-  made.element.append(fresh);
+  fresh.style.setProperty("--marquee-fade", "0");
+  fresh.style.setProperty("--marquee-rise", "0");
+  old.after(fresh);
   return made.element;
 }

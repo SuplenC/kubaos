@@ -15,6 +15,8 @@
 //   is a part shut to nothing, or it was moved or placed out of the flow to be there. A layout's child
 //   left out keeps its place as a plain box, so its siblings' gaps still add up. Content a layout
 //   pushed past its box is still reported, and sticks out of it.
+// - A row whose content is changing, rooms opening and closing in it with their gaps (a pill's
+//   content mid-change), is a plain box until they settle: its gap isn't held, its boxes are.
 // - A box out of the flow (`position: absolute`) is marked `over`, so its parent's layout leaves
 //   it out; one its probe says floats (a hint's bubble) is marked `floats` too, so it is held to
 //   its own boxes, not its control's.
@@ -22,6 +24,9 @@
 //   `lib/probe.ts`), and a box that says nothing and scrolls is one too. A probed box that scrolls its own content (a
 //   dialog's middle) is reported inside a scroll, as tall as its content. A box the site lets
 //   scroll sideways (a screen wider than the page under `?all`) is a `scroll` marked `across`.
+//
+// - A marquee's words are reported at the start of their pass, where it holds, whenever the frame
+//   is taken, so every mode and scale report the same frame.
 //
 // The root is the page's own box, which claims nothing, so every mock on the page is one frame.
 
@@ -114,6 +119,10 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
     return;
   }
   role = { ...role };
+  // A row whose content is changing (a pill's, `lib/pill.ts`) has rooms opening and closing in it,
+  // their gaps with them: a box until they settle, its boxes held to every rule but its gap.
+  const changing = role.role === "layout" && element.querySelector(":scope > .k-pill-slot") !== null;
+  if (changing) role = { role: "box" };
   const { floats, ...said } = role;
   role = said;
   if (out || at.over) role.over = true;
@@ -142,7 +151,7 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
   // Tab) lists its children in the order they are drawn, as a toolkit's column would hold them.
   if (role.role === "layout" && style.flexDirection.endsWith("-reverse")) children.reverse();
   let kept = children;
-  while (kept.length === 1 && kept[0]!.role === "box" && !marked(kept[0]!) && same(kept[0]!.bounds, bounds)) kept = kept[0]!.children;
+  while (kept.length === 1 && kept[0]!.role === "box" && !marked(kept[0]!) && !mid.has(kept[0]!) && same(kept[0]!.bounds, bounds)) kept = kept[0]!.children;
   // A box whose one child is placed out of the flow over it (a select's surface in its room) is
   // what its layout lays out, so it stays: standing in for that child would leave the layout a gap.
   if (role.role === "box" && !marked(role) && kept.length === 1 && kept[0]!.over !== true && same(kept[0]!.bounds, bounds)) {
@@ -150,6 +159,7 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
     return;
   }
   const node: FrameNode = { ...role, role: String(role.role), bounds, children: kept };
+  if (changing) mid.add(node);
   into.push((scrollsDown || scroller) && role.role !== "scroll" ? scrolledOf(element, style, node, scroller) : node);
 }
 
@@ -168,6 +178,9 @@ function scrolledOf(element: Element, style: CSSStyleDeclaration, node: FrameNod
 }
 
 /** Whether a box says more than that it is a box: what folding it into its child would lose. */
+/** Rows caught mid-change, reported as boxes: each stays one, never taken for its parent's room. */
+const mid = new WeakSet<FrameNode>();
+
 function marked(node: Record<string, unknown>): boolean {
   return Object.keys(node).some((key) => key !== "role" && key !== "bounds" && key !== "children");
 }
@@ -364,6 +377,20 @@ function lineOf(element: Element): number {
 }
 
 /** The frame of `page`, the page's box, drawn at `scale` in `mode`. */
+/**
+ * Puts every marquee's pass back at its start, where it holds, for the walk, and returns how to put
+ * them back where they were. A pass loops for as long as the page shows, so where its words stand
+ * is only when the frame was taken: at the start, every mode and scale report the same frame.
+ */
+function atStart(page: HTMLElement): () => void {
+  const passes = page
+    .getAnimations({ subtree: true })
+    .filter((animation) => animation.effect instanceof KeyframeEffect && animation.effect.target instanceof HTMLElement && animation.effect.target.classList.contains("k-marquee"));
+  const were = passes.map((animation) => animation.currentTime);
+  for (const animation of passes) animation.currentTime = 0;
+  return () => passes.forEach((animation, index) => (animation.currentTime = were[index] ?? 0));
+}
+
 export function frame(page: HTMLElement, slug: string, mode: string, scale: number): Frame {
   const origin = page.getBoundingClientRect();
   // The page's box is zoomed so its CSS pixels are device pixels; a logical pixel is `scale` of
@@ -377,7 +404,9 @@ export function frame(page: HTMLElement, slug: string, mode: string, scale: numb
   });
   const children: FrameNode[] = [];
   const at: Walk = { space, part: false, clips: [], over: false, perCss: scale };
+  const passes = atStart(page);
   for (const child of page.children) walk(child, at, children);
+  passes();
   return {
     page: slug,
     mode,

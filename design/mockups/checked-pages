@@ -6,7 +6,9 @@
 # with the reason in its pull request (docs/DESIGN.md, "The mockups").
 backdrop
 badge
+bar
 bar-audio
+bar-contents
 button
 checkbox
 divider
@@ -16,12 +18,15 @@ hint
 icon
 icon-button
 icon-tile
+marquee
 motion
 notification-card
 order-list
+pill
 popover
 popup-stack
 radio
+recording
 skeleton
 spinner
 spinner-in-context
