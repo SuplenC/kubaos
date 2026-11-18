@@ -82,7 +82,7 @@ export default page<"rest" | "lit" | "pressed">({
   title: "Bar",
   lede: "The frame's top edge: what you're doing on the left, the clock centred, what opens a panel on the right.",
   code: { qml: "Bar", unbuilt: "QML: steps not built yet" },
-  stage: { live, hint: "drag the slider: 540 to 3840", daylight: true },
+  stage: { live, hint: "drag the slider: 540 to 3840", daylight: true, stacked: true },
   variants: [
     { name: "Everyday", for: "tray, system monitor, mute, bell, status", sample: () => strip(WIDE) },
     { name: "Everything on", for: "every pill at once, on its own side", sample: () => strip(WIDE, EVERYTHING) },
