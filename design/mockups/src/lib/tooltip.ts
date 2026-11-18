@@ -22,6 +22,7 @@ import { row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { text, wrapped } from "./text.ts";
 import { milliseconds } from "../site/recipe.ts";
+import { length } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
 /** Why a menu's popover is drawn ahead of `kubaos-ui`'s, which pads it 12 and draws its items' symbols 20, 12 from their words. */
@@ -39,6 +40,39 @@ export function popover(step: Step, ...content: Element[]): HTMLElement {
   // `kubaos-ui`'s haven't caught up with yet.
   const ahead = content.some((each) => each.matches(".k-menu")) ? { ahead: MENU_AHEAD } : {};
   return probe(card, { role: "component", name: "Popover", variant: "", fixed: { width: false, height: false, holds: true } }, ahead);
+}
+
+/** Where a popover stands by its anchor, and how far inside its room it is held. */
+export interface Anchoring {
+  /** Above its anchor, or below it. */
+  readonly side?: "above" | "below";
+  /** How far in from the room's sides it is held, in the room's CSS pixels: its padding. */
+  readonly inset?: number;
+}
+
+/**
+ * Stands `card`, laid out absolutely in `room`, by its `anchor`: `space.s8` off the anchor's edge,
+ * as a hint or a tooltip floats off its control, centred across it, and held inside `room` by
+ * `inset` at either end, on whole pixels. Laid out again whenever its owner asks, as the anchor
+ * moves with the room.
+ */
+export function anchorPopover(card: HTMLElement, anchor: HTMLElement, room: HTMLElement, anchoring: Anchoring = {}): void {
+  // In the room's own pixels: its box is scaled by the page's zoom like everything in it.
+  const box = room.getBoundingClientRect();
+  const ratio = room.offsetWidth / Math.max(1, box.width);
+  const at = anchor.getBoundingClientRect();
+  const gap = length("space-s8") * settings().scale;
+  const inset = anchoring.inset ?? 0;
+  const centre = (at.left + at.width / 2 - box.left) * ratio;
+  const left = Math.max(inset, Math.min(room.offsetWidth - inset - card.offsetWidth, centre - card.offsetWidth / 2));
+  card.style.left = `${Math.round(left)}px`;
+  if ((anchoring.side ?? "above") === "above") {
+    card.style.top = "auto";
+    card.style.bottom = `${Math.round((box.bottom - at.top) * ratio + gap)}px`;
+  } else {
+    card.style.bottom = "auto";
+    card.style.top = `${Math.round((at.bottom - box.top) * ratio + gap)}px`;
+  }
 }
 
 /** The card: `title`, `body` under it when there is one, and `extra` below. */

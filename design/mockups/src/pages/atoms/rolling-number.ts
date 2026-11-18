@@ -8,6 +8,7 @@ import { rollingMidway, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { CHROME } from "../../site/settings.ts";
 
 /** The widest a counter's value is shown: three figures. */
 const WIDEST = "000";
@@ -50,6 +51,15 @@ function roll(name: string, from: number, to: number): Move {
   };
 }
 
+/** The time a minute past an hour, rolling a second on every second while it is shown live. */
+function clockSample(): HTMLElement {
+  const words = (seconds: number) => `${Math.floor(seconds / 3600)}:${String(Math.floor((seconds % 3600) / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const made = rollingNumber({ value: 3659, widest: "0:00:00", format: words, style: "label_number" });
+  const tick = () => made.element.isConnected && (made.set(made.value() + 1), setTimeout(tick, 1000));
+  if (CHROME) setTimeout(tick, 1000);
+  return made.element;
+}
+
 export default page<"rest">({
   level: "atoms",
   slug: "rolling-number",
@@ -64,6 +74,7 @@ export default page<"rest">({
   variants: [
     { name: "Going up", for: "the new figure in from below", sample: () => rollingMidway(99, 100, WIDEST) },
     { name: "Going down", for: "the new figure in from above", sample: () => rollingMidway(100, 99, WIDEST) },
+    { name: "A clock", for: "figures roll, colons keep their place: a player's time", sample: clockSample },
   ],
   sizes: doesntApply("one size: `mono_large`, a counter's value beside its buttons."),
   states: {

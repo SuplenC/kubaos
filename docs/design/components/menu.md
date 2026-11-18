@@ -10,6 +10,8 @@ The floating surface a menu sits on: `surface_container`, raised to the ladder's
 
 A popover's menu and a select's open list (`select.md`) are one build, the rule for every raised list ([DESIGN.md, "Radii"](../../DESIGN.md#radii-by-role)): 12 corners and 4 inside, rows 32 tall at the row radius (8) and 8 inside, so their words start 12 from the surface's edge, and a hairline between groups inset to the words.
 
+**By its anchor.** A popover opened from a control stands 8 (`space.s8`) off the control's edge, above or below it, as a hint or a tooltip floats off its control, centred across it and held inside its room's padding at either end, on whole pixels (`anchorPopover` in the mockups). It moves with its anchor when the room lays out again. *Not built yet: `kubaos-ui` draws a popover where it is laid out, and QML's `Popover` takes its place from its owner; neither holds it to this gap.*
+
 ## `Menu`, `MenuItem`
 
 Rust `menu::menu`, `menu::menu_item`, `menu::menu_separator`; QML `Menu`, `MenuItem`.

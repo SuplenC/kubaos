@@ -13,7 +13,7 @@
 import { KINDS, lightKind, METRICS, paintKind, type Kind, type Size } from "./button.ts";
 import { pin, type Pinned } from "./control.ts";
 import { type Held, withHint } from "./hint.ts";
-import { icon } from "./icon.ts";
+import { icon, type Morph, morphIcon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
 import { heldByKeys, holdable } from "./hold.ts";
 
@@ -34,6 +34,11 @@ export interface IconButtonOptions {
   readonly hint?: boolean;
   /** Its hint above it whatever the room: a button in a toolbar at a container's foot. */
   readonly hintAbove?: boolean;
+  /**
+   * Its symbol morphs between two states in place of `icon` (`morphIcon`, `setMorph`): play and
+   * pause. `on` is the second state; the owner names the button for what a press does.
+   */
+  readonly morph?: { readonly pair: Morph; readonly on: boolean };
   /** Its hint held inside the window at its end: a button at the end of a page's title. */
   readonly hintAtEnd?: boolean;
   /** Held, not pressed: what it does once held for `duration.hold`. */
@@ -57,7 +62,7 @@ export function iconButton(options: IconButtonOptions): HTMLButtonElement {
   element.style.setProperty("--height", `var(--size-${METRICS[size].height})`);
   const slot = document.createElement("span");
   slot.className = "k-icon-slot";
-  slot.append(icon(options.icon, `var(--type-${style}-icon)`, "var(--shown)"));
+  slot.append(options.morph ? morphIcon(options.morph.pair, `var(--type-${style}-icon)`, "var(--shown)", options.morph.on) : icon(options.icon, `var(--type-${style}-icon)`, "var(--shown)"));
   element.append(slot);
   lightKind(element, kind, "full", slot);
   if (options.hold || options.held !== undefined) {

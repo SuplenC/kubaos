@@ -77,6 +77,40 @@
   stroke-width: calc(var(--device-stroke) * 24 / (var(--icon-size) / 1px));
 }
 
+/* A symbol that morphs between two states (`morphIcon`): its two shapes' corners at `--morph` of
+   the way from the first state's to the second's, moving over `short` on `standard`; with reduce
+   motion, at once. */
+@property --morph {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.k-morph {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  --morph: 0;
+  transition: --morph var(--motion-short) var(--easing-standard);
+}
+
+.k-morph[data-on] {
+  --morph: 1;
+}
+
+.k-morph-part {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: currentColor;
+}
+
+[data-reduced] .k-morph {
+  transition: none;
+}
+
 /* An icon beside a label: a box as wide as the icon and the label's line tall, the icon centred
    down it on a whole device pixel, half a pixel rounding down the box (`Look.snap`). */
 .k-icon-line {
@@ -2173,6 +2207,11 @@
   right: var(--space-s12);
   top: round(nearest, calc((var(--side) - var(--t-line)) / 2), 1px);
   transition: opacity var(--motion-micro) var(--easing-standard);
+}
+
+/* A label with no room between the icon and the far end is not drawn. */
+.k-slider[data-cramped] .k-slider-label {
+  opacity: 0;
 }
 
 /* A compact slider's number shows only lit or held; a name always shows. */

@@ -6,6 +6,7 @@ import { fixed, shown, type Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { hintRoom } from "../../lib/hint.ts";
 import { ICON_KINDS, type IconKind, iconButton } from "../../lib/icon-button.ts";
+import { setMorph } from "../../lib/icon.ts";
 import { row } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
@@ -63,6 +64,18 @@ function litKinds(): HTMLElement {
   return row("s16", "start", ...ICON_KINDS.map((kind) => sample(kind, "Md", "lit", false)));
 }
 
+/** Play and pause in a Filled md button: a press morphs its symbol to the other state. */
+function morphing(): HTMLElement {
+  let on = false;
+  const made = iconButton({ icon: "play_arrow", label: "Play", kind: "Filled", size: "Md", morph: { pair: "play_pause", on } });
+  made.addEventListener("click", () => {
+    on = !on;
+    setMorph(made, on);
+    made.setAttribute("aria-label", on ? "Pause" : "Play");
+  });
+  return roomy(made, "Md");
+}
+
 const ON = "every kind";
 
 /** The state matrix's rows: every kind at every size. */
@@ -81,6 +94,7 @@ export default page({
   },
   variants: nonEmpty([
     ...ICON_KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => roomy(sample(kind, "Md"), "Md") })),
+    { name: "A morphing symbol", for: "two states in one symbol: play's halves part into pause", sample: morphing },
     { name: "Held", for: "acts once held for `duration.hold`: a reset", sample: () => heldSample() },
     { name: "Held, halfway", for: "the ring's arc half round, from the top", sample: () => heldSample(0.5) },
   ]),

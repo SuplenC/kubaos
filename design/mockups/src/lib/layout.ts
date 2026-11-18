@@ -24,6 +24,15 @@ export function stack(gap: Space, align: Align, ...children: Element[]): HTMLEle
   return layout("y", gap, align, children);
 }
 
+/**
+ * Lines a row's or a stack's children up by `align` from now on, its probe saying so with it: a
+ * layout that stands somewhere else in another state keeps its children and its place in the page.
+ */
+export function realign(layout: HTMLElement, align: Align): void {
+  layout.dataset.align = align;
+  layout.dataset.probe = JSON.stringify({ ...(JSON.parse(layout.dataset.probe ?? "{}") as object), align });
+}
+
 function layout(axis: "x" | "y", gap: Space, align: Align, children: Element[]): HTMLElement {
   const element = document.createElement("span");
   element.className = axis === "x" ? "k-row" : "k-stack";
