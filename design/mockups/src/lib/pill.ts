@@ -6,9 +6,10 @@
 // An interactive pill takes the pointer and is a control in the state model (`.k-control` in
 // `lib.css`), lit only by the pointer: it is never a stop for Tab, so a panel's keyboard focus never
 // wanders into the bar. Its name shows in a hint under it while it is lit. When its content changes,
-// what stays keeps its place and moves with the change; what leaves fades out as its room closes and
-// what arrives fades in as its room opens, over `medium` on `standard_decel`, so the pill's width
-// eases with them. Reduce motion changes it at once, with no fade.
+// what stays (the same element, or an equal one) keeps its place, solid, and moves with the change;
+// what leaves fades out as its room closes and what arrives fades in as its room opens, over
+// `medium` on `standard_decel`, so the pill's width eases with them. Inside a symbol and its value,
+// only the part that differs fades. Reduce motion changes it at once, with no fade.
 //
 // A symbol and its own value (a reading, a battery's share, a count down) are one thing in the row:
 // `space.s4` apart, the value straight after its symbol (`paired`). Room a value is held to, so its
@@ -88,24 +89,22 @@ export function makePill(options: PillOptions): Pill {
   }
 
   function change(content: readonly Element[]): void {
-    for (const slot of line.querySelectorAll<HTMLElement>(":scope > .k-pill-slot")) settle(slot);
+    for (const slot of line.querySelectorAll<HTMLElement>(".k-pill-slot")) settle(slot);
     if (settings().reduced) {
       line.replaceChildren(...content);
       return;
     }
-    const merged = swapped([...line.children], content);
-    line.replaceChildren(...merged);
+    line.replaceChildren(...swapped([...line.children], content));
     const easing = `cubic-bezier(${cubic("easing-standard_decel").join(", ")})`;
-    for (const slot of merged) {
-      if (!(slot instanceof HTMLElement) || !slot.classList.contains("k-pill-slot")) continue;
+    for (const slot of line.querySelectorAll<HTMLElement>(".k-pill-slot")) {
       const leaving = slot.hasAttribute("data-out");
       const move = slot.animate([{ "--pill-open": leaving ? 1 : 0 }, { "--pill-open": leaving ? 0 : 1 }], { duration: motion("medium"), easing, fill: "forwards" });
       move.finished.then(() => settle(slot), () => {});
     }
   }
 
-  probe(element, { role: "component", name: "Pill", variant: "", fixed: { width: false, height: true } });
   const caught = (content: readonly Element[]) => line.replaceChildren(...swapped([...line.children], content));
+  probe(element, { role: "component", name: "Pill", variant: "", fixed: { width: false, height: true } });
   return { element, change, caught };
 }
 
@@ -125,12 +124,15 @@ function settle(made: HTMLElement): void {
 }
 
 /**
- * The row while it changes from `old` to `next`: what is in both stays as it is, what only `old`
- * has leaves where it was, and what only `next` has arrives where it will be. What stays keeps its
- * order in both.
+ * The row while it changes from `old` to `next`. What is in both stays as it is: the same element,
+ * or an equal one (the recording's dot, built again with its time), the old one kept. A row of the
+ * library's layout in both, as alike as a symbol and its value (`paired`), stays too, and changes
+ * inside the same way, so only the part that differs fades. What only `old` has leaves where it
+ * was, and what only `next` has arrives where it will be. What stays keeps its order in both.
  */
 function swapped(old: readonly Element[], next: readonly Element[]): Element[] {
-  const staying = new Set(next);
+  const kept = matched(old, next);
+  const staying = new Set(kept);
   const merged: Element[] = [];
   let at = 0;
   for (const each of old) {
@@ -138,13 +140,38 @@ function swapped(old: readonly Element[], next: readonly Element[]): Element[] {
       merged.push(slot(each, "out"));
       continue;
     }
-    const found = next.indexOf(each, at);
-    for (; at < found; at++) merged.push(slot(next[at]!, "in"));
+    const found = kept.indexOf(each, at);
+    for (; at < found; at++) merged.push(slot(kept[at]!, "in"));
     merged.push(each);
     at = found + 1;
   }
-  for (; at < next.length; at++) merged.push(slot(next[at]!, "in"));
+  for (; at < kept.length; at++) merged.push(slot(kept[at]!, "in"));
   return merged;
+}
+
+/**
+ * `next` with each element that has a match in `old` swapped for it, in order: the same element, an
+ * equal one, or a layout row alike enough to change inside, whose children are swapped then.
+ */
+function matched(old: readonly Element[], next: readonly Element[]): Element[] {
+  const identical = new Set(next);
+  const free = old.filter((each) => !identical.has(each));
+  let from = 0;
+  return next.map((each) => {
+    if (identical.has(each) && old.includes(each)) return each;
+    const rest = free.slice(from);
+    const equal = rest.find((candidate) => candidate.isEqualNode(each));
+    const alike = equal ?? rest.find((candidate) => sameRow(candidate, each));
+    if (!alike) return each;
+    from = free.indexOf(alike) + 1;
+    if (!equal) alike.replaceChildren(...swapped([...alike.children], [...each.children]));
+    return alike;
+  });
+}
+
+/** Two rows of the library's layout with the same look: one can change inside into the other. */
+function sameRow(a: Element, b: Element): boolean {
+  return a.hasAttribute("data-layout") && a.className === b.className && a.getAttribute("style") === b.getAttribute("style");
 }
 
 /**
