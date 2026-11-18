@@ -347,8 +347,9 @@ export interface Code {
 }
 
 /**
- * The stage, which leads the page: the thing itself, live and large, by night and by day side by
- * side, under a bar of the states' chips with a hint on how to try it.
+ * The stage, which leads the page: the thing itself, live and large, by night and by day, under a
+ * bar of the states' chips with a hint on how to try it. The panes stand side by side where the
+ * sample fits half the stage, else one under the other.
  */
 export interface Stage {
   readonly live: Sample;
@@ -357,8 +358,9 @@ export interface Stage {
   /** The day pane, or why it doesn't apply: a lock drawn in its wallpaper's night scheme. */
   readonly daylight: true | DoesntApply;
   /**
-   * Its samples run as wide as a screen without being one (the bar), so its panes stand one under
-   * the other, each across the stage, instead of each showing half of it.
+   * Its panes stand one under the other whatever its width. The Bar's live sample takes whatever
+   * room it is given and scrolls the bar inside it, so it has no width of its own to stand the
+   * panes by, and the reader's slider sets the bar from 540 to 3840 wide.
    */
   readonly stacked?: true;
 }

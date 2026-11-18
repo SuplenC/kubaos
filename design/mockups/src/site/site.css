@@ -326,8 +326,8 @@ body {
   color: var(--color-on_surface_variant);
 }
 
-/* The stage: the panes side by side, then the bar of chips that drives them, all one surface in
-   a hairline. Each pane is painted in its own mode; a sample wider than it is scaled to fit. */
+/* The stage: the panes, then the bar of chips that drives them, all one surface in a hairline.
+   Each pane is painted in its own mode; a sample wider than it is scaled to fit. */
 .page-hero {
   display: flex;
   flex-direction: column;
@@ -356,18 +356,17 @@ body {
   --panes: 2;
 }
 
-/* A stage of whole screens or of apps' windows stands its panes one under the other, each across
-   the stage, so they are drawn about twice as large as side by side; the night pane above takes
-   both top corners. */
-.page-hero[data-screen] .page-panes {
+/* A stage whose sample side by side would shrink stands its panes one under the other, each across
+   the stage (`site/parts/stage.ts`); the night pane above takes both top corners. */
+.page-hero[data-stacked] .page-panes {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.page-hero[data-screen] .page-panes > .page-pane:first-child {
+.page-hero[data-stacked] .page-panes > .page-pane:first-child {
   border-top-right-radius: var(--radius-surface);
 }
 
-.page-hero[data-screen] .page-panes > .page-pane:last-child:not(:first-child) {
+.page-hero[data-stacked] .page-panes > .page-pane:last-child:not(:first-child) {
   border-top-right-radius: 0;
 }
 
