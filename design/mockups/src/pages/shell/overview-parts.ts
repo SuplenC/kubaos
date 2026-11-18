@@ -23,6 +23,7 @@ import { iconButton } from "../../lib/icon-button.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
 import { length, number, raw } from "../../lib/tokens.ts";
+import { eased } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { barScreen } from "./bar-parts.ts";
 import { face } from "./overview-apps.ts";
@@ -694,8 +695,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     readonly fromIndex: number;
     /** Its scale where it was lifted: a window's workspace's, a workspace's own. */
     readonly scale: number;
-    /** Its longer side as drawn now, in world points: a window's at the scale it is drawn at. */
-    extent: number;
+    /** Its own box, in the same pixels as `grab`: a window's tile, a workspace's miniature. */
+    readonly size: { readonly w: number; readonly h: number };
     target: Target | null;
     point: Point;
     /** Each screen's grid without the workspace carried, from which a carried workspace's place is found. */
@@ -1309,7 +1310,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-sy", String(slot.s));
     commit(element);
     const index = model.groupOf(desk, space).spaces.indexOf(space);
-    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, extent: Math.max(rect.w, rect.h) * slot.s, target: { kind: "space", space }, point, bare: new Map() };
+    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, size: { w: rect.w, h: rect.h }, target: { kind: "space", space }, point, bare: new Map() };
+    drawn = { x: point.x - grab.x, y: point.y - grab.y, k: 1 };
     root.dataset.carrying = "window";
     element.dataset.held = "";
     if (pending) dressBin();
@@ -1323,7 +1325,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!on || !slot || !made) return;
     const grab = { x: point.x - on.at.x - slot.x, y: point.y - on.at.y - slot.y };
     const group = model.groupOf(desk, id);
-    carry = { kind: "space", id, element: made.root, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: slot.s, extent: Math.max(slot.w, slot.h), target: null, point, bare: new Map() };
+    carry = { kind: "space", id, element: made.root, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: slot.s, size: { w: slot.w, h: slot.h }, target: null, point, bare: new Map() };
+    drawn = { x: point.x - grab.x, y: point.y - grab.y, k: 1 };
     for (const each of views) carry.bare.set(each.screen.id, arrange(each.size.w, each.size.h, specsOf(each.screen)));
     lift.append(made.root);
     made.root.dataset.lifted = "";
@@ -1343,13 +1346,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!carry) return;
     carry.point = point;
     const element = carry.element;
-    if (carry.kind === "window") {
-      element.style.setProperty("--ov-tx", css(point.x - carry.grab.x));
-      element.style.setProperty("--ov-ty", css(point.y - carry.grab.y));
-    } else {
-      element.style.setProperty("--ov-x", css(point.x - carry.grab.x));
-      element.style.setProperty("--ov-y", css(point.y - carry.grab.y));
-    }
+    if (!pull) pose(pointerPose());
     showBin(point);
     const target = carry.kind === "window" ? windowTarget(point) : spaceTarget(point);
     if (sameTarget(target, carry.target)) return;
@@ -1357,26 +1354,90 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     lightBin(target?.kind === "bin");
     if (carry.kind === "window") {
       const scale = scaleOver(target);
-      const rect = tiles.get(carry.id);
-      if (rect) carry.extent = Math.max(rect.w, rect.h) * scale;
       element.style.setProperty("--ov-sx", String(scale));
       element.style.setProperty("--ov-sy", String(scale));
     }
-    // In the delete zone's reach it shrinks to the round's size round the pointer and stands off the
-    // grown round's top left, `space.s16` clear of it, so the lit round shows beside it.
-    const over = target?.kind === "bin";
-    // A window's offset is drawn inside its own scale, so it is that much larger.
-    const within = carry.kind === "window" ? scaleOver(target) : 1;
-    const aside = over ? css(-(L("size-drop_target_over") / 2 + L("space-s16")) / within) : "0px";
-    element.style.setProperty("--ov-shrink", over ? String(Math.min(1, L("size-drop_target") / carriedSize())) : "1");
-    element.style.setProperty("--ov-bx", aside);
-    element.style.setProperty("--ov-by", aside);
+    const caught = target?.kind === "bin";
+    if (caught !== (pull?.toRound ?? false)) pullTo(caught);
     place("reflow");
   }
 
-  /** The carried thing's longer side as it is drawn, in world points. */
-  function carriedSize(): number {
-    return carry?.extent ?? 1;
+  // ── The delete zone pulling a carried thing in ──
+
+  /** Where a carried thing is drawn: its box's place, in world points, and its shrink. */
+  interface Pose {
+    readonly x: number;
+    readonly y: number;
+    readonly k: number;
+  }
+
+  /**
+   * A flight between the pointer and the round, from where the thing was drawn when it began: it
+   * eases toward a pose worked out afresh each frame, so a pointer that moves, or turns back, is
+   * followed from wherever the thing is, never by a jump. Null once it is home under the pointer.
+   */
+  let pull: { readonly from: Pose; readonly start: number; readonly toRound: boolean; frame: number } | null = null;
+  /** The pose last drawn. */
+  let drawn: Pose = { x: 0, y: 0, k: 1 };
+
+  /** Under the pointer at its carried size, the point held under it. */
+  function pointerPose(): Pose {
+    if (!carry) return drawn;
+    return { x: carry.point.x - carry.grab.x, y: carry.point.y - carry.grab.y, k: 1 };
+  }
+
+  /**
+   * In the round, centred, its longer side the grown round's less `space.s16` on each side. The
+   * thing scales about the point held, so its box stands where that point lands the middle on the
+   * round's.
+   */
+  function roundPose(): Pose {
+    if (!carry) return drawn;
+    const lift = number("scale-lift");
+    const base = carry.kind === "window" ? carry.scale : 1;
+    const longer = Math.max(carry.size.w, carry.size.h) * base * lift;
+    const k = Math.min(1, (L("size-drop_target_over") - 2 * L("space-s16")) / longer);
+    const at = binCentre();
+    const s = base * lift * k;
+    return {
+      x: at.x - carry.grab.x - (carry.size.w / 2 - carry.grab.x) * s,
+      y: at.y - carry.grab.y - (carry.size.h / 2 - carry.grab.y) * s,
+      k,
+    };
+  }
+
+  function pose(at: Pose): void {
+    if (!carry) return;
+    drawn = at;
+    const [x, y] = carry.kind === "window" ? ["--ov-tx", "--ov-ty"] : ["--ov-x", "--ov-y"];
+    carry.element.style.setProperty(x, css(at.x));
+    carry.element.style.setProperty(y, css(at.y));
+    carry.element.style.setProperty("--ov-shrink", String(at.k));
+  }
+
+  /**
+   * Into the round in the reach, back to the pointer out of it: over `medium` on
+   * `emphasized_decel`, as a carried thing lands; with reduced motion, there at once.
+   */
+  function pullTo(toRound: boolean): void {
+    if (pull) cancelAnimationFrame(pull.frame);
+    bin.toggleAttribute("data-holding", toRound);
+    if (settings().reduced || root.hasAttribute("data-still")) {
+      pull = toRound ? { from: drawn, start: 0, toRound, frame: 0 } : null;
+      pose(toRound ? roundPose() : pointerPose());
+      return;
+    }
+    pull = { from: drawn, start: performance.now(), toRound, frame: 0 };
+    const step = (now: number): void => {
+      if (!pull || !carry) return;
+      const p = Math.min(1, (now - pull.start) / ms("medium"));
+      const e = eased("emphasized_decel", p);
+      const to = pull.toRound ? roundPose() : pointerPose();
+      pose({ x: pull.from.x + (to.x - pull.from.x) * e, y: pull.from.y + (to.y - pull.from.y) * e, k: pull.from.k + (to.k - pull.from.k) * e });
+      if (p < 1) pull.frame = requestAnimationFrame(step);
+      else if (!pull.toRound) pull = null;
+    };
+    pull.frame = requestAnimationFrame(step);
   }
 
   function sameTarget(a: Target | null, b: Target | null): boolean {
@@ -1401,9 +1462,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     delete root.dataset.carrying;
     delete was.element.dataset.held;
     delete was.element.dataset.refused;
-    was.element.style.setProperty("--ov-shrink", "1");
-    was.element.style.setProperty("--ov-bx", "0px");
-    was.element.style.setProperty("--ov-by", "0px");
+    if (pull) cancelAnimationFrame(pull.frame);
+    pull = null;
+    bin.removeAttribute("data-holding");
+    // Dropped mid-pull, a window's landing and a workspace's glide take its shrink from where it is.
+    if (was.kind === "space" && target?.kind !== "bin") {
+      glide(was.element, "land");
+      was.element.style.setProperty("--ov-shrink", "1");
+    }
     delete landing.dataset.shown;
     if (target?.kind === "bin") {
       intoBin(was.kind === "window" ? { window: was.id } : { space: was.id }, was.element);
@@ -1428,7 +1494,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!on || !slot) return;
     // From where it is drawn now, its grab point held, to its tile's place and size.
     const style = getComputedStyle(element);
-    const k = Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1;
+    // As drawn now, the lift aside: its scale and what it still has of a pull's shrink.
+    const k = (Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1) * (Number.parseFloat(style.getPropertyValue("--ov-shrink")) || 1);
     const scale = settings().scale;
     const tx = Number.parseFloat(style.getPropertyValue("--ov-tx")) / scale;
     const ty = Number.parseFloat(style.getPropertyValue("--ov-ty")) / scale;
@@ -1448,6 +1515,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-th", css(rect.h));
     element.style.setProperty("--ov-sx", String(visible.w / rect.w));
     element.style.setProperty("--ov-sy", String(visible.h / rect.h));
+    element.style.setProperty("--ov-shrink", "1");
     commit(element);
     glide(element, "land");
     element.style.setProperty("--ov-tx", css(on.at.x + slot.x + rect.x * slot.s));
@@ -1683,7 +1751,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const size = L("type-button-icon");
     if ("window" in what) {
       const style = getComputedStyle(element);
-      const k = Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1;
+      // As drawn now, the lift aside, which eases out of its own accord: its scale and its shrink.
+      const k = (Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1) * (Number.parseFloat(style.getPropertyValue("--ov-shrink")) || 1);
       const scale = settings().scale;
       const at = { x: Number.parseFloat(style.getPropertyValue("--ov-tx")) / scale, y: Number.parseFloat(style.getPropertyValue("--ov-ty")) / scale };
       const grab = { x: Number.parseFloat(style.getPropertyValue("--ov-gx")) / scale, y: Number.parseFloat(style.getPropertyValue("--ov-gy")) / scale };
@@ -1694,6 +1763,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       element.style.setProperty("--ov-gy", "0px");
       element.style.setProperty("--ov-tx", css(at.x + grab.x * (1 - k)));
       element.style.setProperty("--ov-ty", css(at.y + grab.y * (1 - k)));
+      element.style.setProperty("--ov-sx", String(k));
+      element.style.setProperty("--ov-sy", String(k));
+      element.style.setProperty("--ov-shrink", "1");
       commit(element);
       const into = size / Math.max(w, h);
       bins(element);
@@ -1709,6 +1781,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       const into = size / Math.max(w, h);
       for (const part of [made.root, made.desk, made.tag]) bins(part);
       made.root.dataset.binned = "";
+      // Its shrink in the round eases out as its desktop takes the symbol's size.
+      made.root.style.setProperty("--ov-shrink", "1");
       made.root.style.setProperty("--ov-x", css(goal.x - (w * into) / 2));
       made.root.style.setProperty("--ov-y", css(goal.y - (h * into) / 2));
       made.desk.style.setProperty("--ov-s", String(into));

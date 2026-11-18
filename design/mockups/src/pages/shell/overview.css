@@ -28,8 +28,6 @@
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
-@property --ov-bx { syntax: "<length>"; inherits: false; initial-value: 0px; }
-@property --ov-by { syntax: "<length>"; inherits: false; initial-value: 0px; }
 
 /* The sample: a whole screen, the size the stage or the full screen gives it. */
 .ov {
@@ -144,7 +142,7 @@
   opacity: var(--ov-arrive);
   scale: calc(var(--scale-behind) + (1 - var(--scale-behind)) * var(--ov-arrive));
   transform-origin: 50% 50%;
-  transform: translate(var(--ov-bx), var(--ov-by)) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
+  transform: scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -152,10 +150,8 @@
     --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
-    --ov-held var(--motion-short) var(--easing-standard),
-    --ov-shrink var(--motion-short) var(--easing-standard),
-    --ov-bx var(--motion-short) var(--easing-standard),
-    --ov-by var(--motion-short) var(--easing-standard);
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-held var(--motion-short) var(--easing-standard);
 }
 
 /* The screen's own desktop flies over the others, shrinking into its place and growing out of it. */
@@ -275,7 +271,7 @@
   overflow: hidden;
   border-radius: calc(var(--radius-surface) - var(--space-s8));
   background: var(--color-surface);
-  transform: translate(var(--ov-bx), var(--ov-by)) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
+  transform: scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   box-shadow:
     inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
     0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
@@ -286,6 +282,7 @@
     --ov-th var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-sx var(--ov-pt, 0s) var(--ov-pe, linear),
     --ov-sy var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
     opacity var(--motion-medium) var(--easing-emphasized_accel),
     --ov-held var(--motion-short) var(--easing-standard);
 }
@@ -307,10 +304,7 @@
     --ov-sx var(--motion-short) var(--easing-standard),
     --ov-sy var(--motion-short) var(--easing-standard),
     opacity var(--motion-short) var(--easing-standard),
-    --ov-held var(--motion-short) var(--easing-standard),
-    --ov-shrink var(--motion-short) var(--easing-standard),
-    --ov-bx var(--motion-short) var(--easing-standard),
-    --ov-by var(--motion-short) var(--easing-standard);
+    --ov-held var(--motion-short) var(--easing-standard);
 }
 
 .ov-win[data-held] {
@@ -570,6 +564,19 @@
   scale: var(--ov-over);
 }
 
+/* While a carried thing sits in the round, its symbol steps aside: it fades and falls back to
+   `scale.behind` over `short`, and comes back as the thing leaves. */
+.ov-bin .ov-bin-delete .k-icon-slot {
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    scale var(--motion-short) var(--easing-standard);
+}
+
+.ov-bin[data-holding] .ov-bin-delete .k-icon-slot {
+  opacity: 0;
+  scale: var(--scale-behind);
+}
+
 /* A thing gone into the zone: it shrinks into its symbol as it fades, over `medium`. */
 .ov-win[data-binned],
 .ov-ws[data-binned] {
@@ -582,6 +589,7 @@
     --ov-sy var(--ov-pt, 0s) var(--ov-pe, linear),
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
     opacity var(--motion-medium) var(--easing-emphasized_accel);
 }
 

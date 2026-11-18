@@ -216,11 +216,20 @@ const ZONE_ARRIVES: Move = {
 
 const INTO_ZONE: Move = {
   name: "Into the delete zone",
-  what: "Let go over it: the window shrinks into its symbol and fades over `medium`; the rest close up.",
+  what: "Let go anywhere in the reach: from the round it shrinks into the symbol's place and fades over `medium`.",
   tracks: [{ part: "the window", on: "the terminal", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
   reduced: [{ part: "the window", on: "a fade", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
   back: "cuts",
   sample: () => still({ pin: { kind: "binning", what: TERMINAL, over: true } }),
+};
+
+const PULLED: Move = {
+  name: "Pulled into the round",
+  what: "In the reach it leaves the pointer and flies into the round over `medium`; out of it, back to the pointer the same way.",
+  tracks: [{ part: "the carried thing", on: "the terminal", target: '[data-window="w-term"]', property: "--ov-shrink", from: 1, to: 0.25, duration: "medium", curve: "emphasized_decel" }],
+  reduced: [{ part: "the carried thing", on: "there at once", target: '[data-window="w-term"]', property: "--ov-shrink", from: 0.25, to: 0.25, duration: "instant", curve: "standard" }],
+  back: "plays",
+  sample: () => still({ pin: { kind: "binning", what: TERMINAL, over: false } }),
 };
 
 const TIMER: Move = {
@@ -285,8 +294,8 @@ export default page<Shown>({
     { name: "The empty 3, deleted", for: "right-dragged into the zone", sample: at({ fill: "gap", pin: { kind: "binning", what: { space: "s8" }, over: true } }) },
     { name: "After it: 1, 2, 3", for: "4 rolled to 3; Undo puts the gap back", sample: at({ fill: "gap", pin: { kind: "pending", what: { space: "s8" }, left: 0.9 } }) },
     { name: "The delete zone, carrying", for: "a window on its way to it", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
-    { name: "Over the delete zone", for: "lit: let go, and it closes", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
-    { name: "A workspace over the zone", for: "right-dragged: Remove", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
+    { name: "Over the delete zone", for: "pulled into the lit round: let go, and it closes", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
+    { name: "A workspace over the zone", for: "right-dragged: its miniature held in the round", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
     { name: "Waiting to close", for: "three fifths of its time left", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }) },
     { name: "A second one over it", for: "let go, the first goes for good", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
     { name: "The second dropped", for: "the first gone, the second waiting", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
@@ -295,8 +304,8 @@ export default page<Shown>({
     { name: "The tip, one drag learned", for: "a window dragged: it stays, all of it", sample: corner({ learned: ["window"] }, "left", 720, 160) },
     { name: "The tip, both learned", for: "both drags made: gone for good", sample: corner({ learned: ["window", "space"] }, "left", 720, 160) },
     { name: "The zone's reach", for: "dashed: a drop anywhere inside deletes", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: false } }) },
-    { name: "Just inside the reach", for: "a window, far from the round: already small, the round lit", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: "edge" } }) },
-    { name: "A workspace just inside", for: "right-dragged: small, the round lit", sample: at({ reach: true, pin: { kind: "binning", what: GAME, over: "edge" } }) },
+    { name: "Just inside the reach", for: "a window, the pointer far off: already in the round", sample: at({ reach: true, pin: { kind: "binning", what: TERMINAL, over: "edge" } }) },
+    { name: "A workspace just inside", for: "right-dragged, the pointer far off: held in the round", sample: at({ reach: true, pin: { kind: "binning", what: GAME, over: "edge" } }) },
     { name: "Carrying, at true size", for: "the delete round waiting, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: false } }, "right", 720, 400) },
     { name: "Over the zone, at true size", for: "the bottom right corner, 1:1", sample: corner({ pin: { kind: "binning", what: TERMINAL, over: true } }, "right", 720, 400) },
     { name: "Waiting, at true size", for: "the zone's timer and Undo, 1:1", sample: corner({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }, "right", 720, 400) },
@@ -339,7 +348,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING, SWIPE_OPENS],
     leaves: [CLOSING, SWIPE_CLOSES],
-    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, ZONE_ARRIVES, INTO_ZONE, TIMER],
+    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, ZONE_ARRIVES, PULLED, INTO_ZONE, TIMER],
   },
   keyboard: {
     keys: [
@@ -378,7 +387,8 @@ export default page<Shown>({
       { part: "Wallpaper blur", token: "size-lock_blur" },
       { part: "Slit between two", token: "space-s4" },
       { part: "Delete round", token: "size-drop_target" },
-      { part: "Delete round, something over it", token: "size-drop_target_over" },
+      { part: "Delete round, holding something", token: "size-drop_target_over" },
+      { part: "Held thing, clear of the ring", token: "space-s16" },
       { part: "Round in from the corner", token: "space-s48" },
       { part: "Drop reach, of the shorter side", token: "scale-drop_reach" },
     ],

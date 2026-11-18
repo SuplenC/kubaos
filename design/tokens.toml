@@ -198,10 +198,11 @@ control_md = 40
 control_lg = 48
 # A round you drop something on rather than press, as an IconButton's Target size: the Overview's
 # delete zone, hit at speed with a window carried in the hand. A step past the large control's 48
-# by the grid's 16, so it reads at a glance from across the screen, and while something is over it
-# a step larger again, so it answers the carried thing before it is let go.
+# by the grid's 16, so it reads at a glance from across the screen. While something is in its
+# reach the round pulls the thing in and holds it: grown to 96, room for the miniature, 64 on its
+# longer side, with `space.s16` clear of the ring all round.
 drop_target = 64
-drop_target_over = 80
+drop_target_over = 96
 # A list row with one line, with a title over a subtitle, and with a title over a
 # subtitle that wraps to its second line (a menu item's or a select option's
 # description): each a `small` line taller, with the same inset at its top and foot.
