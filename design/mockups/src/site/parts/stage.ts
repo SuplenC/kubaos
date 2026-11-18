@@ -116,7 +116,7 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     panes.forEach((pane, i) => {
       const drawn = pick.draw(modes[i]!);
       pane.inner.replaceChildren(...drawn);
-      screen = allScreens(drawn) || allWindows(drawn);
+      screen = spec.stacked === true || allScreens(drawn) || allWindows(drawn);
       if (pane.full) pane.full.hidden = !isScreen(drawn);
     });
     // `?all` stacks every stage's panes already, and the shots keep its corners.

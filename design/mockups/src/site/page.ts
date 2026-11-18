@@ -356,6 +356,11 @@ export interface Stage {
   readonly hint: Cell;
   /** The day pane, or why it doesn't apply: a lock drawn in its wallpaper's night scheme. */
   readonly daylight: true | DoesntApply;
+  /**
+   * Its samples run as wide as a screen without being one (the bar), so its panes stand one under
+   * the other, each across the stage, instead of each showing half of it.
+   */
+  readonly stacked?: true;
 }
 
 export interface Page<S extends State = State> {
