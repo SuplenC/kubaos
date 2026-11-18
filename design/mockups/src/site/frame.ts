@@ -177,10 +177,10 @@ function scrolledOf(element: Element, style: CSSStyleDeclaration, node: FrameNod
   return { role: "scroll", ...(across ? { across: true } : {}), bounds: node.bounds, children: [inner] };
 }
 
-/** Whether a box says more than that it is a box: what folding it into its child would lose. */
 /** Rows caught mid-change, reported as boxes: each stays one, never taken for its parent's room. */
 const mid = new WeakSet<FrameNode>();
 
+/** Whether a box says more than that it is a box: what folding it into its child would lose. */
 function marked(node: Record<string, unknown>): boolean {
   return Object.keys(node).some((key) => key !== "role" && key !== "bounds" && key !== "children");
 }
@@ -376,7 +376,6 @@ function lineOf(element: Element): number {
   return line / scale;
 }
 
-/** The frame of `page`, the page's box, drawn at `scale` in `mode`. */
 /**
  * Puts every marquee's pass back at its start, where it holds, for the walk, and returns how to put
  * them back where they were. A pass loops for as long as the page shows, so where its words stand
@@ -391,6 +390,7 @@ function atStart(page: HTMLElement): () => void {
   return () => passes.forEach((animation, index) => (animation.currentTime = were[index] ?? 0));
 }
 
+/** The frame of `page`, the page's box, drawn at `scale` in `mode`. */
 export function frame(page: HTMLElement, slug: string, mode: string, scale: number): Frame {
   const origin = page.getBoundingClientRect();
   // The page's box is zoomed so its CSS pixels are device pixels; a logical pixel is `scale` of
