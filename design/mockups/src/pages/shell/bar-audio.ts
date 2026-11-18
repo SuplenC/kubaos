@@ -5,7 +5,7 @@
 
 import { hint } from "../../lib/hint.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { powerMoves } from "../../site/moves.ts";
+import { pillSwap, powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { marqueeChanging } from "../../lib/marquee.ts";
 import { HEADSET, shot as panelShot } from "./audio-parts.ts";
@@ -169,15 +169,10 @@ function live(): HTMLElement {
   return room;
 }
 
-/** Now playing's two widths in CSS, by token: wide, the icon, the song's room and three controls; folded, without the room. */
-const WIDE = "calc(8 * var(--space-s4) + 4 * var(--size-chip) + var(--size-now_playing))";
-const FOLDED = "calc(5 * var(--space-s4) + 4 * var(--size-chip))";
-
-/** Now playing caught as it folds (`to` folded) or opens, its width at `--grown` 0 the one it leaves. */
+/** Now playing caught as it folds or opens, the song's room at the start of closing or opening. */
 function folding(fold: boolean): HTMLElement {
-  const made = makeNowPlaying({ folded: fold });
-  made.element.style.setProperty("--from", fold ? WIDE : FOLDED);
-  made.element.style.setProperty("--to", fold ? FOLDED : WIDE);
+  const made = makeNowPlaying({ folded: !fold });
+  made.folding(fold);
   return made.element;
 }
 
@@ -222,17 +217,15 @@ const PLAYING_MOVES: readonly Move[] = [
   },
   {
     name: "Folding",
-    what: "The words go; the pill eases to its folded width over `medium` on `standard_decel`.",
-    tracks: [{ part: "the pill's width", on: "now playing", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
-    reduced: "same",
+    what: "The words fade as their room closes over `medium` on `standard_decel`; the pill narrows with it.",
+    ...pillSwap("now playing", "out"),
     back: "cuts",
     sample: () => folding(true),
   },
   {
     name: "Opening",
-    what: "The pill eases to its wide width over `medium`, the words in it.",
-    tracks: [{ part: "the pill's width", on: "now playing", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
-    reduced: "same",
+    what: "The words fade in as their room opens over `medium`; the pill widens with it.",
+    ...pillSwap("now playing", "in"),
     back: "cuts",
     sample: () => folding(false),
   },

@@ -5,8 +5,10 @@
 //
 // An interactive pill takes the pointer and is a control in the state model (`.k-control` in
 // `lib.css`), lit only by the pointer: it is never a stop for Tab, so a panel's keyboard focus never
-// wanders into the bar. Its name shows in a hint under it while it is lit. When its content changes
-// width it eases to the new width over `medium`, cutting its content at its own edge meanwhile.
+// wanders into the bar. Its name shows in a hint under it while it is lit. When its content changes,
+// what stays keeps its place and moves with the change; what leaves fades out as its room closes and
+// what arrives fades in as its room opens, over `medium` on `standard_decel`, so the pill's width
+// eases with them. Reduce motion changes it at once, with no fade.
 //
 // A symbol and its own value (a reading, a battery's share, a count down) are one thing in the row:
 // `space.s4` apart, the value straight after its symbol (`paired`). Room a value is held to, so its
@@ -18,6 +20,7 @@ import { withHint } from "./hint.ts";
 import { row } from "./layout.ts";
 import { probe } from "./probe.ts";
 import { cubic } from "./tokens.ts";
+import { settings } from "../site/settings.ts";
 
 /** A pill's colours: the bar's own, or a tone's fill and ink together. */
 export type PillTone = "neutral" | "recording" | "preview";
@@ -46,8 +49,10 @@ export interface PillOptions {
 
 export interface Pill {
   readonly element: HTMLElement;
-  /** Puts `content` in it, easing its width from the old content's to the new's. */
+  /** Puts `content` in it: what leaves fades as its room closes, what arrives as its room opens. */
   readonly change: (content: readonly Element[]) => void;
+  /** Catches it at the start of a change to `content`, without playing it: a move's sample. */
+  readonly caught: (content: readonly Element[]) => void;
 }
 
 /** A symbol and its own value, `space.s4` apart: one thing in a pill's row. */
@@ -83,18 +88,73 @@ export function makePill(options: PillOptions): Pill {
   }
 
   function change(content: readonly Element[]): void {
-    const from = element.offsetWidth;
-    line.replaceChildren(...content);
-    element.style.removeProperty("--from");
-    element.style.removeProperty("--to");
-    const to = element.offsetWidth;
-    element.style.setProperty("--from", `${from}px`);
-    element.style.setProperty("--to", `${to}px`);
-    element.animate([{ "--grown": 0 }, { "--grown": 1 }], { duration: motion("medium"), easing: `cubic-bezier(${cubic("easing-standard_decel").join(", ")})` });
+    for (const slot of line.querySelectorAll<HTMLElement>(":scope > .k-pill-slot")) settle(slot);
+    if (settings().reduced) {
+      line.replaceChildren(...content);
+      return;
+    }
+    const merged = swapped([...line.children], content);
+    line.replaceChildren(...merged);
+    const easing = `cubic-bezier(${cubic("easing-standard_decel").join(", ")})`;
+    for (const slot of merged) {
+      if (!(slot instanceof HTMLElement) || !slot.classList.contains("k-pill-slot")) continue;
+      const leaving = slot.hasAttribute("data-out");
+      const move = slot.animate([{ "--pill-open": leaving ? 1 : 0 }, { "--pill-open": leaving ? 0 : 1 }], { duration: motion("medium"), easing, fill: "forwards" });
+      move.finished.then(() => settle(slot), () => {});
+    }
   }
 
   probe(element, { role: "component", name: "Pill", variant: "", fixed: { width: false, height: true } });
-  return { element, change };
+  const caught = (content: readonly Element[]) => line.replaceChildren(...swapped([...line.children], content));
+  return { element, change, caught };
+}
+
+/** Content in its own room while it leaves or arrives: the room closes or opens, the content fading with it. */
+function slot(content: Element, way: "out" | "in"): HTMLElement {
+  const made = document.createElement("span");
+  made.className = "k-pill-slot";
+  made.dataset[way] = "";
+  made.append(content);
+  return made;
+}
+
+/** A finished slot: what arrived takes its place in the row; what left goes. */
+function settle(made: HTMLElement): void {
+  if (made.hasAttribute("data-out")) made.remove();
+  else if (made.firstElementChild) made.replaceWith(made.firstElementChild);
+}
+
+/**
+ * The row while it changes from `old` to `next`: what is in both stays as it is, what only `old`
+ * has leaves where it was, and what only `next` has arrives where it will be. What stays keeps its
+ * order in both.
+ */
+function swapped(old: readonly Element[], next: readonly Element[]): Element[] {
+  const staying = new Set(next);
+  const merged: Element[] = [];
+  let at = 0;
+  for (const each of old) {
+    if (!staying.has(each)) {
+      merged.push(slot(each, "out"));
+      continue;
+    }
+    const found = next.indexOf(each, at);
+    for (; at < found; at++) merged.push(slot(next[at]!, "in"));
+    merged.push(each);
+    at = found + 1;
+  }
+  for (; at < next.length; at++) merged.push(slot(next[at]!, "in"));
+  return merged;
+}
+
+/**
+ * A pill caught as its content changes from `from` to `to`, its leaving and arriving content in
+ * their rooms at the change's start: what a move's player plays.
+ */
+export function pillChanging(options: Omit<PillOptions, "content">, from: readonly Element[], to: readonly Element[]): HTMLElement {
+  const made = makePill({ ...options, content: from });
+  made.caught(to);
+  return made.element;
 }
 
 /** A duration token in milliseconds, as the toolbar's speed and reduce motion scale it. */

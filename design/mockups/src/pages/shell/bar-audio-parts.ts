@@ -216,6 +216,8 @@ export interface NowPlaying {
   readonly element: HTMLElement;
   /** Folds it to its controls or opens it to its words, its width easing between the two. */
   readonly fold: (folded: boolean) => void;
+  /** Catches it at the start of folding or opening, without playing it: a move's sample. */
+  readonly folding: (folded: boolean) => void;
   readonly change: (song: Song) => void;
   readonly play: (playing: boolean) => void;
 }
@@ -223,7 +225,8 @@ export interface NowPlaying {
 /**
  * The active player's icon, the song and its artist in a `size.now_playing` room, then previous,
  * play or pause on the accent's fill, next; folded, the icon and the controls alone. Two widths,
- * whatever plays. Paused, the words hold at their start.
+ * whatever plays, the words fading as their room closes or opens between them (`Pill`). Paused,
+ * the words hold at their start.
  */
 export function makeNowPlaying(options: PlayingOptions = {}): NowPlaying {
   const players = options.players ?? PLAYERS;
@@ -254,6 +257,11 @@ export function makeNowPlaying(options: PlayingOptions = {}): NowPlaying {
       folded = next_;
       made.element.toggleAttribute("data-folded", folded);
       made.change(content());
+    },
+    folding: (next_) => {
+      folded = next_;
+      made.element.toggleAttribute("data-folded", folded);
+      made.caught(content());
     },
     change: (song) => words.change(songParts(song)),
     play: (next_) => {

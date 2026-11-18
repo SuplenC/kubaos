@@ -24,12 +24,14 @@ function strip(width: number, content: BarContent = EVERYDAY, state: Shown = "re
   return barStrip({ width, content, state });
 }
 
-/** What gave way at `width` against the step above, in a line. */
+/** What gave way at `width` against the step above, and what came back, in a line. */
 function gaveWay(width: number, above: number | null): string {
   const now = fitBar(width, EVERYTHING).taken;
   const before = above === null ? new Set<number>() : fitBar(above, EVERYTHING).taken;
   const fresh = [...now].filter((index) => !before.has(index)).map((index) => RUNGS[index]!.says);
-  return fresh.length === 0 ? (above === null ? "Everything shows" : "Nothing changes") : fresh.join(" · ");
+  const returned = [...before].filter((index) => !now.has(index)).map((index) => RUNGS[index]!.back ?? RUNGS[index]!.says);
+  const said = [...fresh, ...returned];
+  return said.length === 0 ? (above === null ? "Everything shows" : "Nothing changes") : said.join(" · ");
 }
 
 /** The stage: the bar with every pill, at the width the slider picks, 540 to a 4K screen's. */
@@ -99,7 +101,8 @@ export default page<"rest" | "lit" | "pressed">({
     { name: "Playing, 1440", for: "now playing wide, beside the clock", sample: () => strip(1440, PLAYING) },
     { name: "A long song, 1440", for: "its words scroll; nothing else moves", sample: () => strip(1440, PLAYING_LONG) },
     { name: "A long title, 1440", for: "now playing folds; the title keeps its room", sample: () => strip(1440, PLAYING_TITLED) },
-    { name: "Playing, 1024", for: "folded, the date gone", sample: () => strip(1024, PLAYING) },
+    { name: "Playing, 1024", for: "wide again: the title gone, the date gone", sample: () => strip(1024, PLAYING) },
+    { name: "Playing, 640", for: "folded: the wide pill doesn't fit", sample: () => strip(640, PLAYING) },
     { name: "The narrowest", for: "540: the last step, everything on", sample: () => strip(540, EVERYTHING) },
   ],
   sizes: doesntApply("one height, `size.bar`; its width is the screen's, and its steps the Reflow's."),
@@ -165,6 +168,7 @@ export default page<"rest" | "lit" | "pressed">({
       { part: "Ends, between pills", token: "space-s8" },
       { part: "Pills to the title", token: "space-s12" },
       { part: "Clear of the clock", token: "space-s40" },
+      { part: "Now playing to the clock", token: "space-s8" },
       { part: "Title, at least", token: "space-s48" },
       { part: "Title to now playing", token: "space-s8" },
       { part: "Song's room", token: "size-now_playing" },

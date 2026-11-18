@@ -27,9 +27,15 @@
   flex: 0 1 auto;
 }
 
-/* Now playing ends the left, beside the clock, the title between the pills and it. */
+/* Now playing ends the left, beside the clock at the bar's gap between pills, as a pill of the
+   clock's own would stand: the clear space is for what isn't a pill, the title, which now playing
+   then keeps from the clock. The title stands between the pills and it. */
 .shell-bar-left > .shell-playing-pill {
   margin-left: auto;
+}
+
+.shell-bar-left:has(> .shell-playing-pill) {
+  padding-right: var(--space-s8);
 }
 
 .shell-bar-right {

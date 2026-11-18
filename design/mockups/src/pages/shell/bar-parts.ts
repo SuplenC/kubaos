@@ -491,19 +491,22 @@ type Side = "left" | "right" | "clock";
 export interface Rung {
   readonly side: Side;
   readonly says: string;
+  /** What it says when a narrower step takes it back: now playing opens again once there is room. */
+  readonly back?: string;
   readonly apply: (state: BarState) => void;
 }
 
 /**
  * The order the bar gives way in, Kuba's and its proposals: now playing's words first, so the title
- * keeps its room; then the title, then the layout; what only shows state before what opens
+ * keeps its room, and back again once the title has gone or is short and the wide pill fits; then
+ * the title, then the layout; what only shows state before what opens
  * something; the clock, the system monitor, the mute pill, status and the bell always there, and the
  * recording's dot never gone. It reaches down to 540; a phone's width is a topic of its own. A rung
  * is taken only while its side runs short of the clock's clear space (a clock rung, while either
  * side does), and nothing else goes while the title still shows.
  */
 export const RUNGS: readonly Rung[] = [
-  { side: "left", says: "Now playing folds to its controls", apply: (s) => void (s.playing = "folded") },
+  { side: "left", says: "Now playing folds to its controls", back: "Now playing wide again", apply: (s) => void (s.playing = "folded") },
   { side: "left", says: "Title gone", apply: (s) => void (s.title = false) },
   { side: "left", says: "Keyboard layout goes", apply: (s) => void (s.layout = false) },
   { side: "clock", says: "Countdown goes", apply: (s) => void (s.countdown = false) },
@@ -528,6 +531,8 @@ export const RUNGS: readonly Rung[] = [
 /** The rungs `fitBar` takes before the rest: now playing's words, then the title. */
 const FOLD = 0;
 const TITLE_GONE = 1;
+/** Now playing gone: no words to give back. */
+const GONE = RUNGS.findIndex((rung) => rung.says === "Now playing goes");
 
 function stateOf(taken: ReadonlySet<number>): BarState {
   const state = { ...FULL };
@@ -590,6 +595,8 @@ function recordingDot(shown: Shown): HTMLElement {
 
 /** A rung's state's fit at `width` logical pixels, measured where the page draws. */
 interface Measured {
+  /** Now playing ends the left, `space.s8` from the clock rather than its clear space. */
+  readonly playing: boolean;
   readonly leftFits: boolean;
   readonly rightFits: boolean;
   readonly titleRoom: number;
@@ -616,10 +623,12 @@ function measure(width: number, content: BarContent, state: BarState): Measured 
   const leftNeed = need(drawn.left);
   const rightNeed = need(drawn.right);
   const clockWidth = of(drawn.clock);
+  const playing = drawn.left.querySelector(".shell-playing-pill") !== null;
   host.remove();
   const clear = length("space-s40");
+  const leftClear = playing ? gap : clear;
   const half = (width - 2 * gap - clockWidth) / 2;
-  return { leftFits: leftNeed + clear <= half, rightFits: rightNeed + clear <= half, titleRoom: half - clear - leftNeed - length("space-s12") };
+  return { playing, leftFits: leftNeed + leftClear <= half, rightFits: rightNeed + clear <= half, titleRoom: half - leftClear - leftNeed - length("space-s12") };
 }
 
 /**
@@ -636,6 +645,19 @@ function folds(content: BarContent, got: Measured): boolean {
 
 /** The least room the title shows in: under it, it goes. */
 const TITLE_LEAST = () => 2 * length("space-s48");
+
+/**
+ * Gives now playing its words back where they no longer cost the title anything: the title gone,
+ * or still as roomy as `folds` asks with the pill wide, and the left still clear of the clock.
+ */
+function unfold(width: number, content: BarContent, taken: Set<number>): void {
+  if (taken.has(GONE)) return;
+  const wide = new Set([...taken].filter((index) => index !== FOLD));
+  const got = measure(width, content, stateOf(wide));
+  if (!got.leftFits) return;
+  if (!wide.has(TITLE_GONE) && folds(content, got)) return;
+  taken.delete(FOLD);
+}
 
 /** The rungs the bar takes at `width` logical pixels to clear its centred clock, and its state. */
 export function fitBar(width: number, content: BarContent): { readonly taken: ReadonlySet<number>; readonly state: BarState; readonly fits: boolean } {
@@ -655,6 +677,7 @@ export function fitBar(width: number, content: BarContent): { readonly taken: Re
   }
   // The title goes once anything past the song's words has given way, or under space.s48 × 2 of room.
   if ([...taken].some((index) => index !== FOLD) || got.titleRoom < TITLE_LEAST()) taken.add(TITLE_GONE);
+  if (taken.has(FOLD)) unfold(width, content, taken);
   return { taken, state: stateOf(taken), fits: fits() };
 }
 

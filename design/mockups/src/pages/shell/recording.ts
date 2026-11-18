@@ -5,9 +5,9 @@
 import type { Words } from "../../lib/content.ts";
 import type { Shown } from "../../lib/control.ts";
 import { row } from "../../lib/layout.ts";
-import { makePill } from "../../lib/pill.ts";
+import { makePill, pillChanging } from "../../lib/pill.ts";
 import { ALL } from "../../site/settings.ts";
-import { lights, powerMoves, press } from "../../site/moves.ts";
+import { lights, powerMoves, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { CLOCK, clockContent, clockPill, idleContent, idleOptions, idlePill, recordingContent, recordingPill } from "./bar-parts.ts";
 
@@ -118,16 +118,10 @@ export default page<State>({
     between: [
       {
         name: "A new digit",
-        what: "9:59 to 10:00: the pill eases to its new width over `medium` on `standard_decel`.",
-        tracks: [{ part: "width", on: "the recording", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
-        reduced: [{ part: "width", on: "the recording", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "instant", curve: "standard_decel" }],
+        what: "9:59 to 10:00: the old time fades as its room closes, the new as its opens, over `medium`.",
+        ...pillSwap("the recording"),
         back: "plays",
-        sample: () => {
-          const made = makePill({ content: recordingContent({ elapsed: "10:00" }), lone: false, tone: "recording" });
-          made.element.style.setProperty("--from", "calc(var(--size-control_sm) * 2)");
-          made.element.style.setProperty("--to", "calc(var(--size-control_sm) * 2 + var(--space-s8))");
-          return made.element;
-        },
+        sample: () => pillChanging({ lone: false, tone: "recording" }, recordingContent({ elapsed: "9:59" }), recordingContent({ elapsed: "10:00" })),
       },
       { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => row("s8", "centre", recordingPill(), idlePill()) },
       { name: "Pressed", what: "Over `micro` the tube runs white-hot.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => row("s8", "centre", recordingPill({ state: "lit" }), idlePill({ state: "lit" })) },

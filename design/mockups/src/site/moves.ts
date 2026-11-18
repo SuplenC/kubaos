@@ -22,6 +22,22 @@ export function press(target: string, on: string): NonEmpty<Track<"standard">> {
   return [{ part: "pressed", on, target, property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" }];
 }
 
+/**
+ * A pill's content changing (`lib/pill.ts`): what leaves fades out as its room closes, what arrives
+ * fades in as its room opens, both over `medium` on `standard_decel`; reduce motion changes it at
+ * once. `ways` names which happen: content only leaving (now playing folding), only arriving, or both.
+ */
+export function pillSwap(on: string, ways: "both" | "out" | "in" = "both"): { readonly tracks: NonEmpty<Track<"standard_decel">>; readonly reduced: NonEmpty<Track<"linear">> } {
+  const out = (duration: "medium" | "instant") => ({ part: "what leaves", on, target: ".k-pill-slot[data-out]", property: "--pill-open", from: 1, to: 0, duration });
+  const arrive = (duration: "medium" | "instant") => ({ part: "what arrives", on, target: ".k-pill-slot[data-in]", property: "--pill-open", from: 0, to: 1, duration });
+  const of = <C extends "standard_decel" | "linear">(duration: "medium" | "instant", curve: C): NonEmpty<Track<C>> => {
+    const leaving = { ...out(duration), curve };
+    const arriving = { ...arrive(duration), curve };
+    return ways === "out" ? [leaving] : ways === "in" ? [arriving] : [leaving, arriving];
+  };
+  return { tracks: of("medium", "standard_decel"), reduced: of("instant", "linear") };
+}
+
 /** A palette: a theme in a mode. */
 interface Painted {
   readonly theme: string;
