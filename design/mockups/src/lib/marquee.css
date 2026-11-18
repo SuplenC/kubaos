@@ -1,0 +1,105 @@
+/* A marquee (`lib/marquee.ts`): words in a room a size token wide, scrolling when they run past it,
+   a soft fade only at an edge where words are cut. */
+
+/* How far along its pass the words are, in `space.s32`. */
+@property --marquee-x {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* New words arriving: how far faded in and how far risen, 0 to 1. */
+@property --marquee-fade {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+@property --marquee-rise {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 1;
+}
+
+.k-marquee {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--marquee-room);
+  overflow: clip;
+}
+
+/* What the words scroll in. It never takes the pointer, so the wheel can't scroll it: only the
+   pass moves it. */
+.k-marquee-window {
+  position: relative;
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  pointer-events: none;
+}
+
+/* The words and their copy, on whole device pixels as every box is: at 32 a second that is a
+   step every frame or two, which reads as a glide. */
+.k-marquee-track {
+  display: flex;
+  width: max-content;
+  translate: round(nearest, calc(var(--marquee-x) * -1 * var(--space-s32)), 1px) 0;
+}
+
+.k-marquee-line {
+  display: flex;
+  flex: none;
+}
+
+.k-marquee-line[data-copy] {
+  margin-inline-start: var(--space-s32);
+}
+
+/* The old words fade where they stand, over the new. */
+.k-marquee-track[data-out] {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.k-marquee-track[data-in] {
+  opacity: var(--marquee-fade);
+  translate: round(nearest, calc(var(--marquee-x) * -1 * var(--space-s32)), 1px) round(nearest, calc(var(--space-s8) * (1 - var(--marquee-rise))), 1px);
+}
+
+/* A fade `space.s16` wide only where words are cut: at the end while they run past the room, at the
+   start as far as they have moved, up to `space.s16`, and back down as the copy lands. */
+.k-marquee:has(> .k-marquee-window > .k-marquee-track[data-runs]:not([data-out])) {
+  --marquee-cut: max(0px, min(var(--space-s16), var(--marquee-x) * var(--space-s32), (var(--marquee-end, 0) - var(--marquee-x)) * var(--space-s32)));
+  mask-image: linear-gradient(to right, transparent, black var(--marquee-cut), black calc(100% - var(--space-s16)), transparent);
+}
+
+/* Reduce motion: nothing scrolls. The words stop at the room's edge, the part that crosses it ending
+   in an ellipsis, and nothing is faded. */
+[data-reduced] .k-marquee:has(> .k-marquee-window > .k-marquee-track[data-runs]:not([data-out])) {
+  mask-image: none;
+}
+
+[data-reduced] .k-marquee-track {
+  width: 100%;
+  translate: none;
+}
+
+[data-reduced] .k-marquee-line {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-reduced] .k-marquee-line[data-copy],
+[data-reduced] .k-marquee [data-marquee-past] {
+  display: none;
+}
+
+[data-reduced] .k-marquee [data-marquee-cut] {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

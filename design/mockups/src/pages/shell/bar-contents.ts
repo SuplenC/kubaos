@@ -5,9 +5,9 @@
 import type { Words } from "../../lib/content.ts";
 import type { Shown } from "../../lib/control.ts";
 import { row } from "../../lib/layout.ts";
-import { makePill } from "../../lib/pill.ts";
+import { makePill, pillChanging } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
-import { lights, powerMoves, press } from "../../site/moves.ts";
+import { lights, powerMoves, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import {
   bellPill,
@@ -181,17 +181,11 @@ export default page<State>({
     leaves: doesntApply("it goes at once as its service turns off."),
     between: [
       {
-        name: "Its content changes width",
-        what: "Hide offered, or a layout switched: it eases to its new width over `medium` on `standard_decel`.",
-        tracks: [{ part: "width", on: "the system monitor", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
-        reduced: [{ part: "width", on: "the system monitor", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "instant", curve: "standard_decel" }],
+        name: "Its content changes",
+        what: "Hide offered, or a layout switched: the old fades as its room closes, the new as its opens.",
+        ...pillSwap("the system monitor"),
         back: "plays",
-        sample: () => {
-          const made = makePill({ content: sysmonContent({ offering: true }), lone: false, gap: "s8" });
-          made.element.style.setProperty("--from", "var(--size-thumbnail_height)");
-          made.element.style.setProperty("--to", "var(--size-control_sm)");
-          return made.element;
-        },
+        sample: () => pillChanging({ lone: false, gap: "s8" }, sysmonContent(), sysmonContent({ offering: true })),
       },
       { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => all() },
       { name: "Back to rest", what: "The pointer off: back to rest over `short`.", tracks: lights(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => all("lit") },

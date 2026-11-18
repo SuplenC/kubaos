@@ -17,7 +17,7 @@ import { advance, clamped, text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
 import { settings } from "../../site/settings.ts";
-import { mutePill, nowPlaying } from "./bar-audio-parts.ts";
+import { mutePill, nowPlaying, type Song } from "./bar-audio-parts.ts";
 import { workspaces, type WorkspacesOptions, SHOTS_GROUPS } from "./workspaces.ts";
 
 export { wallpaper };
@@ -452,8 +452,10 @@ export interface BarContent {
   readonly title: string;
   readonly readings: 2 | 3;
   readonly borrowed: boolean;
-  /** An app has a player: now playing shows. */
+  /** A player plays or is paused: now playing shows. */
   readonly playing: boolean;
+  /** What plays, while something does. */
+  readonly song?: Song;
 }
 
 /** Every pill at once, as the shots' stand-ins hold them. */
@@ -475,12 +477,12 @@ interface BarState {
   name: boolean;
   ghosts: boolean;
   sysmon: "numbers" | "rings";
-  playing: "full" | "play" | "none";
+  playing: "wide" | "folded" | "none";
   mute: "both" | "mic";
   shed: number;
 }
 
-const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", playing: "full", mute: "both", shed: 0 };
+const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", playing: "wide", mute: "both", shed: 0 };
 
 /** Where a rung's part sits: the left, the right, or the clock in the middle. */
 type Side = "left" | "right" | "clock";
@@ -489,18 +491,22 @@ type Side = "left" | "right" | "clock";
 export interface Rung {
   readonly side: Side;
   readonly says: string;
+  /** What it says when a narrower step takes it back: now playing opens again once there is room. */
+  readonly back?: string;
   readonly apply: (state: BarState) => void;
 }
 
 /**
- * The order the bar gives way in, Kuba's and its proposals: the title first, then the layout; what
- * only shows state before what opens something; the clock, the system monitor, the mute pill, status
- * and the bell always there, and the recording's dot never gone. It reaches down to 540; a phone's
- * width is a topic of its own. A rung is taken only while its side runs short of the clock's clear
- * space (a clock rung, while either side does), and nothing else goes while
- * the title still shows.
+ * The order the bar gives way in, Kuba's and its proposals: now playing's words first, so the title
+ * keeps its room, and back again once the title has gone or is short and the wide pill fits; then
+ * the title, then the layout; what only shows state before what opens
+ * something; the clock, the system monitor, the mute pill, status and the bell always there, and the
+ * recording's dot never gone. It reaches down to 540; a phone's width is a topic of its own. A rung
+ * is taken only while its side runs short of the clock's clear space (a clock rung, while either
+ * side does), and nothing else goes while the title still shows.
  */
 export const RUNGS: readonly Rung[] = [
+  { side: "left", says: "Now playing folds to its controls", back: "Now playing wide again", apply: (s) => void (s.playing = "folded") },
   { side: "left", says: "Title gone", apply: (s) => void (s.title = false) },
   { side: "left", says: "Keyboard layout goes", apply: (s) => void (s.layout = false) },
   { side: "clock", says: "Countdown goes", apply: (s) => void (s.countdown = false) },
@@ -513,15 +519,20 @@ export const RUNGS: readonly Rung[] = [
   { side: "left", says: "Preview joins ⋯", apply: (s) => void (s.preview = false) },
   { side: "left", says: "Group name goes", apply: (s) => void (s.name = false) },
   { side: "left", says: "Ghosts go", apply: (s) => void (s.ghosts = false) },
-  { side: "right", says: "Now playing drops ⏮ ⏭", apply: (s) => void (s.playing = "play") },
+  { side: "left", says: "Now playing goes", apply: (s) => void (s.playing = "none") },
   { side: "right", says: "System monitor turns to rings", apply: (s) => void (s.sysmon = "rings") },
   { side: "right", says: "Battery % goes", apply: (s) => void (s.shed = 1) },
-  { side: "right", says: "Now playing goes", apply: (s) => void (s.playing = "none") },
   { side: "right", says: "Power mode goes", apply: (s) => void (s.shed = 2) },
   { side: "right", says: "Network goes", apply: (s) => void (s.shed = 3) },
   { side: "right", says: "Bluetooth goes", apply: (s) => void (s.shed = 4) },
   { side: "right", says: "Mute pill keeps the mic", apply: (s) => void (s.mute = "mic") },
 ];
+
+/** The rungs `fitBar` takes before the rest: now playing's words, then the title. */
+const FOLD = 0;
+const TITLE_GONE = 1;
+/** Now playing gone: no words to give back. */
+const GONE = RUNGS.findIndex((rung) => rung.says === "Now playing goes");
 
 function stateOf(taken: ReadonlySet<number>): BarState {
   const state = { ...FULL };
@@ -558,15 +569,15 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   if (content.update && state.update) left.append(updatePill(undefined, shown));
   const titled = content.title !== "" && state.title ? title(content.title) : null;
   if (titled) left.append(titled);
+  // The audio pills' circles take the state layer in a pill's place: lit or pressed, the first's.
+  const circle = shown === "lit" || shown === "pressed" ? shown : undefined;
+  if (content.playing && state.playing !== "none") left.append(nowPlaying({ folded: state.playing === "folded", ...(content.song ? { song: content.song } : {}), ...(circle ? { pinned: { part: "play", state: circle } } : {}) }));
   const clock = compactClock({ date: state.date, countdown: content.countdown && state.countdown, state: shown });
   const right = document.createElement("span");
   right.className = "shell-bar-right";
   const folded = state.tray === "folded" || (content.update && !state.update) || (content.preview && !state.preview);
   right.append(content.tray && !folded ? trayPill() : morePill(shown));
   right.append(state.sysmon === "rings" ? rimPill(LOADS.slice(0, 3), shown) : sysmonPill({ readings: READINGS.slice(0, content.readings), state: shown }));
-  // The audio pills' circles take the state layer in a pill's place: lit or pressed, the first's.
-  const circle = shown === "lit" || shown === "pressed" ? shown : undefined;
-  if (content.playing && state.playing !== "none") right.append(nowPlaying({ compact: state.playing === "play", ...(circle ? { pinned: { part: "play", state: circle } } : {}) }));
   right.append(mutePill({ ...(state.mute === "mic" ? { micOnly: true } : {}), ...(circle ? { pinned: { side: state.mute === "mic" ? "input" : "output", state: circle } } : {}) }), bellPill(false, shown), shedStatus({ shed: state.shed, state: shown }));
   const row = document.createElement("span");
   row.className = "shell-bar-row";
@@ -584,6 +595,8 @@ function recordingDot(shown: Shown): HTMLElement {
 
 /** A rung's state's fit at `width` logical pixels, measured where the page draws. */
 interface Measured {
+  /** Now playing ends the left, `space.s8` from the clock rather than its clear space. */
+  readonly playing: boolean;
   readonly leftFits: boolean;
   readonly rightFits: boolean;
   readonly titleRoom: number;
@@ -610,26 +623,61 @@ function measure(width: number, content: BarContent, state: BarState): Measured 
   const leftNeed = need(drawn.left);
   const rightNeed = need(drawn.right);
   const clockWidth = of(drawn.clock);
+  const playing = drawn.left.querySelector(".shell-playing-pill") !== null;
   host.remove();
   const clear = length("space-s40");
+  const leftClear = playing ? gap : clear;
   const half = (width - 2 * gap - clockWidth) / 2;
-  return { leftFits: leftNeed + clear <= half, rightFits: rightNeed + clear <= half, titleRoom: half - clear - leftNeed - length("space-s12") };
+  return { playing, leftFits: leftNeed + leftClear <= half, rightFits: rightNeed + clear <= half, titleRoom: half - leftClear - leftNeed - length("space-s12") };
+}
+
+/**
+ * Whether now playing's words give way for the title: the left runs short of the clock's clear
+ * space, or the title would have less room than its own width or the song's room, whichever is
+ * less, or than the least it shows in. The title is never cut, or gone, to make room for the song.
+ */
+function folds(content: BarContent, got: Measured): boolean {
+  if (!content.playing) return false;
+  if (!got.leftFits) return true;
+  const wants = Math.max(Math.min(advance("body_strong", content.title), length("size-now_playing")), TITLE_LEAST());
+  return content.title !== "" && got.titleRoom < wants;
+}
+
+/** The least room the title shows in: under it, it goes. */
+const TITLE_LEAST = () => 2 * length("space-s48");
+
+/**
+ * Gives now playing its words back where they no longer cost the title anything: the title gone,
+ * or still as roomy as `folds` asks with the pill wide, and the left still clear of the clock.
+ */
+function unfold(width: number, content: BarContent, taken: Set<number>): void {
+  if (taken.has(GONE)) return;
+  const wide = new Set([...taken].filter((index) => index !== FOLD));
+  const got = measure(width, content, stateOf(wide));
+  if (!got.leftFits) return;
+  if (!wide.has(TITLE_GONE) && folds(content, got)) return;
+  taken.delete(FOLD);
 }
 
 /** The rungs the bar takes at `width` logical pixels to clear its centred clock, and its state. */
 export function fitBar(width: number, content: BarContent): { readonly taken: ReadonlySet<number>; readonly state: BarState; readonly fits: boolean } {
   const taken = new Set<number>();
   let got = measure(width, content, stateOf(taken));
+  if (folds(content, got)) {
+    taken.add(FOLD);
+    got = measure(width, content, stateOf(taken));
+  }
   const fits = () => got.leftFits && got.rightFits;
-  for (let index = 1; index < RUNGS.length && !fits(); index++) {
+  for (let index = TITLE_GONE + 1; index < RUNGS.length && !fits(); index++) {
     const side = RUNGS[index]!.side;
     const short = side === "left" ? !got.leftFits : side === "right" ? !got.rightFits : true;
     if (!short) continue;
     taken.add(index);
     got = measure(width, content, stateOf(taken));
   }
-  // The title goes first: once anything else has given way, or under space.s48 × 2 of room.
-  if (taken.size > 0 || got.titleRoom < 2 * length("space-s48")) taken.add(0);
+  // The title goes once anything past the song's words has given way, or under space.s48 × 2 of room.
+  if ([...taken].some((index) => index !== FOLD) || got.titleRoom < TITLE_LEAST()) taken.add(TITLE_GONE);
+  if (taken.has(FOLD)) unfold(width, content, taken);
   return { taken, state: stateOf(taken), fits: fits() };
 }
 

@@ -270,6 +270,10 @@ bar = 40
 # The widest a name the bar shows grows (a live preview's branch): past it, it
 # ends in an ellipsis, so the bar's right side never runs into the clock.
 bar_label = 160
+# The room for the song and its artist in the bar's now playing, wide: one width whatever plays,
+# so nothing in the bar moves when the song changes. A song and its artist of about 26 letters
+# at `body` read whole; a longer pair scrolls in it (`Marquee`).
+now_playing = 192
 # How far the lock's wallpaper blurs once it is awake, a blur's standard
 # deviation: enough that the city recedes behind the password's sheet, little
 # enough that it is still the same picture.
@@ -667,6 +671,19 @@ use = "A live meter's peak tick falling the whole bar back."
 [duration.hum]
 ms = 1200
 use = "Half a skeleton's breath: its glass warming or cooling."
+
+# Words that run past their fixed room (`Marquee`): they hold at their start for `marquee_hold`,
+# so the start is read first, then scroll at an even pace, `space.s32` per `marquee_pace` (32 a
+# second, slow enough to read in the corner of the eye), until the copy that follows them stands
+# where they began, and hold again. The pace is a rate, not a move's length: a pass takes as long
+# as its words are wide. Reduce motion doesn't scroll at all, so neither is capped.
+[duration.marquee_hold]
+ms = 2400
+use = "Words that run past their room holding at their start between passes."
+
+[duration.marquee_pace]
+ms = 1000
+use = "Words scrolling in their room: the time they take to travel `space.s32`."
 
 # How long a toast stays once it has arrived, before it leaves. Not a move: reduce motion doesn't
 # cap it, since the words must still be read.

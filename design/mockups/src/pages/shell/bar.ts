@@ -1,7 +1,8 @@
 // The Bar page: the frame's top edge as it is designed now. What you're doing on the left (the
-// workspaces, the preview, recording, Keep awake, Proxy, the layout, the update, the title), the
-// clock always centred, and on the right what opens a panel (the tray or its ⋯, the system monitor,
-// now playing and the mute pill, the bell and status, which end it). As the bar narrows its parts give way in one order (`RUNGS`).
+// workspaces, the preview, recording, Keep awake, Proxy, the layout, the update, the title, and now
+// playing at its end beside the clock), the clock always centred, and on the right what opens a
+// panel (the tray or its ⋯, the system monitor, the mute pill, the bell and status, which end it).
+// As the bar narrows its parts give way in one order (`RUNGS`), now playing's words first.
 
 import type { Shown } from "../../lib/control.ts";
 import { row, stack } from "../../lib/layout.ts";
@@ -10,6 +11,7 @@ import { text } from "../../lib/text.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { WINDOWS } from "../../site/settings.ts";
+import { LONG_SONG } from "./bar-audio-parts.ts";
 import { barStrip, type BarContent, EVERYDAY, EVERYTHING, fitBar, logicalWidth, RUNGS, TITLE } from "./bar-parts.ts";
 
 /** The widths the bar is designed at, logical pixels: a 4K screen down to a portrait one at 2. */
@@ -22,12 +24,14 @@ function strip(width: number, content: BarContent = EVERYDAY, state: Shown = "re
   return barStrip({ width, content, state });
 }
 
-/** What gave way at `width` against the step above, in a line. */
+/** What gave way at `width` against the step above, and what came back, in a line. */
 function gaveWay(width: number, above: number | null): string {
   const now = fitBar(width, EVERYTHING).taken;
   const before = above === null ? new Set<number>() : fitBar(above, EVERYTHING).taken;
   const fresh = [...now].filter((index) => !before.has(index)).map((index) => RUNGS[index]!.says);
-  return fresh.length === 0 ? (above === null ? "Everything shows" : "Nothing changes") : fresh.join(" · ");
+  const returned = [...before].filter((index) => !now.has(index)).map((index) => RUNGS[index]!.back ?? RUNGS[index]!.says);
+  const said = [...fresh, ...returned];
+  return said.length === 0 ? (above === null ? "Everything shows" : "Nothing changes") : said.join(" · ");
 }
 
 /** The stage: the bar with every pill, at the width the slider picks, 540 to a 4K screen's. */
@@ -76,6 +80,13 @@ const TITLE_SWAP: Move = {
 
 const QUIET: BarContent = { ...EVERYDAY, tray: false, title: "" };
 
+/** Music on an ordinary day, the focused window's title short: now playing wide. */
+const PLAYING: BarContent = { ...EVERYDAY, playing: true, title: "Firefox" };
+/** The same with a song that runs past its room. */
+const PLAYING_LONG: BarContent = { ...PLAYING, song: LONG_SONG };
+/** The title long: now playing folds, so the title keeps its room. */
+const PLAYING_TITLED: BarContent = { ...EVERYDAY, playing: true };
+
 export default page<"rest" | "lit" | "pressed">({
   level: "shell",
   slug: "bar",
@@ -87,6 +98,11 @@ export default page<"rest" | "lit" | "pressed">({
     { name: "Everyday", for: "tray, system monitor, mute, bell, status", sample: () => strip(WIDE) },
     { name: "Everything on", for: "every pill at once, on its own side", sample: () => strip(WIDE, EVERYTHING) },
     { name: "No window", for: "an empty workspace: no title", sample: () => strip(WIDE, { ...EVERYDAY, title: "" }) },
+    { name: "Playing, 1440", for: "now playing wide, beside the clock", sample: () => strip(1440, PLAYING) },
+    { name: "A long song, 1440", for: "its words scroll; nothing else moves", sample: () => strip(1440, PLAYING_LONG) },
+    { name: "A long title, 1440", for: "now playing folds; the title keeps its room", sample: () => strip(1440, PLAYING_TITLED) },
+    { name: "Playing, 1024", for: "wide again: the title gone, the date gone", sample: () => strip(1024, PLAYING) },
+    { name: "Playing, 640", for: "folded: the wide pill doesn't fit", sample: () => strip(640, PLAYING) },
     { name: "The narrowest", for: "540: the last step, everything on", sample: () => strip(540, EVERYTHING) },
   ],
   sizes: doesntApply("one height, `size.bar`; its width is the screen's, and its steps the Reflow's."),
@@ -123,6 +139,7 @@ export default page<"rest" | "lit" | "pressed">({
     missingPicture: doesntApply("its symbols are always there; a tray app's missing picture is the Tray page's."),
     counts: [
       { name: "The fewest", for: "workspaces, clock, system monitor, mute, bell, status", sample: () => strip(WIDE, QUIET) },
+      { name: "Music", for: "and now playing, beside the clock", sample: () => strip(WIDE, { ...QUIET, playing: true }) },
       { name: "Everyday", for: "and the tray", sample: () => strip(WIDE) },
       { name: "Every one", for: "every pill, each on its side", sample: () => strip(WIDE, EVERYTHING) },
     ],
@@ -142,6 +159,7 @@ export default page<"rest" | "lit" | "pressed">({
   measures: {
     samples: nonEmpty([
       { name: "Everything on", for: "both sides' gaps, the title, the clear space", sample: () => strip(WIDE, EVERYTHING) },
+      { name: "Playing", for: "the title, now playing, the clock", sample: () => strip(1440, PLAYING) },
       { name: "The narrowest", for: "540, everything on", sample: () => strip(540, EVERYTHING) },
     ]),
     measures: [
@@ -150,7 +168,10 @@ export default page<"rest" | "lit" | "pressed">({
       { part: "Ends, between pills", token: "space-s8" },
       { part: "Pills to the title", token: "space-s12" },
       { part: "Clear of the clock", token: "space-s40" },
+      { part: "Now playing to the clock", token: "space-s8" },
       { part: "Title, at least", token: "space-s48" },
+      { part: "Title to now playing", token: "space-s8" },
+      { part: "Song's room", token: "size-now_playing" },
       { part: "Title's line", token: "type-body_strong-line" },
     ],
     reflow: {

@@ -7,9 +7,9 @@ import type { Words } from "../../lib/content.ts";
 import { type Shown, stateOptions } from "../../lib/control.ts";
 import { icon } from "../../lib/icon.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { makePill, type PillOptions, type PillTone, paired, pill } from "../../lib/pill.ts";
+import { makePill, pillChanging, type PillOptions, type PillTone, paired, pill } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
-import { lights, powerMoves, press } from "../../site/moves.ts";
+import { lights, powerMoves, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const LAYOUT: Words = { short: "PL", long: "Polish (programmer's)" };
@@ -42,7 +42,7 @@ function bar(state: Shown = "rest"): HTMLElement {
   );
 }
 
-/** A pill whose content changes on a press: it eases to its new width. */
+/** A pill whose content changes on a press: the old words fade as their room closes, the new as theirs opens. */
 function growing(): HTMLElement {
   const layouts = ["PL", "EN", "Polish (programmer's)"];
   let at = 0;
@@ -83,7 +83,7 @@ export default page({
   title: "Pill",
   lede: "A group in the bar: symbols and short words side by side in a pill, the shell's alone.",
   code: { qml: "Pill", unbuilt: "QML only; neon not built yet" },
-  stage: { live, hint: "point at one; press PL to see it ease", daylight: true },
+  stage: { live, hint: "point at one; press PL to see it change", daylight: true },
   variants: nonEmpty(TONES.map(({ name, tone, for: what, content }) => ({ name, for: what, sample: () => pill({ content: content(), lone: false, tone }) }))),
   sizes: [
     { name: "Symbols and words", for: "`space.s12` at each end", sample: () => pill({ content: STATUS(), lone: false }) },
@@ -130,17 +130,11 @@ export default page({
     leaves: doesntApply("it goes at once, as its content ends."),
     between: [
       {
-        name: "Its content changes width",
-        what: "It eases to its new width over `medium` on `standard_decel`, its content cut at its edge.",
-        tracks: [{ part: "width", on: "the keyboard layout's pill", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "medium", curve: "standard_decel" }],
-        reduced: [{ part: "width", on: "the keyboard layout's pill", target: ".k-pill", property: "--grown", from: 0, to: 1, duration: "instant", curve: "standard_decel" }],
+        name: "Its content changes",
+        what: "What leaves fades as its room closes, what arrives as its opens, over `medium`.",
+        ...pillSwap("the keyboard layout's pill"),
         back: "plays",
-        sample: () => {
-          const made = makePill({ content: [words("Polish (programmer's)")], lone: false });
-          made.element.style.setProperty("--from", "var(--size-control_sm)");
-          made.element.style.setProperty("--to", "var(--size-thumbnail_height)");
-          return made.element;
-        },
+        sample: () => pillChanging({ lone: false }, [words("PL")], [words("Polish (programmer's)")]),
       },
       { name: "Lit", what: "The pointer onto it: it lights up over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => bar() },
       { name: "Back to rest", what: "The pointer off: back to rest over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => bar("lit") },

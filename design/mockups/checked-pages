@@ -16,9 +16,11 @@ hint
 icon
 icon-button
 icon-tile
+marquee
 motion
 notification-card
 order-list
+pill
 popover
 popup-stack
 radio

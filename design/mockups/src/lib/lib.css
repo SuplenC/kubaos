@@ -1864,16 +1864,15 @@
   top: round(nearest, calc(var(--size-badge_dot) / -2), 1px);
 }
 
-/* How far a pill has eased from its old width to its new, 0 to 1. */
-@property --grown {
+/* How far a pill's leaving or arriving content is open, 0 to 1: its room and its opacity. */
+@property --pill-open {
   syntax: "<number>";
   inherits: false;
   initial-value: 1;
 }
 
 /* A pill (`lib/pill.ts`): `size.control_sm` tall at the full radius on its fill, its content a row
-   centred on device pixels, `space.s12` at each end, `space.s8` round a lone symbol. While its
-   content changes width it is `--from` wide easing to `--to`, its content cut at its edge. An
+   centred on device pixels, `space.s12` at each end, `space.s8` round a lone symbol. An
    interactive one pressed by day takes its tone's tint, as a Text button does. */
 .k-pill {
   position: relative;
@@ -1893,10 +1892,6 @@
   --end: var(--space-s8);
 }
 
-.k-pill[style*="--from"] {
-  width: round(up, calc(var(--from) + (var(--to) - var(--from)) * var(--grown)), 1px);
-}
-
 .k-pill.k-control {
   cursor: pointer;
 }
@@ -1910,10 +1905,26 @@
   border-radius: inherit;
 }
 
-/* Its content is cut at its edge only while its width is eased: at rest it cuts nothing, so the
-   hint of a press target inside it (an audio pill's circle) floats whole under it. */
-.k-pill[style*="--from"] > .k-pill-clip {
+/* Content leaving or arriving, in a room as wide as it times how open it is, rounded up to a device
+   pixel so the pill's edges stay on one: the room cuts it and it fades with it, and the gap beside
+   it closes with the room, so a closed room takes no space at all. At rest no content has one, so
+   nothing is cut and the hint of a press target inside a pill floats whole under it. */
+.k-pill-slot {
+  display: flex;
+  flex: none;
   overflow: clip;
+  width: calc-size(max-content, round(up, size * var(--pill-open), 1px));
+  opacity: var(--pill-open);
+  margin-inline-start: calc(var(--gap) * (var(--pill-open) - 1));
+}
+
+.k-pill-slot:first-child {
+  margin-inline-start: 0;
+  margin-inline-end: calc(var(--gap) * (var(--pill-open) - 1));
+}
+
+.k-pill-slot[data-in] {
+  --pill-open: 0;
 }
 
 /* A ticking number: as wide as the same text with every digit a 0, its text at the left. */
