@@ -121,3 +121,13 @@
 .share-draw[data-drawn] > .share-draw-size {
   display: flex;
 }
+
+/* A draft part's sample: a desktop's corner the size of a panel and a thumbnail, with room round it. */
+.share-sample {
+  position: relative;
+  display: block;
+  width: calc(var(--size-panel) + 2 * var(--space-s16));
+  height: calc(var(--size-thumbnail_height) + 2 * var(--space-s16));
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_lowest);
+}

@@ -661,8 +661,8 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
   return surface;
 }
 
-/** The region's drawing over the desktop, the box drawn part-way. */
-export function drawingScreen(rect: Rect | undefined = REGION): HTMLElement {
+/** The region's drawing over the desktop, the box drawn, or none before the drag. */
+export function drawingScreen(rect: Rect | null = REGION): HTMLElement {
   const made = desktop();
   made.append(regionDraw(rect ? { rect } : {}));
   return made;
