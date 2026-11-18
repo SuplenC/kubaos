@@ -10,16 +10,6 @@
 // The apps' content follows the palette's roles, so a miniature takes the wallpaper's scheme with
 // the rest of the desktop, as the apps themed from it do.
 
-import chromium from "../../assets/apps/chromium.svg?url";
-import discord from "../../assets/apps/discord.svg?url";
-import firefox from "../../assets/apps/firefox.svg?url";
-import ghostty from "../../assets/apps/ghostty.svg?url";
-import spotify from "../../assets/apps/spotify.svg?url";
-import steam from "../../assets/apps/steam.svg?url";
-import strawberry from "../../assets/apps/strawberry.svg?url";
-import telegram from "../../assets/apps/telegram.svg?url";
-import thunderbird from "../../assets/apps/thunderbird.svg?url";
-import vscode from "../../assets/apps/vscode-insiders.svg?url";
 import shibuya from "../../assets/lock/shibuya-rainy-corner.jpg?url";
 import shinjuku from "../../assets/lock/shinjuku-purple-hour.jpg?url";
 import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
@@ -27,26 +17,6 @@ import { icon } from "../../lib/icon.ts";
 import { text, type TypeStyle } from "../../lib/text.ts";
 import type { App, Win } from "./overview-model.ts";
 import { bareWindow } from "../apps/settings/settings-window.ts";
-
-/** Each app's icon, from the system's icon theme; Showtime, yazi and Settings have none there. */
-export const ICONS: Partial<Record<App, string>> = {
-  chromium,
-  discord,
-  firefox,
-  ghostty,
-  spotify,
-  steam,
-  strawberry,
-  telegram,
-  thunderbird,
-  vscode,
-};
-
-/**
- * The apps whose windows are told apart by their icon: two browsers, two chats, two players look
- * alike from above, while a terminal, an editor or Settings shows what it is.
- */
-export const BADGED: ReadonlySet<App> = new Set(["firefox", "chromium", "discord", "telegram", "spotify", "strawberry"]);
 
 function box(name: string, ...children: (Node | string)[]): HTMLElement {
   const element = document.createElement("span");

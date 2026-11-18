@@ -25,7 +25,6 @@
 @property --ov-veil { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-aside { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-held { syntax: "<number>"; inherits: false; initial-value: 0; }
-@property --ov-hover { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
@@ -112,6 +111,24 @@
   display: block;
 }
 
+/* ── The pointer ─────────────────────────────────────────────────────────────────────────────
+
+   The open hand over anything that can be carried, a window or a workspace, as OrderList's grip;
+   the closed hand everywhere while something is carried; a control's pointer over the "+" slot and
+   the delete zone's Undo, as the library's controls show it. */
+.ov[data-open] :is(.ov-ws, .ov-win) {
+  cursor: grab;
+}
+
+.ov[data-carrying],
+.ov[data-carrying] * {
+  cursor: grabbing;
+}
+
+.ov[data-open]:not([data-carrying]) .ov-plus {
+  cursor: pointer;
+}
+
 /* ── A workspace ─────────────────────────────────────────────────────────────────────────────── */
 
 /* Its box at its slot; flying, it travels to the screen's corner as its desktop grows to the
@@ -127,7 +144,7 @@
   opacity: var(--ov-arrive);
   scale: calc(var(--scale-behind) + (1 - var(--scale-behind)) * var(--ov-arrive));
   transform-origin: 50% 50%;
-  transform: translate(var(--ov-bx), calc(var(--ov-by) - var(--space-s4) * var(--ov-hover))) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
+  transform: translate(var(--ov-bx), var(--ov-by)) scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -135,7 +152,6 @@
     --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
-    --ov-hover var(--motion-short) var(--easing-standard),
     --ov-held var(--motion-short) var(--easing-standard),
     --ov-shrink var(--motion-short) var(--easing-standard),
     --ov-bx var(--motion-short) var(--easing-standard),
@@ -210,11 +226,6 @@
 
 .ov-ws-number[data-shown] {
   background: var(--color-primary);
-}
-
-/* The pointer over a miniature lifts it a little. */
-.ov[data-open]:not([data-carrying]) .ov-ws:not([data-selected], [data-gone]):has(> .ov-ws-desk:hover) {
-  --ov-hover: 1;
 }
 
 .ov:not([data-open]) .ov-ws:not([data-shown-here]),
@@ -314,19 +325,6 @@
   z-index: 1;
 }
 
-/* The app's icon, a small tile in the window's corner, at its own size whatever the scale. */
-.ov-badge {
-  position: absolute;
-  left: var(--space-s16);
-  bottom: var(--space-s16);
-  transform-origin: 0 100%;
-  scale: var(--ov-badge, 1);
-}
-
-.ov-win[data-cramped] > .ov-badge {
-  display: none;
-}
-
 /* Where a carried window would tile on the workspace below it. */
 .ov-landing {
   position: absolute;
@@ -339,7 +337,8 @@
   box-sizing: border-box;
   border-radius: calc(var(--radius-surface) - var(--space-s8));
   background: rgb(from var(--color-surface) r g b / var(--opacity-placeholder));
-  box-shadow: inset 0 0 0 calc(var(--stroke-thin) * var(--ov-badge, 1)) var(--color-primary);
+  /* Drawn inside the scaled desktop, so its line is the miniature's scale undone. */
+  box-shadow: inset 0 0 0 calc(var(--stroke-thin) * var(--ov-unscale, 1)) var(--color-primary);
   opacity: 0;
   transition: opacity var(--motion-short) var(--easing-standard);
 }
@@ -618,10 +617,6 @@
 [data-reduced] .ov :is(.ov-ws, .ov-ws-desk, .ov-win, .ov-plus, .ov-room, .ov-label, .ov-ring) {
   --ov-pt: 0s !important;
   --ov-ft: 0s !important;
-}
-
-[data-reduced] .ov .ov-ws {
-  --ov-hover: 0 !important;
 }
 
 /* ══ What the apps show (`overview-apps.ts`) ═══════════════════════════════════════════════════ */

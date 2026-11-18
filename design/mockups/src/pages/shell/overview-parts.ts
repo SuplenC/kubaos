@@ -20,12 +20,12 @@ import { focusRing } from "../../lib/focus.ts";
 import { pill } from "../../lib/pill.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconButton } from "../../lib/icon-button.ts";
-import { iconTile } from "../../lib/icon-tile.ts";
+import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
 import { length, number, raw } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 import { barScreen } from "./bar-parts.ts";
-import { BADGED, face, ICONS } from "./overview-apps.ts";
+import { face } from "./overview-apps.ts";
 import * as model from "./overview-model.ts";
 import type { Group as BarGroup } from "./workspaces.ts";
 
@@ -44,7 +44,7 @@ interface Slot extends model.Rect {
 
 /** Where a carried thing would land, as the pointer finds it. */
 export type Target =
-  | { readonly kind: "space"; readonly space: string }
+  | { readonly kind: "space"; readonly space: string; readonly at?: model.Place }
   | { readonly kind: "between"; readonly group: string; readonly index: number }
   | { readonly kind: "plus"; readonly group: string }
   | { readonly kind: "refused"; readonly group: string }
@@ -64,6 +64,10 @@ export type Pin =
    * thing carried over the zone meanwhile, or, `confirmed`, the first one gone and `what` pending.
    */
   | { readonly kind: "pending"; readonly what: Carried; readonly left: number; readonly next?: Carried; readonly confirmed?: Carried }
+  /** A window carried onto `to` and let go there: where it lands. */
+  | { readonly kind: "placed"; readonly window: string; readonly to: Target }
+  /** Three fingers on the touchpad, the Overview `progress` of the way open: opening from closed, or closing. */
+  | { readonly kind: "swiping"; readonly opening: boolean; readonly progress: number }
   /** A window dropped on the delete zone and brought back, drawn `share` of its way home. */
   | { readonly kind: "undoing"; readonly window: string; readonly share: number };
 
@@ -119,6 +123,14 @@ export interface Driver {
   readonly thaw: () => void;
   /** The middle of the delete zone where it stands, or would stand on the focused screen. */
   readonly bin: () => Point;
+  /** A point over `side` of `window` on `space`, in world points, and the order a workspace tiles its windows in. */
+  readonly sidePoint: (space: string, window: string, side: model.Side) => Point;
+  readonly order: (space: string) => string[];
+  /** A workspace's number as drawn. */
+  readonly numberShown: (space: string) => string;
+  /** Three fingers holding the Overview `p` of the way open, and lifting. */
+  readonly swipe: (p: number) => void;
+  readonly lift: () => void;
   /** The drags learned, and whether the tip still shows. */
   readonly learned: () => Learned[];
   readonly tipShown: () => boolean;
@@ -290,6 +302,9 @@ interface SpaceEl {
   readonly desk: HTMLElement;
   readonly tag: HTMLElement;
   readonly number: HTMLElement;
+  /** Its number as it rolls when the workspaces before it change, and whether it is the shown one's. */
+  rolling: Rolling | null;
+  shown: boolean;
 }
 
 /** A screen drawn: the desktop with its frame and bar, and the overview's layer over it. */
@@ -607,12 +622,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element = span("ov-win", face(win));
     element.dataset.window = id;
     element.dataset.app = win.app;
-    const picture = ICONS[win.app];
-    if (picture && BADGED.has(win.app)) {
-      const badge = iconTile({ picture, size: "Sm", name: win.title });
-      badge.classList.add("ov-badge");
-      element.append(badge);
-    }
     winEls.set(id, element);
     return element;
   }
@@ -631,7 +640,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const tag = span("ov-ws-tag", number);
     const element = span("ov-ws", desktop, tag);
     element.dataset.space = id;
-    made = { root: element, desk: desktop, tag, number };
+    made = { root: element, desk: desktop, tag, number, rolling: null, shown: false };
     spaceEls.set(id, made);
     return made;
   }
@@ -654,13 +663,21 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return element;
   }
 
+  /**
+   * Its number as the bar draws it: rolled to its new value as the workspaces before it change, as a
+   * gap closing moves every later one down; drawn afresh when it becomes or stops being the shown one.
+   */
   function dressTag(id: string, made: SpaceEl, screen: model.Screen): void {
     const shown = desk.shown.get(screen.id) === id;
-    const words = String(model.numberOf(desk, id));
-    if (made.number.textContent !== words || made.number.hasAttribute("data-shown") !== shown) {
-      made.number.replaceChildren(text(words, "button_small", shown ? "on_primary" : "on_surface"));
-      made.number.toggleAttribute("data-shown", shown);
+    const value = model.numberOf(desk, id);
+    if (made.rolling && made.shown === shown) {
+      made.rolling.set(value);
+      return;
     }
+    made.rolling = rollingNumber({ value, widest: String(value).replace(/\d/g, "0"), style: "button_small", color: shown ? "on_primary" : "on_surface" });
+    made.shown = shown;
+    made.number.replaceChildren(made.rolling.element);
+    made.number.toggleAttribute("data-shown", shown);
   }
 
   // ── Where everything goes ──
@@ -697,9 +714,22 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** The windows a workspace tiles now: one carried away left out, one carried over it added last. */
   function windowsShown(space: string): string[] {
-    let list = desk.spaces.get(space)!.windows.filter((id) => !(carry?.kind === "window" && carry.id === id));
-    if (carry?.kind === "window" && carry.target?.kind === "space" && carry.target.space === space) list = [...list, carry.id];
-    return list;
+    return [...tilesShown(space, { x: 0, y: 0, w: 1, h: 1 }).keys()];
+  }
+
+  /**
+   * How a workspace tiles now, in `area`: a carried window out of the one it came from, and in the
+   * one it is over, at the side of the window under the pointer, the others making room.
+   */
+  function tilesShown(space: string, area: model.Rect): Map<string, model.Rect> {
+    let tree = model.treeOf(desk.spaces.get(space)!);
+    // Lifted and not yet moved off, it still stands in its own place.
+    const home = carry?.kind === "window" && carry.target?.kind === "space" && carry.target.space === space && !carry.target.at && space === carry.from;
+    if (carry?.kind === "window" && !home) {
+      tree = model.remove(tree, carry.id);
+      if (carry.target?.kind === "space" && carry.target.space === space) tree = model.insert(tree, carry.id, carry.target.at);
+    }
+    return model.layout(tree, area, L("space-s8"));
   }
 
   /** Lays every screen out again and sends each element to its place, moving as `motion` says. */
@@ -771,9 +801,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.root.style.setProperty("--ov-w", css(slot.w));
     made.root.style.setProperty("--ov-h", css(slot.h));
     made.desk.style.setProperty("--ov-s", String(slot.s));
+    made.desk.style.setProperty("--ov-unscale", String(1 / slot.s));
     made.desk.style.setProperty("--ov-dw", css(on.size.w));
     made.desk.style.setProperty("--ov-dh", css(on.size.h));
-    made.desk.style.setProperty("--ov-badge", String(1 / slot.s));
     made.root.toggleAttribute("data-shown-here", desk.shown.get(on.screen.id) === id);
     dressTag(id, made, on.screen);
     tileSpace(id, on, motion);
@@ -791,6 +821,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.root.style.setProperty("--ov-w", css(slot.w));
     made.root.style.setProperty("--ov-h", css(slot.h));
     made.desk.style.setProperty("--ov-s", String(slot.s));
+    made.desk.style.setProperty("--ov-unscale", String(1 / slot.s));
     made.desk.style.setProperty("--ov-dw", css(on.size.w));
     made.desk.style.setProperty("--ov-dh", css(on.size.h));
     commit(made.root);
@@ -801,10 +832,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /** Sets how an element arrives or leaves next: its duration, curve and cue. */
-  function arriving(element: HTMLElement, motion: "open" | "close" | "arrive" | "collapse" | "none", delay = "0s"): void {
+  function arriving(element: HTMLElement, motion: "open" | "close" | "arrive" | "collapse" | "settle" | "none", delay = "0s"): void {
     const reduced = settings().reduced;
     const [duration, curve] =
-      motion === "open" ? ["long", "emphasized_decel"] : motion === "close" ? ["medium", "emphasized_accel"] : motion === "collapse" ? ["medium", "emphasized_accel"] : ["medium", "emphasized_decel"];
+      motion === "open" ? ["long", "emphasized_decel"] : motion === "close" ? ["medium", "emphasized_accel"] : motion === "collapse" ? ["medium", "emphasized_accel"] : motion === "settle" ? ["medium", "standard_decel"] : ["medium", "emphasized_decel"];
     element.style.setProperty("--ov-at", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : `var(--motion-${duration})`);
     element.style.setProperty("--ov-ae", reduced ? "var(--easing-standard)" : `var(--easing-${curve})`);
     element.style.setProperty("--ov-ad", reduced ? "0s" : delay);
@@ -813,14 +844,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** Tiles workspace `id`'s windows on its desktop, a landing slot where a carried window would go. */
   function tileSpace(id: string, on: ScreenView, motion: Motion): void {
     const made = spaceEl(id);
-    const list = windowsShown(id);
-    const rects = model.tile(list.length, tilingArea(on.size.w, on.size.h), L("space-s8"));
+    const rects = tilesShown(id, tilingArea(on.size.w, on.size.h));
     const focused = desk.spaces.get(id)!.focused;
-    list.forEach((win, k) => {
-      const rect = rects[k]!;
+    rects.forEach((rect, win) => {
       if (carry?.kind === "window" && carry.id === win) {
+        // The place it would take, in its shape: it glides between sides as the pointer moves.
+        const fresh = landing.parentElement !== made.desk || !landing.hasAttribute("data-shown");
         if (landing.parentElement !== made.desk) made.desk.append(landing);
-        setTile(landing, rect, "none");
+        setTile(landing, rect, fresh ? "none" : "reflow");
         landing.dataset.shown = "";
         return;
       }
@@ -834,21 +865,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (element.hasAttribute("data-lifted") || element.hasAttribute("data-landing")) return;
       setTile(element, rect, motion);
       element.toggleAttribute("data-focused", win === focused);
-      // A badge needs room round it: a miniature window narrower than four of its tiles, or shorter
-      // than three, shows its app by its contents alone.
-      const side = L("size-control_sm");
-      element.toggleAttribute("data-cramped", rect.w * slotScale(id) < 4 * side || rect.h * slotScale(id) < 3 * side);
     });
     if (landing.parentElement === made.desk && !(carry?.kind === "window" && carry.target?.kind === "space" && carry.target.space === id)) delete landing.dataset.shown;
-  }
-
-  /** The scale workspace `id`'s miniature is drawn at. */
-  function slotScale(id: string): number {
-    for (const each of views) {
-      const slot = each.layout.spaces.get(id);
-      if (slot) return slot.s;
-    }
-    return 1;
   }
 
   function setTile(element: HTMLElement, rect: model.Rect, motion: Motion): void {
@@ -949,19 +967,24 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   const STAGGER = ["0s", "var(--motion-swap_lag)", "var(--motion-micro)", "calc(var(--motion-micro) + var(--motion-swap_lag))"];
 
   /** Sets every workspace's and screen's open or closed look, gliding as `motion` says. */
-  function setLook(isOpen: boolean, motion: "open" | "close" | "none"): void {
+  /**
+   * Sets every workspace's and screen's open or closed look, gliding as `motion` says: `settle` is a
+   * swipe's lift, every part going on from where the fingers left it over `medium`, none staggered.
+   */
+  function setLook(isOpen: boolean, motion: "open" | "close" | "settle" | "none"): void {
+    const settling = motion === "settle";
     for (const each of views) {
       each.element.toggleAttribute("data-open", isOpen);
       const reduced = settings().reduced;
       for (const part of each.veiled) {
-        part.style.setProperty("--ov-vt", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : "var(--motion-long)");
-        part.style.setProperty("--ov-ve", "var(--easing-standard)");
+        part.style.setProperty("--ov-vt", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : settling ? "var(--motion-medium)" : "var(--motion-long)");
+        part.style.setProperty("--ov-ve", settling ? "var(--easing-standard_decel)" : "var(--easing-standard)");
         part.style.setProperty("--ov-veil", isOpen ? "1" : "0");
       }
       // The frame steps aside as things leave a screen, and comes back as things arrive.
       for (const part of each.aside) {
-        part.style.setProperty("--ov-vt", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : isOpen ? "var(--motion-medium)" : "var(--motion-long)");
-        part.style.setProperty("--ov-ve", isOpen ? "var(--easing-emphasized_accel)" : "var(--easing-emphasized_decel)");
+        part.style.setProperty("--ov-vt", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : isOpen || settling ? "var(--motion-medium)" : "var(--motion-long)");
+        part.style.setProperty("--ov-ve", settling ? "var(--easing-standard_decel)" : isOpen ? "var(--easing-emphasized_accel)" : "var(--easing-emphasized_decel)");
         part.style.setProperty("--ov-aside", isOpen ? "1" : "0");
       }
       const shown = desk.shown.get(each.screen.id);
@@ -975,12 +998,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
           for (const part of parts) {
             part.dataset.rank = home ? "home" : String(rankOf(id));
             // Reduced, the screen's desktop doesn't fly: its miniature fades in where it stands, and out.
-            if (reduced && home) {
+            if (reduced && home && !settling) {
               arriving(part, "none");
               part.style.setProperty("--ov-arrive", isOpen ? "0" : "1");
               commit(part);
             }
             if (motion === "none") arriving(part, "none");
+            else if (settling) arriving(part, "settle");
             else arriving(part, motion === "open" ? "open" : "close", motion === "open" && !home ? STAGGER[rankOf(id)]! : "0s");
             flying(part, motion);
             part.style.setProperty("--ov-arrive", isOpen || (home && !reduced) ? "1" : "0");
@@ -990,6 +1014,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
           const tag = made.tag;
           tag.style.setProperty("--ov-tt", motion === "none" ? "0s" : isOpen ? "var(--motion-short)" : "var(--motion-micro)");
           tag.style.setProperty("--ov-td", motion === "open" && home && !reduced ? "var(--motion-medium)" : "0s");
+          if (settling) tag.style.setProperty("--ov-tt", "var(--motion-short)");
           if (motion === "open" && home) {
             tag.style.setProperty("--ov-tt", "0s");
             tag.style.setProperty("--ov-tag", "0");
@@ -1000,21 +1025,103 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         }
       }
       for (const element of [...each.layer.querySelectorAll<HTMLElement>(".ov-plus, .ov-label")]) {
-        arriving(element, motion === "none" ? "none" : motion === "open" ? "open" : "close", motion === "open" ? STAGGER[3]! : "0s");
+        arriving(element, motion === "none" ? "none" : settling ? "settle" : motion === "open" ? "open" : "close", motion === "open" ? STAGGER[3]! : "0s");
         element.style.setProperty("--ov-arrive", isOpen ? "1" : "0");
       }
     }
     root.toggleAttribute("data-open", isOpen);
   }
 
-  function flying(element: HTMLElement, motion: "open" | "close" | "none"): void {
-    if (motion === "none" || settings().reduced) {
+  function flying(element: HTMLElement, motion: "open" | "close" | "settle" | "none"): void {
+    if (motion === "none" || (settings().reduced && motion !== "settle")) {
       element.style.setProperty("--ov-ft", "0s");
       return;
     }
-    element.style.setProperty("--ov-ft", "var(--motion-long)");
-    element.style.setProperty("--ov-fe", "var(--easing-emphasized_decel)");
+    const settling = motion === "settle";
+    element.style.setProperty("--ov-ft", settling ? "var(--motion-medium)" : "var(--motion-long)");
+    element.style.setProperty("--ov-fe", settling ? "var(--easing-standard_decel)" : "var(--easing-emphasized_decel)");
   }
+
+  // ── A three-finger swipe: up opens, down closes, following the fingers ──
+
+  /** How far open the swipe has the Overview, 0 to 1, while fingers are on the touchpad; null otherwise. */
+  let swiping: number | null = null;
+
+  /**
+   * Draws the Overview `p` of the way open, every part where the fingers have it and nothing gliding:
+   * the frame aside and the wallpaper veiled by `p`, the screen's desktop `p` of its way into its
+   * miniature, and every other miniature, number, slot and name `p` of the way in.
+   */
+  function follow(p: number): void {
+    if (swiping === null && !open) place("none");
+    swiping = Math.max(0, Math.min(1, p));
+    const at = String(swiping);
+    for (const each of views) {
+      for (const part of [...each.veiled, ...each.aside]) {
+        part.style.setProperty("--ov-vt", "0s");
+        part.style.setProperty(each.veiled.includes(part) ? "--ov-veil" : "--ov-aside", at);
+      }
+      const shown = desk.shown.get(each.screen.id);
+      for (const section of each.layout.sections) {
+        for (const id of section.items) {
+          if (id === ROOM) continue;
+          const made = spaceEl(id);
+          const home = id === shown;
+          for (const part of [made.root, made.desk, made.tag]) {
+            part.dataset.rank = home ? "home" : String(rankOf(id));
+            arriving(part, "none");
+            flying(part, "none");
+            part.style.setProperty("--ov-arrive", home ? "1" : at);
+            part.style.setProperty("--ov-fly", home ? String(1 - swiping) : "0");
+          }
+          made.tag.style.setProperty("--ov-tt", "0s");
+          made.tag.style.setProperty("--ov-td", "0s");
+          made.tag.style.setProperty("--ov-tag", at);
+        }
+      }
+      for (const element of [...each.layer.querySelectorAll<HTMLElement>(".ov-plus, .ov-label")]) {
+        arriving(element, "none");
+        element.style.setProperty("--ov-arrive", at);
+      }
+    }
+    root.dataset.swiping = "";
+  }
+
+  /** The fingers lift: past half way it settles open, short of it falls back closed, from where it is. */
+  function fingersLift(): void {
+    if (swiping === null) return;
+    const opens = swiping >= 0.5;
+    swiping = null;
+    delete root.dataset.swiping;
+    const was = open;
+    open = opens;
+    if (opens && !was) {
+      selected = desk.shown.get(desk.focused) ?? null;
+      keyed = false;
+    }
+    setLook(opens, "settle");
+    if (!opens && was) for (const each of views) each.bar.replaceChildren(...barRow(each.screen, each.size.w));
+    if (opens) root.focus({ preventScroll: true });
+  }
+
+  // The mockup's stand-in for the touchpad: the wheel turned while the pointer is on the stage. Up
+  // is the fingers going up; they lift once the wheel has been still for `short`.
+  let wheelAt = 0;
+  let wheelStill = 0;
+  root.addEventListener(
+    "wheel",
+    (event) => {
+      if (carry) return;
+      event.preventDefault();
+      const travel = number("scale-swipe") * (views.find((each) => each.screen.id === desk.focused) ?? views[0]!).size.h;
+      if (swiping === null) wheelAt = open ? 1 : 0;
+      wheelAt = Math.max(0, Math.min(1, wheelAt - event.deltaY / settings().scale / travel));
+      follow(wheelAt);
+      window.clearTimeout(wheelStill);
+      wheelStill = window.setTimeout(fingersLift, ms("short"));
+    },
+    { passive: false },
+  );
 
   function setOpen(isOpen: boolean, into?: string, focus?: string): void {
     if (open === isOpen) return;
@@ -1109,12 +1216,33 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
           if (lastInRow && local.x >= slot.x + slot.w - gap / 2 && local.x < slot.x + slot.w + gap && !(section.plus && k + 1 === count)) {
             return full ? { kind: "refused", group: section.group } : { kind: "between", group: section.group, index: k + 1 };
           }
-          if (inside(local, slot)) return { kind: "space", space: id };
+          if (inside(local, slot)) {
+            const at = placeAt(id, { x: (local.x - slot.x) / slot.s, y: (local.y - slot.y) / slot.s });
+            return at ? { kind: "space", space: id, at } : { kind: "space", space: id };
+          }
         }
         if (section.plus && inside(local, section.plus)) return { kind: "plus", group: section.group };
       }
     }
     return null;
+  }
+
+  /**
+   * Where a carried window would tile on workspace `space`, the pointer at `point` on its desktop:
+   * beside the window under it, or the nearest, on the side it is nearest. Nothing on a workspace
+   * with no other window: it takes the whole of it.
+   */
+  function placeAt(space: string, point: Point): model.Place | undefined {
+    if (!carry) return undefined;
+    const on = viewOfSpace(space);
+    if (!on) return undefined;
+    const base = model.layout(model.remove(model.treeOf(desk.spaces.get(space)!), carry.id), tilingArea(on.size.w, on.size.h), L("space-s8"));
+    let best: { window: string; rect: model.Rect; far: number } | null = null;
+    for (const [window, rect] of base) {
+      const far = Math.max(rect.x - point.x, point.x - rect.x - rect.w, 0) + Math.max(rect.y - point.y, point.y - rect.y - rect.h, 0);
+      if (!best || far < best.far) best = { window, rect, far };
+    }
+    return best ? { window: best.window, side: model.sideOf(best.rect, point) } : undefined;
   }
 
   /**
@@ -1179,7 +1307,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-ty", css(point.y - grab.y));
     element.style.setProperty("--ov-sx", String(slot.s));
     element.style.setProperty("--ov-sy", String(slot.s));
-    element.style.setProperty("--ov-badge", String(1 / slot.s));
     commit(element);
     const index = model.groupOf(desk, space).spaces.indexOf(space);
     carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, extent: Math.max(rect.w, rect.h) * slot.s, target: { kind: "space", space }, point, bare: new Map() };
@@ -1234,7 +1361,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (rect) carry.extent = Math.max(rect.w, rect.h) * scale;
       element.style.setProperty("--ov-sx", String(scale));
       element.style.setProperty("--ov-sy", String(scale));
-      element.style.setProperty("--ov-badge", String(1 / scale));
     }
     // In the delete zone's reach it shrinks to the round's size round the pointer and stands off the
     // grown round's top left, `space.s16` clear of it, so the lit round shows beside it.
@@ -1265,7 +1391,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     let landed = false;
     if (was.kind === "window" && target && target.kind !== "refused" && target.kind !== "bin") {
       const landingAt: model.Landing = target.kind === "space" ? { space: target.space } : target.kind === "between" ? { group: target.group, index: target.index } : { group: target.group, index: model.groupById(desk, target.group).spaces.length };
-      landed = model.moveWindow(desk, was.id, landingAt) !== null;
+      landed = model.moveWindow(desk, was.id, landingAt, target.kind === "space" ? target.at : undefined) !== null;
     }
     if (was.kind === "space" && target && target.kind !== "refused" && target.kind !== "space" && target.kind !== "bin") {
       const at = roomOf(target)!;
@@ -1328,15 +1454,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-ty", css(on.at.y + slot.y + rect.y * slot.s));
     element.style.setProperty("--ov-sx", String(slot.s));
     element.style.setProperty("--ov-sy", String(slot.s));
-    element.style.setProperty("--ov-badge", String(1 / slot.s));
     later(ms("medium"), () => settleWindow(id));
   }
 
   function tileOf(id: string): model.Rect {
     const space = model.spaceOf(desk, id).id;
     const on = viewOfSpace(space)!;
-    const list = windowsShown(space);
-    return model.tile(list.length, tilingArea(on.size.w, on.size.h), L("space-s8"))[list.indexOf(id)]!;
+    return tilesShown(space, tilingArea(on.size.w, on.size.h)).get(id)!;
   }
 
   /** A landed window goes onto its workspace's desktop, where it is drawn as it was. */
@@ -1351,7 +1475,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     glide(element, "none");
     element.style.setProperty("--ov-sx", "1");
     element.style.setProperty("--ov-sy", "1");
-    element.style.removeProperty("--ov-badge");
     setTile(element, tiles.get(id) ?? tileOf(id), "none");
   }
 
@@ -1370,9 +1493,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.root.style.setProperty("--ov-w", css(slot.w));
     made.root.style.setProperty("--ov-h", css(slot.h));
     made.desk.style.setProperty("--ov-s", String(slot.s));
+    made.desk.style.setProperty("--ov-unscale", String(1 / slot.s));
     made.desk.style.setProperty("--ov-dw", css(on.size.w));
     made.desk.style.setProperty("--ov-dh", css(on.size.h));
-    made.desk.style.setProperty("--ov-badge", String(1 / slot.s));
     dressTag(id, made, on.screen);
     tileSpace(id, on, "land");
     later(ms("medium"), () => {
@@ -1866,6 +1989,18 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       return;
     }
     if (pin.kind === "undoing" || pin.kind === "binning" || pin.kind === "pending") return;
+    if (pin.kind === "swiping") {
+      follow(pin.progress);
+      return;
+    }
+    if (pin.kind === "placed") {
+      liftWindow(pin.window, centreOf({ window: pin.window }));
+      moveCarry(pointOf(pin.to));
+      drop();
+      settleWindow(pin.window);
+      settle();
+      return;
+    }
     if (pin.kind === "window") {
       const start = centreOf({ window: pin.window });
       liftWindow(pin.window, start);
@@ -1922,6 +2057,19 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     }
   }
 
+  /** A point a third of the way from `at`'s window's middle toward its side, in world points. */
+  function sidePoint(space: string, at: model.Place): Point {
+    const box = worldBox({ kind: "space", space });
+    const on = viewOfSpace(space);
+    if (!box || !on) return { x: 0, y: 0 };
+    const rect = model.layout(model.treeOf(desk.spaces.get(space)!), tilingArea(on.size.w, on.size.h), L("space-s8")).get(at.window);
+    if (!rect) return centreOf({ space });
+    const [dx, dy] = at.side === "left" ? [-1, 0] : at.side === "right" ? [1, 0] : at.side === "top" ? [0, -1] : [0, 1];
+    const x = rect.x + rect.w / 2 + (dx * rect.w) / 3;
+    const y = rect.y + rect.h / 2 + (dy * rect.h) / 3;
+    return { x: box.x + x * box.s, y: box.y + y * box.s };
+  }
+
   /** Lifts a window by its middle, or a workspace by its miniature's middle; returns where it was taken. */
   function liftThing(what: Carried): Point {
     const at = "window" in what ? centreOf({ window: what.window }) : centreOf({ space: what.space });
@@ -1963,6 +2111,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   function pointOf(target: Target): Point {
+    if (target.kind === "space" && target.at) return sidePoint(target.space, target.at);
     if (target.kind === "space") return centreOf({ space: target.space });
     if (target.kind === "plus") return centreOf({ plus: target.group });
     if (target.kind === "between") return betweenPoint(target.group, target.index);
@@ -2020,6 +2169,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     thaw: settle,
     redraw: (next) => redraw({ ...options, ...next }),
     bin: () => binPoint(),
+    swipe: (p) => follow(p),
+    sidePoint: (space, window, side) => sidePoint(space, { window, side }),
+    order: (space) => [...model.layout(model.treeOf(desk.spaces.get(space)!), { x: 0, y: 0, w: 1600, h: 900 }, 0).entries()].sort(([, a], [, b]) => a.y - b.y || a.x - b.x).map(([id]) => id),
+    numberShown: (space) => spaceEls.get(space)?.rolling?.element.getAttribute("aria-label") ?? "",
+    lift: () => fingersLift(),
     learned: () => [...learned].sort(),
     tipShown: () => !tip.hasAttribute("data-learned"),
     pending: () => pending?.what ?? null,

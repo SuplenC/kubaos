@@ -110,15 +110,6 @@ const CLOSING: Move = {
   sample: () => still(),
 };
 
-const HOVER: Move = {
-  name: "Pointed at",
-  what: "A miniature under the pointer rises `space.s4` over `short`.",
-  tracks: [{ part: "the miniature", on: "the centre's 2", target: '.ov-ws[data-space="s7"]', property: "--ov-hover", from: 0, to: 1, duration: "short", curve: "standard" }],
-  reduced: [{ part: "the miniature", on: "still", target: '.ov-ws[data-space="s7"]', property: "--ov-hover", from: 0, to: 0, duration: "instant", curve: "standard" }],
-  back: "plays",
-  sample: () => still(),
-};
-
 const LIFT: Move = {
   name: "Lifted",
   what: "Pressed and moved `space.s8`: the window comes up to `scale.lift`, its shadow `shadow.lifted`.",
@@ -135,6 +126,71 @@ const ARRIVES: Move = {
   reduced: [{ part: "the miniature", on: "a fade", target: parts('.ov-ws[data-space="s9"]'), property: "--ov-arrive", from: 0, to: 1, duration: "short", curve: "standard" }],
   back: "cuts",
   sample: () => still(),
+};
+
+/** Every part a swipe moves, each straight with the fingers: `long` stands in for the fingers' time. */
+function swiped(opening: boolean): [Track<"linear">, ...Track<"linear">[]] {
+  const [from, to] = opening ? [0, 1] : [1, 0];
+  return [
+    { part: "the frame and bar", on: "every screen", target: ".k-screen-glass, .k-frame, .k-bar", property: "--ov-aside", from, to, duration: "long", curve: "linear" },
+    { part: "the wallpaper's blur and dim", on: "every screen", target: ".ov-screen > .k-screen-wallpaper", property: "--ov-veil", from, to, duration: "long", curve: "linear" },
+    { part: "the shown workspace", on: "its screen", target: parts('.ov-ws[data-rank="home"]'), property: "--ov-fly", from: to, to: from, duration: "long", curve: "linear" },
+    { part: "every other miniature", on: "slots and names too", target: `${parts('.ov-ws:not([data-rank="home"])')}, .ov-plus, .ov-label`, property: "--ov-arrive", from, to, duration: "long", curve: "linear" },
+  ];
+}
+
+const SWIPE_OPENS: Move = {
+  name: "Three fingers up",
+  what: "Every part as far as the fingers have gone, unstaggered; lifted past half, it settles over `medium`.",
+  tracks: swiped(true),
+  reduced: [{ part: "every miniature", on: "a fade", target: `${parts(".ov-ws")}, .ov-plus, .ov-label`, property: "--ov-arrive", from: 0, to: 1, duration: "long", curve: "linear" }],
+  back: "cuts",
+  sample: () => still({ closed: true }),
+};
+
+const SWIPE_CLOSES: Move = {
+  name: "Three fingers down",
+  what: "The mirror: it closes as far as the fingers go; short of half when they lift, it falls back open.",
+  tracks: swiped(false),
+  reduced: [{ part: "every miniature", on: "a fade", target: `${parts('.ov-ws:not([data-rank="home"])')}, .ov-plus, .ov-label`, property: "--ov-arrive", from: 1, to: 0, duration: "long", curve: "linear" }],
+  back: "cuts",
+  sample: () => still(),
+};
+
+const GAP_CLOSES: Move = {
+  name: "A gap deleted",
+  what: "The empty 3 goes into the zone; the later ones close up over `medium` as their numbers roll down over `short`.",
+  tracks: [
+    { part: "the gap", on: "the empty 3", target: '.ov-ws[data-space="s8"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
+    { part: "the later numbers", on: "4 to 3", target: '.ov-ws[data-space="s9"] .k-roll-slot', property: "--roll", from: 0, to: 1, duration: "short", curve: "standard" },
+  ],
+  reduced: [{ part: "the gap", on: "a fade", target: '.ov-ws[data-space="s8"]', property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
+  back: "cuts",
+  sample: () => still({ fill: "gap" }),
+};
+
+/** The game's one window, carried over its `side`. */
+const overGame = (side: "left" | "right" | "top" | "bottom"): Pin => ({ kind: "window", window: "w-term", to: { kind: "space", space: "s8", at: { window: "w-game", side } } });
+const onGame = (side: "left" | "right" | "top" | "bottom"): Pin => ({ kind: "placed", window: "w-term", to: { kind: "space", space: "s8", at: { window: "w-game", side } } });
+/** nvim, one of three on the centre's fourth, its left side. */
+const NVIM_LEFT = { kind: "space", space: "s9", at: { window: "w-nvim", side: "left" } } as const;
+
+const PLACE_FOLLOWS: Move = {
+  name: "The place following the pointer",
+  what: "The pointer picks the window under it and its nearest side: the dropped one takes that half, the window keeps the other.",
+  tracks: [{ part: "the place it would take", on: "the game's workspace", target: ".ov-landing", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "plays",
+  sample: () => still({ pin: overGame("left") }),
+};
+
+const DROP_SETTLES: Move = {
+  name: "The drop settling",
+  what: "Let go: it comes down from `scale.lift` over `short` and flies into its place over `medium`.",
+  tracks: [{ part: "the lift", on: "the terminal", target: ".ov-win[data-held]", property: "--ov-held", from: 1, to: 0, duration: "short", curve: "standard" }],
+  reduced: [{ part: "the lift", on: "none", target: ".ov-win[data-held]", property: "--ov-held", from: 0, to: 0, duration: "instant", curve: "standard" }],
+  back: "cuts",
+  sample: () => still({ pin: overGame("right") }),
 };
 
 const TIP_LEAVES: Move = {
@@ -211,6 +267,23 @@ export default page<Shown>({
     { name: "A workspace to another screen", for: "the centre's 4 into the portrait's group", sample: at({ view: "desk", pin: { kind: "space", space: "s9", to: { kind: "between", group: "g-ext1", index: 1 } } }) },
     { name: "Refused by a full group", for: "ten in use: it dims, no room", sample: at({ view: "desk", fill: "full", pin: { kind: "space", space: "s1", to: { kind: "refused", group: "g-ext2" } } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
+    { name: "Over the game's left", for: "the terminal would take its left half", sample: at({ pin: overGame("left") }) },
+    { name: "Over the game's right", for: "its right half", sample: at({ pin: overGame("right") }) },
+    { name: "Over the game's top", for: "its top half", sample: at({ pin: overGame("top") }) },
+    { name: "Over the game's bottom", for: "its bottom half", sample: at({ pin: overGame("bottom") }) },
+    { name: "Dropped on the left", for: "the terminal left, the game right", sample: at({ pin: onGame("left") }) },
+    { name: "Dropped on the right", for: "the game left, the terminal right", sample: at({ pin: onGame("right") }) },
+    { name: "Dropped on the top", for: "the terminal over the game", sample: at({ pin: onGame("top") }) },
+    { name: "Dropped on the bottom", for: "the game over the terminal", sample: at({ pin: onGame("bottom") }) },
+    { name: "Over one of three", for: "nvim's left: it gives up half, the rest stay", sample: at({ pin: { kind: "window", window: "w-term", to: NVIM_LEFT } }) },
+    { name: "Dropped beside nvim", for: "the terminal where nvim's left half was", sample: at({ pin: { kind: "placed", window: "w-term", to: NVIM_LEFT } }) },
+    { name: "Over an empty workspace", for: "no window there: it takes the whole", sample: at({ fill: "gap", pin: { kind: "window", window: "w-term", to: { kind: "space", space: "s8" } } }) },
+    { name: "Dropped on the empty one", for: "the terminal fills the empty 3", sample: at({ fill: "gap", pin: { kind: "placed", window: "w-term", to: { kind: "space", space: "s8" } } }) },
+    { name: "Three fingers up, half way", for: "arriving as far as the swipe has gone", sample: at({ closed: true, pin: { kind: "swiping", opening: true, progress: 0.5 } }) },
+    { name: "Three fingers down, half way", for: "closing as far as the swipe has gone", sample: at({ pin: { kind: "swiping", opening: false, progress: 0.5 } }) },
+    { name: "1, 2, empty 3, 4", for: "a gap: 3 holds its place, empty", sample: at({ fill: "gap" }) },
+    { name: "The empty 3, deleted", for: "right-dragged into the zone", sample: at({ fill: "gap", pin: { kind: "binning", what: { space: "s8" }, over: true } }) },
+    { name: "After it: 1, 2, 3", for: "4 rolled to 3; Undo puts the gap back", sample: at({ fill: "gap", pin: { kind: "pending", what: { space: "s8" }, left: 0.9 } }) },
     { name: "The delete zone, carrying", for: "a window on its way to it", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
     { name: "Over the delete zone", for: "lit: let go, and it closes", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
     { name: "A workspace over the zone", for: "right-dragged: Remove", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
@@ -256,7 +329,7 @@ export default page<Shown>({
   },
   content: {
     text: [{ name: "A waiting group's name", words: GROUP_NAME, sample: (words: string) => still({ desk: "laptop", names: { "g-studio": words } }) }],
-    missingPicture: doesntApply("a window is its live picture; an app with no icon has no badge."),
+    missingPicture: doesntApply("a window is its live picture, never an icon in its place."),
     counts: [
       { name: "None", for: "one empty workspace, its slot", sample: at({ desk: "laptop", fill: "empty" }) },
       { name: "Nine on one", for: "the centre's 1, tiled small", sample: at({ fill: "crowded" }) },
@@ -264,13 +337,17 @@ export default page<Shown>({
     ],
   },
   motion: {
-    arrives: [OPENING],
-    leaves: [CLOSING],
-    between: [HOVER, LIFT, ARRIVES, TIP_LEAVES, ZONE_ARRIVES, INTO_ZONE, TIMER],
+    arrives: [OPENING, SWIPE_OPENS],
+    leaves: [CLOSING, SWIPE_CLOSES],
+    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, ZONE_ARRIVES, INTO_ZONE, TIMER],
   },
   keyboard: {
     keys: [
       { keys: ["Super+W"], does: "opens it; again, or Esc, closes" },
+      { keys: ["Three fingers up"], does: "opens it as far as they go; past half it stays" },
+      { keys: ["Three fingers down"], does: "closes it the same way: past half it goes" },
+      { keys: ["Pointer over one"], does: "the open hand: a window or workspace can be carried" },
+      { keys: ["Pointer, carrying"], does: "the closed hand, until it is let go" },
       { keys: ["Left button"], does: "on a window, dragged: carries the window" },
       { keys: ["Right button"], does: "on a workspace, dragged: carries the workspace" },
       { keys: ["Left button"], does: "pressed: goes there; on the delete zone, brings it back" },
