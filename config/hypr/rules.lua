@@ -111,8 +111,10 @@ hl.window_rule({
 ---------------------------------------------------------------------------
 
 hl.layer_rule({ match = { namespace = "^launcher$" }, blur = true, animation = "popin 90%" }) -- fuzzel
-hl.layer_rule({ match = { namespace = "^selection$" }, animation = "fade" })                -- slurp
-hl.layer_rule({ match = { namespace = "^hyprpicker$" }, animation = "fade" })
+-- The region screenshot's freeze (hyprpicker) and selection (slurp) come and go at once: the shot
+-- is taken the moment slurp's layer closes, over the freeze (scripts/dot-hypr-screenshot), so a
+-- fade would put the live screen or slurp's box in it, and the selection starts sooner.
+hl.layer_rule({ match = { namespace = "^(hyprpicker|selection)$" }, no_anim = true })
 
 -- Quickshell (config/quickshell). The shell animates its own surfaces, so
 -- Hyprland must not animate them too. The frame (bar, border and panels) is

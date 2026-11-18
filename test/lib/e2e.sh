@@ -1553,31 +1553,44 @@ c_notifications() {
   return "$bad"
 }
 
-# stub_screenshot_tools DIR: stand-ins for what dot-hypr-screenshot calls, in DIR. Two monitors
-# (1920x1200 at scale 1.5, 1920x1080 at 1), so grim's frame is 5760x1800 with a red 150x75 box at
-# pixel 300,150. Every call is logged to DIR/calls; slurp answers 200,100 100x50 (that box in
-# logical coordinates) or cancels when DIR/cancel exists.
+# stub_screenshot_tools DIR: stand-ins for what dot-hypr-screenshot calls, in DIR, with two
+# monitors. Every call is logged to DIR/calls. slurp answers 200,100 100x50 or cancels when
+# DIR/cancel exists. socat is Hyprland's event stream: an `openlayer>>hyprpicker` a monitor a
+# moment after hyprpicker starts, and a `closelayer>>selection` a monitor a moment after slurp
+# ends. grim writes a red 150x75 PNG and logs what had happened when it ran.
 stub_screenshot_tools() {
   local d=$1 tool
   for tool in notify-send xdg-user-dir; do printf '#!/bin/sh\nexit 0\n' >"$d/$tool"; done
   cat >"$d/hyprctl" <<'STUB'
 #!/bin/bash
-D=$(dirname "$0")
 case "$*" in
   "-j monitors") echo '[{"x":0,"y":0,"scale":1.5},{"x":1920,"y":0,"scale":1}]' ;;
-  "-j layers")
-    if [[ -e $D/picker.pid ]]; then
-      echo '{"A":{"levels":{"3":[{"namespace":"hyprpicker"}]}},"B":{"levels":{"3":[{"namespace":"hyprpicker"}]}}}'
-    else
-      echo '{}'
-    fi ;;
 esac
+STUB
+  cat >"$d/socat" <<'STUB'
+#!/bin/bash
+D=$(dirname "$0")
+trap 'echo ended >"$D/events.ended"; exit 0' TERM
+echo "activewindow>>foot,~"
+until [[ -e $D/picker.pid ]]; do sleep 0.02; done
+sleep 0.2
+echo "openlayer>>hyprpicker"
+echo "openlayer>>hyprpicker"
+echo "maps seen" >>"$D/calls"
+until [[ -e $D/slurp.ended ]]; do sleep 0.02; done
+sleep 0.2
+echo "closelayer>>selection"
+echo "closelayer>>selection"
+echo "selection closed" >>"$D/calls"
+while :; do sleep 0.05; done
 STUB
   cat >"$d/grim" <<'STUB'
 #!/bin/bash
 D=$(dirname "$0")
 echo "grim $*" >>"$D/calls"
-magick -size 5760x1800 xc:white -fill red -draw 'rectangle 300,150 449,224' "${@: -1}"
+! grep -q '^maps seen$' "$D/calls" || echo "grim saw the freeze" >>"$D/calls"
+! grep -q '^selection closed$' "$D/calls" || echo "grim after the selection closed" >>"$D/calls"
+magick -size 150x75 xc:red "${@: -1}"
 STUB
   cat >"$d/hyprpicker" <<'STUB'
 #!/bin/bash
@@ -1592,6 +1605,7 @@ STUB
 D=$(dirname "$0")
 echo "slurp $*" >>"$D/calls"
 [[ ! -e $D/picker.pid ]] || echo "slurp saw the freeze" >>"$D/calls"
+touch "$D/slurp.ended"
 [[ ! -e $D/cancel ]] || exit 1
 echo "200,100 100x50"
 STUB
@@ -1611,43 +1625,47 @@ wait_for_file() {
 }
 
 c_screenshot() {
-  local t dir bad=0 rc shot
+  local t bad=0 rc shot
   t="$(mktemp -d)"
   mkdir "$t/bin"
   stub_screenshot_tools "$t/bin"
   run_shot() { PATH="$t/bin:$PATH" HOME="$t" DOT_SCREENSHOT_DIR="$t/shots" bash "$REPO/scripts/dot-hypr-screenshot" "$@"; }
+  fresh() { rm -f "$t"/bin/{calls,picker.ended,events.ended,slurp.ended,cancel}; rm -rf "$t/shots"; }
 
   run_shot region || { echo "FAIL region exited non-zero"; bad=1; }
   shot="$(ls "$t"/shots/Screenshot_*.png 2>/dev/null | head -1)"
-  [[ -n $shot ]] && [[ "$(magick "$shot" -format '%wx%h %[pixel:p{0,0}] %[pixel:p{149,74}]' info:)" == "150x75 srgb(255,0,0) srgb(255,0,0)" ]] \
-    && echo "ok   region crops the selection at scale 1.5 from the frame taken before slurp" \
-    || { echo "FAIL region crop: ${shot:-no file}"; bad=1; }
+  [[ -n $shot ]] && grep -q '^grim -l 1 -g 200,100 100x50 ' "$t/bin/calls" \
+    && echo "ok   region shoots the selection alone, at zlib level 1" || { echo "FAIL region shot: ${shot:-no file}"; bad=1; }
+  grep -q 'grim saw the freeze' "$t/bin/calls" && grep -q 'grim after the selection closed' "$t/bin/calls" \
+    && echo "ok   the shot is taken over the freeze, once slurp's layer closed" || { echo "FAIL shot taken before the freeze or with slurp up"; bad=1; }
   grep -q 'hyprpicker --render-inactive --no-zoom' "$t/bin/calls" && grep -q 'slurp saw the freeze' "$t/bin/calls" \
     && echo "ok   hyprpicker's overlay is up when slurp starts" || { echo "FAIL freeze not up before slurp"; bad=1; }
-  wait_for_file "$t/bin/picker.ended" && echo "ok   the trap ended the freeze" || { echo "FAIL hyprpicker was left running"; bad=1; }
+  wait_for_file "$t/bin/picker.ended" && wait_for_file "$t/bin/events.ended" \
+    && echo "ok   the trap ended the freeze and the event stream" || { echo "FAIL hyprpicker or socat was left running"; bad=1; }
   grep -q '^wl-copy \[--type\] \[image/png\]' "$t/bin/calls" && echo "ok   wl-copy gets the image type" || { echo "FAIL wl-copy without a type"; bad=1; }
 
-  rm -f "$t/bin/picker.ended" "$t/bin/calls"
-  rm -rf "$t/shots"
+  fresh
   touch "$t/bin/cancel"
   rc=0
   run_shot region || rc=$?
   [[ $rc == 0 && -z "$(compgen -G "$t/shots/Screenshot_*")" ]] && wait_for_file "$t/bin/picker.ended" && ! grep -q '^wl-copy' "$t/bin/calls" \
     && echo "ok   Esc ends the freeze and saves nothing" || { echo "FAIL cancel (exit $rc)"; bad=1; }
 
-  rm -f "$t/bin/picker.ended" "$t/bin/cancel" "$t/bin/calls"
+  fresh
   mkdir "$t/failing"
-  printf '#!/bin/sh\ncase "$*" in *-crop*) exit 1 ;; esac\nPATH=${PATH#*failing:}\nexec magick "$@"\n' >"$t/failing/magick"
-  chmod +x "$t/failing/magick"
+  printf '#!/bin/sh\nexit 1\n' >"$t/failing/grim"
+  chmod +x "$t/failing/grim"
   rc=0
   PATH="$t/failing:$t/bin:$PATH" HOME="$t" DOT_SCREENSHOT_DIR="$t/shots" bash "$REPO/scripts/dot-hypr-screenshot" region 2>/dev/null || rc=$?
   [[ $rc != 0 ]] && wait_for_file "$t/bin/picker.ended" && echo "ok   an error ends the freeze too" || { echo "FAIL error path (exit $rc)"; bad=1; }
 
-  rm -f "$t/bin/calls"
+  fresh
   run_shot region --edit
   grep -q '^satty .*\[--copy-command\] \[wl-copy --type image/png\]' "$t/bin/calls" \
     && echo "ok   satty copies through 'wl-copy --type image/png'" || { echo "FAIL satty copy command"; bad=1; }
 
+  # The stream's stub writes when the trap stops it, which may come after the script returned.
+  wait_for_file "$t/bin/events.ended" || true
   rm -rf "$t"
   return "$bad"
 }
