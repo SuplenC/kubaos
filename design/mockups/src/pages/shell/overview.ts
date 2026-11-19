@@ -189,6 +189,15 @@ const BTOP_TOP = { kind: "space", space: "s5", at: { window: "w-btop", side: "to
 /** Telegram, floating over the centre's 2, carried to the game's workspace. */
 const CHAT_TO_GAME = { kind: "space", space: "s8" } as const;
 
+const SPACE_SNAPS: Move = {
+  name: "A workspace snapping in",
+  what: "Its room opens where it would go; near the room's middle, within `scale.snap`, it snaps in over `medium`; pulled `space.s24` off, back.",
+  tracks: [{ part: "the room", on: "between the first two", target: ".ov-room", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "plays",
+  sample: () => still({ pin: { ...SPACE_BETWEEN, hand: true } }),
+};
+
 const STICKS: Move = {
   name: "Sitting where it would go",
   what: "Where the window manager would put it, here a dwindle half, it leaves the pointer and sits there over `medium`; off it, back.",
@@ -313,6 +322,7 @@ export default page<Shown>({
     { name: "On another screen's slot", for: "a lone window in the laptop's new slot, lit", sample: at({ view: "desk", pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-laptop" } } }) },
     { name: "Between two workspaces", for: "a window: a new workspace there", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "between", group: "g-ext2", index: 2 } } }) },
     { name: "A workspace to another screen", for: "the centre's 4 in the room the portrait's group opens", sample: at({ view: "desk", pin: { kind: "space", space: "s9", to: { kind: "between", group: "g-ext1", index: 1 } } }) },
+    { name: "A workspace near its room", for: "at the hand, the room open, not yet snapped in", sample: at({ pin: { ...SPACE_BETWEEN, hand: true } }) },
     { name: "Refused by a full group", for: "ten in use: it dims, no room", sample: at({ view: "desk", fill: "full", pin: { kind: "space", space: "s1", to: { kind: "refused", group: "g-ext2" } } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
     { name: "Over the game's left", for: "the terminal sits in its left half", sample: at({ pin: overGame("left") }) },
@@ -367,7 +377,7 @@ export default page<Shown>({
       rest: "each window where the window manager has it, any layout",
       lit: "the keyboard on a workspace: its tube",
       pressed: "a window carried, sitting where it would go",
-      selected: "a workspace carried, sitting in the room opened",
+      selected: "a workspace carried, snapped into the room opened",
       empty: "nothing open: one workspace, its slot",
     },
   },
@@ -393,7 +403,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING, SWIPE_OPENS],
     leaves: [CLOSING, SWIPE_CLOSES],
-    between: [LIFT, STICKS, SLOT_LIGHTS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, SLOT_REDDENS, TIMER, COVERS, TIMES_OUT],
+    between: [LIFT, STICKS, SPACE_SNAPS, SLOT_LIGHTS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, SLOT_REDDENS, TIMER, COVERS, TIMES_OUT],
   },
   keyboard: {
     keys: [
@@ -438,6 +448,8 @@ export default page<Shown>({
       { part: "New slot's line", token: "stroke-thin" },
       { part: "New slot lit, carrying", token: "opacity-tint" },
       { part: "New slot lit, proposed", token: "opacity-selection" },
+      { part: "Snap capture, of its room", token: "scale-snap" },
+      { part: "It lets go, pulled off", token: "space-s24" },
       { part: "Slot's room, its height", token: "size-drop_slot" },
       { part: "Slot's room, in from its line", token: "space-s16" },
       { part: "Slot in from the corner", token: "space-s48" },

@@ -55,7 +55,8 @@ export type Target =
 export type Pin =
   | { readonly kind: "lit"; readonly space: string }
   | { readonly kind: "window"; readonly window: string; readonly to: Target; readonly crossing?: number }
-  | { readonly kind: "space"; readonly space: string; readonly to: Target }
+  /** A workspace carried toward `to`: its middle on the room it opens, snapped in, or with `hand`, at the pointer over `to`. */
+  | { readonly kind: "space"; readonly space: string; readonly to: Target; readonly hand?: boolean }
   /** A window or a workspace carried toward the delete slot: `over`, pulled in with the pointer on
    * the slot; `edge`, pulled in with the pointer just inside the reach; neither, on its way. */
   | { readonly kind: "binning"; readonly what: Carried; readonly over: boolean | "edge" }
@@ -1344,6 +1345,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     holdRing(carry);
     if (pending) dressBin();
     showBin(point);
+    // Lifted, it is in the room its own place opens: it stays at the hand from the first move.
+    pulledFree = true;
     retarget(targetOf(point), "short", "standard");
   }
 
@@ -1367,7 +1370,56 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const target = targetOf(point);
     if (!sameTarget(target, carry.target)) return retarget(target, "medium", "standard_decel");
     // Within the place it sits in it stays there; off every place it follows the pointer.
+    if (magnet()) return void fly(carry, wanted(carry), "medium", "standard_decel");
     if (!flights.has(carry.element) && !stuckPose()) pose(carry, pointerPose());
+  }
+
+  /** Where `held` is drawn now: in the place it sits in, or under the pointer. */
+  function wanted(held: Carry): () => Pose {
+    return () => (carry === held ? (stuckPose() ?? pointerPose()) : posed.get(held.element)!);
+  }
+
+  /**
+   * A carried workspace snapped into the room opened for it: the nearest its middle, as it would be
+   * at the hand, has come to the room's middle since; null while it is at the hand.
+   */
+  let snapped: { closest: number } | null = null;
+  /** Let go of its room, it snaps in again only once its middle has been out of the capture. */
+  let pulledFree = false;
+
+  /**
+   * A light magnet on a carried workspace: the room opened for it shows where it would go, and it
+   * snaps in only once its own middle is within `scale.snap` of the room's shorter side of the
+   * room's middle. Pulled `space.s24` further off the room's middle than the nearest it came, it
+   * lets go, back at the hand where it would be had it never snapped: moving on toward the room
+   * never pulls it out. Returns whether it snapped in or let go.
+   */
+  function magnet(): boolean {
+    const held = carry;
+    if (held?.kind !== "space") return false;
+    const room = held.target?.kind === "bin" ? null : roomBox();
+    if (!room) {
+      const was = snapped !== null;
+      snapped = null;
+      pulledFree = false;
+      return was;
+    }
+    const free = pointerPose();
+    const off = Math.hypot(free.x + free.w / 2 - (room.x + room.w / 2), free.y + free.h / 2 - (room.y + room.h / 2));
+    if (snapped) {
+      snapped.closest = Math.min(snapped.closest, off);
+      if (off - snapped.closest < L("space-s24")) return false;
+      snapped = null;
+      pulledFree = true;
+      return true;
+    }
+    if (off > number("scale-snap") * Math.min(room.w, room.h)) {
+      pulledFree = false;
+      return false;
+    }
+    if (pulledFree) return false;
+    snapped = { closest: off };
+    return true;
   }
 
   /**
@@ -1384,8 +1436,12 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       slotTakes(into);
     }
     lightBin(into);
+    // A workspace's room moves with its target: out of the room it was in, then in this one if its
+    // middle is already near enough.
+    snapped = null;
     place("reflow");
-    fly(held, () => (carry === held ? (stuckPose() ?? pointerPose()) : posed.get(held.element)!), duration, curve);
+    magnet();
+    fly(held, wanted(held), duration, curve);
   }
 
   // ── Where a carried thing is drawn ──
@@ -1454,7 +1510,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /**
    * The place the carried thing sits in, if its target offers one: a tiled window in the tile it
    * would take, laid out as the drop would leave the workspace, or a lone window's on the
-   * new-workspace slot; a workspace in the room opened for it, at the room's size; either in the slot.
+   * new-workspace slot; a workspace in the room opened for it, at the room's size, once it has
+   * snapped in (`magnet`); either in the slot.
    * A floating window sits in no tile.
    */
   function stuckPose(): Pose | null {
@@ -1463,7 +1520,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!held || !target) return null;
     if (target.kind === "bin") return slotPose(held);
     if (held.kind === "space") {
-      const room = roomBox();
+      const room = snapped ? roomBox() : null;
       if (!room) return null;
       const fit = Math.min(room.w / held.own.w, room.h / held.own.h);
       const w = held.own.w * fit;
@@ -1656,6 +1713,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     // Let go out of the reach after it was in it: what waits there shows again, its time from full.
     if (caught && target?.kind !== "bin") slotTakes(false);
     carry = null;
+    snapped = null;
     caught = false;
     delete root.dataset.carrying;
     // Let go in the reach it stays above the desk: it waits in the slot exactly as it is drawn.
@@ -2311,6 +2369,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const start = centreOf({ space: pin.space });
     liftSpace(pin.space, start);
     moveCarry(pointOf(pin.to));
+    // Held by its middle, brought onto the middle of the room it opens: it snaps in.
+    const room = roomBox();
+    if (room && !pin.hand) moveCarry({ x: room.x + room.w / 2, y: room.y + room.h / 2 });
     settle();
   }
 
