@@ -24,6 +24,7 @@
 @property --ov-arrive { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-veil { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-aside { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-cover { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-plus-tint { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
@@ -208,7 +209,8 @@
 /* A place's number, `space.s8` in from its top left corner, over the miniature and its windows. It
    belongs to the place, not to the workspace in it: it stands still while workspaces move between
    places, and shows once the miniature has come to rest there (`--ov-tag`), fading with a place
-   that comes or goes (`--ov-arrive`). */
+   that comes or goes (`--ov-arrive`), and as something settles under it or leaves it
+   (`--ov-cover`, `overview-parts.ts`). */
 .ov-numbers {
   position: absolute;
   inset: 0;
@@ -221,12 +223,13 @@
   top: 0;
   display: block;
   translate: var(--ov-x) var(--ov-y);
-  opacity: calc(var(--ov-tag) * var(--ov-arrive));
+  opacity: calc(var(--ov-tag) * var(--ov-arrive) * var(--ov-cover));
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-tag var(--ov-tt, 0s) var(--easing-standard) var(--ov-td, 0s),
-    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s);
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
+    --ov-cover var(--ov-ct, 0s) var(--easing-standard);
 }
 
 /* A number on the frame's glass, as the bar draws its workspaces on its own pill: it reads on any
@@ -338,13 +341,20 @@
   z-index: 1;
 }
 
-/* What is carried rides over what waits in the slot; a workspace carried into a place sits under
-   that place's number, a carried window over it; the lit line round either over all. */
+/* The places' numbers are under everything carried, at the hand or flying: no number shows over a
+   carried thing. What is carried rides over what waits in the slot; the number of the place a
+   carried workspace sits in is over it, in a layer of its own over what is carried, as is a number
+   fading while something settles under it or leaves it; a carried window is over that too, and the
+   lit line round either over all. */
+.ov-lift > .ov-numbers {
+  z-index: 1;
+}
+
 .ov-lift > [data-held] {
   z-index: 2;
 }
 
-.ov-lift > .ov-numbers {
+.ov-lift > .ov-numbers-over {
   z-index: 3;
 }
 

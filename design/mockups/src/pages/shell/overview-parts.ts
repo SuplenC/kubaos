@@ -506,7 +506,12 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   // The places' numbers, over every miniature and over a workspace carried into a place, under a
   // carried window (`overview.css`).
   const numbers = span("ov-numbers");
-  lift.append(numbers);
+  // Over what is carried: the number of a place a carried workspace sits in, and a number fading as
+  // something settles under it or leaves it, so the order never flips in sight.
+  const numbersOver = span("ov-numbers ov-numbers-over");
+  lift.append(numbers, numbersOver);
+  /** The place a carried workspace sits in, its number over it. */
+  let placedKey: string | null = null;
 
   // ── The screens ──
 
@@ -704,6 +709,74 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       made.number.replaceChildren(made.rolling.element);
       made.number.toggleAttribute("data-shown", shown);
     }
+  }
+
+  /** The key of the place `space` stands in as drawn now. */
+  function placeKeyOf(space: string): string | null {
+    for (const each of views) {
+      for (const section of each.layout.sections) {
+        const k = section.items.indexOf(space);
+        if (k >= 0) return `${section.group}#${k}`;
+      }
+    }
+    return null;
+  }
+
+  /** A place's number's box, in world points. */
+  function badgeOf(key: string): model.Rect | null {
+    const at = key.lastIndexOf("#");
+    const group = key.slice(0, at);
+    const index = Number(key.slice(at + 1));
+    for (const each of views) {
+      const slot = each.layout.sections.find((section) => section.group === group)?.places[index];
+      if (slot) return { x: each.at.x + slot.x + L("space-s8"), y: each.at.y + slot.y + L("space-s8"), w: L("size-chip"), h: L("size-chip") };
+    }
+    return null;
+  }
+
+  function overlaps(a: model.Rect, b: model.Rect): boolean {
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  }
+
+  /** Shows or hides a place's number over `short`, or at once. */
+  function cover(made: PlaceTag, shown: boolean, instant = false): void {
+    made.root.style.setProperty("--ov-ct", instant ? "0s" : "var(--motion-short)");
+    made.root.style.setProperty("--ov-cover", shown ? "1" : "0");
+    if (instant) commit(made.root);
+  }
+
+  /**
+   * Something has settled in place `key`, under its number: the number comes over it unseen and
+   * fades in. Unless `stays`, as a carried workspace's place does, it goes back to the numbers'
+   * own layer once faded in, what settled being on the desk below them by then.
+   */
+  function settleTag(key: string, stays: boolean): void {
+    const made = placeTags.get(key);
+    if (!made) return;
+    cover(made, false, true);
+    numbersOver.append(made.root);
+    commit(made.root);
+    cover(made, true);
+    if (stays) return;
+    later(ms("short"), () => {
+      if (placedKey !== key && made.root.parentElement === numbersOver) numbers.append(made.root);
+    });
+  }
+
+  /**
+   * Something leaves place `key`, carried: the number stays over it as it fades out, then goes back
+   * under what is carried and shows again, so nothing carried has a number over it.
+   */
+  function releaseTag(key: string): void {
+    const made = placeTags.get(key);
+    if (!made) return;
+    if (made.root.parentElement !== numbersOver) numbersOver.append(made.root);
+    cover(made, false);
+    later(ms("short"), () => {
+      if (placedKey === key) return;
+      numbers.append(made.root);
+      cover(made, true);
+    });
   }
 
   /** A place gone, its group shorter: its number fades where it stands, and goes. */
@@ -1425,6 +1498,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!on || !slot || !rect || !element) return;
     const at: Pose = { x: on.at.x + slot.x + rect.x * slot.s, y: on.at.y + slot.y + rect.y * slot.s, w: rect.w, h: rect.h, s: slot.s, k: 1 };
     const grab = { x: (point.x - at.x) / (rect.w * slot.s), y: (point.y - at.y) / (rect.h * slot.s) };
+    // Lifted from under its workspace's number, the number fades off it as it comes up.
+    const key = placeKeyOf(space);
+    const badge = key ? badgeOf(key) : null;
+    if (key && badge && overlaps(badge, drawn("window", at))) releaseTag(key);
     lift.append(element);
     delete element.dataset.landing;
     element.dataset.lifted = "";
@@ -1454,6 +1531,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const at: Pose = { x: on.at.x + slot.x, y: on.at.y + slot.y, w: slot.w, h: slot.h, s: slot.s, k: 1 };
     const grab = { x: (point.x - at.x) / slot.w, y: (point.y - at.y) / slot.h };
     const group = model.groupOf(desk, id);
+    // Lifted in its own place, it sits there under that place's number until it leaves it.
+    placedKey = placeKeyOf(id);
+    const own = placedKey ? placeTags.get(placedKey) : undefined;
+    if (own) numbersOver.append(own.root);
     lift.append(made.root);
     delete made.root.dataset.landing;
     made.root.dataset.lifted = "";
@@ -1511,7 +1592,20 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     }
     lightBin(into);
     place("reflow");
-    fly(held, wanted(held), duration, curve);
+    // A workspace leaving a place leaves its number; one that settles in a place has its number
+    // come over it once it is there.
+    const key = held.kind === "space" && target?.kind === "between" ? `${target.group}#${target.index}` : null;
+    if (placedKey && placedKey !== key) {
+      const was = placedKey;
+      placedKey = null;
+      releaseTag(was);
+    }
+    const settles = key !== null && key !== placedKey;
+    fly(held, wanted(held), duration, curve, settles ? () => {
+      if (carry !== held || placedKey !== null) return;
+      placedKey = key;
+      settleTag(key, true);
+    } : undefined);
   }
 
   // ── Where a carried thing is drawn ──
@@ -1837,7 +1931,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     delete was.element.dataset.lifted;
     was.element.dataset.landing = "";
     place("reflow");
-    fly(was, () => tilePose(was.id) ?? posed.get(was.element)!, "medium", "emphasized_decel", () => settleWindow(was.id));
+    fly(was, () => tilePose(was.id) ?? posed.get(was.element)!, "medium", "emphasized_decel", () => {
+      // Landed under its workspace's number: the number fades in over it.
+      const key = placeKeyOf(model.spaceOf(desk, was.id).id);
+      const at = tilePose(was.id);
+      const badge = key ? badgeOf(key) : null;
+      settleWindow(was.id);
+      if (key && badge && at && overlaps(badge, drawn("window", at))) settleTag(key, false);
+    });
   }
 
   /** A window's tile on its workspace's miniature as drawn now, in world points. */
@@ -1889,6 +1990,12 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.desk.style.setProperty("--ov-dw", css(on.size.w));
     made.desk.style.setProperty("--ov-dh", css(on.size.h));
     tileSpace(id, on, "land");
+    // Let go in the place it sat in, its number is over it already and stays; let go elsewhere, the
+    // number of the place it lands in fades in over it once it is there.
+    const there = placeKeyOf(id);
+    const kept = placedKey !== null && placedKey === there;
+    if (placedKey && !kept) releaseTag(placedKey);
+    placedKey = null;
     fly(
       was,
       () => {
@@ -1898,7 +2005,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       },
       "medium",
       "emphasized_decel",
-      () => settleSpace(id),
+      () => {
+        settleSpace(id);
+        const key = placeKeyOf(id);
+        const made = key ? placeTags.get(key) : undefined;
+        if (kept && made && key === there) {
+          if (made.root.parentElement === numbersOver) numbers.append(made.root);
+        } else if (key) settleTag(key, false);
+      },
     );
   }
 
