@@ -1177,7 +1177,7 @@ warning = ""
 # shared, with `sharing_core` along its middle as `primary_core` runs along the accent's.
 burn_sharing = ""
 sharing = ""
-# The line of every on-air mark (a shared window's border, a region's line, a screen's corners) and
+# The line of every on-air mark (a shared window's border, a region's line, a screen's edge) and
 # of a lit sharing control by day: violet that reads beside the window it marks and beside the dark
 # or light wallpaper past it, which text's fit, pinned dark by the day surfaces, would lose.
 sharing_line = ""

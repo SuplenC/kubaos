@@ -1,11 +1,11 @@
 // The on-air marks: what is shared, marked on the desktop for the person alone, never in the stream.
 // A shared window keeps a violet border, and its tube burns violet while it has the keyboard; a
-// shared region has a violet line just outside it; a shared screen has a violet square as tall as
-// the bar in each of its outer corners. Nothing else changes. The windows and the marks are draft
-// parts, proposed for the library (`sharing-parts.ts`).
+// shared region has a violet line just outside it; a shared screen has the same line round its
+// whole edge, inside it. One mark for all three. Nothing else changes. The windows and the marks
+// are draft parts, proposed for the library (`sharing-parts.ts`).
 
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
-import { DESK, desktop, type DesktopOptions, deskWindow, GHOSTTY, REGION, regionMark, screenMarks } from "./sharing-parts.ts";
+import { DESK, desktop, type DesktopOptions, deskWindow, GHOSTTY, REGION, regionMark, screenMark } from "./sharing-parts.ts";
 
 /** A shared window's desktop, the keyboard on window `focused`. */
 const windowShared = (focused = 0, index = 1) => desktop({ shared: { kind: "window", index }, focused });
@@ -74,7 +74,7 @@ export default page<State>({
     { name: "A window, not focused", for: "its border violet; nothing else", sample: shown({ shared: { kind: "window", index: 1 }, focused: 0 }) },
     { name: "A window, focused", for: "its tube violet, glow at night", sample: shown({ shared: { kind: "window", index: 1 }, focused: 1 }) },
     { name: "A region", for: "a violet line just outside it", sample: shown({ shared: { kind: "region" } }) },
-    { name: "A screen", for: "four violet squares, a bar tall, in its corners", sample: shown({ shared: { kind: "screen" } }) },
+    { name: "A screen", for: "a violet line round its whole edge", sample: shown({ shared: { kind: "screen" } }) },
     { name: "With the camera too", for: "the marks unchanged; the bar's two pills", sample: shown({ shared: { kind: "window", index: 1 }, camera: true }) },
     { name: "Nothing shared", for: "no mark, no pill", sample: shown({}) },
   ],
@@ -87,7 +87,7 @@ export default page<State>({
         { name: "Window, shared", for: "draft: the violet border over it", sample: () => windowAlone(true, false) },
         { name: "Window, shared and focused", for: "draft: the tube in `sharing`", sample: () => windowAlone(true, true) },
         { name: "Region mark", for: "draft: `stroke.thin` outside the region", sample: () => sampleOf(regionMark({ x: 16, y: 16, width: 240, height: 120 })) },
-        { name: "Screen marks", for: "draft: `size.bar` squares, no rounding", sample: () => sampleOf(screenMarks()) },
+        { name: "Screen mark", for: "draft: `stroke.thin` inside the screen's edge", sample: () => sampleOf(screenMark()) },
       ],
     },
   ],
@@ -125,11 +125,11 @@ export default page<State>({
     arrives: [
       strikes("A window's share starts", "Its violet border strikes on, as a sign powering up.", "the border", ".share-border", true, screen(() => windowShared(0))),
       strikes("A region's share starts", "Its violet line strikes on.", "the line", ".share-region", true, screen(() => desktop({ shared: { kind: "region", rect: REGION } }))),
-      strikes("A screen's share starts", "Its four corner squares strike on together.", "the squares", ".share-corner", true, screen(() => desktop({ shared: { kind: "screen" } }))),
+      strikes("A screen's share starts", "Its violet edge strikes on, round the whole screen.", "the edge", ".share-edge", true, screen(() => desktop({ shared: { kind: "screen" } }))),
     ],
     leaves: [
       strikes("A window's share stops", "Its border flickers out; the neutral border is left.", "the border", ".share-border", false, screen(() => windowShared(0))),
-      strikes("A screen's share stops", "Its corner squares flicker out together.", "the squares", ".share-corner", false, screen(() => desktop({ shared: { kind: "screen" } }))),
+      strikes("A screen's share stops", "Its violet edge flickers out.", "the edge", ".share-edge", false, screen(() => desktop({ shared: { kind: "screen" } }))),
     ],
     between: [FOCUS],
   },
@@ -137,15 +137,15 @@ export default page<State>({
   measures: {
     samples: nonEmpty([
       { name: "A shared window", for: "its border and tube", sample: () => windowAlone(true, true) },
-      { name: "A shared screen", for: "the squares in its corners", sample: shown({ shared: { kind: "screen" } }) },
+      { name: "A shared screen", for: "the line round its edge, clear of the bar's pills", sample: shown({ shared: { kind: "screen" } }) },
     ]),
     measures: [
       { part: "Window's border, shared", token: "stroke-thin" },
       { part: "Window's corner", token: "radius-surface" },
       { part: "Region's line, outside it", token: "stroke-thin" },
-      { part: "Corner square's side", token: "size-bar" },
+      { part: "Screen's line, inside its edge", token: "stroke-thin" },
     ],
-    reflow: doesntApply("the squares sit in the screen's own corners at every size."),
+    reflow: doesntApply("the line runs round the screen's own edge at every size."),
   },
 });
 

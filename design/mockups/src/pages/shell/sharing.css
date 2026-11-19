@@ -22,8 +22,9 @@
   pointer-events: none;
 }
 
-/* Drawing a region: the screen's own dim gives way to the drawing's, which leaves the box clear. */
-.k-screen.share-screen[data-drawing] > .k-screen-dim {
+/* Drawing a region, the screen's own dim gives way to the drawing's, which leaves the box clear;
+   a screen lit whole comes out of it. */
+.k-screen.share-screen:is([data-drawing], [data-lit-screen]) > .k-screen-dim {
   --panel-dim: 0;
 }
 
@@ -47,13 +48,24 @@
   min-width: 0;
 }
 
-/* A lit window's label: a Tooltip in the middle of the window, taking no pointer. */
+/* A window's label while picking: a Tooltip in the middle of the window, taking no pointer, shown
+   while the window is lit; its Enter only while the keyboard is on it. */
 .share-pick-label {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-window[data-lifted] > .share-pick-label {
+  opacity: 1;
+}
+
+.share-window:not([data-keyboard]) .share-pick-enter {
+  display: none;
 }
 
 /* A window on the desktop: draft part, proposed. */
@@ -72,13 +84,19 @@
   background: var(--color-surface);
 }
 
-/* A shared window's border: `sharing`, the window border's width, over the neutral border, there
-   whether or not the window has the keyboard. The tube, while it has it, burns over it. */
+/* A shared window's border: `sharing_line`, the window border's width, over the neutral border,
+   shown while the window is shared or lit while picking, whether or not it has the keyboard. The
+   tube, while it has it, burns over it. */
 .share-border {
   position: absolute;
   inset: 0;
   border: var(--line) solid var(--color-sharing_line);
   border-radius: var(--corner);
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-window:not([data-shared]) .share-border {
+  opacity: 0;
 }
 
 /* A shared region's mark: the thin stroke just outside the region. */
@@ -89,36 +107,22 @@
   pointer-events: none;
 }
 
-/* A shared screen's marks: squares as tall as the bar, unrounded, in the screen's own corners. */
-.share-corners {
+/* A shared screen's mark: the thin stroke inside the screen's whole edge, at its own corners, in
+   `sharing_line`, as a window's and a region's. It lies within the bar's room above and below
+   its pills and takes no pointer. In picking it shows while its screen is lit whole. */
+.share-edge {
   position: absolute;
   z-index: 3;
   inset: 0;
   display: block;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line);
   pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
 }
 
-.share-corner {
-  position: absolute;
-  width: var(--size-bar);
-  height: var(--size-bar);
-  background: var(--color-sharing_line);
-}
-
-.share-corner[data-at^="top"] {
-  top: 0;
-}
-
-.share-corner[data-at^="bottom"] {
-  bottom: 0;
-}
-
-.share-corner[data-at$="left"] {
-  left: 0;
-}
-
-.share-corner[data-at$="right"] {
-  right: 0;
+.share-screen:not([data-lit-screen]) > .share-edge {
+  opacity: 0;
 }
 
 /* Drawing a region: draft part, proposed. Picking's dim is the box's own spread, so the box stays

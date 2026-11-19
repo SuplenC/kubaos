@@ -21,7 +21,9 @@ import {
   NARROW,
   NOTHING,
   pickBar,
+  type Picking,
   picking,
+  buildPicking,
   type PickingOptions,
   REGION,
 } from "./sharing-parts.ts";
@@ -52,8 +54,9 @@ function playShared(root: HTMLElement): void {
 /**
  * Picking live on `monitors`: point at a window and click it, point at Share this screen and click
  * it, Region or a right-button drag to draw, or the keys, Tab walking every screen's windows and
- * bar. Shared, the move to sharing plays as its recipe says; cancelled, the desktop is left as it
- * was. A double-click on the desktop asks again.
+ * bar. The screens are built once as picking opens and only lit after that; shared, the move to
+ * sharing plays as its recipe says; cancelled, the desktop is left as it was. A double-click on
+ * the desktop asks again.
  */
 function livePicking(monitors: readonly Monitor[]): HTMLElement {
   const holder = document.createElement("span");
@@ -62,30 +65,40 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
   holder.style.display = "inline-block";
   let lit: Lit = NOTHING;
   let at = -1;
+  let picker: Picking | null = null;
 
-  const again = (shown: HTMLElement) => {
-    shown.addEventListener("dblclick", () => {
-      lit = NOTHING;
-      at = -1;
-      draw();
-    });
-    holder.replaceChildren(shown);
+  /** The keyboard to the region being drawn, or else to picking; a frame later while not yet on the page. */
+  const focus = () => {
+    if (ALL || !picker) return;
+    const shown = picker.element;
+    const take = () => (shown.querySelector<HTMLElement>(".share-draw") ?? shown).focus({ preventScroll: true });
+    if (holder.isConnected) take();
+    else requestAnimationFrame(take);
   };
 
   const light = (next: Lit) => {
     if (JSON.stringify(next) === JSON.stringify(lit)) return;
+    const drawing = lit.kind === "region" || next.kind === "region";
     lit = next;
-    draw();
+    picker?.light(lit);
+    // Only drawing a region changes what holds the keyboard; anything else leaves it where it is.
+    if (drawing) focus();
+  };
+
+  const settled = (shown: HTMLElement) => {
+    picker = null;
+    shown.addEventListener("dblclick", ask);
+    holder.replaceChildren(shown);
   };
 
   const share = (picked: Lit) => {
     if (picked.kind === "none") return;
     const shown = picking({ monitors, lit: picked, pill: true });
-    again(shown);
+    settled(shown);
     if (!ALL) playShared(shown);
   };
 
-  const cancel = () => again(picking({ monitors, phase: "shared" }));
+  const cancel = () => settled(picking({ monitors, phase: "shared" }));
 
   const keys = (event: KeyboardEvent) => {
     const screenAt = lit.kind === "none" ? 0 : lit.screen;
@@ -104,20 +117,20 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
     event.stopPropagation();
   };
 
-  function draw(): void {
-    const shown = picking({ monitors, lit, handlers: { onLight: light, onShare: share, onCancel: cancel } });
-    shown.tabIndex = 0;
-    shown.addEventListener("keydown", keys);
-    holder.replaceChildren(shown);
-    if (ALL) return;
-    const drawing = shown.querySelector<HTMLElement>(".share-draw");
-    const focus = () => (drawing ?? shown).focus({ preventScroll: true });
-    // Each key draws the picker again: the new one takes the keyboard at once, or a quick next key
-    // would reach the page. Drawn before the holder is on the page, it takes it a frame later.
-    if (holder.isConnected) focus();
-    else requestAnimationFrame(focus);
+  function ask(): void {
+    lit = NOTHING;
+    at = -1;
+    picker = buildPicking({ monitors, handlers: { onLight: light, onShare: share, onCancel: cancel } });
+    picker.light(lit);
+    picker.element.tabIndex = 0;
+    picker.element.addEventListener("keydown", keys);
+    // The pointer coming onto the screens hands them the keyboard, as picking holds it on every
+    // screen: the page draws the stage twice, by night and by day, and the keys follow the one in use.
+    picker.element.addEventListener("pointerenter", focus);
+    holder.replaceChildren(picker.element);
+    focus();
   }
-  draw();
+  ask();
   return holder;
 }
 
@@ -197,7 +210,7 @@ export default page<Shown>({
   variants: [
     { name: "Picking, at rest", for: "both screens dimmed, a bar on each", sample: screen(() => both()) },
     { name: "A window pointed at", for: "out of the dim, its on-air edge, the label", sample: screen(() => both({ lit: { kind: "window", screen: 0, index: 1 } })) },
-    { name: "This screen pointed at", for: "out of the dim, its corner marks", sample: screen(() => both({ lit: { kind: "screen", screen: 0 } })) },
+    { name: "This screen pointed at", for: "out of the dim, its violet edge", sample: screen(() => both({ lit: { kind: "screen", screen: 0 } })) },
     { name: "A region being drawn", for: "clear inside its on-air line; its size", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
     { name: "The keyboard on a window", for: "lit as pointed; the label says Enter", sample: screen(() => both({ lit: { kind: "window", screen: 1, index: 0, keyboard: true } })) },
     { name: "An app asks", for: "the app's name in each bar", sample: screen(() => both({ asker: DISCORD })) },
@@ -266,8 +279,8 @@ export default page<Shown>({
       },
       {
         name: "This screen lit",
-        what: "Share this screen pointed at: the corner marks fade in over `short`.",
-        tracks: [{ part: "the marks", on: "the screen", target: ".share-corner", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+        what: "Share this screen pointed at: its violet edge fades in over `short`.",
+        tracks: [{ part: "the edge", on: "the screen", target: ".share-edge", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
         sample: screen(() => one({ lit: { kind: "screen", screen: 0 } })),
@@ -299,7 +312,7 @@ export default page<Shown>({
       { part: "Label's width", token: "size-menu" },
       { part: "Dim", token: "opacity-panel_scrim" },
       { part: "A window's edge", token: "stroke-thin" },
-      { part: "Corner mark", token: "size-bar" },
+      { part: "A screen's edge", token: "stroke-thin" },
     ],
     reflow: { note: "The bar keeps to the bottom left; on a narrow screen who asks is cut first.", sample: screen(() => picking({ monitors: [NARROW], asker: LONG_ASKER })) },
   },
