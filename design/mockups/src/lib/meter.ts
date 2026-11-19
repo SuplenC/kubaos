@@ -18,7 +18,7 @@
 
 import "./feedback.css";
 import { probe } from "./probe.ts";
-import { length, raw } from "./tokens.ts";
+import { durationMs, length } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
 /** A reading's colour step against its threshold: fine, close to it, over it. */
@@ -83,7 +83,7 @@ export interface LiveMeter {
 
 /** The duration token `name` in milliseconds under the speed setting. */
 function duration(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 export function liveMeter(level = 0, peak = level): LiveMeter {

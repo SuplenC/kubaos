@@ -25,7 +25,7 @@ import { probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
 import { type RegionHost, settingsWell } from "./sidebar-page.ts";
 import { advance, text } from "./text.ts";
-import { length, raw } from "./tokens.ts";
+import { durationMs, length, raw } from "./tokens.ts";
 import type { ListRowSpec } from "./list.ts";
 
 /** An object on the canvas: a screen, in logical pixels, where it sits in the arrangement. */
@@ -78,7 +78,7 @@ function marks(start: number, size: number): number[] {
 
 /** The duration token `name` in milliseconds, as the page plays it. */
 function motionMs(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`));
+  return durationMs(name);
 }
 
 /** The numbers an object shows under its own: its size in logical pixels. */

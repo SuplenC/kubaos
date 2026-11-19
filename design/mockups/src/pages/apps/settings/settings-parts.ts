@@ -32,7 +32,7 @@ import { type RegionHost, settingsWell, type Section, type SubSection } from "..
 import { select } from "../../../lib/select.ts";
 import { setSlider, slider } from "../../../lib/slider.ts";
 import { tabs } from "../../../lib/tabs.ts";
-import { length, number } from "../../../lib/tokens.ts";
+import { durationMs, length } from "../../../lib/tokens.ts";
 import { settings } from "../../../site/settings.ts";
 
 /** What a setting is set with. */
@@ -587,7 +587,7 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
         well?.focus({ preventScroll: true });
       }
       // What shows may change: drawn again once the controls have moved.
-      if (which.some((each) => each.drives || each.warns || each.shows)) setTimeout(draw, number("duration-medium") / settings().speed);
+      if (which.some((each) => each.drives || each.warns || each.shows)) setTimeout(draw, durationMs("medium") / settings().speed);
     }
 
     /** A reset, kept with what it asks of it. */

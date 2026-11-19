@@ -16,7 +16,7 @@
 import "./rolling-number.css";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { advance, centreFor, tabularFigure, text, type TypeStyle } from "./text.ts";
-import { raw } from "./tokens.ts";
+import { durationMs, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
 /** Every figure, so each one is centred for the same mass and they share one baseline. */
@@ -44,7 +44,7 @@ const COUNT = new Intl.NumberFormat("en-GB", { useGrouping: false });
 
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** One figure in its slot's ink, centred for every figure's mass. */

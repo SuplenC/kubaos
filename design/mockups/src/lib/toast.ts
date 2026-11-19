@@ -16,7 +16,7 @@ import { icon } from "./icon.ts";
 import { keyHints } from "./keycap.ts";
 import { row } from "./layout.ts";
 import { probe } from "./probe.ts";
-import { raw } from "./tokens.ts";
+import { durationMs } from "./tokens.ts";
 import { wrapped } from "./text.ts";
 import { settings } from "../site/settings.ts";
 
@@ -43,7 +43,7 @@ export function toast(options: ToastOptions): HTMLElement {
 
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** Centres `shown` across its room on a whole device pixel, the odd one after it. */

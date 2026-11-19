@@ -24,7 +24,7 @@ import { switchControl } from "../../lib/switch.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { tile, type TileOptions } from "../../lib/tile.ts";
-import { cubic, raw } from "../../lib/tokens.ts";
+import { cubic, durationMs } from "../../lib/tokens.ts";
 import { tooltip } from "../../lib/tooltip.ts";
 import { settings } from "../../site/settings.ts";
 import { bellPill, statusPill, sysmonPill } from "./bar-parts.ts";
@@ -54,7 +54,7 @@ export function ccHeader(options: { date?: string; lit?: Pinned } = {}): HTMLEle
  * it as it is.
  */
 export function fadeIn(element: HTMLElement): void {
-  const duration = Number.parseFloat(raw("duration-short")) / settings().speed;
+  const duration = durationMs("short") / settings().speed;
   element.animate([{ opacity: 0 }, { opacity: 1 }], { duration, easing: `cubic-bezier(${cubic("easing-standard").join(", ")})` });
 }
 

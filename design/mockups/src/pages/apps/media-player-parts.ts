@@ -29,7 +29,7 @@ import { spinner } from "../../lib/spinner.ts";
 import { advance, clamped, text, type TypeStyle, wrapped } from "../../lib/text.ts";
 import { anchorPopover, popover } from "../../lib/tooltip.ts";
 import { declare, probe } from "../../lib/probe.ts";
-import { length, raw } from "../../lib/tokens.ts";
+import { durationMs, length, raw } from "../../lib/tokens.ts";
 import { ALL, CHROME, settings } from "../../site/settings.ts";
 import { Live, neon, type Palette, roleColour, still } from "./media-player-gl.ts";
 import { MOODS, QUIET, type Signal, synthetic } from "./media-player-signal.ts";
@@ -312,7 +312,7 @@ function coverPalette(root: HTMLElement): Palette {
 
 /** A duration token in milliseconds under the speed setting; nothing with reduce motion. */
 function ms(name: string): number {
-  return settings().reduced ? 0 : Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return settings().reduced ? 0 : durationMs(name) / settings().speed;
 }
 
 // The picture's own light.
@@ -1071,7 +1071,7 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     if ((now.sidebar ?? false) !== (was.sidebar ?? false)) {
       window.clearTimeout(refit);
       if (now.sidebar) fit(true);
-      else refit = window.setTimeout(() => fit(true), Number.parseFloat(raw("duration-medium")) / (settings().speed || 1));
+      else refit = window.setTimeout(() => fit(true), durationMs("medium") / (settings().speed || 1));
     }
     // The subtitle line.
     const line = screen.querySelector<HTMLElement>(".mp-subtitle");
@@ -1338,7 +1338,7 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     for (const running of disc.getAnimations()) running.cancel();
     const bloomed = `${raw("scale-bloom")}`;
     if (settings().reduced) {
-      disc.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0 }], { duration: ms("short") || Number.parseFloat(raw("duration-short")), easing: raw("easing-standard") });
+      disc.animate([{ opacity: 0 }, { opacity: 1, offset: 0.3 }, { opacity: 0 }], { duration: ms("short") || durationMs("short"), easing: raw("easing-standard") });
       return;
     }
     disc.animate(

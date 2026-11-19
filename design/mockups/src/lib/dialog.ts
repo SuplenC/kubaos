@@ -47,7 +47,7 @@ import { probe, variant } from "./probe.ts";
 import { captionedBar, progressBar } from "./progress.ts";
 import { markup, text, wrapped } from "./text.ts";
 import { settings } from "../site/settings.ts";
-import { length, raw } from "./tokens.ts";
+import { durationMs, length } from "./tokens.ts";
 
 export type { Action, Tone } from "./button-bar.ts";
 
@@ -320,7 +320,7 @@ export function dialogOver(frame: HTMLElement, options: DialogOptions, answered:
     asked.element.addEventListener("transitionend", (event) => {
       if (event.propertyName === "opacity") gone();
     });
-    setTimeout(gone, Number.parseFloat(raw("duration-medium")) / settings().speed);
+    setTimeout(gone, durationMs("medium") / settings().speed);
     if (opener?.isConnected) opener.focus({ preventScroll: true });
     answered(said);
   };

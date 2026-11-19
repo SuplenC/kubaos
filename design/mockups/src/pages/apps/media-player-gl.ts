@@ -15,7 +15,7 @@
 // the same still comes out every time; with no WebGL it is the cover alone.
 
 import { type Analysis, BANDS, QUIET, type Signal, WAVE } from "./media-player-signal.ts";
-import { raw } from "../../lib/tokens.ts";
+import { durationMs } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 
 export type VizKind = "water" | "silk" | "tube" | "embers";
@@ -511,7 +511,7 @@ function sinceKick(signal: Signal, time: number): number {
 
 /** A duration token in seconds under the speed setting. */
 function seconds(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / 1000 / settings().speed;
+  return durationMs(name) / 1000 / settings().speed;
 }
 
 /**

@@ -10,7 +10,7 @@ import { chip } from "./chip.ts";
 import { fill, row } from "./layout.ts";
 import { type CardElement, card, CORNER, type Note } from "./notification-card.ts";
 import { raise } from "./elevation.ts";
-import { raw } from "./tokens.ts";
+import { durationMs } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 import { declare, probe } from "./probe.ts";
 import { clamped, text } from "./text.ts";
@@ -34,7 +34,7 @@ export interface GroupOptions {
 
 /** The duration token `name` in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** A group with what its owner moves it by. */

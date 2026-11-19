@@ -15,7 +15,7 @@
 import "./marquee.css";
 import { probe } from "./probe.ts";
 import { text, type TypeStyle } from "./text.ts";
-import { length, raw } from "./tokens.ts";
+import { durationMs, length, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
 /** One run of words in its style and colour: a song, a separator, an artist. */
@@ -45,7 +45,7 @@ export interface Marquee {
 
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 function words(parts: readonly MarqueePart[], room: number): { readonly line: HTMLElement; readonly runs: boolean } {

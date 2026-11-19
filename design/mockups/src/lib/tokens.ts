@@ -69,6 +69,17 @@ export function raw(name: string): string {
 }
 
 /**
+ * The duration token `--duration-name` in milliseconds. The tokens write milliseconds, but the
+ * built site's minifier rewrites `2000ms` as `2s`, so the unit is read rather than assumed.
+ */
+export function durationMs(name: string): number {
+  const value = raw(`duration-${name}`);
+  const amount = Number.parseFloat(value);
+  if (Number.isNaN(amount)) throw new Error(`--duration-${name} is no duration`);
+  return Math.round(value.endsWith("ms") ? amount : amount * 1000);
+}
+
+/**
  * Every token whose custom property starts `--prefix`, without the dashes, in the order the
  * tokens' CSS declares them, each once: what a foundation lists, so a token added to the tokens
  * shows on its page without the page changing.
