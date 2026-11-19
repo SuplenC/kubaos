@@ -237,14 +237,14 @@ On a quieter machine the cold test build takes about 70 s. Running the tests tak
 
 | Job | Runs |
 |---|---|
-| `changes` | which gated jobs a pull request needs, from the files it changes since its merge base with `main`; a push to `main` needs `mockups` and no `apps verify`. A pull request into `main` runs on opening, its pushes and reopening; one retargeted onto `main` runs from its next push, or after closing and reopening it (an edit trigger would let a title edit mark the checks skipped, which counts as passed) |
+| `changes` | which gated jobs a pull request needs, from the files it changes since its merge base with `main`; a push to `main` needs neither `mockups` nor `apps verify`, which its pull request ran. A pull request into `main` runs on opening, its pushes and reopening; one retargeted onto `main` runs from its next push, or after closing and reopening it (an edit trigger would let a title edit mark the checks skipped, which counts as passed) |
 | `flake` | `nix flake check --no-build`, which evaluates the flake and builds nothing |
 | `fmt and lint` | `just fmt-check`, `just lint` |
 | `nextest` | `just nextest`, every test but Kōbō's `every_screen_keeps_to_the_grid` |
 | `nextest (slow)` | that one test, `cargo nextest run -p kubaos-kobo`: two to three minutes alone, longer than all the others together |
 | `qml` | `just qml-test` |
 | `design` | `just shots-test`, then `just design-check-ui`: the design lint, the contrast check, the specimen's geometry and QML's parity, on every pull request |
-| `mockups` | gated: `just mockups-checked`, when a pull request changes `design/`, `config/quickshell/`, `crates/kubaos-ui`, `-tokens`, `-specimen` or `-geometry`, `crates/kubaos-kobo/assets/`, `branding/`, `system/files/plymouth/` or `system/files/grub/`, `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, the `justfile`, `flake.nix`, `flake.lock`, `.github/actions/` or `check.yml` |
+| `mockups` | gated: `just mockups-checked`, when a pull request changes `design/`, `config/quickshell/`, `crates/kubaos-ui`, `-tokens`, `-specimen` or `-geometry`, `crates/kubaos-kobo/assets/`, `branding/`, `system/files/plymouth/` or `system/files/grub/`, `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, the `justfile`, `flake.nix`, `flake.lock`, `.github/actions/` or `check.yml`. A push to `main` skips it: its pull request checked the same pages, and the job saves no cache of its own (it reads `design`'s) |
 | `apps verify` | gated: `just apps-verify --changed origin/main`, when a pull request changes `apps/`, `system/packages.toml` or a sources file of `system/files/apt/sources.list.d/`; `just apps-verify`, every app, when it changes `crates/kubaos-apps-verify`. A push to `main` only builds the verifier and saves its compile cache |
 | `shellcheck` | `just shellcheck` |
 | `system files` | `just system-files-check`'s two scripts, straight on the runner with no Nix (they need only bash and git), on the whole history for the merge base with main |
@@ -254,7 +254,9 @@ On a quieter machine the cold test build takes about 70 s. Running the tests tak
 
 `.github/actions/setup` sets up every job: Nix, the kuba-os Cachix read-only, the Nix store from the Actions cache, and for the jobs that compile, sccache's directory and cargo's downloads. Each compiling job keeps its own compile cache, as each builds different crates (`mockups` reads `design`'s); the jobs that need only the devshell share one Nix store cache. Only the run on a push to main saves them, and every PR starts from them. A job with no cache of its own yet starts from another job's, and a change to `Cargo.lock` or `flake.lock` from the last one saved.
 
-**The mockups' player test** (`design/mockups/scripts/player-test.ts`) seeks every motion player of the checked pages in five settings and holds each ball to its recipe. Its time goes to round trips, not to work: every other player on the page keeps playing, so each call into the page waits 30 to 70 ms for the renderer while the CPU idles. A seek is one call to find where to click, the click and one call to read what it held, and the five settings run side by side in pages of their own. On the development machine at a load of 20 to 30, `button` takes about 1 min 23 s and `popup-stack` about 1 min 42 s.
+**The mockups' check runs its pages side by side.** `just mockups-check` draws the pages (`design/mockups/scripts/render.ts`) and runs their player test `MOCKUPS_JOBS` browser pages at once, one per CPU unless set, each in a context of its own; what both say reads by page whatever finishes first, so two runs on the same tree print the same. The frames go to `kubaos-specimen mockup` together, so the `identical` rule still compares every page of the run. A page is measured once each picture on it has loaded and each icon tile's has been placed, so a busy CPU draws the same frame as an idle one.
+
+**The mockups' player test** (`design/mockups/scripts/player-test.ts`) seeks every motion player of the checked pages in five settings and holds each ball to its recipe, each page in each setting in a browser page of its own. Each call into the page waits 30 to 70 ms for the renderer, which every other player on the page keeps busy playing, so the test is held by the CPUs: on four of them, four pages' player test took 82 s four at once and 93 s eight at once. A seek is one call to find where to click, the click and one call to read what it held.
 
 Measured 2026-10-28, wall time from the push to `check (x86_64-linux)`:
 

@@ -11,12 +11,16 @@
 // motion lists hold (`?all`), 1280 logical pixels wide as the specimen's are, at a device pixel ratio of 1, so the shot's pixels are the page's device pixels.
 // The browser is nixpkgs' Playwright Chromium (`PLAYWRIGHT_BROWSERS_PATH`, set by `nix develop`
 // and `just shots`). An error the page throws or logs fails the run.
+//
+// It draws `MOCKUPS_JOBS` pages at once, one per CPU unless set, each worker in a browser
+// context of its own; what it prints keeps the order of modes, scales and pages, whatever
+// finishes first.
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright-core";
-import { chromiumPath, serve } from "./browser.ts";
+import { type Browser, chromium, type Page } from "playwright-core";
+import { chromiumPath, inOrder, jobs, serve } from "./browser.ts";
 
 const WIDTH = 1280;
 const SCALES = ["1", "1.25", "1.5", "2"];
@@ -59,57 +63,106 @@ async function main(): Promise<void> {
   const origin = await serve(dist);
   const browser = await chromium.launch({ executablePath: chromiumPath() });
   try {
-    for (const mode of modes) {
-      for (const scale of scales) {
-        const context = await browser.newContext({
-          viewport: { width: Math.round(WIDTH * Number(scale)), height: 800 },
-          deviceScaleFactor: 1,
-          reducedMotion: "no-preference",
-        });
-        const page = await context.newPage();
-        const errors: string[] = [];
-        page.on("pageerror", (error) => errors.push(error.message));
-        page.on("console", (message) => {
-          if (message.type() === "error") errors.push(message.text());
-        });
-        const failOnErrors = () => {
-          if (errors.length > 0) throw new Error(`the page failed: ${errors.join("; ")}`);
-        };
-        // `all` draws every sample a stage or a motion list shows one at a time.
-        const query = `chrome=off&all&mode=${mode}&scale=${scale}&text=short&reduced=off&speed=1&flicker=on&window=Default`;
-        await page.goto(`${origin}/index.html?${query}`);
+    const settings = modes.flatMap((mode) => scales.map((scale) => ({ mode, scale })));
+    // A worker keeps one page, loaded at one mode and scale, for as long as its items stay there.
+    const tabs: (Tab | undefined)[] = [];
+    const tab = async (worker: number, mode: string, scale: string): Promise<Tab> => {
+      const kept = tabs[worker];
+      if (kept?.mode === mode && kept.scale === scale) return kept;
+      await kept?.page.context().close();
+      tabs[worker] = await open(browser, origin, mode, scale);
+      return tabs[worker]!;
+    };
+    const first = await tab(0, settings[0]!.mode, settings[0]!.scale);
+    const pages = await first.page.evaluate(() => window.kubaos.pages);
+    const unknown = named.filter((slug) => !pages.some((p) => p.slug === slug));
+    if (unknown.length > 0) throw new Error(`no page ${unknown.join(", ")}: one of ${pages.map((p) => p.slug).join(", ")}`);
+    const chosen = pages.filter((p) => named.length === 0 || named.includes(p.slug));
+    const items = settings.flatMap(({ mode, scale }) => chosen.map(({ level, slug }) => ({ mode, scale, level, slug })));
+    await inOrder(
+      items,
+      jobs(),
+      async ({ mode, scale, level, slug }, worker) => {
+        const { page, query, errors } = await tab(worker, mode, scale);
+        const printed: string[] = [];
+        // A new hash draws the page again without loading it, so the wait is for that draw.
+        await page.goto(`${origin}/index.html?${query}#/${level}/${slug}`);
         await page.evaluate(() => window.kubaos.ready);
-        failOnErrors();
-        const pages = await page.evaluate(() => window.kubaos.pages);
-        const unknown = named.filter((slug) => !pages.some((p) => p.slug === slug));
-        if (unknown.length > 0) throw new Error(`no page ${unknown.join(", ")}: one of ${pages.map((p) => p.slug).join(", ")}`);
-        for (const { level, slug } of pages.filter((p) => named.length === 0 || named.includes(p.slug))) {
-          // A new hash draws the page again without loading it, so the wait is for that draw.
-          await page.goto(`${origin}/index.html?${query}#/${level}/${slug}`);
-          await page.evaluate(() => window.kubaos.ready);
-          await page.waitForFunction((want) => document.getElementById("page")?.dataset.page === want, slug);
-          failOnErrors();
-          const name = `${slug}-${mode}-${scale}x`;
-          if (shots) {
-            await page.locator("#page").screenshot({ path: path.join(out, `${name}.png`), animations: "disabled" });
-            process.stdout.write(`${path.join(out, `${name}.png`)}\n`);
-          }
-          if (frames) {
-            const frame = await page.evaluate(() => window.kubaos.frame());
-            writeFileSync(path.join(out, `${name}.json`), JSON.stringify(frame));
-          }
-          if (motion) {
-            const recipes = await page.evaluate(() => window.kubaos.motion());
-            writeFileSync(path.join(out, `${slug}.json`), `${JSON.stringify(recipes, null, 2)}\n`);
-            process.stdout.write(`${path.join(out, `${slug}.json`)}\n`);
-          }
+        await page.waitForFunction((want) => document.getElementById("page")?.dataset.page === want, slug);
+        await pictures(page);
+        failOnErrors(errors);
+        const name = `${slug}-${mode}-${scale}x`;
+        if (shots) {
+          await page.locator("#page").screenshot({ path: path.join(out, `${name}.png`), animations: "disabled" });
+          printed.push(path.join(out, `${name}.png`));
         }
-        await context.close();
-      }
-    }
+        if (frames) {
+          const frame = await page.evaluate(() => window.kubaos.frame());
+          writeFileSync(path.join(out, `${name}.json`), JSON.stringify(frame));
+        }
+        if (motion) {
+          const recipes = await page.evaluate(() => window.kubaos.motion());
+          writeFileSync(path.join(out, `${slug}.json`), `${JSON.stringify(recipes, null, 2)}\n`);
+          printed.push(path.join(out, `${slug}.json`));
+        }
+        return printed;
+      },
+      (printed) => {
+        for (const line of printed) process.stdout.write(`${line}\n`);
+      },
+      // Loading the site at another mode or scale takes longer than drawing most pages.
+      ({ mode, scale }) => `${mode} ${scale}`,
+    );
   } finally {
     await browser.close();
   }
+}
+
+/** A worker's page, with the errors it has thrown or logged since its last item. */
+interface Tab {
+  readonly mode: string;
+  readonly scale: string;
+  readonly query: string;
+  readonly page: Page;
+  readonly errors: string[];
+}
+
+/** Opens a page of its own context at `mode` and `scale`, loaded and ready. */
+async function open(browser: Browser, origin: string, mode: string, scale: string): Promise<Tab> {
+  const context = await browser.newContext({
+    viewport: { width: Math.round(WIDTH * Number(scale)), height: 800 },
+    deviceScaleFactor: 1,
+    reducedMotion: "no-preference",
+  });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  // `all` draws every sample a stage or a motion list shows one at a time.
+  const query = `chrome=off&all&mode=${mode}&scale=${scale}&text=short&reduced=off&speed=1&flicker=on&window=Default`;
+  await page.goto(`${origin}/index.html?${query}`);
+  await page.evaluate(() => window.kubaos.ready);
+  failOnErrors(errors);
+  return { mode, scale, query, page, errors };
+}
+
+/**
+ * Waits for every picture on the page to load, and each icon tile's to be measured and placed or
+ * taken away. A tile shows its symbol until then, after the draw the page says is done, so a page
+ * drawn while the CPU is busy would otherwise be measured with the symbol, and a quiet one without.
+ */
+async function pictures(page: Page): Promise<void> {
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll<HTMLImageElement>("#page img[src]")].every(
+      (picture) => picture.complete && (!picture.matches(".k-icon-tile > img") || picture.hasAttribute("data-loaded")),
+    ),
+  );
+}
+
+function failOnErrors(errors: string[]): void {
+  if (errors.length > 0) throw new Error(`the page failed: ${errors.join("; ")}`);
 }
 
 main().catch((error: unknown) => {
