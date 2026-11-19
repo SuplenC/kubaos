@@ -6,6 +6,7 @@
 
 import { stack } from "../../lib/layout.ts";
 import { tabs } from "../../lib/tabs.ts";
+import { length } from "../../lib/tokens.ts";
 import { label } from "../../site/dom.ts";
 import { stageControls } from "../../site/parts/stage.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
@@ -53,11 +54,14 @@ function live(): HTMLElement {
   return holder;
 }
 
+/** A draft part's sample room in logical pixels, as `.share-sample` sizes it: a panel and a thumbnail, with room round them. */
+const sampleRoom = () => ({ width: length("size-panel") + 2 * length("space-s16"), height: length("size-thumbnail_height") + 2 * length("space-s16") });
+
 /** A window alone in a room of its own, as a library part's sample. */
 function windowAlone(shared: boolean, focused: boolean, app = DESK[1]!.app): HTMLElement {
   const room = document.createElement("span");
   room.className = "share-sample";
-  room.append(deskWindow({ app, title: app.titles[0]!, rect: { x: 16, y: 16, width: 392, height: 160 }, shared, focused }));
+  room.append(deskWindow({ app, title: app.titles[0]!, column: "1", row: "1", shared, focused }));
   return room;
 }
 
@@ -114,7 +118,7 @@ export default page<State>({
         { name: "Window, at rest", for: "draft: a desktop window, Hyprland's border", sample: () => windowAlone(false, false) },
         { name: "Window, shared", for: "draft: the violet border over it", sample: () => windowAlone(true, false) },
         { name: "Window, shared and focused", for: "draft: the tube in `sharing`", sample: () => windowAlone(true, true) },
-        { name: "Region mark", for: "draft: `stroke.thin` outside the region", sample: () => sampleOf(regionMark({ x: 16, y: 16, width: 240, height: 120 })) },
+        { name: "Region mark", for: "draft: `stroke.thin` outside the region", sample: () => sampleOf(regionMark({ x: 16, y: 16, width: 240, height: 120 }, sampleRoom())) },
         { name: "Screen mark", for: "draft: `stroke.thin` inside the screen's edge", sample: () => sampleOf(screenMark()) },
       ],
     },

@@ -70,16 +70,23 @@
 }
 
 /* A window on the desktop: draft part, proposed. */
+/* The screen's tiling: the room inside the frame, `space.s8` in from it and between the windows,
+   as Hyprland's gaps, split into equal tracks; it fills whatever size the screen is drawn at. */
 .share-desk {
   position: absolute;
-  inset: 0;
-  display: block;
+  inset: calc(var(--frame-top) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8));
+  display: grid;
+  grid-template-columns: repeat(var(--desk-columns, 1), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--desk-rows, 1), minmax(0, 1fr));
+  gap: var(--space-s8);
 }
 
 .share-window {
-  position: absolute;
+  position: relative;
   box-sizing: border-box;
   display: block;
+  min-width: 0;
+  min-height: 0;
   padding: var(--space-s16);
   border-radius: var(--corner);
   background: var(--color-surface);
@@ -167,7 +174,9 @@
 /* A draft part's sample: a desktop's corner the size of a panel and a thumbnail, with room round it. */
 .share-sample {
   position: relative;
-  display: block;
+  box-sizing: border-box;
+  display: grid;
+  padding: var(--space-s16);
   width: calc(var(--size-panel) + 2 * var(--space-s16));
   height: calc(var(--size-thumbnail_height) + 2 * var(--space-s16));
   border-radius: var(--radius-surface);

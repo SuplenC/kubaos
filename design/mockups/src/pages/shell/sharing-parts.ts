@@ -80,11 +80,16 @@ export interface Rect {
   readonly height: number;
 }
 
-/** A window where it lies on its screen. */
+/**
+ * A window where it is tiled on its screen: its grid lines in the screen's tiling, as Hyprland
+ * splits the room inside the frame, so it fills that room at any size of the screen with the same
+ * gaps ("1", or "1 / 3" to span two).
+ */
 export interface Placed {
   readonly app: AppWindows;
   readonly title: string;
-  readonly rect: Rect;
+  readonly column: string;
+  readonly row: string;
 }
 
 /**
@@ -112,9 +117,9 @@ export interface Monitor extends DeskScreen {
 
 /** DP-10's windows: VS Code on the left, Firefox and Discord stacked on the right. */
 export const DESK: readonly Placed[] = [
-  { app: VSCODE, title: VSCODE.titles[0]!, rect: { x: 16, y: 48, width: 780, height: 936 } },
-  { app: FIREFOX, title: FIREFOX.titles[0]!, rect: { x: 804, y: 48, width: 780, height: 464 } },
-  { app: DISCORD_APP, title: DISCORD_APP.titles[0]!, rect: { x: 804, y: 520, width: 780, height: 464 } },
+  { app: VSCODE, title: VSCODE.titles[0]!, column: "1", row: "1 / 3" },
+  { app: FIREFOX, title: FIREFOX.titles[0]!, column: "2", row: "1" },
+  { app: DISCORD_APP, title: DISCORD_APP.titles[0]!, column: "2", row: "2" },
 ];
 
 export const DP10: Monitor = { connector: "DP-10", model: "Dell U2723QE", width: SCREEN_WIDTH, height: 1000, x: 0, y: 0, density: 1.6, windows: DESK };
@@ -129,8 +134,8 @@ export const EDP1: Monitor = {
   y: 0,
   density: 2,
   windows: [
-    { app: SPOTIFY, title: SPOTIFY.titles[0]!, rect: { x: 16, y: 48, width: 700, height: 836 } },
-    { app: GHOSTTY, title: GHOSTTY.titles[0]!, rect: { x: 724, y: 48, width: 700, height: 836 } },
+    { app: SPOTIFY, title: SPOTIFY.titles[0]!, column: "1", row: "1" },
+    { app: GHOSTTY, title: GHOSTTY.titles[0]!, column: "2", row: "1" },
   ],
 };
 /** DP-10 on its third workspace: what the picker shows once the person switches to it. */
@@ -138,8 +143,8 @@ export const DP10_THIRD: Monitor = {
   ...DP10,
   workspace: 3,
   windows: [
-    { app: FIREFOX, title: FIREFOX.titles[1]!, rect: { x: 16, y: 48, width: 780, height: 936 } },
-    { app: STEAM, title: STEAM.titles[0]!, rect: { x: 804, y: 48, width: 780, height: 936 } },
+    { app: FIREFOX, title: FIREFOX.titles[1]!, column: "1", row: "1" },
+    { app: STEAM, title: STEAM.titles[0]!, column: "2", row: "1" },
   ],
 };
 /** The narrowest screen the bar is laid out for, an app's least window wide. */
@@ -151,7 +156,7 @@ export const NARROW: Monitor = {
   x: 0,
   y: 0,
   density: 1,
-  windows: [{ app: FIREFOX, title: FIREFOX.titles[0]!, rect: { x: 16, y: 48, width: 688, height: 416 } }],
+  windows: [{ app: FIREFOX, title: FIREFOX.titles[0]!, column: "1", row: "1" }],
 };
 
 export const MONITORS: readonly Monitor[] = [DP10, EDP1];
@@ -336,12 +341,41 @@ export const CAMERAS = {
 
 // Draft parts, proposed for the library: a window on the desktop, the on-air marks, the region's drawing.
 
-/** A box's place and size as the CSS draws it at the scale picked. */
-function place(element: HTMLElement, rect: Rect): void {
-  element.style.left = `calc(${rect.x} * var(--px))`;
-  element.style.top = `calc(${rect.y} * var(--px))`;
-  element.style.width = `calc(${rect.width} * var(--px))`;
-  element.style.height = `calc(${rect.height} * var(--px))`;
+/** The size a box's place is a share of: a screen's, in logical pixels. */
+export interface Room {
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * `rect`'s place and size as shares of `room`, so the box keeps its share of the screen however
+ * large the screen is drawn: on the stage, in Full screen, as the window resizes.
+ */
+function place(element: HTMLElement, rect: Rect, room: Room): void {
+  element.style.left = `${(rect.x / room.width) * 100}%`;
+  element.style.top = `${(rect.y / room.height) * 100}%`;
+  element.style.width = `${(rect.width / room.width) * 100}%`;
+  element.style.height = `${(rect.height / room.height) * 100}%`;
+}
+
+/**
+ * Makes `desk` the screen's tiling: a grid of `columns` by `rows` equal tracks in the room inside
+ * the frame, `space.s8` apart and in from it, as Hyprland's gaps; each window names its lines.
+ */
+export function tiling(desk: HTMLElement, columns: number, rows: number): HTMLElement {
+  desk.className = "share-desk";
+  desk.style.setProperty("--desk-columns", String(columns));
+  desk.style.setProperty("--desk-rows", String(rows));
+  return desk;
+}
+
+/** How many columns and rows `windows`' lines need. */
+function tracks(windows: readonly Placed[]): { readonly columns: number; readonly rows: number } {
+  const last = (line: string) => {
+    const [start, end] = line.split("/").map((each) => Number.parseInt(each.trim(), 10));
+    return end !== undefined && !Number.isNaN(end) ? end - 1 : (start ?? 1);
+  };
+  return { columns: Math.max(1, ...windows.map((each) => last(each.column))), rows: Math.max(1, ...windows.map((each) => last(each.row))) };
 }
 
 export interface DeskWindowOptions extends Placed {
@@ -362,7 +396,8 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
   const drawn = document.createElement("span");
   drawn.className = "share-window";
   drawn.style.setProperty("--corner", corner.css);
-  place(drawn, options.rect);
+  drawn.style.gridColumn = options.column;
+  drawn.style.gridRow = options.row;
   const tile = iconTile({ name: options.app.app, size: "Sm", ...(options.app.picture ? { picture: options.app.picture } : {}) });
   drawn.append(row("s8", "centre", tile, clamped(options.title, "body_strong", "on_surface")));
   const ring = focusRing(drawn, "surface", options.shared ? "sharing" : "accent", false);
@@ -378,10 +413,10 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
 }
 
 /** Draft part, proposed: a shared region's mark, a line of `sharing` the thin stroke wide just outside it. */
-export function regionMark(rect: Rect): HTMLElement {
+export function regionMark(rect: Rect, room: Room): HTMLElement {
   const mark = document.createElement("span");
   mark.className = "share-region";
-  place(mark, rect);
+  place(mark, rect, room);
   return mark;
 }
 
@@ -473,11 +508,10 @@ export function desktop(options: DesktopOptions = {}): HTMLElement {
         : shareOf({ kind: "region", screen: 0 }, [DP10])
     : undefined;
   const made = barScreen(SCREEN_WIDTH, TALL, { content: { ...EVERYDAY, ...(share ? { sharing: share } : {}), ...(options.camera ? { camera: { who: DISCORD.app } } : {}) } });
-  const desk = document.createElement("span");
-  desk.className = "share-desk";
+  const desk = tiling(document.createElement("span"), tracks(DESK).columns, tracks(DESK).rows);
   desk.append(...DESK.map((each, index) => deskWindow({ ...each, focused: index === (options.focused ?? 0), shared: shared?.kind === "window" && shared.index === index })));
   made.element.querySelector(".k-screen-dim")!.before(desk);
-  if (shared?.kind === "region") made.element.append(regionMark(shared.rect ?? REGION));
+  if (shared?.kind === "region") made.element.append(regionMark(shared.rect ?? REGION, DP10));
   if (shared?.kind === "screen") made.element.append(screenMark());
   return made.element;
 }
@@ -518,9 +552,9 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
   const show = () => {
     surface.toggleAttribute("data-drawn", rect !== undefined);
     if (!rect) return;
-    place(box, rect);
-    size.style.left = `calc(${rect.x} * var(--px))`;
-    size.style.top = `calc(${rect.y + rect.height} * var(--px) + var(--space-s8))`;
+    place(box, rect, { width, height });
+    size.style.left = `${(rect.x / width) * 100}%`;
+    size.style.top = `calc(${((rect.y + rect.height) / height) * 100}% + var(--space-s8))`;
     size.replaceChildren(chip({ label: regionSize(Math.round(rect.width * density), Math.round(rect.height * density)), icon: SHARE_ICONS.region }));
   };
   show();
@@ -689,8 +723,8 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
   });
   const element = made.element;
   element.classList.add("share-screen");
-  const desk = document.createElement("span");
-  desk.className = "share-desk";
+  const grid = tracks(monitor.windows);
+  const desk = tiling(document.createElement("span"), grid.columns, grid.rows);
   const handlers = options.handlers ?? {};
   const windows = monitor.windows.map((placed, at) => {
     const drawn = deskWindow({ ...placed, focused: false });
@@ -717,7 +751,7 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
       if (phase === "picking") window.append(pickLabel(monitor.windows[at]!.title));
     }
     mark(element, "data-lit-screen", here && built.kind === "screen");
-    if (here && built.kind === "region" && built.rect) element.append(regionMark(built.rect));
+    if (here && built.kind === "region" && built.rect) element.append(regionMark(built.rect, monitor));
   }
   if (phase === "shared") return { element, light: () => undefined, open: () => undefined, close: () => undefined };
 
