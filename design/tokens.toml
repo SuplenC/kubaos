@@ -911,9 +911,9 @@ carried = 0.5
 # circle of the corner a person throws a drag at (270 on a 1080 tall screen, 360 on 1440), not only
 # on the round, which the carried thing covers.
 drop_reach = 0.25
-# How near a carried workspace's middle comes to the middle of the room opened for it before it
-# snaps in, a share of the room's shorter side: a light magnet, so it follows the hand until it is
-# nearly there.
+# How near a carried workspace's middle comes to the middle of a place in the Overview's grid before
+# that place is proposed, a share of the place's shorter side: the room opens there and the
+# workspace snaps in, one event on this one threshold; elsewhere it follows the hand.
 snap = 0.55
 # How far three fingers travel to open the Overview all the way, a share of the screen's height: the
 # Overview arrives as far as the swipe has gone, and settles open past half of it when they lift.
