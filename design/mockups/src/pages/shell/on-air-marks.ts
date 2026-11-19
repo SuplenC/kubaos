@@ -111,7 +111,7 @@ export default page<State>({
   level: "shell",
   slug: "on-air-marks",
   title: "On-air marks",
-  lede: "What is shared, marked in violet for the person alone, never in the stream; a region's lit corners and grab band too.",
+  lede: "What is shared, marked in violet for the person alone, never in the stream; a region's corner twins and grab band too.",
   code: { unbuilt: "Not built: Hyprland, the shell" },
   stage: { live, hint: "pick what is shared; point at a window to focus it", daylight: true },
   variants: [

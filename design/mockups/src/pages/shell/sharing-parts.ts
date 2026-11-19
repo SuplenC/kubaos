@@ -1,6 +1,6 @@
 // What KubaOS shows while something is on air: picking what to share, when an app asks (the
 // system's share prompt), the bar's sharing and camera pills and the panels they open, and the
-// marks on what is shared, a region's grab band and lit corners with them, which only the person
+// marks on what is shared, a region's grab band and corner arcs with them, which only the person
 // sees, never the stream.
 //
 // Picking is on the live desktop, no dialog and no dim: while a request waits the desktop works as
@@ -415,7 +415,7 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
   return drawn;
 }
 
-/** What a region's mark shows as a sample: its corners lit, as with the pointer near its line, or a move or a resize under way. */
+/** What a region's mark shows as a sample: its corners' twins, as with the pointer near its line, or a move or a resize under way. */
 export type RegionShown = "near" | "moving" | "resizing";
 
 export interface RegionOptions {
@@ -464,14 +464,14 @@ function resized(began: Rect, grab: Grab, dx: number, dy: number, room: Room): R
  * resized live, and draws no handle: its line is a grab band reaching `space.s8` either side of it.
  * Each corner's stretch, the curve and `space.s32` of the line either side of it, resizes from that
  * corner, the opposite corner staying put; the rest of the band moves it. While the pointer is near
- * the line, each corner's stretch lights as a lit control's tube does, in the sharing tone (the
- * library's ring, `focusRing`, filled, so the lit line burns at `sharing_core`): every corner's
- * line at the core, the one under the pointer glowing fully and the others at
- * `focus.near_opacity`; a corner being dragged holds the pressed look, its glow swollen. While it moves the
+ * the line, each corner shows a twin: a second arc outside it, the same line, of the corner's own
+ * radius moved out along its diagonal, `space.s4` clear of the line, over three quarters of the
+ * turn with round ends; faint (`opacity.held`) at every corner, whole at the one under the pointer
+ * and at one being dragged. It is a plain line, the same by night and by day. While it moves the
  * drawing's size chip follows under it. It stays inside its own screen and never gets smaller than
  * `size.control_lg` each way. Only the band takes the pointer: inside, the desktop is as usual. The
- * band and the lit corners are the mark's own, which only the person sees, never the stream. Only a
- * drag changes it; the pointer near it lights the corners by the stylesheet alone.
+ * band and the twins are the mark's own, which only the person sees, never the stream. Only a drag
+ * changes it; the pointer near it shows the twins by the stylesheet alone.
  */
 export function regionMark(start: Rect, room: Room, options: RegionOptions = {}): HTMLElement {
   const density = options.density ?? 1;
@@ -483,7 +483,7 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
   const size = document.createElement("span");
   size.className = "share-region-size";
   const showSize = () => size.replaceChildren(chip({ label: regionSize(Math.round(rect.width * density), Math.round(rect.height * density)), icon: SHARE_ICONS.region }));
-  const lights = new Map<string, HTMLElement>();
+  const twins = new Map<string, HTMLElement>();
   /** Follows the pointer from `event` until it lets go: `change` gives the box for how far it has gone, in the screen's logical pixels. */
   const drag = (event: PointerEvent, doing: "moving" | "resizing", change: (began: Rect, dx: number, dy: number) => Rect, corner?: string) => {
     if (event.button !== 0) return;
@@ -497,8 +497,8 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
     const began = rect;
     grabbed.setPointerCapture(event.pointerId);
     mark.dataset.dragging = doing;
-    const held = corner ? lights.get(corner) : undefined;
-    if (held) held.dataset.pinned = "pressed";
+    const held = corner ? twins.get(corner) : undefined;
+    if (held) held.dataset.held = "";
     showSize();
     const follow = (moving: PointerEvent) => {
       rect = change(began, (moving.clientX - event.clientX) * across, (moving.clientY - event.clientY) * down);
@@ -508,7 +508,7 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
     const end = () => {
       grabbed.removeEventListener("pointermove", follow);
       delete mark.dataset.dragging;
-      if (held) delete held.dataset.pinned;
+      if (held) delete held.dataset.held;
     };
     grabbed.addEventListener("pointermove", follow);
     grabbed.addEventListener("pointerup", end, { once: true });
@@ -522,33 +522,23 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
     mark.append(band);
   }
   for (const [name, grab] of Object.entries(CORNERS)) {
-    // The corner's light: a control of its own holding the library's ring in the sharing tone,
-    // its tube laid on the line, shown only at the corner's stretch; it takes no pointer.
-    const corner = document.createElement("span");
-    corner.className = "share-region-corner";
-    corner.dataset.corner = name;
-    const light = document.createElement("span");
-    light.className = "share-region-light k-control";
-    // Lit, its line burns at the tone's core, as a filled control's edge does, so the line itself
-    // brightens; pressed, its glow swells as any control's does.
-    light.style.setProperty("--edge", "var(--color-sharing_core)");
-    light.style.setProperty("--edge-off", "var(--color-sharing_glass)");
-    const ring = focusRing(light, "surface", "sharing", true);
-    ring.style.setProperty("--corner", "calc(var(--region-corner) + var(--region-line))");
-    corner.append(light);
-    lights.set(name, light);
+    // The corner's twin: a second arc outside it, drawn by the stylesheet; it takes no pointer.
+    const twin = document.createElement("span");
+    twin.className = "share-region-twin";
+    twin.dataset.corner = name;
+    twins.set(name, twin);
     // Its grip: the band along the corner's stretch, which resizes from that corner.
     const grip = document.createElement("span");
     grip.className = "share-region-grip";
     grip.dataset.corner = name;
     grip.addEventListener("pointerdown", (event) => drag(event, "resizing", (began, dx, dy) => resized(began, grab, dx, dy, room), name));
-    mark.append(corner, grip);
+    mark.append(twin, grip);
   }
   mark.append(size);
   if (options.shown === "near") mark.dataset.near = "se";
   else if (options.shown) {
     mark.dataset.dragging = options.shown;
-    if (options.shown === "resizing") lights.get("se")!.dataset.pinned = "pressed";
+    if (options.shown === "resizing") twins.get("se")!.dataset.held = "";
     showSize();
   }
   return mark;
@@ -805,7 +795,7 @@ export interface PickingOptions {
   readonly pill?: boolean;
   /** The asking app's hint drawn up, as under the pointer: a sample of it. */
   readonly hint?: "app";
-  /** A shared region's corners lit, or a move or a resize under way: a sample of it. */
+  /** A shared region's corners' twins shown, or a move or a resize under way: a sample of it. */
   readonly regionShown?: RegionShown;
   /** A bar's button pointed at, on every screen's bar: a sample of it. */
   readonly barPointed?: "region" | "cancel";

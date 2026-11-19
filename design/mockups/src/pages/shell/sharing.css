@@ -97,7 +97,7 @@
 .share-region {
   --region-line: max(1px, round(nearest, var(--stroke-thin), 1px));
   --region-band: var(--space-s8);
-  /* How far from the region's corner each corner's stretch runs along the line. */
+  /* How far from the region's corner each corner's grip runs along the line. */
   --region-stretch: var(--space-s32);
   position: absolute;
   display: block;
@@ -181,60 +181,71 @@
   cursor: nesw-resize;
 }
 
-/* A corner's light: the library's ring (`focusRing`, in the sharing tone) on a control as large as
-   the region and its line, its tube laid on the line at the line's outer corner, so lit it is the
-   line brightening and glowing as a lit control's tube does, and pressed it runs white-hot. The
-   corner holds it with room for its glow and shows only the corner's stretch of it, fading out
-   along the line. It takes no pointer. */
-.share-region-corner {
-  --corner-glow-room: round(up, calc(var(--focus-far) - 0.001px), 1px);
+/* A corner's twin: a second arc outside the corner, the region's own line (`sharing_line`, the
+   thin stroke), of the corner's own radius, its centre moved out along the corner's diagonal so its
+   middle stands `space.s4` clear of the line's; three quarters of the quarter turn, centred on the
+   diagonal, with round ends. Drawn as a ring as large as the corner's circle, masked to the arc and
+   its two end caps; set for the top left corner and turned for the others. The trigonometry is
+   the arc's own: its centre moved by the gap over the diagonal (cos 45°), its ends 33.75° either
+   side of it. It takes no pointer. */
+.share-region-twin {
+  --twin-radius: calc(var(--region-corner) + var(--region-line) / 2);
+  --twin-size: calc(2 * (var(--region-corner) + var(--region-line)));
+  --twin-shift: calc((var(--space-s4) + var(--region-line)) * 0.7071);
+  --twin-mid: calc(var(--twin-size) / 2);
+  --twin-cap: calc(var(--region-line) / 2);
   position: absolute;
-  inset: calc(-1 * (var(--region-line) + var(--corner-glow-room)));
+  box-sizing: border-box;
   display: block;
+  width: var(--twin-size);
+  height: var(--twin-size);
+  border: var(--region-line) solid var(--color-sharing_line);
+  border-radius: var(--radius-full);
+  mask-image:
+    conic-gradient(from 281.25deg, var(--color-scrim) 0 67.5deg, transparent 0),
+    radial-gradient(circle at calc(var(--twin-mid) - 0.9808 * var(--twin-radius)) calc(var(--twin-mid) - 0.1951 * var(--twin-radius)), var(--color-scrim) var(--twin-cap), transparent calc(var(--twin-cap) + 1px)),
+    radial-gradient(circle at calc(var(--twin-mid) - 0.1951 * var(--twin-radius)) calc(var(--twin-mid) - 0.9808 * var(--twin-radius)), var(--color-scrim) var(--twin-cap), transparent calc(var(--twin-cap) + 1px));
+  opacity: 0;
   pointer-events: none;
-  --stretch-end: calc(var(--corner-glow-room) + var(--region-line) + var(--region-stretch));
-  mask-image: radial-gradient(circle at var(--at), var(--color-scrim) var(--stretch-end), transparent calc(var(--stretch-end) + var(--region-band)));
+  transition: opacity var(--motion-short) var(--easing-standard);
 }
 
-.share-region-corner[data-corner="nw"] {
-  --at: left top;
+.share-region-twin[data-corner="nw"] {
+  top: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  left: calc(-1 * (var(--region-line) + var(--twin-shift)));
 }
 
-.share-region-corner[data-corner="ne"] {
-  --at: right top;
+.share-region-twin[data-corner="ne"] {
+  top: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  right: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  transform: scaleX(-1);
 }
 
-.share-region-corner[data-corner="se"] {
-  --at: right bottom;
+.share-region-twin[data-corner="se"] {
+  right: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  bottom: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  transform: scale(-1);
 }
 
-.share-region-corner[data-corner="sw"] {
-  --at: left bottom;
-}
-
-.share-region-light {
-  position: absolute;
-  inset: var(--corner-glow-room);
-  display: block;
-}
-
-.share-region-light > .k-ring {
-  --line: var(--region-line);
+.share-region-twin[data-corner="sw"] {
+  bottom: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  left: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  transform: scaleY(-1);
 }
 
 /* Near the line (on its band or a grip, a drag under way, or `data-near` for a sample): every
-   corner's line lit at the core, its glow at `focus.near_opacity`; the one under the pointer
-   (`data-near`'s corner) glows fully. */
-.share-region:is([data-near], [data-dragging], :has(> .share-region-band:hover, > .share-region-grip:hover)) .share-region-light:not([data-pinned]) {
-  --lit: var(--focus-near_opacity);
-  --line-shown: 1;
+   corner's twin faint, at `opacity.held`; the one under the pointer (`data-near`'s corner), and
+   one being dragged, whole. */
+.share-region:is([data-near], [data-dragging], :has(> .share-region-band:hover, > .share-region-grip:hover)) > .share-region-twin {
+  opacity: var(--opacity-held);
 }
 
-.share-region:is([data-near="nw"], :has(> .share-region-grip[data-corner="nw"]:hover)) > [data-corner="nw"] > .share-region-light,
-.share-region:is([data-near="ne"], :has(> .share-region-grip[data-corner="ne"]:hover)) > [data-corner="ne"] > .share-region-light,
-.share-region:is([data-near="se"], :has(> .share-region-grip[data-corner="se"]:hover)) > [data-corner="se"] > .share-region-light,
-.share-region:is([data-near="sw"], :has(> .share-region-grip[data-corner="sw"]:hover)) > [data-corner="sw"] > .share-region-light {
-  --lit: 1;
+.share-region:is([data-near="nw"], :has(> .share-region-grip[data-corner="nw"]:hover)) > .share-region-twin[data-corner="nw"],
+.share-region:is([data-near="ne"], :has(> .share-region-grip[data-corner="ne"]:hover)) > .share-region-twin[data-corner="ne"],
+.share-region:is([data-near="se"], :has(> .share-region-grip[data-corner="se"]:hover)) > .share-region-twin[data-corner="se"],
+.share-region:is([data-near="sw"], :has(> .share-region-grip[data-corner="sw"]:hover)) > .share-region-twin[data-corner="sw"],
+.share-region > .share-region-twin[data-held] {
+  opacity: 1;
 }
 
 /* Its size while it moves or resizes: the drawing's chip, `space.s8` under its line from its start,
