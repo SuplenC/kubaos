@@ -28,15 +28,16 @@
   --panel-dim: 0;
 }
 
-/* The picking bar: a Popover `space.s16` in from the frame's bottom left inner corner, as wide as
-   its row, never wider than the screen less that room on both sides; who asks gives way first. */
+/* The picking bar, on its Sheet in the middle of the frame's bottom edge: as wide as its row, never
+   wider than the screen less the frame and the Sheet's fillets on both sides; who asks gives way first. */
 .share-pick-bar {
-  position: absolute;
+  box-sizing: border-box;
+  max-width: calc(var(--screen-width) - 2 * (var(--frame-side) + var(--radius-surface)));
+}
+
+/* Drawing a region, the frame and the bar's Sheet stay over the drawing's dim, Region held pressed. */
+.k-screen[data-picking][data-drawing] > :is(.k-screen-glass, .k-screen-over) {
   z-index: 4;
-  left: calc(var(--frame-side) + var(--space-s16));
-  bottom: calc(var(--frame-side) + var(--space-s16));
-  --popover-width: max-content;
-  max-width: calc(100% - 2 * (var(--frame-side) + var(--space-s16)));
 }
 
 .share-pick-bar .k-row {

@@ -1,6 +1,7 @@
 // Picking what to share: the system's share prompt, which an app's request to share opens in place
-// of the portal's own. No dialog: every screen dims a little and holds a bar at its bottom left
-// (who asks, Share this screen, Region, Cancel), a window is picked by pointing at it, and a region
+// of the portal's own. No dialog: every screen dims a little and its frame grows a bar out of the
+// middle of its bottom edge (who asks, Share this screen, Region, Cancel), on the Sheet the shell's
+// attached surfaces use, a window is picked by pointing at it, and a region
 // is drawn after Region or by a right-button drag anywhere. What lights while picking is the mark
 // it keeps on air. Its parts are `sharing-parts.ts`'.
 
@@ -98,7 +99,15 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
     if (!ALL) playShared(shown);
   };
 
-  const cancel = () => settled(picking({ monitors, phase: "shared" }));
+  // Cancelled, each bar sinks back into its edge and the dim lifts, as the Sheet leaves, before the desktop is left as it was.
+  const cancel = () => {
+    const leaving = picker;
+    if (!leaving || ALL) return settled(picking({ monitors, phase: "shared" }));
+    leaving.close();
+    window.setTimeout(() => {
+      if (picker === leaving) settled(picking({ monitors, phase: "shared" }));
+    }, milliseconds("medium"));
+  };
 
   const keys = (event: KeyboardEvent) => {
     const screenAt = lit.kind === "none" ? 0 : lit.screen;
@@ -120,7 +129,7 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
   function ask(): void {
     lit = NOTHING;
     at = -1;
-    picker = buildPicking({ monitors, handlers: { onLight: light, onShare: share, onCancel: cancel } });
+    picker = buildPicking({ monitors, arrive: !ALL, handlers: { onLight: light, onShare: share, onCancel: cancel } });
     picker.light(lit);
     picker.element.tabIndex = 0;
     picker.element.addEventListener("keydown", keys);
@@ -129,6 +138,9 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
     picker.element.addEventListener("pointerenter", focus);
     holder.replaceChildren(picker.element);
     focus();
+    // Built shut, it arrives on the next frame: the dim comes in and each bar's Sheet opens.
+    const arriving = picker;
+    if (!ALL) requestAnimationFrame(() => arriving.open());
   }
   ask();
   return holder;
@@ -143,11 +155,16 @@ const live = () => livePicking([DP10]);
 const DIM = "the dim";
 const BARS = "the bars";
 
+/** The bars' Sheets: their depth, as every attached surface moves; under reduced motion, a fade. */
+const SHEETS = ".k-sheet-part";
+
 function asking(reduced: boolean): NonEmpty<Track<Easing>> {
   const duration = reduced ? "short" : "long";
   return [
     { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 0, to: 1, duration, curve: "emphasized_decel" },
-    { part: BARS, on: "every screen", target: ".share-pick-bar", property: "opacity", from: 0, to: 1, duration, curve: "emphasized_decel" },
+    reduced
+      ? { part: BARS, on: "every screen", target: SHEETS, property: "opacity", from: 0, to: 1, duration, curve: "emphasized_decel" }
+      : { part: BARS, on: "every screen", target: SHEETS, property: "--reveal", from: 0, to: 1, duration, curve: "emphasized_decel" },
   ];
 }
 
@@ -155,24 +172,26 @@ function cancelling(reduced: boolean): NonEmpty<Track<Easing>> {
   const duration = reduced ? "short" : "medium";
   return [
     { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 1, to: 0, duration, curve: "emphasized_accel" },
-    { part: BARS, on: "every screen", target: ".share-pick-bar", property: "opacity", from: 1, to: 0, duration, curve: "emphasized_accel" },
+    reduced
+      ? { part: BARS, on: "every screen", target: SHEETS, property: "opacity", from: 1, to: 0, duration, curve: "emphasized_accel" }
+      : { part: BARS, on: "every screen", target: SHEETS, property: "--reveal", from: 1, to: 0, duration, curve: "emphasized_accel" },
   ];
 }
 
-/** Picking giving way to the share: the label, the bars and the dim go, the mark stays, the pill arrives. */
+/** Picking giving way to the share: the label fades, the bars sink into their edges, the dim lifts, the mark stays, the pill arrives. */
 function onAir(power: Strike | Easing, reduced: boolean): NonEmpty<Track> {
   const pill = ".shell-on-air";
   if (reduced) {
     return [
       { part: "the label", on: "the window", target: ".share-pick-label", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-      { part: BARS, on: "every screen", target: ".share-pick-bar", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+      { part: BARS, on: "every screen", target: SHEETS, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
       { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
       { part: "the pill", on: "every bar", target: pill, property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     ];
   }
   return [
     { part: "the label", on: "the window", target: ".share-pick-label", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
-    { part: BARS, on: "every screen", target: ".share-pick-bar", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+    { part: BARS, on: "every screen", target: SHEETS, property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the pill's power", on: "every bar", target: pill, property: "opacity", from: 0, to: 1, duration: "medium", cue: "medium", curve: power },
     { part: "the pill's beat lit", on: "every bar", target: pill, property: "--lit", from: 0, to: 1, duration: "short", cue: ["medium", "medium"], curve: "standard" },
@@ -187,7 +206,7 @@ function aboutToShare(): HTMLElement {
 
 const SHARED: Move = {
   name: "Picked, then on air",
-  what: "A click: the label, bars and dim go; the violet edge stays; the pill strikes on and burns a beat.",
+  what: "A click: the label fades, the bars sink, the dim lifts; the violet edge stays; the pill strikes on.",
   tracks: onAir("neon.strike", false),
   reduced: onAir("standard", true) as NonEmpty<Track<Easing>>,
   unflickered: onAir("standard", false) as NonEmpty<Track<Easing>>,
@@ -205,7 +224,7 @@ export default page<Shown>({
   title: "Share picker",
   lede: "Picking what to share on the desktop itself: each screen's bar, a window pointed at, a region drawn.",
   code: { qml: "SharePicker", unbuilt: "Not built yet" },
-  from: ["popover", "button", "icon-button", "tooltip", "keycap", "banner", "chip"],
+  from: ["button", "icon-button", "tooltip", "keycap", "banner", "chip"],
   stage: { live, hint: "point and click; S, R, Tab, Enter, Esc; right-drag", daylight: true },
   variants: [
     { name: "Picking, at rest", for: "both screens dimmed, a bar on each", sample: screen(() => both()) },
@@ -238,7 +257,7 @@ export default page<Shown>({
       { name: "This screen", cell: (state: Shown) => one(state === "lit" ? { lit: { kind: "screen", screen: 0 } } : {}) },
     ],
     looks: {
-      rest: "dimmed a little, the bar at the bottom left",
+      rest: "dimmed a little, the bar out of the bottom edge",
       lit: "out of the dim, wearing the mark it keeps on air",
     },
   },
@@ -260,9 +279,9 @@ export default page<Shown>({
     ],
   },
   motion: {
-    arrives: [{ name: "Asked", what: "An app asks: every screen dims a little and each bar fades in.", tracks: asking(false), reduced: asking(true), back: "cuts", sample: screen(() => both()) }],
+    arrives: [{ name: "Asked", what: "An app asks: every screen dims a little and each bar rises out of its bottom edge.", tracks: asking(false), reduced: asking(true), back: "cuts", sample: screen(() => both()) }],
     leaves: [
-      { name: "Cancelled", what: "Esc or ×: the bars and the dim fade off every screen.", tracks: cancelling(false), reduced: cancelling(true), back: "cuts", sample: screen(() => both()) },
+      { name: "Cancelled", what: "Esc or ×: each bar sinks back into its edge and the dim lifts.", tracks: cancelling(false), reduced: cancelling(true), back: "cuts", sample: screen(() => both()) },
       SHARED,
     ],
     between: [
@@ -305,8 +324,8 @@ export default page<Shown>({
       { name: "The bar alone", for: "its row and its tip", sample: () => pickBar(MEET, { tip: true }) },
     ]),
     measures: [
-      { part: "Bar from the frame", token: "space-s16" },
-      { part: "Bar's padding", token: "space-s12" },
+      { part: "Bar's padding, on its Sheet", token: "space-s16" },
+      { part: "Sheet's fillets into the edge", token: "radius-surface" },
       { part: "Between the bar's parts", token: "space-s8" },
       { part: "Buttons", token: "size-control_sm" },
       { part: "Label's width", token: "size-menu" },
@@ -314,6 +333,6 @@ export default page<Shown>({
       { part: "A window's edge", token: "stroke-thin" },
       { part: "A screen's edge", token: "stroke-thin" },
     ],
-    reflow: { note: "The bar keeps to the bottom left; on a narrow screen who asks is cut first.", sample: screen(() => picking({ monitors: [NARROW], asker: LONG_ASKER })) },
+    reflow: { note: "The bar keeps to the middle of the bottom edge; on a narrow screen who asks is cut first.", sample: screen(() => picking({ monitors: [NARROW], asker: LONG_ASKER })) },
   },
 });

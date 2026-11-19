@@ -26,7 +26,7 @@ import { focusRing, windowRing } from "../../lib/focus.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { keycap } from "../../lib/keycap.ts";
-import { filling, row, stack } from "../../lib/layout.ts";
+import { filling, inset, row, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
 import { media } from "../../lib/media.ts";
 import { panelPage } from "../../lib/panel-page.ts";
@@ -34,11 +34,11 @@ import { nested, role } from "../../lib/radius.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { centreOnInk, clamped, text } from "../../lib/text.ts";
-import { floatingTooltip, keyTooltip, popover, tooltip } from "../../lib/tooltip.ts";
+import { floatingTooltip, keyTooltip, tooltip } from "../../lib/tooltip.ts";
 import { mutePill } from "./bar-audio-parts.ts";
 import { barScreen, bellPill, type CameraUse, cameraPill, EVERYDAY, type Share, SHARE_ICONS, type ShareKind, sharingPill, statusPill, wallpaper } from "./bar-parts.ts";
 import { CORNER, TALL } from "./control-center-parts.ts";
-import { SCREEN_WIDTH } from "./screen-parts.ts";
+import { live as liven, SCREEN_WIDTH } from "./screen-parts.ts";
 import type { Group } from "./workspaces.ts";
 
 // The stand-ins.
@@ -588,6 +588,8 @@ export interface PickingOptions {
   readonly lit?: Lit;
   /** Picking, or shared: the dim and the bars gone, the mark kept, the pill in every bar. */
   readonly phase?: "picking" | "shared";
+  /** Built with its dim off and its bars' Sheets shut, for `open` to bring them in: picking arriving live. */
+  readonly arrive?: boolean;
   /**
    * Picked: the pill in the bars while picking's dim and bars are still there, and what was picked
    * wearing its mark, nothing else lit: the moment picking gives way to the share.
@@ -599,8 +601,9 @@ export interface PickingOptions {
 }
 
 /**
- * The bar on one screen: who asks, Share this screen, Region and Cancel on a Popover, each button
- * saying its key in its Tooltip, and the right-button tip under them where it is shown.
+ * The bar on one screen, which hangs on a Sheet in the middle of the frame's bottom edge: who asks,
+ * Share this screen, Region and Cancel, each button saying its key in its Tooltip, and the
+ * right-button tip under them where it is shown.
  */
 export function pickBar(asker: Asker, options: { lit?: "screen" | "region"; tip?: boolean; onScreen?: () => void; onPoint?: (on: boolean) => void; onRegion?: () => void; onCancel?: () => void } = {}): HTMLElement {
   const who = clamped(WORDS.title(asker.site ?? asker.app), "body_strong", "on_surface");
@@ -626,7 +629,8 @@ export function pickBar(asker: Asker, options: { lit?: "screen" | "region"; tip?
     floatingTooltip(region, keyTooltip(WORDS.region, PICK_KEYS.region), { side: "above" }),
     floatingTooltip(cancel, keyTooltip(WORDS.cancel, "Esc"), { side: "above" }),
   );
-  const bar = popover(2, options.tip ? stack("s8", "start", line, tipLine(WORDS.rightDrag)) : line);
+  // What hangs on the bottom edge's Sheet: `space.s16` inside on every side, as the OSD's strip.
+  const bar = inset(options.tip ? stack("s8", "start", line, tipLine(WORDS.rightDrag)) : line, "s16", "s16");
   bar.classList.add("share-pick-bar");
   return bar;
 }
@@ -654,6 +658,10 @@ export interface Picking {
    * change, and draws a region's surface only while one is being drawn. It builds nothing else.
    */
   readonly light: (lit: Lit) => void;
+  /** Brings the dim in and opens each bar's Sheet, by the Sheet's own move. */
+  readonly open: () => void;
+  /** Lifts the dim and shuts each bar's Sheet, the same move played back. */
+  readonly close: () => void;
 }
 
 /** Sets or removes `name` on `element`, only where that changes it. */
@@ -711,10 +719,10 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     mark(element, "data-lit-screen", here && built.kind === "screen");
     if (here && built.kind === "region" && built.rect) element.append(regionMark(built.rect));
   }
-  if (phase === "shared") return { element, light: () => undefined };
+  if (phase === "shared") return { element, light: () => undefined, open: () => undefined, close: () => undefined };
 
   element.dataset.picking = "";
-  element.dataset.open = "";
+  if (!options.arrive) element.dataset.open = "";
   let shown: Lit = NOTHING;
   const bar = pickBar(asker, {
     ...(options.tip === false ? {} : { tip: true }),
@@ -727,7 +735,10 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     onRegion: () => handlers.onLight?.({ kind: "region", screen: index }),
     onCancel: () => handlers.onCancel?.(),
   });
-  element.append(bar);
+  // The bar is part of the frame: its Sheet hangs in the middle of the bottom edge, on this screen's own frame.
+  const barSheet = sheet({ content: bar, edge: "bottom" });
+  hang(made, barSheet);
+  const shut = options.arrive ? liven(barSheet, false) : undefined;
   const screenButton = bar.querySelector<HTMLElement>(".share-pick-screen")!;
   const regionButton = bar.querySelector<HTMLElement>(".share-pick-region")!;
   if (!picked) {
@@ -778,7 +789,18 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     });
     element.append(surface);
   };
-  return { element, light };
+  return {
+    element,
+    light,
+    open: () => {
+      mark(element, "data-open", true);
+      shut?.(true);
+    },
+    close: () => {
+      mark(element, "data-open", false);
+      shut?.(false);
+    },
+  };
 }
 
 /** Every screen side by side, top-aligned as Hyprland lays them out, built once for picking, or shared. */
@@ -788,7 +810,12 @@ export function buildPicking(options: PickingOptions = {}): Picking {
   laid.className = "share-screens";
   const screens = monitors.map((monitor, index) => pickingScreen(monitor, index, { ...options, monitors }));
   laid.append(...screens.map((each) => each.element));
-  return { element: laid, light: (lit) => screens.forEach((each) => each.light(lit)) };
+  return {
+    element: laid,
+    light: (lit) => screens.forEach((each) => each.light(lit)),
+    open: () => screens.forEach((each) => each.open()),
+    close: () => screens.forEach((each) => each.close()),
+  };
 }
 
 /** Picking, or shared, drawn still with `options.lit` lit: a sample. */
