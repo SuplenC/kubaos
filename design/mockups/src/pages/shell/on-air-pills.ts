@@ -43,7 +43,9 @@ const onTheBar = (sharing: Share | readonly Share[] = SHARES.screen, camera: Cam
  */
 function live(): HTMLElement {
   const holder = document.createElement("span");
-  holder.style.display = "contents";
+  // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
+  // with none (`contents`) reads as reaching from the page's edge.
+  holder.style.display = "inline-block";
   let shares: readonly Share[] = TWO_SHARES;
   let open: "sharing" | "camera" | null = "sharing";
   const draw = () => {

@@ -13,7 +13,9 @@ const windowShared = (focused = 0, index = 1) => desktop({ shared: { kind: "wind
 /** The stage: a click on a window gives it the keyboard; the shared one's tube burns violet. */
 function live(): HTMLElement {
   const holder = document.createElement("span");
-  holder.style.display = "contents";
+  // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
+  // with none (`contents`) reads as reaching from the page's edge.
+  holder.style.display = "inline-block";
   const draw = (focused: number) => {
     const made = windowShared(focused);
     made.querySelectorAll<HTMLElement>(".share-window").forEach((each, index) => each.addEventListener("click", () => draw(index)));

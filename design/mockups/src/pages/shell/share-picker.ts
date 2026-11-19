@@ -55,7 +55,9 @@ function playShared(root: HTMLElement): void {
  */
 function live(): HTMLElement {
   const holder = document.createElement("span");
-  holder.style.display = "contents";
+  // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
+  // with none (`contents`) reads as reaching from the page's edge.
+  holder.style.display = "inline-block";
   let lit: Lit = NOTHING;
   let at = -1;
 
