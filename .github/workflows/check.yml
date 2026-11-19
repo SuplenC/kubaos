@@ -8,7 +8,8 @@
 # The checks run as parallel jobs, each on its own runner, one step per recipe
 # so a failure names what failed:
 # - changes: which of the gated jobs below a pull request needs, from the
-#   files it changes since its merge base with main. A push to main needs all.
+#   files it changes since its merge base with main. A push to main needs
+#   none: its pull request ran them.
 # - flake: `nix flake check --no-build`.
 # - fmt and lint: `just fmt-check`, `just lint`.
 # - nextest and nextest (slow): `just nextest`, split in two by `SLOW_TEST`.
@@ -16,6 +17,8 @@
 # - design: `just shots-test`, `just design-check-ui` (the lint, contrast,
 #   the specimen's geometry and QML's parity).
 # - mockups, gated: `just mockups-checked`, when the mockups' inputs change.
+#   Not on a push to main. It reads the design job's caches and saves none
+#   of its own, so the push to main still saves every cache.
 # - apps verify, gated: `just apps-verify` on the apps a pull request changes
 #   (their folders, or their vendor repositories' pins), against the vendors'
 #   servers; every app when the check itself changes. Not on a push to main.
@@ -97,7 +100,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           if [[ $EVENT != pull_request ]]; then
-            printf '%s\n' mockups=true apps=false apps-all=false >>"$GITHUB_OUTPUT"
+            printf '%s\n' mockups=false apps=false apps-all=false >>"$GITHUB_OUTPUT"
             exit 0
           fi
           changed="$(git diff --name-only "origin/$BASE...HEAD")"
@@ -325,7 +328,14 @@ jobs:
 
       - name: Not needed
         if: env.NEEDED != 'true'
-        run: echo "No input of the mockups' check changed."
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [[ $EVENT == push ]]; then
+            echo "A push to main: its pull request checked the mockups."
+          else
+            echo "No input of the mockups' check changed."
+          fi
 
   apps-verify:
     name: apps verify
