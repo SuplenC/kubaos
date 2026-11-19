@@ -43,7 +43,7 @@ function layer(src: string, cls: string): HTMLImageElement {
  * @2× pictures' 1× size, halved and rounded down as `sign-base.png` is; `--splash-scale` on an
  * ancestor turns those into the sample's logical pixels.
  */
-export function neonRoom(lit = GROUPS.length, ...under: Element[]): HTMLElement {
+export function neonRoom(lit: number = GROUPS.length, ...under: Element[]): HTMLElement {
   const room = document.createElement("span");
   room.className = "neon-room";
   const sign = document.createElement("span");
