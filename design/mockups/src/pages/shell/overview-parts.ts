@@ -217,7 +217,6 @@ interface Layout {
 function arrange(width: number, height: number, specs: readonly SectionSpec[]): Layout {
   const margin = L("space-s48");
   const gap = L("space-s24");
-  const tag = L("space-s8") + L("size-control_sm");
   const apart = L("space-s32");
   const label = L("size-chip") + L("space-s8");
   const aspect = height / width;
@@ -238,9 +237,9 @@ function arrange(width: number, height: number, specs: readonly SectionSpec[]): 
       return { tile, rows, cols: Math.ceil(counts[i]! / rows) };
     });
   const tall = (plans: readonly Plan[]): number =>
-    plans.reduce((sum, each, i) => sum + (specs[i]!.waiting ? label : 0) + each.rows * (each.tile * aspect + tag) + (each.rows - 1) * gap, 0) + (plans.length - 1) * apart;
+    plans.reduce((sum, each, i) => sum + (specs[i]!.waiting ? label : 0) + each.rows * each.tile * aspect + (each.rows - 1) * gap, 0) + (plans.length - 1) * apart;
 
-  const cap = Math.min((roomW - 2 * gap) / 3, ((roomH - 2 * gap) / 3 - tag) / aspect);
+  const cap = Math.min((roomW - 2 * gap) / 3, (roomH - 2 * gap) / 3 / aspect);
   let low = 1;
   let high = Math.max(low, cap);
   if (tall(plan(high)) > roomH) {
@@ -276,7 +275,7 @@ function arrange(width: number, height: number, specs: readonly SectionSpec[]): 
         places.push({ x: device(x0 + k * (tw + gap)), y: device(y), w: tw, h: th, s: tw / width });
         rows.push(row);
       }
-      y += th + tag + gap;
+      y += th + gap;
     }
     y += apart - gap;
     spec.items.forEach((id, k) => {
@@ -307,13 +306,16 @@ function span(name: string, ...children: (Node | string)[]): HTMLElement {
   return element;
 }
 
-/** A workspace's elements: its box, the desktop scaled inside it, and its number under it. */
+/** A workspace's elements: its box, and the desktop scaled inside it. */
 interface SpaceEl {
   readonly root: HTMLElement;
   readonly desk: HTMLElement;
-  readonly tag: HTMLElement;
+}
+
+/** A place's number: the badge in its top left corner, and whether it marks the shown workspace. */
+interface PlaceTag {
+  readonly root: HTMLElement;
   readonly number: HTMLElement;
-  /** Its number as it rolls when the workspaces before it change, and whether it is the shown one's. */
   rolling: Rolling | null;
   shown: boolean;
 }
@@ -500,6 +502,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   const labelEls = new Map<string, HTMLElement>();
   /** Each window's tile on its workspace's desktop, in the screen's logical pixels. */
   const tiles = new Map<string, model.Rect>();
+  const placeTags = new Map<string, PlaceTag>();
+  // The places' numbers, over every miniature and over a workspace carried into a place, under a
+  // carried window (`overview.css`).
+  const numbers = span("ov-numbers");
+  lift.append(numbers);
 
   // ── The screens ──
 
@@ -615,11 +622,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     picture.alt = "";
     picture.draggable = false;
     desktop.append(picture);
-    const number = span("ov-ws-number");
-    const tag = span("ov-ws-tag", number);
-    const element = span("ov-ws", desktop, tag);
+    const element = span("ov-ws", desktop);
     element.dataset.space = id;
-    made = { root: element, desk: desktop, tag, number, rolling: null, shown: false };
+    made = { root: element, desk: desktop };
     spaceEls.set(id, made);
     return made;
   }
@@ -643,20 +648,75 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * Its number as the bar draws it: rolled to its new value as the workspaces before it change, as a
-   * gap closing moves every later one down; drawn afresh when it becomes or stops being the shown one.
+   * A place's number, by its group and its order there: the badge stays with the place, so as
+   * workspaces move between places during a carry the numbers stand still and the workspaces move
+   * under them; the room left open keeps its number, and a carried workspace shows none.
    */
-  function dressTag(id: string, made: SpaceEl, screen: model.Screen): void {
-    const shown = desk.shown.get(screen.id) === id;
-    const value = model.numberOf(desk, id);
-    if (made.rolling && made.shown === shown) {
-      made.rolling.set(value);
-      return;
+  function tagOf(group: string, index: number): PlaceTag {
+    const key = `${group}#${index}`;
+    let made = placeTags.get(key);
+    if (made) return made;
+    const number = span("ov-ws-number");
+    const element = span("ov-place", number);
+    element.dataset.place = key;
+    made = { root: element, number, rolling: null, shown: false };
+    placeTags.set(key, made);
+    return made;
+  }
+
+  /** Draws the number of place `index` of `section`, `space.s8` in from its top left corner. */
+  function putTag(section: Section, index: number, on: ScreenView, motion: Motion): void {
+    const made = tagOf(section.group, index);
+    const slot = section.places[index]!;
+    const fresh = !made.root.isConnected;
+    delete made.root.dataset.gone;
+    // A place made while things move, by a drop or a room opening, fades in with it.
+    const grows = fresh && motion !== "none" && open;
+    if (fresh) {
+      numbers.append(made.root);
+      glide(made.root, "none");
+      arriving(made.root, "none");
+      made.root.style.setProperty("--ov-arrive", grows ? "0" : "1");
+      made.root.style.setProperty("--ov-tag", open ? "1" : "0");
     }
-    made.rolling = rollingNumber({ value, widest: String(value).replace(/\d/g, "0"), style: "button_small", color: shown ? "on_primary" : "on_surface" });
-    made.shown = shown;
-    made.number.replaceChildren(made.rolling.element);
-    made.number.toggleAttribute("data-shown", shown);
+    const inset = L("space-s8");
+    if (fresh) {
+      made.root.style.setProperty("--ov-x", css(on.at.x + slot.x + inset));
+      made.root.style.setProperty("--ov-y", css(on.at.y + slot.y + inset));
+      commit(made.root);
+    }
+    glide(made.root, motion);
+    made.root.style.setProperty("--ov-x", css(on.at.x + slot.x + inset));
+    made.root.style.setProperty("--ov-y", css(on.at.y + slot.y + inset));
+    if (made.root.style.getPropertyValue("--ov-arrive") === "0") {
+      arriving(made.root, open && motion !== "none" ? "arrive" : "none");
+      made.root.style.setProperty("--ov-arrive", "1");
+    }
+    // It marks the shown workspace's place; carried, the place it leaves open in its own group.
+    const item = section.items[index];
+    const shownId = desk.shown.get(on.screen.id);
+    const shown = item === shownId || (item === ROOM && carry?.kind === "space" && carry.id === shownId && section.group === carry.from);
+    const value = index + 1;
+    if (made.rolling && made.shown === shown) made.rolling.set(value);
+    else {
+      made.rolling = rollingNumber({ value, widest: String(value).replace(/\d/g, "0"), style: "button_small", color: shown ? "on_primary" : "on_surface" });
+      made.shown = shown;
+      made.number.replaceChildren(made.rolling.element);
+      made.number.toggleAttribute("data-shown", shown);
+    }
+  }
+
+  /** A place gone, its group shorter: its number fades where it stands, and goes. */
+  function dropTag(key: string, made: PlaceTag): void {
+    if (made.root.hasAttribute("data-gone")) return;
+    made.root.dataset.gone = "";
+    arriving(made.root, open ? "collapse" : "none");
+    made.root.style.setProperty("--ov-arrive", "0");
+    later(ms("medium"), () => {
+      if (!made.root.hasAttribute("data-gone")) return;
+      made.root.remove();
+      placeTags.delete(key);
+    });
   }
 
   // ── Where everything goes ──
@@ -724,6 +784,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** Lays every screen out again and sends each element to its place, moving as `motion` says. */
   function place(motion: Motion): void {
     const rooms = roomsNow();
+    const numbered = new Set<string>();
     for (const each of views) {
       each.layout = arrange(each.size.w, each.size.h, specsOf(each.screen, rooms));
       const groups = model.groupsOn(desk, each.screen);
@@ -731,6 +792,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         const group = groups.find((g) => g.id === section.group)!;
         section.items.forEach((id, k) => {
           if (id !== ROOM) putSpace(id, section.places[k]!, each, motion);
+          putTag(section, k, each, motion);
+          numbered.add(`${section.group}#${k}`);
         });
         const plus = plusEl(group.id);
         if (section.plus) {
@@ -753,6 +816,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       }
       for (const [group, element] of plusEls) if (!groups.some((g) => g.id === group) && element.parentElement === each.layer) delete element.dataset.shown;
     }
+    for (const [key, made] of placeTags) if (!numbered.has(key)) dropTag(key, made);
     showRoom();
     showAim();
     showSelect();
@@ -784,7 +848,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (fresh) arriveFrom(made, slot, on);
     }
     if (carried) return;
-    for (const part of [made.root, made.desk, made.tag]) glide(part, motion);
+    for (const part of [made.root, made.desk]) glide(part, motion);
     made.root.style.setProperty("--ov-x", css(slot.x));
     made.root.style.setProperty("--ov-y", css(slot.y));
     made.root.style.setProperty("--ov-w", css(slot.w));
@@ -794,13 +858,12 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.desk.style.setProperty("--ov-dw", css(on.size.w));
     made.desk.style.setProperty("--ov-dh", css(on.size.h));
     made.root.toggleAttribute("data-shown-here", desk.shown.get(on.screen.id) === id);
-    dressTag(id, made, on.screen);
     tileSpace(id, on, motion);
   }
 
   /** A workspace made by a drop grows in from nothing where it will stand. */
   function arriveFrom(made: SpaceEl, slot: Slot, on: ScreenView): void {
-    for (const part of [made.root, made.desk, made.tag]) {
+    for (const part of [made.root, made.desk]) {
       glide(part, "none");
       part.style.setProperty("--ov-arrive", "0");
       part.style.setProperty("--ov-fly", open ? "0" : "1");
@@ -814,7 +877,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.desk.style.setProperty("--ov-dw", css(on.size.w));
     made.desk.style.setProperty("--ov-dh", css(on.size.h));
     commit(made.root);
-    for (const part of [made.root, made.desk, made.tag]) {
+    for (const part of [made.root, made.desk]) {
       arriving(part, "arrive");
       part.style.setProperty("--ov-arrive", open ? "1" : "0");
     }
@@ -986,11 +1049,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       }
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
-        for (const id of section.items) {
+        for (const [k, id] of section.items.entries()) {
           if (id === ROOM) continue;
           const made = spaceEl(id);
           const home = id === shown;
-          const parts = [made.root, made.desk, made.tag];
+          const parts = [made.root, made.desk];
           const reduced = settings().reduced && motion !== "none";
           for (const part of parts) {
             part.dataset.rank = home ? "home" : String(rankOf(id));
@@ -1007,10 +1070,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
             part.style.setProperty("--ov-arrive", isOpen || (home && !reduced) ? "1" : "0");
             part.style.setProperty("--ov-fly", !isOpen && home ? "1" : "0");
           }
-          // A number shows once its miniature has come to rest: the screen's own after its flight.
-          const tag = made.tag;
+          // A place's number shows once its miniature has come to rest there: the screen's own after
+          // its flight; the others' arrive with them.
+          const tag = tagOf(section.group, k).root;
           tag.style.setProperty("--ov-tt", motion === "none" ? "0s" : isOpen ? "var(--motion-short)" : "var(--motion-micro)");
-          tag.style.setProperty("--ov-td", motion === "open" && home && !reduced ? "var(--motion-medium)" : "0s");
+          tag.style.setProperty("--ov-td", motion === "open" && home && !reduced ? "var(--motion-medium)" : motion === "open" && !reduced ? STAGGER[rankOf(id)]! : "0s");
           if (settling) tag.style.setProperty("--ov-tt", "var(--motion-short)");
           if (motion === "open" && home) {
             tag.style.setProperty("--ov-tt", "0s");
@@ -1060,20 +1124,25 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       }
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
-        for (const id of section.items) {
+        for (const [k, id] of section.items.entries()) {
           if (id === ROOM) continue;
           const made = spaceEl(id);
           const home = id === shown;
-          for (const part of [made.root, made.desk, made.tag]) {
+          for (const part of [made.root, made.desk]) {
             part.dataset.rank = home ? "home" : String(rankOf(id));
             arriving(part, "none");
             flying(part, "none");
             part.style.setProperty("--ov-arrive", home ? "1" : at);
             part.style.setProperty("--ov-fly", home ? String(1 - swiping) : "0");
           }
-          made.tag.style.setProperty("--ov-tt", "0s");
-          made.tag.style.setProperty("--ov-td", "0s");
-          made.tag.style.setProperty("--ov-tag", at);
+          // The others' numbers come as far as their miniatures; the screen's own, still in flight
+          // to its place, shows its number once it is there.
+          const tag = tagOf(section.group, k).root;
+          arriving(tag, "none");
+          tag.style.setProperty("--ov-arrive", "1");
+          tag.style.setProperty("--ov-tt", "0s");
+          tag.style.setProperty("--ov-td", "0s");
+          tag.style.setProperty("--ov-tag", home ? "0" : at);
         }
       }
       for (const element of [...each.layer.querySelectorAll<HTMLElement>(".ov-plus, .ov-label")]) {
@@ -1170,8 +1239,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         for (const [k, id] of section.items.entries()) {
           if (id === ROOM) continue;
           const slot = section.places[k]!;
-          // Its number under it is the workspace's too.
-          if (!inside(local, { ...slot, h: slot.h + L("space-s8") + L("size-control_sm") })) continue;
+          if (!inside(local, slot)) continue;
           const at = { x: (local.x - slot.x) / slot.s, y: (local.y - slot.y) / slot.s };
           for (const win of [...windowsShown(id)].reverse()) {
             const rect = tiles.get(win);
@@ -1389,7 +1457,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     lift.append(made.root);
     delete made.root.dataset.landing;
     made.root.dataset.lifted = "";
-    for (const part of [made.root, made.desk, made.tag]) glide(part, "none");
+    for (const part of [made.root, made.desk]) glide(part, "none");
     made.root.style.setProperty("--ov-gx", "0px");
     made.root.style.setProperty("--ov-gy", "0px");
     carry = { kind: "space", id, element: made.root, own: { w: slot.w, h: slot.h }, scale: slot.s, grab, from: group.id, fromIndex: group.spaces.indexOf(id), target: null, point };
@@ -1839,7 +1907,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const slot = home?.layout.spaces.get(id);
     if (!home || !slot) return;
     home.layer.append(made.root);
-    for (const part of [made.root, made.desk, made.tag]) glide(part, "none");
+    for (const part of [made.root, made.desk]) glide(part, "none");
     made.root.style.setProperty("--ov-shrink", "1");
     putSpace(id, slot, home, "none");
   }
@@ -1855,7 +1923,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   function collapse(id: string, made: SpaceEl, delay: string): void {
     made.root.dataset.gone = "";
-    for (const part of [made.root, made.desk, made.tag]) {
+    for (const part of [made.root, made.desk]) {
       arriving(part, "collapse", delay);
       part.style.setProperty("--ov-arrive", "0");
     }
@@ -2510,7 +2578,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     centreOf,
     handleOf(space) {
       const box = worldBox({ kind: "space", space });
-      return box ? { x: box.x + box.w / 2, y: box.y + box.h + L("space-s8") + L("size-control_sm") / 2 } : { x: 0, y: 0 };
+      const middle = L("space-s8") + L("size-chip") / 2;
+      return box ? { x: box.x + middle, y: box.y + middle } : { x: 0, y: 0 };
     },
     between: betweenPoint,
     target: () => carry?.target ?? null,
@@ -2539,7 +2608,15 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     swipe: (p) => follow(p),
     sidePoint: (space, window, side) => sidePoint(space, { window, side }),
     order: (space) => [...model.layout(model.treeOf(desk.spaces.get(space)!), { x: 0, y: 0, w: 1600, h: 900 }, 0).entries()].sort(([, a], [, b]) => a.y - b.y || a.x - b.x).map(([id]) => id),
-    numberShown: (space) => spaceEls.get(space)?.rolling?.element.getAttribute("aria-label") ?? "",
+    numberShown(space) {
+      for (const each of views) {
+        for (const section of each.layout.sections) {
+          const k = section.items.indexOf(space);
+          if (k >= 0) return placeTags.get(`${section.group}#${k}`)?.rolling?.element.getAttribute("aria-label") ?? "";
+        }
+      }
+      return "";
+    },
     lift: () => fingersLift(),
     learned: () => [...learned].sort(),
     tipShown: () => !tip.hasAttribute("data-learned"),

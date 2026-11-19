@@ -66,8 +66,8 @@ const GROUP_NAME: Words = { short: "Studio", long: "Living room television" };
 
 // ── Motion ────────────────────────────────────────────────────────────────────────────────────
 
-/** The three parts of a workspace that move together: its box, its desktop, its number. */
-const parts = (selector: string): string => `${selector}, ${selector} > .ov-ws-desk, ${selector} > .ov-ws-tag`;
+/** The two parts of a workspace that move together: its box and its desktop. */
+const parts = (selector: string): string => `${selector}, ${selector} > .ov-ws-desk`;
 
 const OPENING_TRACKS: [Track<"standard" | "emphasized_decel" | "emphasized_accel">, ...Track<"standard" | "emphasized_decel" | "emphasized_accel">[]] = [
   { part: "the frame and bar", on: "every screen", target: ".k-screen-glass, .k-frame, .k-bar", property: "--ov-aside", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
@@ -165,10 +165,10 @@ const SWIPE_CLOSES: Move = {
 
 const GAP_CLOSES: Move = {
   name: "A gap deleted",
-  what: "The empty 3 goes into the slot; the later ones close up over `medium` as their numbers roll down over `short`.",
+  what: "The empty 3 goes into the slot; the later ones close up over `medium` under their places' numbers, and the last place's number fades.",
   tracks: [
     { part: "the gap", on: "the empty 3", target: '.ov-ws[data-space="s8"]', property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
-    { part: "the later numbers", on: "4 to 3", target: '.ov-ws[data-space="s9"] .k-roll-slot', property: "--roll", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the last place's number", on: "the 4", target: '.ov-place[data-place="g-ext2#3"]', property: "--ov-arrive", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
   ],
   reduced: [{ part: "the gap", on: "a fade", target: '.ov-ws[data-space="s8"]', property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
   back: "cuts",
@@ -347,7 +347,7 @@ export default page<Shown>({
     { name: "Three fingers down, half way", for: "closing as far as the swipe has gone", sample: at({ pin: { kind: "swiping", opening: false, progress: 0.5 } }) },
     { name: "1, 2, empty 3, 4", for: "a gap: 3 holds its place, empty", sample: at({ fill: "gap" }) },
     { name: "The empty 3, deleted", for: "right-dragged into the slot", sample: at({ fill: "gap", pin: { kind: "binning", what: { space: "s8" }, over: true } }) },
-    { name: "After it: 1, 2, 3", for: "4 rolled to 3; dragged back out, the gap returns", sample: at({ fill: "gap", pin: { kind: "pending", what: { space: "s8" }, left: 0.9 } }) },
+    { name: "After it: 1, 2, 3", for: "the 4 moved under the 3; dragged back out, the gap returns", sample: at({ fill: "gap", pin: { kind: "pending", what: { space: "s8" }, left: 0.9 } }) },
     { name: "The delete slot, carrying", for: "on its way: the line full red, the glass warmed", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
     { name: "Over the delete slot", for: "pulled in and held: solid red; let go, it waits", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
     { name: "A workspace over the slot", for: "right-dragged: its miniature held in the slot", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
@@ -434,9 +434,8 @@ export default page<Shown>({
       { part: "Screen margin", token: "space-s48" },
       { part: "Between miniatures", token: "space-s24" },
       { part: "Between sections", token: "space-s32" },
-      { part: "Number under", token: "space-s8" },
-      { part: "Number's row", token: "size-control_sm" },
-      { part: "Number", token: "size-chip" },
+      { part: "Place's number, in from its corner", token: "space-s8" },
+      { part: "Place's number", token: "size-chip" },
       { part: "Name over a section", token: "size-chip" },
       { part: "Miniature corners", token: "radius-control" },
       { part: "Window corners, on the desktop", token: "radius-surface" },

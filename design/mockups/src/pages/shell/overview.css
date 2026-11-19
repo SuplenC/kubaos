@@ -205,20 +205,28 @@
   pointer-events: none;
 }
 
-/* Under it: its number as the bar draws it, and its delete at its right end. */
-.ov-ws-tag {
+/* A place's number, `space.s8` in from its top left corner, over the miniature and its windows. It
+   belongs to the place, not to the workspace in it: it stands still while workspaces move between
+   places, and shows once the miniature has come to rest there (`--ov-tag`), fading with a place
+   that comes or goes (`--ov-arrive`). */
+.ov-numbers {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.ov-place {
   position: absolute;
   left: 0;
-  right: 0;
-  top: calc(100% + var(--space-s8));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--size-control_sm);
-  opacity: var(--ov-tag);
+  top: 0;
+  display: block;
+  translate: var(--ov-x) var(--ov-y);
+  opacity: calc(var(--ov-tag) * var(--ov-arrive));
   transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-tag var(--ov-tt, 0s) var(--easing-standard) var(--ov-td, 0s),
-    opacity var(--motion-short) var(--easing-standard);
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s);
 }
 
 /* A number on the frame's glass, as the bar draws its workspaces on its own pill: it reads on any
@@ -251,10 +259,6 @@
 
 .ov-ws:is([data-lifted], [data-landing]) > .ov-ws-desk {
   box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
-}
-
-.ov-ws:is([data-lifted], [data-landing], [data-gone]) > .ov-ws-tag {
-  opacity: 0;
 }
 
 /* Refused by a full group: it dims, and goes back where it came from when let go. */
@@ -334,13 +338,22 @@
   z-index: 1;
 }
 
-/* What is carried rides over what waits in the slot, and the lit line round it over both. */
+/* What is carried rides over what waits in the slot; a workspace carried into a place sits under
+   that place's number, a carried window over it; the lit line round either over all. */
 .ov-lift > [data-held] {
   z-index: 2;
 }
 
-.ov-lift > .ov-hold {
+.ov-lift > .ov-numbers {
   z-index: 3;
+}
+
+.ov-lift > .ov-win[data-held] {
+  z-index: 4;
+}
+
+.ov-lift > .ov-hold {
+  z-index: 5;
 }
 
 /* Covered by a second thing pulled into the slot, what waits there steps out of sight over
@@ -736,7 +749,7 @@
 
 /* ── Reduced motion: places change at once, only fades play ──────────────────────────────────── */
 
-[data-reduced] .ov :is(.ov-ws, .ov-ws-desk, .ov-win, .ov-plus, .ov-room, .ov-label, .ov-ring) {
+[data-reduced] .ov :is(.ov-ws, .ov-ws-desk, .ov-win, .ov-plus, .ov-room, .ov-label, .ov-ring, .ov-place) {
   --ov-pt: 0s !important;
   --ov-ft: 0s !important;
 }
