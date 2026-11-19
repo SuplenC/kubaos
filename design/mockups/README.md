@@ -16,6 +16,8 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 | `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
 | `npm run perf -- PAGE…` | Measures the pages named for speed and holds them to their budgets ("Speed", below). |
 
+On each push to `main` that changes the site or what it is built from, CI builds the site with `just mockups-build` and publishes it on GitHub Pages at <https://suplenc.github.io/kubaos/> (`.github/workflows/mockups.yml`).
+
 Plain HTML, CSS and TypeScript, built by Vite; no UI framework. The npm dependencies are locked in `package-lock.json`, and `playwright-core` is the version of nixpkgs' Playwright, whose Chromium draws the shots and frames. Use a Chromium-based browser: the icons' stroke uses CSS typed arithmetic.
 
 ## The top bar

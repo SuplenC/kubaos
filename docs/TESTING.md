@@ -231,7 +231,7 @@ On a quieter machine the cold test build takes about 70 s. Running the tests tak
 
 ## CI
 
-**What runs where.** `.github/workflows/check.yml` runs on each pull request into `main` and each push to `main`, on GitHub's `ubuntu-latest` (x86_64, 4 CPUs). A pull request into any other branch runs no CI: the pieces of a feature land on its parent branch (`feature/<name>`) after a review and `just check` run locally, and their checks run on the parent's pull request into `main`. `cache.yml` (the binary cache) and `specimen.yml` (the specimen's pictures) run on each push to `main` only.
+**What runs where.** `.github/workflows/check.yml` runs on each pull request into `main` and each push to `main`, on GitHub's `ubuntu-latest` (x86_64, 4 CPUs). A pull request into any other branch runs no CI: the pieces of a feature land on its parent branch (`feature/<name>`) after a review and `just check` run locally, and their checks run on the parent's pull request into `main`. `cache.yml` (the binary cache) and `specimen.yml` (the specimen's pictures) run on each push to `main` only, and `mockups.yml` (the mockup site on GitHub Pages) on each push to `main` that changes what the site is built from.
 
 `check.yml` runs what `just check` runs, in `nix develop`, and `nix flake check --no-build`, as parallel jobs, each on its own runner:
 
