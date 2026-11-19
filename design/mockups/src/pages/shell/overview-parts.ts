@@ -665,8 +665,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     readonly size: { readonly w: number; readonly h: number };
     target: Target | null;
     point: Point;
-    /** Each screen's grid without the workspace carried, from which a carried workspace's place is found. */
-    readonly bare: Map<string, Layout>;
   }
   let carry: Carry | null = null;
 
@@ -1220,29 +1218,62 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * Where a carried workspace would go at `point`: the place in a section the point is in, counted
-   * among the miniatures left when it is lifted, in reading order; refused by a full group.
+   * Where a carried workspace would go at `point`: the place in a section the point is in, among the
+   * workspaces of the grid as it will be drawn with the room opened there, in reading order, the
+   * carried one left out; refused by a full group.
+   *
+   * HAZARD: read the grid that will be drawn, never the one without the room. A miniature's size
+   * depends on how many places its screen shows, so a grid of another size is laid out with other
+   * rows, and on a small screen a point over the drawn upper row falls outside it. The room opening
+   * in another group can change that group's grid in turn, so the target is settled on the grid it
+   * opens: tried against the grid drawn now, then against the grid its room makes, until they agree.
+   * The room is no workspace, so a point over it counts as before it, which keeps the target still.
    */
   function spaceTarget(point: Point): Target | null {
     if (!carry) return null;
     if (overBin(point)) return { kind: "bin" };
+    let target = spaceTargetIn(point, new Map(views.map((each) => [each.screen.id, each.layout])));
+    for (let tries = 0; tries < 3 && target?.kind === "between"; tries++) {
+      const at = roomOf(target);
+      const layouts = new Map(views.map((each) => [each.screen.id, arrange(each.size.w, each.size.h, specsOf(each.screen, at))]));
+      // The point over the room it opens: that is where it goes, whatever else the grid could read.
+      if (overRoom(point, layouts)) break;
+      const next = spaceTargetIn(point, layouts);
+      if (sameTarget(next, target)) break;
+      target = next;
+    }
+    return target;
+  }
+
+  /** Whether `point` is over the room one of `layouts` holds open. */
+  function overRoom(point: Point, layouts: Map<string, Layout>): boolean {
+    return views.some((each) => {
+      const room = layouts.get(each.screen.id)?.room;
+      return room ? inside({ x: point.x - each.at.x, y: point.y - each.at.y }, room) : false;
+    });
+  }
+
+  /** Where a carried workspace would go at `point`, read against each screen's grid in `layouts`. */
+  function spaceTargetIn(point: Point, layouts: Map<string, Layout>): Target | null {
+    if (!carry) return null;
     const gap = L("space-s24");
+    const tag = L("space-s8") + L("size-control_sm");
     for (const each of views) {
-      const bare = carry.bare.get(each.screen.id);
-      if (!bare) continue;
+      const layout = layouts.get(each.screen.id);
+      if (!layout) continue;
       const local = { x: point.x - each.at.x, y: point.y - each.at.y };
-      for (const section of bare.sections) {
+      for (const section of layout.sections) {
         const reach = { x: section.box.x - gap, y: section.box.y - gap, w: section.box.w + 2 * gap, h: section.box.h + 2 * gap };
         if (!inside(local, reach)) continue;
         const group = model.groupById(desk, section.group);
         if (group.spaces.length >= model.MOST && !group.spaces.includes(carry.id)) return { kind: "refused", group: group.id };
-        const tag = L("space-s8") + L("size-control_sm");
         let index = 0;
-        section.items.forEach((_, k) => {
+        section.items.forEach((id, k) => {
+          if (id === ROOM) return;
           const slot = section.places[k]!;
-          const above = local.y >= slot.y + slot.h + tag + gap / 2;
+          const below = local.y >= slot.y + slot.h + tag + gap / 2;
           const sameRow = local.y >= slot.y - gap / 2 && local.y < slot.y + slot.h + tag + gap / 2;
-          if (above || (sameRow && local.x > slot.x + slot.w / 2)) index = k + 1;
+          if (below || (sameRow && local.x > slot.x + slot.w / 2)) index++;
         });
         return { kind: "between", group: group.id, index };
       }
@@ -1285,7 +1316,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-sy", String(slot.s));
     commit(element);
     const index = model.groupOf(desk, space).spaces.indexOf(space);
-    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, size: { w: rect.w, h: rect.h }, target: { kind: "space", space }, point, bare: new Map() };
+    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, size: { w: rect.w, h: rect.h }, target: { kind: "space", space }, point };
     posed.set(element, { x: point.x - grab.x, y: point.y - grab.y, k: 1 });
     root.dataset.carrying = "window";
     element.dataset.held = "";
@@ -1300,9 +1331,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!on || !slot || !made) return;
     const grab = { x: point.x - on.at.x - slot.x, y: point.y - on.at.y - slot.y };
     const group = model.groupOf(desk, id);
-    carry = { kind: "space", id, element: made.root, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: slot.s, size: { w: slot.w, h: slot.h }, target: null, point, bare: new Map() };
+    carry = { kind: "space", id, element: made.root, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: slot.s, size: { w: slot.w, h: slot.h }, target: null, point };
     posed.set(made.root, { x: point.x - grab.x, y: point.y - grab.y, k: 1 });
-    for (const each of views) carry.bare.set(each.screen.id, arrange(each.size.w, each.size.h, specsOf(each.screen)));
     lift.append(made.root);
     made.root.dataset.lifted = "";
     for (const part of [made.root, made.desk, made.tag]) glide(part, "none");
@@ -1880,16 +1910,15 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       const space = model.spaceOf(desk, id).id;
       const slot = viewOfSpace(space)?.layout.spaces.get(space);
       const scale = slot?.s ?? was.posed.scale;
-      carry = { kind: "window", id, element, grab, from: space, fromIndex: model.groupOf(desk, space).spaces.indexOf(space), scale, size, target: { kind: "bin" }, point, bare: new Map() };
+      carry = { kind: "window", id, element, grab, from: space, fromIndex: model.groupOf(desk, space).spaces.indexOf(space), scale, size, target: { kind: "bin" }, point };
       element.style.transition = "none";
       element.style.setProperty("--ov-sx", String(scale));
       element.style.setProperty("--ov-sy", String(scale));
     } else {
       const id = (was.what as { space: string }).space;
       const group = model.groupOf(desk, id);
-      carry = { kind: "space", id, element, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: was.posed.scale, size, target: { kind: "bin" }, point, bare: new Map() };
-      for (const each of views) carry.bare.set(each.screen.id, arrange(each.size.w, each.size.h, specsOf(each.screen)));
-      element.style.transition = "none";
+      carry = { kind: "space", id, element, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: was.posed.scale, size, target: { kind: "bin" }, point };
+        element.style.transition = "none";
     }
     // Held at its middle now: the same box, drawn about another point.
     element.style.setProperty("--ov-gx", css(grab.x));
