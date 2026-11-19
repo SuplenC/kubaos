@@ -15,18 +15,19 @@ import { DESK, desktop, type DesktopOptions, deskWindow, GHOSTTY, REGION, region
 /** A shared window's desktop, window `focused` focused. */
 const windowShared = (focused = 0, index = 1) => desktop({ shared: { kind: "window", index }, focused });
 
-/** The marks the stage switches between, each a desktop with that share on air. */
+/** The marks the stage switches between, each a desktop with that share on air, `focused` focused. */
 const MARKS: readonly { readonly label: string; readonly draw: (focused: number) => HTMLElement }[] = [
   { label: "Screen", draw: (focused) => desktop({ shared: { kind: "screen" }, focused }) },
   { label: "Window", draw: (focused) => windowShared(focused) },
-  { label: "Focused window", draw: () => windowShared(1) },
   { label: "Region", draw: (focused) => desktop({ shared: { kind: "region" }, focused }) },
 ];
 
 /**
  * The stage: what is shared picked over the desktop, as the site's other stages offer their states,
- * the screen first, the choice lifted above the sample by the stage (`stageControls`); a click on a
- * window focuses it, the shared one's tube burning violet.
+ * the screen first, the choice lifted above the sample by the stage (`stageControls`). Focus
+ * follows the pointer, as on the system: the window under it is the focused one, the shared one's
+ * tube burning violet, and the last one keeps the focus while the pointer is off the desktop. Only
+ * the windows' attributes change as the pointer moves; a new choice draws its desktop.
  */
 function live(): HTMLElement {
   const holder = document.createElement("span");
@@ -36,9 +37,19 @@ function live(): HTMLElement {
   const room = document.createElement("span");
   room.style.display = "contents";
   let mark = 0;
-  const draw = (focused: number) => {
+  let focused = 0;
+  const draw = () => {
     const made = MARKS[mark]!.draw(focused);
-    made.querySelectorAll<HTMLElement>(".share-window").forEach((each, index) => each.addEventListener("click", () => draw(index)));
+    const windows = [...made.querySelectorAll<HTMLElement>(".share-window")];
+    windows.forEach((each, index) =>
+      each.addEventListener("pointerenter", () => {
+        focused = index;
+        for (const [at, other] of windows.entries()) {
+          if (at === index) other.setAttribute("data-pinned", "lit");
+          else other.removeAttribute("data-pinned");
+        }
+      }),
+    );
     room.replaceChildren(made);
   };
   const choice = tabs({
@@ -46,11 +57,11 @@ function live(): HTMLElement {
     picked: 0,
     onPick: (index) => {
       mark = index;
-      draw(index === 2 ? 1 : 0);
+      draw();
     },
   });
   holder.append(stack("s12", "start", stageControls(stack("s8", "start", label("What is shared", "label"), choice)), room));
-  draw(0);
+  draw();
   return holder;
 }
 
@@ -101,7 +112,7 @@ export default page<State>({
   title: "On-air marks",
   lede: "What is shared, marked in violet for the person alone, never in the stream.",
   code: { unbuilt: "Not built: Hyprland, the shell" },
-  stage: { live, hint: "pick what is shared; click a window to focus it", daylight: true },
+  stage: { live, hint: "pick what is shared; point at a window to focus it", daylight: true },
   variants: [
     { name: "A window, not focused", for: "its border violet; nothing else", sample: shown({ shared: { kind: "window", index: 1 }, focused: 0 }) },
     { name: "A window, focused", for: "its tube violet, glow at night", sample: shown({ shared: { kind: "window", index: 1 }, focused: 1 }) },

@@ -41,16 +41,17 @@ const onTheBar = (sharing: Share | readonly Share[] = SHARES.screen, camera: Cam
   barStrip({ width: SCREEN_WIDTH, content: { ...EVERYDAY, sharing, camera } });
 
 /**
- * The stage: the screen's corner with both pills, two shares running; a click on a pill opens its
- * panel and on it again shuts it. Change what's shared goes to picking's page; Stop sharing ends
- * that share, the pill's count with it, and the pill goes with the last.
+ * The stage: the screen's corner with both pills, a screen, a window and a region shared, a card
+ * each in the panel, the pill counting three; a click on a pill opens its panel and on it again
+ * shuts it. Change what's shared goes to picking's page; Stop sharing ends that share, the pill's
+ * count with it, and the pill goes with the last.
  */
 function live(): HTMLElement {
   const holder = document.createElement("span");
   // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
   // with none (`contents`) reads as reaching from the page's edge.
   holder.style.display = "inline-block";
-  let shares: readonly ShareView[] = TWO_VIEWS;
+  let shares: readonly ShareView[] = kinds(VIEWS.three);
   let open: "sharing" | "camera" | null = "sharing";
   const draw = () => {
     const bar: Element[] = [];

@@ -389,8 +389,11 @@ export interface DeskWindowOptions extends Placed {
  * has the keyboard (`windowRing`), the window border the thin stroke wide. The Focus page draws
  * one of its own; this would be the library's, for every desktop scene.
  */
+/** A window's corner on the desktop: the frame's, the surface radius, less the gap round it. */
+const windowCorner = () => nested(role("surface"), "s8");
+
 export function deskWindow(options: DeskWindowOptions): HTMLElement {
-  const corner = nested(role("surface"), "s8");
+  const corner = windowCorner();
   const drawn = document.createElement("span");
   drawn.className = "share-window";
   drawn.style.setProperty("--corner", corner.css);
@@ -441,7 +444,8 @@ export interface MapShare {
 /**
  * Draft part, proposed: a map of the desk for a share's card. Every screen a rectangle in its real
  * place and proportions, the whole as wide as the card and no taller than `size.row_three_line`,
- * centred where it is narrower. A screen shared wears `sharing_line` with a faint `sharing` fill;
+ * centred where it is narrower. Its corners are the real ones scaled with the map: a screen's the
+ * frame's (the surface radius), a window's and a region's a window's, none under `radius.small`. A screen shared wears `sharing_line` with a faint `sharing` fill;
  * a window or a region is a solid `sharing` box at its real place and size, its screen outlined
  * quietly, and a window's screen carries the window's workspace in its top left corner, where the
  * bar shows it. Nothing else: no picture, no other window.
@@ -454,6 +458,9 @@ export function shareMap(desk: readonly DeskScreen[], shared: MapShare): HTMLEle
   const map = document.createElement("span");
   map.className = "share-map";
   map.style.setProperty("--map-ratio", String(wide / tall));
+  // Each corner's share of the desk's width, which the stylesheet scales by the map's own.
+  map.style.setProperty("--screen-corner", String(role("surface").px! / wide));
+  map.style.setProperty("--window-corner", String(windowCorner().px! / wide));
   // Each box's place and size as a share of what holds it, which the CSS turns into lengths.
   const placed = (element: HTMLElement, x: number, y: number, width: number, height: number, ofWidth: number, ofHeight: number) => {
     element.style.setProperty("--x", String((x / ofWidth) * 100));
@@ -616,7 +623,7 @@ export function shareOf(lit: Lit, monitors: readonly Monitor[] = MONITORS, asker
 export interface PickHandlers {
   readonly onLight?: (lit: Lit) => void;
   readonly onShare?: (lit: Lit) => void;
-  /** A click on a window anywhere but its Share pill: it takes the keyboard, as on any day. */
+  /** The pointer onto a window: it takes the focus, as on any day; a click shares nothing. */
   readonly onFocus?: (window: WindowAt) => void;
   readonly onCancel?: () => void;
 }
@@ -625,7 +632,7 @@ export interface PickingOptions {
   readonly asker?: Asker;
   readonly monitors?: readonly Monitor[];
   readonly lit?: Lit;
-  /** The window with the keyboard: the first screen's first, unless said. */
+  /** The window with the focus: the one under the pointer, else the first screen's first, unless said. */
   readonly focused?: WindowAt;
   /**
    * The window under the pointer, its Share pill shown, and the pointer on the pill, its line
@@ -731,7 +738,7 @@ export interface Picking {
    * a region's surface only while one is being drawn. It builds nothing else.
    */
   readonly light: (lit: Lit) => void;
-  /** Gives `window` the keyboard: its tube lit, every other window's out, by their attributes. */
+  /** Gives `window` the focus: its tube lit, every other window's out, by their attributes. */
   readonly focus: (window: WindowAt) => void;
   /** Opens each bar's Sheet, by the Sheet's own move. */
   readonly open: () => void;
@@ -771,8 +778,9 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
   const grid = tracks(monitor.windows);
   const desk = tiling(document.createElement("span"), grid.columns, grid.rows);
   const handlers = options.handlers ?? {};
-  const focused = options.focused ?? FIRST;
   const pointed = options.pointed;
+  // Focus follows the pointer: the window pointed at is the focused one.
+  const focused = options.focused ?? pointed ?? FIRST;
   const windows = monitor.windows.map((placed, at) => {
     const drawn = deskWindow({ ...placed, focused: focused.screen === index && focused.index === at });
     const here: WindowAt = { screen: index, index: at };
@@ -786,7 +794,7 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
         event.stopPropagation();
         handlers.onShare?.({ kind: "window", ...here });
       });
-      drawn.addEventListener("click", () => handlers.onFocus?.(here));
+      drawn.addEventListener("pointerenter", () => handlers.onFocus?.(here));
     }
     desk.append(drawn);
     return drawn;

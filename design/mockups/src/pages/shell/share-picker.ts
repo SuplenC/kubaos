@@ -1,6 +1,6 @@
 // Picking what to share: the system's share prompt, which an app's request to share opens in place
-// of the portal's own. No dialog, no dim: while the request waits the desktop works as usual, and
-// a click on a window only gives it the keyboard. Each screen's frame grows a bar out of the middle
+// of the portal's own. No dialog, no dim: while the request waits the desktop works as usual, focus
+// following the pointer, and a click on a window shares nothing. Each screen's frame grows a bar out of the middle
 // of its bottom edge (who asked, Share this screen, Region, Cancel), on the Sheet the shell's
 // attached surfaces use, the standing sign that a request waits. The window under the pointer
 // offers a violet Share pill riding its top border. Pointing at a way to share previews the mark
@@ -51,8 +51,8 @@ function playShared(root: HTMLElement): void {
 }
 
 /**
- * A request waiting live on `monitors`: a click on a window gives it the keyboard; its Share pill,
- * on the window under the pointer, shares it; Share this screen shares the screen; Region
+ * A request waiting live on `monitors`: the window under the pointer takes the focus and shows its
+ * Share pill, which shares it; Share this screen shares the screen; Region
  * draws, Enter sharing the region and Esc going back to waiting; × cancels. The screens are built
  * once as the request arrives and only change attributes after that; shared, the move to sharing
  * plays as its recipe says; cancelled, the desktop is left as it was. A double-click on the
@@ -201,19 +201,19 @@ export default page<Shown>({
   lede: "A share request on the live desktop: a bar on each screen, Share on the pointed window.",
   code: { qml: "SharePicker", unbuilt: "Not built yet" },
   from: ["icon-tile", "button", "icon-button", "tooltip", "chip"],
-  stage: { live, hint: "point at a window, then its Share pill; a click focuses it", daylight: true },
+  stage: { live, hint: "point at a window to focus it; its Share pill shares it", daylight: true },
   variants: [
     { name: "Waiting", for: "the desktop as usual, no dim; a bar on each screen", sample: screen(() => both()) },
-    { name: "A window pointed at", for: "its Share pill riding its top border", sample: screen(() => both({ pointed: FIREFOX_WINDOW })) },
+    { name: "A window pointed at", for: "it takes the focus; its Share pill on its border", sample: screen(() => both({ pointed: FIREFOX_WINDOW })) },
     { name: "Its Share pill pointed at", for: "lit violet; the line runs on behind it", sample: screen(() => both({ pointed: { ...FIREFOX_WINDOW, pill: true } })) },
     { name: "This screen pointed at", for: "the button lit violet; the screen's edge previewed", sample: screen(() => both({ lit: { kind: "screen", screen: 0 } })) },
     { name: "A region being drawn", for: "the one dim; Region held; clear inside its line", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
-    { name: "A window clicked", for: "it takes the keyboard; nothing is shared", sample: screen(() => both({ focused: FIREFOX_WINDOW })) },
     { name: "Pointed on the other screen", for: "the pill on the window under the pointer", sample: screen(() => both({ pointed: { screen: 1, index: 0 } })) },
     { name: "An app asks", for: "the app's icon in each bar", sample: screen(() => both({ asker: DISCORD })) },
     { name: "Who asked, its hint up", for: "the app's icon names it on hover", sample: screen(() => one({ hint: "app" })) },
     { name: "Region pointed at", for: "lit violet, as Share this screen", sample: screen(() => both({ barPointed: "region" })) },
     { name: "Another workspace", for: "switched while waiting: the bar stays", sample: screen(() => both({ monitors: [DP10_THIRD, EDP1] })) },
+    { name: "A region shared", for: "its line stays; the pill in the bar", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION }, phase: "shared" })) },
     { name: "Shared", for: "the bars gone; mark and pill stay", sample: screen(() => both({ lit: { kind: "window", ...FIREFOX_WINDOW }, phase: "shared" })) },
   ],
   sizes: [
@@ -231,7 +231,7 @@ export default page<Shown>({
       error: "a failed share ends; a notification says so",
     },
     rows: [
-      { name: "A window", cell: (state: Shown) => (state === "pressed" ? one({ focused: FIREFOX_WINDOW }) : one(state === "lit" ? { pointed: FIREFOX_WINDOW } : {})) },
+      { name: "A window", cell: (state: Shown) => one(state === "rest" ? {} : { pointed: FIREFOX_WINDOW }) },
       { name: "Its Share pill", cell: windowState },
       {
         name: "Share this screen",
@@ -242,12 +242,12 @@ export default page<Shown>({
     looks: {
       rest: "waiting: the desktop as usual, the bar out of its edge",
       lit: "pointed at: the Share pill shows, or a line previews",
-      pressed: "a window focused; shared; or a region drawn",
+      pressed: "a window: nothing; a share starts; Region draws",
     },
   },
   focus: {
     tubes: [
-      { name: "The window with the keyboard", tone: "accent", filled: false, content: false },
+      { name: "The window under the pointer", tone: "accent", filled: false, content: false },
       { name: "Share this screen, the Share pill", tone: "sharing", filled: false, content: false },
       { name: "Region", tone: "sharing", filled: false, content: true },
       { name: "Cancel", tone: "accent", filled: false, content: true },
@@ -255,7 +255,7 @@ export default page<Shown>({
     looks: { lit: "the window's tube; the sharing buttons' violet tube and glow", signsOff: "the tubes as glass; the violet line stays" },
     signsOff: (index: number) =>
       [
-        () => one({ focused: FIREFOX_WINDOW }),
+        () => one({ pointed: FIREFOX_WINDOW }),
         () => one({ pointed: { ...FIREFOX_WINDOW, pill: true } }),
         () => pickBar(MEET, { pinned: "screen" }),
         () => pickBar(MEET, { pinned: "region" }),
@@ -313,11 +313,11 @@ export default page<Shown>({
       },
       {
         name: "A window focused",
-        what: "A click on a window: its tube fades in over `short`, the last one's out.",
+        what: "The pointer onto a window: it takes the focus, its tube in over `short`, the last one's out.",
         tracks: [{ part: "the tube", on: "the window", target: ".share-window[data-pinned] > .k-ring", property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
-        sample: screen(() => one({ focused: FIREFOX_WINDOW })),
+        sample: screen(() => one({ pointed: FIREFOX_WINDOW })),
       },
     ],
   },

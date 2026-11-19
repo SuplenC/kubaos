@@ -7,9 +7,9 @@
   gap: var(--space-s24);
 }
 
-/* The screen's dim never shows while a request waits, and it is no target: the pointer reaches
-   the windows under it. */
-.k-screen.share-screen > .k-screen-dim {
+/* A desktop's dim never shows over its windows here, and it is no target: the pointer reaches the
+   windows under it, while a request waits and on the on-air desktop alike. */
+.k-screen:has(> .share-desk) > .k-screen-dim {
   pointer-events: none;
 }
 
@@ -185,9 +185,12 @@
 }
 
 /* A map of the desk, a draft part: as wide as the card, never taller than a three-line row, its
-   screens in their real places, each parted from the next by the thin stroke. */
+   screens in their real places, each parted from the next by the thin stroke. It is its boxes'
+   container, so their corners scale with its width: each corner's share of the desk's width
+   (`--screen-corner`, `--window-corner`) times the map's. */
 .share-map {
   --map-gap: max(1px, round(nearest, calc(var(--stroke-thin) / 2), 1px));
+  container-type: inline-size;
   position: relative;
   display: block;
   align-self: center;
@@ -204,7 +207,7 @@
   top: calc(var(--y) * 1% + var(--map-gap));
   width: calc(var(--w) * 1% - 2 * var(--map-gap));
   height: calc(var(--h) * 1% - 2 * var(--map-gap));
-  border-radius: var(--radius-small);
+  border-radius: max(var(--radius-small), calc(var(--screen-corner) * 100cqw));
   background: var(--color-surface_container_highest);
 }
 
@@ -219,7 +222,8 @@
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline);
 }
 
-/* The window or the region, solid violet at its real place and size on its screen. */
+/* The window or the region, solid violet at its real place and size on its screen, at a window's
+   corner scaled with the map. */
 .share-map-taken {
   position: absolute;
   display: block;
@@ -227,6 +231,7 @@
   top: calc(var(--y) * 1%);
   width: calc(var(--w) * 1%);
   height: calc(var(--h) * 1%);
+  border-radius: max(var(--radius-small), calc(var(--window-corner) * 100cqw));
   background: var(--color-sharing);
 }
 
