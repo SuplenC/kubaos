@@ -4,23 +4,49 @@
 // whole edge, inside it. One mark for all three. Nothing else changes. The windows and the marks
 // are draft parts, proposed for the library (`sharing-parts.ts`).
 
+import { stack } from "../../lib/layout.ts";
+import { tabs } from "../../lib/tabs.ts";
+import { label } from "../../site/dom.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
 import { DESK, desktop, type DesktopOptions, deskWindow, GHOSTTY, REGION, regionMark, screenMark } from "./sharing-parts.ts";
 
 /** A shared window's desktop, the keyboard on window `focused`. */
 const windowShared = (focused = 0, index = 1) => desktop({ shared: { kind: "window", index }, focused });
 
-/** The stage: a click on a window gives it the keyboard; the shared one's tube burns violet. */
+/** The marks the stage switches between, each a desktop with that share on air. */
+const MARKS: readonly { readonly label: string; readonly draw: (focused: number) => HTMLElement }[] = [
+  { label: "Screen", draw: (focused) => desktop({ shared: { kind: "screen" }, focused }) },
+  { label: "Window", draw: (focused) => windowShared(focused) },
+  { label: "Window, with the keyboard", draw: () => windowShared(1) },
+  { label: "Region", draw: (focused) => desktop({ shared: { kind: "region" }, focused }) },
+];
+
+/**
+ * The stage: what is shared picked over the desktop, as the site's other stages offer their states,
+ * the screen first; a click on a window gives it the keyboard, the shared one's tube burning violet.
+ */
 function live(): HTMLElement {
   const holder = document.createElement("span");
   // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
   // with none (`contents`) reads as reaching from the page's edge.
   holder.style.display = "inline-block";
+  const room = document.createElement("span");
+  room.style.display = "contents";
+  let mark = 0;
   const draw = (focused: number) => {
-    const made = windowShared(focused);
+    const made = MARKS[mark]!.draw(focused);
     made.querySelectorAll<HTMLElement>(".share-window").forEach((each, index) => each.addEventListener("click", () => draw(index)));
-    holder.replaceChildren(made);
+    room.replaceChildren(made);
   };
+  const choice = tabs({
+    choices: MARKS.map((each) => ({ label: each.label })),
+    picked: 0,
+    onPick: (index) => {
+      mark = index;
+      draw(index === 2 ? 1 : 0);
+    },
+  });
+  holder.append(stack("s12", "start", stack("s8", "start", label("What is shared", "label"), choice), room));
   draw(0);
   return holder;
 }
@@ -69,7 +95,7 @@ export default page<State>({
   title: "On-air marks",
   lede: "What is shared, marked in violet for the person alone, never in the stream.",
   code: { unbuilt: "Not built: Hyprland, the shell" },
-  stage: { live, hint: "click a window: the shared one's tube burns violet", daylight: true },
+  stage: { live, hint: "pick what is shared; click a window to give it the keyboard", daylight: true },
   variants: [
     { name: "A window, not focused", for: "its border violet; nothing else", sample: shown({ shared: { kind: "window", index: 1 }, focused: 0 }) },
     { name: "A window, focused", for: "its tube violet, glow at night", sample: shown({ shared: { kind: "window", index: 1 }, focused: 1 }) },
