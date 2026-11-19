@@ -185,20 +185,26 @@ export function placeOf(desk: readonly DeskScreen[], index: number): Place {
   return at === 0 ? "left" : at === order.length - 1 ? "right" : "middle";
 }
 
-/** A screen's words by its place, each a whole message: its name, as an object, a part of it, a window on it. */
-export const SCREEN_WORDS: Record<Place, { readonly name: string; readonly the: string; readonly part: string; readonly partOf: string; readonly workspace: (workspace: number) => string }> = {
-  left: { name: "Left screen", the: "the left screen", part: "Part of the left screen", partOf: "part of the left screen", workspace: (n) => `Left screen, workspace ${n}` },
-  middle: { name: "Middle screen", the: "the middle screen", part: "Part of the middle screen", partOf: "part of the middle screen", workspace: (n) => `Middle screen, workspace ${n}` },
-  right: { name: "Right screen", the: "the right screen", part: "Part of the right screen", partOf: "part of the right screen", workspace: (n) => `Right screen, workspace ${n}` },
-  laptop: { name: "Laptop screen", the: "the laptop screen", part: "Part of the laptop screen", partOf: "part of the laptop screen", workspace: (n) => `Laptop screen, workspace ${n}` },
-  only: { name: "This screen", the: "this screen", part: "Part of this screen", partOf: "part of this screen", workspace: (n) => `This screen, workspace ${n}` },
+/**
+ * A screen's words by its place, each a whole message: its name, as an object, a region of it as
+ * the hint says it, and where a window or a region is on it.
+ */
+export const SCREEN_WORDS: Record<
+  Place,
+  { readonly name: string; readonly the: string; readonly regionOf: string; readonly workspace: (workspace: number) => string; readonly region: (size: string) => string }
+> = {
+  left: { name: "Left screen", the: "the left screen", regionOf: "a region of the left screen", workspace: (n) => `Left screen, workspace ${n}`, region: (size) => `Left screen, ${size}` },
+  middle: { name: "Middle screen", the: "the middle screen", regionOf: "a region of the middle screen", workspace: (n) => `Middle screen, workspace ${n}`, region: (size) => `Middle screen, ${size}` },
+  right: { name: "Right screen", the: "the right screen", regionOf: "a region of the right screen", workspace: (n) => `Right screen, workspace ${n}`, region: (size) => `Right screen, ${size}` },
+  laptop: { name: "Laptop screen", the: "the laptop screen", regionOf: "a region of the laptop screen", workspace: (n) => `Laptop screen, workspace ${n}`, region: (size) => `Laptop screen, ${size}` },
+  only: { name: "This screen", the: "this screen", regionOf: "a region of this screen", workspace: (n) => `This screen, workspace ${n}`, region: (size) => `This screen, ${size}` },
 };
 
 /** The words for what a share takes, by its kind, as the sharing pill's hint says it. */
 export const SHARE_WHAT = {
   screen: (place: Place) => SCREEN_WORDS[place].the,
   window: (app: string) => `${app}'s window`,
-  region: (place: Place) => SCREEN_WORDS[place].partOf,
+  region: (place: Place) => SCREEN_WORDS[place].regionOf,
 } as const;
 
 /** A region's size, in the screen's own pixels, as its chip shows it. */
@@ -827,20 +833,23 @@ function shareWords(view: ShareView): { readonly title: string; readonly where: 
   const model = view.desk[view.screen]!.model;
   if (view.kind === "screen") return { title: place.name, where: model };
   if (view.kind === "window") return { title: WORDS.windowTitle(view.app?.app ?? "", view.title ?? ""), where: WORDS.withModel(place.workspace(view.workspace ?? 1), model) };
-  return { title: place.part, where: WORDS.withModel(regionSize(view.rect?.width ?? 0, view.rect?.height ?? 0), model) };
+  return { title: WORDS.region, where: WORDS.withModel(place.region(regionSize(view.rect?.width ?? 0, view.rect?.height ?? 0)), model) };
 }
 
 /**
- * One share's card: the desk's map, then what is shared (a window's app icon before it), where it
- * is, to whom since when, and its own Change what's shared and Stop sharing. Each line is cut with
+ * One share's card: the desk's map, then what is shared after its tile (a window's app icon, or the
+ * kind's symbol), where it is, to whom since when, and its own Change what's shared and Stop sharing. Each line is cut with
  * an ellipsis where it runs past the card, so a long title never grows it.
  */
 function shareCard(view: ShareView, index: number, options: SharingPanelOptions): HTMLElement {
   const words = shareWords(view);
   const title = clamped(words.title, "body_strong", "on_surface");
   title.classList.add("share-card-line");
+  // Every card leads with an Sm tile, so the three kinds' titles line up: a window's app icon, or
+  // the kind's own symbol, the one its Change what's shared button carries.
   const app = view.kind === "window" && view.app ? view.app : undefined;
-  const head = app ? row("s8", "centre", iconTile({ name: app.app, size: "Sm", ...(app.picture ? { picture: app.picture } : {}) }), title) : title;
+  const tile = app ? iconTile({ name: app.app, size: "Sm", ...(app.picture ? { picture: app.picture } : {}) }) : iconTile({ glyph: SHARE_ICONS[view.kind], size: "Sm" });
+  const head = row("s8", "centre", tile, title);
   head.classList.add("share-card-line");
   const said = stack(
     "s4",
