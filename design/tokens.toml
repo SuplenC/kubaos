@@ -911,13 +911,13 @@ carried = 0.5
 # circle of the corner a person throws a drag at (270 on a 1080 tall screen, 360 on 1440), not only
 # on the round, which the carried thing covers.
 drop_reach = 0.25
-# How near a carried workspace's middle comes to the middle of a place in the Overview's grid before
-# that place is proposed, a share of the place's shorter side: the room opens there and the
-# workspace snaps in, one event on this one threshold; elsewhere it follows the hand.
-snap = 0.55
-# The least that zone reaches, a share of the screen's shorter side: a waiting group's places are
-# drawn at half size, and this keeps them as easy to catch, 0.9 of a small place's shorter side on a
-# 1080 tall screen (122 of 136), while the large places keep their 0.55.
+# The zone of a place in the Overview's grid that catches a carried workspace, a share of the place's
+# width and height: a rectangle of the place's shape centred in it. The pointer in it proposes that
+# place, the room opens there and the workspace snaps in; out of it, the workspace is at the hand.
+snap = 0.65
+# The least that zone's shorter side reaches, a share of the screen's shorter side, the zone never
+# past its place: a waiting group's places are drawn at half size, and this keeps them as easy to
+# catch, 0.9 of a small place on a 1080 tall screen (122 of 136), while the large places keep 0.65.
 snap_least = 0.113
 # How far three fingers travel to open the Overview all the way, a share of the screen's height: the
 # Overview arrives as far as the swipe has gone, and settles open past half of it when they lift.

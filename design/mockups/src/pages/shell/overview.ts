@@ -191,7 +191,7 @@ const CHAT_TO_GAME = { kind: "space", space: "s8" } as const;
 
 const SPACE_SNAPS: Move = {
   name: "A workspace snapping in",
-  what: "Its middle in a place's zone: the room opens there and it snaps in over `medium`; out of the zone, back to the hand.",
+  what: "The pointer in a place's zone: the room opens there and it snaps in over `medium`; out of the zone, back to the hand.",
   tracks: [{ part: "the room", on: "between the first two", target: ".ov-room", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   reduced: "same",
   back: "plays",
@@ -449,8 +449,8 @@ export default page<Shown>({
       { part: "New slot's line", token: "stroke-thin" },
       { part: "New slot lit, carrying", token: "opacity-tint" },
       { part: "New slot lit, proposed", token: "opacity-selection" },
-      { part: "Catch, of a place's side", token: "scale-snap" },
-      { part: "Catch at least, of the screen", token: "scale-snap_least" },
+      { part: "Zone, of a place's sides", token: "scale-snap" },
+      { part: "Zone at least, of the screen", token: "scale-snap_least" },
       { part: "Slot's room, its height", token: "size-drop_slot" },
       { part: "Slot's room, in from its line", token: "space-s16" },
       { part: "Slot in from the corner", token: "space-s48" },
