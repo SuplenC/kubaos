@@ -548,8 +548,8 @@
 .k-fact-action > .k-button {
   position: absolute;
   inset-inline-end: 0;
-  top: 50%;
-  translate: 0 -50%;
+  /* Centred down its line on a whole device pixel, the odd one after it. */
+  top: round(down, calc((100% - var(--size-control_sm)) / 2), 1px);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--motion-short) var(--easing-standard);

@@ -18,6 +18,7 @@ import { type DialogOptions, dialogOver } from "../../../../lib/dialog.ts";
 import { errorBlock } from "../../../../lib/error-block.ts";
 import { field, labelled, note, setInvalid } from "../../../../lib/field.ts";
 import { iconButton } from "../../../../lib/icon-button.ts";
+import { declare } from "../../../../lib/probe.ts";
 import { iconTile } from "../../../../lib/icon-tile.ts";
 import { filling, grid, row, stack } from "../../../../lib/layout.ts";
 import { scaleOf } from "../../../../lib/list.ts";
@@ -203,8 +204,9 @@ export function glanceCard(values: UpdateValues, act: GlanceActions, tip?: strin
  * doesn't; the part's name is the tile's accessible name and, with the whole figure, its hint.
  */
 function glanceTile(kind: string, glyph: string, title: string, subtitle: string, fullness?: number): HTMLElement {
-  const head = row("s8", "centre", icon(glyph, "var(--type-subheading-icon)", "var(--color-on_surface)"), filling(clamped(title, "subheading")));
-  const parts: HTMLElement[] = [filling(stack("s4", "start", filling(head), filling(clamped(subtitle, "small", "on_surface_variant"))))];
+  // The figure and the line are the machine's words, cut with an ellipsis where the tile is narrow.
+  const head = row("s8", "centre", icon(glyph, "var(--type-subheading-icon)", "var(--color-on_surface)"), filling(declare(clamped(title, "subheading"), { variable: true })));
+  const parts: HTMLElement[] = [filling(stack("s4", "start", filling(head), filling(declare(clamped(subtitle, "small", "on_surface_variant"), { variable: true }))))];
   if (fullness !== undefined) parts.push(meter([{ share: fullness, color: filled(fullness) }]));
   const made = card({ body: parts });
   made.classList.add("ab-glance");
