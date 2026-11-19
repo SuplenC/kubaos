@@ -646,7 +646,8 @@ export function pickBar(asker: Asker, options: { lit?: "screen" | "region"; tip?
   share.classList.add("share-pick-screen");
   const region = button({ label: WORDS.region, kind: "Text", size: "Sm", icon: SHARE_ICONS.region, ...(options.lit === "region" ? { pinned: "pressed" as const } : {}) });
   region.classList.add("share-pick-region");
-  const cancel = iconButton({ icon: "close", label: WORDS.cancel, size: "Sm", kind: "Text" });
+  // Its key Tooltip names it, as the other buttons' do, so its own Hint would say it twice.
+  const cancel = iconButton({ icon: "close", label: WORDS.cancel, size: "Sm", kind: "Text", hint: false });
   if (options.onScreen) share.addEventListener("click", options.onScreen);
   if (options.onPoint) {
     const point = options.onPoint;
