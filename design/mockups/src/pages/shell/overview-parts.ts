@@ -20,7 +20,7 @@ import { focusRing, steadyGlow } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
-import { length, number, raw } from "../../lib/tokens.ts";
+import { durationMs, length, number } from "../../lib/tokens.ts";
 import type { Easing } from "../../site/page.ts";
 import { eased } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
@@ -164,7 +164,7 @@ const css = (value: number): string => `calc(${device(value)} * var(--px))`;
 
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** The room inside a screen's frame and Hyprland's gaps that its windows tile, as `looks.lua` sets them. */
@@ -2258,7 +2258,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    */
   function drain(left: number): void {
     if (!pending) return;
-    const total = Number.parseFloat(raw("duration-undo")) / settings().speed;
+    const total = durationMs("undo") / settings().speed;
     const running = bin.animate([{ "--hold": left }, { "--hold": 0 }], { duration: total * left, easing: "linear", fill: "forwards" });
     pending = { ...pending, drain: running };
     dressBin();
