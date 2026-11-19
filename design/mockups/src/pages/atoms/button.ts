@@ -1,7 +1,8 @@
 // The Button page: `docs/design/components/button.md` is its full reference. Rest, lit, pressed
-// and disabled, for six kinds in three sizes, by night and by day.
+// and disabled, for six kinds in three sizes, and Tonal and Text in the sharing colour, by night
+// and by day.
 
-import { button, filled, KINDS, type Kind, labelGlow, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
+import { type ButtonColour, button, filled, KINDS, type Kind, labelGlow, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { row } from "../../lib/layout.ts";
 import { lights, powerMoves, press } from "../../site/moves.ts";
@@ -33,14 +34,21 @@ function heldRow(held?: number): HTMLElement {
   );
 }
 
-function sample(kind: Kind, size: Size, state: Pinned | "rest" | "disabled" = "rest"): HTMLButtonElement {
-  const { words, icon, trailing } = SAMPLES[kind];
+/** The sharing colour's specimens: the share picker's Share this screen and Region. */
+const SHARING_SAMPLES: Partial<Record<Kind, { words: Words; icon: string }>> = {
+  Tonal: { words: { short: "Share this screen", long: "Share the whole left screen" }, icon: "desktop_windows" },
+  Text: { words: { short: "Region", long: "Draw a region to share" }, icon: "screenshot_region" },
+};
+
+function sample(kind: Kind, size: Size, state: Pinned | "rest" | "disabled" = "rest", colour: ButtonColour = "accent"): HTMLButtonElement {
+  const { words, icon, trailing } = colour === "sharing" ? { ...SHARING_SAMPLES[kind]!, trailing: false } : SAMPLES[kind];
   return button({
     label: shown(words),
     kind,
     size,
     icon,
     trailing,
+    colour,
     disabled: state === "disabled",
     ...(state === "rest" || state === "disabled" ? {} : { pinned: state }),
   });
@@ -71,8 +79,17 @@ function litKinds(): HTMLElement {
   return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md", "lit")));
 }
 
-/** The state matrix's rows: every kind at every size. */
-const ROWS = SIZES.flatMap((size) => KINDS.map((kind) => ({ kind, size })));
+/** The state matrix's rows: every kind at every size, then Tonal and Text in the sharing colour, sm. */
+const ROWS: readonly { readonly kind: Kind; readonly size: Size; readonly colour: ButtonColour }[] = [
+  ...SIZES.flatMap((size) => KINDS.map((kind) => ({ kind, size, colour: "accent" as const }))),
+  { kind: "Tonal", size: "Sm", colour: "sharing" },
+  { kind: "Text", size: "Sm", colour: "sharing" },
+];
+
+/** Tonal and Text in the sharing colour side by side, sm. */
+function sharing(state: Pinned | "rest" = "rest"): HTMLElement {
+  return row("s16", "centre", sample("Tonal", "Sm", state, "sharing"), sample("Text", "Sm", state, "sharing"));
+}
 
 /** The kinds of a list, as the recipe says them. */
 function on(list: readonly Kind[]): string {
@@ -88,6 +105,7 @@ export default page({
   stage: { live: kinds, hint: "hover it, or Tab to it", daylight: true },
   variants: nonEmpty([
     ...KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") })),
+    { name: "Sharing", for: "Tonal and Text in violet: what shares off the machine", sample: () => sharing() },
     { name: "Holding its alternatives' width", for: "Show and Hide one width: it never moves", sample: () => row("s16", "centre", button({ label: "Show", kind: "Text", size: "Sm", alternatives: ["Show", "Hide"], disclosure: false }), button({ label: "Hide", kind: "Text", size: "Sm", alternatives: ["Show", "Hide"], disclosure: true })) },
     { name: "Held", for: "acts once held for `duration.hold`; its body fills meanwhile", sample: () => heldRow() },
     { name: "Held, halfway", for: "filled to half; the label reads either side", sample: () => heldRow(0.5) },
@@ -103,9 +121,9 @@ export default page({
       error: "it has no value to be wrong",
     },
     rows: nonEmpty(
-      ROWS.map(({ kind, size }) => ({
-        name: `${kind} ${size.toLowerCase()}`,
-        cell: (state: "rest" | "lit" | "pressed" | "disabled") => sample(kind, size, state),
+      ROWS.map(({ kind, size, colour }) => ({
+        name: `${kind} ${size.toLowerCase()}${colour === "sharing" ? ", sharing" : ""}`,
+        cell: (state: "rest" | "lit" | "pressed" | "disabled") => sample(kind, size, state, colour),
       })),
     ),
     looks: {
@@ -116,22 +134,33 @@ export default page({
     },
   },
   focus: {
-    tubes: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filled(kind), content: labelGlow(kind) === "content" }))),
+    tubes: nonEmpty([
+      ...KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filled(kind), content: labelGlow(kind) === "content" })),
+      { name: "Tonal, sharing", tone: "sharing" as const, filled: false, content: false },
+      { name: "Text, sharing", tone: "sharing" as const, filled: false, content: true },
+    ]),
     looks: {
       lit: "line and glow in its tone; the label lights",
       signsOff: "the line as unlit glass, no glow",
     },
     signsOff: (index: number) => {
-      const { kind, size } = ROWS[index]!;
-      return sample(kind, size, "signs-off");
+      const { kind, size, colour } = ROWS[index]!;
+      return sample(kind, size, "signs-off", colour);
     },
   },
   content: {
-    text: KINDS.map((kind) => ({
-      name: kind,
-      words: SAMPLES[kind].words,
-      sample: (words: string) => button({ label: words, kind, size: "Md", icon: SAMPLES[kind].icon, trailing: SAMPLES[kind].trailing }),
-    })),
+    text: [
+      ...KINDS.map((kind) => ({
+        name: kind,
+        words: SAMPLES[kind].words,
+        sample: (words: string) => button({ label: words, kind, size: "Md", icon: SAMPLES[kind].icon, trailing: SAMPLES[kind].trailing }),
+      })),
+      ...(["Tonal", "Text"] as const).map((kind) => ({
+        name: `${kind}, sharing`,
+        words: SHARING_SAMPLES[kind]!.words,
+        sample: (words: string) => button({ label: words, kind, size: "Sm", icon: SHARING_SAMPLES[kind]!.icon, colour: "sharing" }),
+      })),
+    ],
     missingPicture: [{ name: "No icon", for: "the label alone; the same height", sample: () => button({ label: "Authenticate", kind: "Filled", size: "Md" }) }],
     counts: doesntApply("a button holds one label; a row of them is the layout's."),
   },
@@ -162,6 +191,14 @@ export default page({
         reduced: "same",
         back: "cuts",
         sample: litKinds,
+      },
+      {
+        name: "A sharing button lights",
+        what: "As every kind, over `short` on `standard`, its line and glow in violet.",
+        tracks: lights(".k-button", "Tonal and Text, sharing", 0, 1),
+        reduced: "same",
+        back: "cuts",
+        sample: () => sharing(),
       },
       {
         name: "Press",

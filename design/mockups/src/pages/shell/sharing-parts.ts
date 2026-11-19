@@ -24,7 +24,6 @@ import { button } from "../../lib/button.ts";
 import { card } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
 import { focusRing, windowRing } from "../../lib/focus.ts";
-import { icon } from "../../lib/icon.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { filling, inset, row, stack } from "../../lib/layout.ts";
@@ -642,19 +641,26 @@ export interface PickingOptions {
    * mark, nothing else shown: the moment the request gives way to the share.
    */
   readonly pill?: boolean;
-  /** A hint of the bar drawn up, as under the pointer: a sample of it. */
-  readonly hint?: "app" | "region";
+  /** The asking app's hint drawn up, as under the pointer: a sample of it. */
+  readonly hint?: "app";
+  /** A bar's button pointed at, on every screen's bar: a sample of it. */
+  readonly barPointed?: "region" | "cancel";
   readonly handlers?: PickHandlers;
 }
 
+/** What a bar's sample shows pointed at or held: Share this screen or Region lit, Region held while drawing, Cancel lit. */
+export type BarPinned = "screen" | "region" | "drawing" | "cancel";
+
 /**
  * The bar on one screen, which hangs on a Sheet in the middle of the frame's bottom edge, one row:
- * the asking app's icon, which names it in its Tooltip, then Share this screen, Region and Cancel,
- * each named in its own. It takes no keys: while a request waits the keyboard is the apps'.
+ * the asking app's icon, which names it in its Tooltip, then Share this screen and Region, Buttons
+ * in the sharing colour, and Cancel, neutral, named in its Tooltip. Share this screen and Region
+ * say what they do on their faces, so they take no Tooltip. It takes no keys: while a request
+ * waits the keyboard is the apps'.
  */
 export function pickBar(
   asker: Asker,
-  options: { lit?: "screen" | "region"; hint?: "app" | "region"; onScreen?: () => void; onPoint?: (on: boolean) => void; onRegion?: () => void; onCancel?: () => void } = {},
+  options: { pinned?: BarPinned; hint?: "app"; onScreen?: () => void; onPoint?: (on: boolean) => void; onRegion?: () => void; onCancel?: () => void } = {},
 ): HTMLElement {
   // Who asked, as the system knows it: the app, not the site inside it.
   const app = iconTile({ name: asker.app, size: "Sm", ...(asker.picture ? { picture: asker.picture } : {}) });
@@ -662,12 +668,14 @@ export function pickBar(
   // The tile is no control, so its Tooltip shows on the pointer by its attribute, as a sample shows one.
   app.addEventListener("pointerenter", () => appTip.toggleAttribute("data-shown", true));
   app.addEventListener("pointerleave", () => appTip.toggleAttribute("data-shown", false));
-  const share = button({ label: WORDS.screen, kind: "Tonal", size: "Sm", icon: SHARE_ICONS.screen, ...(options.lit === "screen" ? { pinned: "lit" as const } : {}) });
+  const pinned = options.pinned;
+  const share = button({ label: WORDS.screen, kind: "Tonal", colour: "sharing", size: "Sm", icon: SHARE_ICONS.screen, ...(pinned === "screen" ? { pinned: "lit" as const } : {}) });
   share.classList.add("share-pick-screen");
-  const region = button({ label: WORDS.region, kind: "Text", size: "Sm", icon: SHARE_ICONS.region, ...(options.lit === "region" ? { pinned: "pressed" as const } : {}) });
+  const regionPin = pinned === "region" ? { pinned: "lit" as const } : pinned === "drawing" ? { pinned: "pressed" as const } : {};
+  const region = button({ label: WORDS.region, kind: "Text", colour: "sharing", size: "Sm", icon: SHARE_ICONS.region, ...regionPin });
   region.classList.add("share-pick-region");
-  // Its Tooltip names it, as the other buttons' do, so its own Hint would say it twice.
-  const cancel = iconButton({ icon: "close", label: WORDS.cancel, size: "Sm", kind: "Text", hint: false });
+  // Its Tooltip names it, so its own Hint would say it twice.
+  const cancel = iconButton({ icon: "close", label: WORDS.cancel, size: "Sm", kind: "Text", hint: false, ...(pinned === "cancel" ? { pinned: "lit" as const } : {}) });
   if (options.onScreen) share.addEventListener("click", options.onScreen);
   if (options.onPoint) {
     const point = options.onPoint;
@@ -680,8 +688,8 @@ export function pickBar(
     "s8",
     "centre",
     floatingTooltip(app, appTip, { side: "above", ...(options.hint === "app" ? { shown: true } : {}) }),
-    floatingTooltip(share, tooltip(WORDS.screen, ""), { side: "above" }),
-    floatingTooltip(region, tooltip(WORDS.region, ""), { side: "above", ...(options.hint === "region" ? { shown: true } : {}) }),
+    share,
+    region,
     floatingTooltip(cancel, tooltip(WORDS.cancel, ""), { side: "above" }),
   );
   // What hangs on the bottom edge's Sheet: `space.s16` inside on every side, as the OSD's strip.
@@ -692,28 +700,23 @@ export function pickBar(
 
 /**
  * Draft part, proposed: the Share pill a window offers while a request waits, riding the window's
- * top border like a tag clipped onto it: a full pill `size.control_sm` tall, centred on the
- * border's line, half above it and half inside, starting `space.s8` past the end of the window's
- * corner, so it never sits on the curve. The window's share symbol and "Share" in `button_small`,
- * `space.s4` apart, `space.s12` at the ends. At rest it is the quiet sharing look,
- * `sharing_container` with `on_sharing_container`; pointed at, it fills with `sharing` under
- * `on_sharing` and the window's violet line previews behind it, pill and line one piece; pressed,
- * the state layer's press. It shows only on the window under the pointer (`:hover`, which its
- * half past the window's box keeps, being the window's own; or `data-pointed` for a sample), and
- * lies over the neighbouring windows, the gap and the bar. The stylesheet does it all, so the
- * pointer moving builds nothing. It takes no Tab: while a request waits the keyboard is the apps'.
- * The library's Button would draw it with a `sharing` kind, placed on its host's edge.
+ * top border like a tag clipped onto it: a small Tonal Button in the sharing colour, the window's
+ * share symbol and "Share", centred on the border's line, half above it and half inside, starting
+ * `space.s8` past the end of the window's corner, so it never sits on the curve. Pointed at, it
+ * lights as the Button does and the window's violet line previews behind it, pill and line one
+ * piece. It shows only on the window under the pointer (`:hover`, which its half past the
+ * window's box keeps, being the window's own; or `data-pointed` for a sample), and lies over the
+ * neighbouring windows, the gap and the bar. The stylesheet does it all, so the pointer moving
+ * builds nothing. It takes no Tab: while a request waits the keyboard is the apps'. Only its place
+ * on its host's edge is its own; the library would place a Button there.
  */
 export function sharePill(pinned?: "lit" | "pressed"): HTMLElement {
-  const pill = document.createElement("button");
-  pill.type = "button";
+  const share = button({ label: WORDS.shareWindow, kind: "Tonal", colour: "sharing", size: "Sm", icon: SHARE_ICONS.window, ...(pinned ? { pinned } : {}) });
+  share.tabIndex = -1;
+  // The place on the border and the showing are the holder's, so the Button keeps its own looks and moves.
+  const pill = document.createElement("span");
   pill.className = "share-pill";
-  pill.tabIndex = -1;
-  if (pinned) pill.dataset.pinned = pinned;
-  const word = text(WORDS.shareWindow, "button_small");
-  // The pill's ink changes as it is pointed at, so the word takes it rather than a role of its own.
-  word.style.color = "inherit";
-  pill.append(icon(SHARE_ICONS.window, "var(--type-button_small-icon)", "currentColor"), word);
+  pill.append(share);
   return pill;
 }
 
@@ -808,6 +811,7 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
   let shown: Lit = NOTHING;
   const bar = pickBar(asker, {
     ...(options.hint ? { hint: options.hint } : {}),
+    ...(options.barPointed ? { pinned: options.barPointed } : {}),
     onScreen: () => handlers.onShare?.({ kind: "screen", screen: index }),
     // Leaving the button undoes only its own preview, this screen's line, never a region since.
     onPoint: (on) => {
@@ -832,7 +836,9 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     const here = lit.kind !== "none" && lit.screen === index;
     mark(element, "data-lit-screen", here && lit.kind === "screen");
     mark(screenButton, "data-pinned", here && lit.kind === "screen", "lit");
-    mark(regionButton, "data-pinned", here && lit.kind === "region", "pressed");
+    // Drawing holds Region pressed; else a sample's pointed Region stays lit.
+    if (here && lit.kind === "region") mark(regionButton, "data-pinned", true, "pressed");
+    else mark(regionButton, "data-pinned", options.barPointed === "region", "lit");
     // A region being drawn is the one part drawn anew: when drawing starts, and gone when it ends.
     const wanted = here && lit.kind === "region" ? JSON.stringify({ rect: lit.rect }) : "";
     if (wanted === drawing) return;

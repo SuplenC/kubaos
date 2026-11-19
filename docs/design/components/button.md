@@ -6,7 +6,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `button::button(label)`; QML `Button`.
 
-**Kinds**, by what the button is for: an emphasis ladder, then three that carry a meaning.
+**Kinds**, by what the button is for: an emphasis ladder, then three that carry a meaning; the quiet two also come in the sharing colour (`colour: "sharing"` in the mockups).
 
 | Kind | At night, rest | By day, rest | For |
 |---|---|---|---|
@@ -16,6 +16,7 @@ Rust `button::button(label)`; QML `Button`.
 | `Danger` | `burn_error`, a bright fixed red, label `on_burn_error`, dark | its deeper daylight red, label fitted (white) | The action that destroys something, after a confirmation. |
 | `Success` | `burn_success`, a bright fixed green, label `on_burn_success`, dark | its deeper daylight green, label fitted | The action that completes something good: Finish. |
 | `Warning` | `burn_warning`, a bright fixed amber, label `on_burn_warning`, dark | its deeper daylight amber, label fitted | The action with a cost the user should weigh: Restart now. |
+| `Tonal`, `Text` in `sharing` | Tonal on `sharing_container`, label `on_sharing_container_rest`, dimmed; Text with no fill, label `sharing_rest`, the violet unlit | Tonal's label `on_sharing_container`; Text's `sharing` | What shares something off the machine: the share picker's Share this screen, Region and a window's Share pill. The same kinds and states in the sharing roles, lighting in `sharing` with `sharing_core`, glass `sharing_glass`; pressed, Tonal's fill is `sharing_container_pressed`, Text's day tint the violet; held, it fills with `sharing` under `on_sharing`. *Not built yet: neither library has it.* |
 
 `primary` comes from the wallpaper (matugen), so every role built on it is a recipe over the live tone (`[color.derived]` in `design/tokens.toml`), never a value. Danger, Success and Warning burn on their own fixed tones, so none can be taken for a wallpaper's accent. Every label holds 4.5:1 on every fill it sits on, at rest, lit and pressed.
 

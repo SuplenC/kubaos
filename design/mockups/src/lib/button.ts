@@ -8,6 +8,10 @@
 // the edge as unlit glass, with no glow. Each kind names the colour roles of its fill, label and
 // line in each state and look, every one a derived role computed from the live tone, and the CSS
 // crossfades them as the control lights, as the signs go off and on, and as it is pressed.
+//
+// A quiet kind can wear the sharing colour instead of the accent (`colour: "sharing"`): the same
+// kind, the same weight and states, in the sharing roles and lighting in violet, for the controls
+// that share something off the machine (the share picker's).
 
 import { type Pinned, pin } from "./control.ts";
 import { focusRing, type Tone, toneColour } from "./focus.ts";
@@ -104,6 +108,48 @@ export const COLOURS: Record<Kind, Colours> = {
   Warning: burning("burn_warning"),
 };
 
+/** The colours a kind wears: the accent's, or the sharing violet's. */
+export type ButtonColour = "accent" | "sharing";
+
+/** The kinds that can wear the sharing colour, and their colours in it, by the accent kinds' recipes. */
+export const SHARING_COLOURS: Partial<Record<Kind, Colours>> = {
+  Tonal: {
+    fill: "sharing_container",
+    fillLit: "sharing_container",
+    fillOff: "sharing_container",
+    fillPressed: "sharing_container_pressed",
+    label: "on_sharing_container_rest",
+    labelLit: "on_sharing_container",
+    labelOff: "on_sharing_container_rest",
+    line: "sharing",
+    lineOff: "sharing_glass",
+  },
+  Text: {
+    fill: null,
+    fillLit: null,
+    fillOff: null,
+    fillPressed: null,
+    label: "sharing_rest",
+    labelLit: "sharing_lit",
+    labelOff: "sharing_rest",
+    line: "sharing",
+    lineOff: "sharing_glass",
+  },
+};
+
+/** `kind`'s colours in `colour`; a kind with no sharing colours can't be asked for one. */
+export function coloursOf(kind: Kind, colour: ButtonColour = "accent"): Colours {
+  if (colour === "accent") return COLOURS[kind];
+  const colours = SHARING_COLOURS[kind];
+  if (!colours) throw new Error(`a ${kind} button has no sharing colour`);
+  return colours;
+}
+
+/** The tone `kind` lights in when it wears `colour`. */
+export function toneOf(kind: Kind, colour: ButtonColour = "accent"): Tone {
+  return colour === "sharing" ? "sharing" : TONES[kind];
+}
+
 /** A burning kind's colours: signs off, its fill stays lit, since a fill isn't a light, and its line is glass. */
 function burning(tone: string): Colours {
   return {
@@ -170,6 +216,8 @@ export interface ButtonOptions {
   readonly hold?: () => void;
   /** A held button drawn this far through its hold, 0 to 1: a sample's. */
   readonly held?: number;
+  /** The accent's colours, or, for Tonal and Text, the sharing violet's. */
+  readonly colour?: ButtonColour;
 }
 
 /**
@@ -185,6 +233,9 @@ const HOLD_FILL: Record<Kind, { readonly fill: string; readonly label: string }>
   Warning: { fill: "burn_warning_line", label: "on_burn_warning" },
 };
 
+/** What a sharing button fills with as it is held: the violet, as the quiet kinds fill with the accent. */
+const SHARING_HOLD = { fill: "sharing", label: "on_sharing" } as const;
+
 /** A symbol in a box as wide as itself and as tall as the label's line beside it. */
 export function iconInLine(name: string, style: TypeStyle, color: string): HTMLElement {
   const slot = document.createElement("span");
@@ -199,12 +250,14 @@ export function iconInLine(name: string, style: TypeStyle, color: string): HTMLE
 const role = (name: string | null) => (name ? `var(--color-${name})` : "transparent");
 
 /**
- * Sets `element`'s colours as `kind`'s, its fill, label and line in every state and look, as the
- * custom properties `.k-kind` crossfades.
+ * Sets `element`'s colours as `kind`'s in `colour`, its fill, label and line in every state and
+ * look, as the custom properties `.k-kind` crossfades, and the tone a Text kind's day press tints
+ * with.
  */
-export function paintKind(element: HTMLElement, kind: Kind): void {
-  const colours = COLOURS[kind];
+export function paintKind(element: HTMLElement, kind: Kind, colour: ButtonColour = "accent"): void {
+  const colours = coloursOf(kind, colour);
   element.dataset.kind = kind;
+  element.style.setProperty("--kind-tone", `var(--color-${toneColour(toneOf(kind, colour))})`);
   element.toggleAttribute("data-hot", kind === "Text");
   element.style.setProperty("--fill", role(colours.fill));
   element.style.setProperty("--fill-lit", role(colours.fillLit));
@@ -218,18 +271,20 @@ export function paintKind(element: HTMLElement, kind: Kind): void {
 }
 
 /**
- * Lights `element` as `kind` lights, at the radius token `corner`: its ring in the kind's tone,
- * and its content, drawn in its tone or on a fill, glowing where the kind's does. Returns the ring.
+ * Lights `element` as `kind` lights in `colour`, at the radius token `corner`: its ring in the
+ * kind's tone, and its content, drawn in its tone or on a fill, glowing where the kind's does.
+ * Returns the ring.
  */
-export function lightKind(element: HTMLElement, kind: Kind, corner: string, content: HTMLElement): HTMLElement {
+export function lightKind(element: HTMLElement, kind: Kind, corner: string, content: HTMLElement, colour: ButtonColour = "accent"): HTMLElement {
   const glowing = labelGlow(kind);
-  const ring = focusRing(element, corner, TONES[kind], filled(kind), glowing ? { content, glow: glowing } : undefined);
+  const ring = focusRing(element, corner, toneOf(kind, colour), filled(kind), glowing ? { content, glow: glowing } : undefined);
   ring.dataset.pressable = "";
   return ring;
 }
 
 export function button(options: ButtonOptions): HTMLButtonElement {
   const kind = options.kind ?? "Filled";
+  const colour = options.colour ?? "accent";
   const size = options.size ?? "Md";
   const m = METRICS[size];
   const element = document.createElement("button");
@@ -237,7 +292,7 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   element.type = "button";
   element.disabled = options.disabled ?? false;
   pin(element, options.pinned);
-  paintKind(element, kind);
+  paintKind(element, kind, colour);
   element.style.setProperty("--height", `var(--size-${m.height})`);
   element.style.setProperty("--line", `var(--type-${m.label}-line)`);
   element.style.setProperty("--padding", `var(--space-${kind === "Text" ? m.textPadding : m.padding})`);
@@ -263,8 +318,9 @@ export function button(options: ButtonOptions): HTMLButtonElement {
     const fill = document.createElement("span");
     fill.className = "k-button-hold";
     fill.setAttribute("aria-hidden", "true");
-    fill.style.setProperty("--hold-fill", role(HOLD_FILL[kind].fill));
-    fill.style.setProperty("--shown", role(HOLD_FILL[kind].label));
+    const holding = colour === "sharing" ? SHARING_HOLD : HOLD_FILL[kind];
+    fill.style.setProperty("--hold-fill", role(holding.fill));
+    fill.style.setProperty("--shown", role(holding.label));
     const copy = content.cloneNode(true) as HTMLElement;
     // The button's own content is what the geometry check reads; the fill's copy is paint.
     for (const each of [copy, ...copy.querySelectorAll<HTMLElement | SVGElement>("[data-probe]")]) delete each.dataset.probe;
@@ -274,7 +330,7 @@ export function button(options: ButtonOptions): HTMLButtonElement {
     if (options.held !== undefined) element.style.setProperty("--hold", String(options.held));
     if (options.hold) heldByKeys(element, holdable(element, options.hold, { empties: true }));
   }
-  lightKind(element, kind, "control", content);
+  lightKind(element, kind, "control", content, colour);
   const placement = disclosing ? "disclosure" : !options.icon ? "" : options.trailing ? "trailing-icon" : "leading-icon";
   return probe(element, { role: "component", name: "Button", variant: variant(kind, size, placement), fixed: FIXED_HEIGHT });
 }

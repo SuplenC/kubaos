@@ -254,9 +254,10 @@
   top: round(nearest, calc((var(--height) - var(--icon-size)) / 2), 1px);
 }
 
-/* A Text button pressed by day: its tone as a faint tint under it. By night it has no fill. */
+/* A Text button pressed by day: its tone as a faint tint under it, the accent or the sharing
+   violet it wears (`--kind-tone`). By night it has no fill. */
 .k-button[data-kind="Text"] {
-  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: rgb(from var(--kind-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
 }
 
 .k-button:disabled {
