@@ -12,6 +12,8 @@
 #   ripdrag drags files out of it (user-layer/tools/yazi/keymap.toml has the key).
 # - The right-click actions are nautilus-python extensions: Ghostty's "Open in
 #   Ghostty" and KubaOS's own, `home/files/kubaos-nautilus.py`.
+# - The list view's Total Size column, in place of Size, adds up each folder:
+#   `home/files/kubaos-folder-sizes.py`, off with `kubaos-files folder-sizes off`.
 # - A daily timer tidies ~/Downloads when the setting is on (`kubaos-files
 #   tidy on`); with it off, the default, the timer's run does nothing.
 #
@@ -116,11 +118,37 @@ in
     "nautilus-python/extensions/ghostty.py".source =
       "${pkgs.ghostty}/share/nautilus-python/extensions/ghostty.py";
     "nautilus-python/extensions/kubaos.py".source = ./files/kubaos-nautilus.py;
+    "nautilus-python/extensions/kubaos-folder-sizes.py".source = ./files/kubaos-folder-sizes.py;
   };
 
   dconf.settings = {
     # Thumbnails on network shares and phones too, not only on local disks.
     "org/gnome/nautilus/preferences".show-image-thumbnails = "always";
+    # The extension's Total Size column stands in for Size, which counts a folder's items.
+    "org/gnome/nautilus/list-view" = {
+      default-visible-columns = [
+        "name"
+        "KubaOS::total_size"
+        "date_modified"
+      ];
+      default-column-order = [
+        "name"
+        "size"
+        "KubaOS::total_size"
+        "type"
+        "owner"
+        "group"
+        "permissions"
+        "mime_type"
+        "where"
+        "date_modified"
+        "date_modified_with_time"
+        "date_accessed"
+        "date_created"
+        "recency"
+        "starred"
+      ];
+    };
     "org/gtk/gtk4/settings/file-chooser".sort-directories-first = true;
   };
 

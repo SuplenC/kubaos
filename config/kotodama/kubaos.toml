@@ -69,7 +69,8 @@ kind = "scripts"
 # `shown_when = [{ ... }, { ... }]`, lists it only while each holds. The Extension reads the
 # states from their files and reads them again when one changes
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
-# `files.tidy-daily`, `files.automount`, `workspaces.open-where-launched`,
+# `files.tidy-daily`, `files.automount`, `files.folder-sizes`,
+# `workspaces.open-where-launched`,
 # `terminal.greeting`, `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`,
 # `proxy`, `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
 # `power.critical-warning`, `power.battery-notes`,
@@ -170,6 +171,24 @@ icon = "drive-removable-media"
 keywords = ["automount", "usb", "sd card", "drive", "mount"]
 run = ["kubaos-automount", "off"]
 shown_when = { state = "files.automount", is = true }
+
+# Files' Total Size column (home/files/kubaos-folder-sizes.py): each folder's
+# total, added up in the background, or its item count; on by default.
+[extensions.kubaos.actions.folder-sizes-on]
+title = "Show folder sizes in Files"
+subtitle = "The Total Size column adds up everything inside each folder"
+icon = "drive-harddisk"
+keywords = ["folder size", "disk usage", "du", "size", "files", "nautilus", "space"]
+run = ["kubaos-files", "folder-sizes", "on"]
+shown_when = { state = "files.folder-sizes", is = false }
+
+[extensions.kubaos.actions.folder-sizes-off]
+title = "Count items in folders instead"
+subtitle = "The Total Size column shows how many items each folder holds, without adding it up"
+icon = "drive-harddisk"
+keywords = ["folder size", "disk usage", "du", "size", "files", "nautilus", "item count"]
+run = ["kubaos-files", "folder-sizes", "off"]
+shown_when = { state = "files.folder-sizes", is = true }
 
 # Your settings: the user layer, ~/.config/kubaos, in Files, whole or one
 # group at a time (scripts/dot-config open, docs/USING.md). Each folder's

@@ -10,6 +10,8 @@
 //! kubaos-files tidy [--scheduled]   sort the files in Downloads older than a day into folders by
 //!                                   kind; with --scheduled, only when the daily tidy is on
 //! kubaos-files tidy on|off          turn the daily tidy on or off
+//! kubaos-files folder-sizes on|off  turn Files' folder sizes on or off: each folder's total
+//!                                   in the Total Size column, or its item count
 //! ```
 //!
 //! # Owns
@@ -30,6 +32,7 @@ use kotodama_extension::Chain;
 use kotodama_extension::log;
 use kubaos_files::entry;
 use kubaos_files::entry::Resolver;
+use kubaos_files::folder_sizes;
 use kubaos_files::service;
 use kubaos_files::service::Entries;
 use kubaos_files::tidy;
@@ -40,11 +43,13 @@ const USAGE: &str = "\
 usage: kubaos-files open [PATH|URI]...
        kubaos-files serve
        kubaos-files tidy [--scheduled|on|off]
+       kubaos-files folder-sizes on|off
 
 open   yazi on each path or file:// URI (the home folder without one)
 serve  org.freedesktop.FileManager1 on the session bus, for D-Bus to start
 tidy   sort Downloads into folders by kind, leaving files younger than a day;
-       --scheduled only when the daily tidy is on; on|off turns the daily tidy on or off";
+       --scheduled only when the daily tidy is on; on|off turns the daily tidy on or off
+folder-sizes  on: Files' Total Size column adds up each folder; off: it counts the items";
 
 #[expect(
     clippy::print_stdout,
@@ -67,6 +72,16 @@ fn main() -> ExitCode {
                     eprintln!("{USAGE}");
                     ExitCode::from(2)
                 }
+            }
+        }
+        Some("folder-sizes") => {
+            let setting = args.next();
+            let setting = setting.as_ref().and_then(|setting| setting.to_str());
+            if let (Some(setting @ ("on" | "off")), None) = (setting, args.next()) {
+                set_folder_sizes(setting == "on")
+            } else {
+                eprintln!("{USAGE}");
+                ExitCode::from(2)
             }
         }
         Some("-h" | "--help") => {
@@ -196,6 +211,25 @@ fn set_daily(on: bool) -> ExitCode {
     match Setting::new(config).set_daily(on) {
         Ok(()) => {
             println!("The daily Downloads tidy is {}", if on { "on" } else { "off" });
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            eprintln!("kubaos-files: changing the setting: {err}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The setting's new state or the refusal is the command's answer to whoever ran it."
+)]
+fn set_folder_sizes(on: bool) -> ExitCode {
+    let (_, config) = home_and_config();
+    match folder_sizes::Setting::new(config).set(on) {
+        Ok(()) => {
+            println!("Folder sizes in Files are {}", if on { "on" } else { "off" });
             ExitCode::SUCCESS
         }
         Err(err) => {

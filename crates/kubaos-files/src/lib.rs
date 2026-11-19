@@ -9,14 +9,17 @@
 //! - The command that opens the window: [`window`].
 //! - The `org.freedesktop.FileManager1` service: [`service`].
 //! - Sorting Downloads into folders by kind: [`tidy`].
+//! - Whether Files' Total Size column adds up folders: [`folder_sizes`].
 //!
 //! # Not here
 //!
 //! - The desktop entry, the folder defaults and the daily tidy's timer: `home/files.nix`.
+//! - The Total Size column itself: `home/files/kubaos-folder-sizes.py`.
 //! - yazi's settings and keys: the user layer, `~/.config/kubaos/tools/yazi/`.
 //! - The Command menu's Files Items: `crates/kotodama-kubaos/src/files.rs`.
 
 pub mod entry;
+pub mod folder_sizes;
 pub mod service;
 pub mod tidy;
 pub mod window;

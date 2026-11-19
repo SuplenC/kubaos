@@ -6,6 +6,7 @@
 //! | `packages.<group>` | on: the optional group is on | `/etc/kubaos/apt-groups`, else the manifest's default |
 //! | `files.tidy-daily` | on: the daily Downloads tidy | `U/desktop/files/tidy-downloads` exists |
 //! | `files.automount` | on: drives mount when plugged in | `U/desktop/files/no-automount` doesn't exist |
+//! | `files.folder-sizes` | on: Files' Total Size column adds up folders | `U/desktop/files/no-folder-sizes` doesn't exist |
 //! | `workspaces.open-where-launched` | on: apps open on the workspace they were launched from | `U/desktop/workspaces/no-open-where-launched` doesn't exist |
 //! | `terminal.greeting` | on: the terminal greeting | `U/terminal/zsh/no-greeting` doesn't exist |
 //! | `keyboard.mac-accents` | on: the accents on Left Alt | `U/desktop/keyboard/keyboard.toml` |
@@ -83,6 +84,8 @@ use crate::suites::Installed;
 pub const TIDY_DAILY: &str = "files.tidy-daily";
 /// Whether drives mount when plugged in.
 pub const AUTOMOUNT: &str = "files.automount";
+/// Whether Files' Total Size column adds up each folder.
+pub const FOLDER_SIZES: &str = "files.folder-sizes";
 /// Whether apps open on the workspace they were launched from.
 pub const OPEN_WHERE_LAUNCHED: &str = "workspaces.open-where-launched";
 /// Whether a new Ghostty window greets with fastfetch.
@@ -315,6 +318,7 @@ impl States {
         let files = Files::new(config);
         self.set(TIDY_DAILY, Reading::Bool(files.tidy.daily()));
         self.set(AUTOMOUNT, Reading::Bool(files.automount.automount()));
+        self.set(FOLDER_SIZES, Reading::Bool(files.folder_sizes.is_on()));
         self.set(OPEN_WHERE_LAUNCHED, Reading::Bool(files.launches.open_where_launched()));
         self.set(GREETING, Reading::Bool(!files.no_greeting.exists()));
         self.set(PHONE_LINK, Reading::Bool(files.phone.is_on()));
@@ -354,10 +358,10 @@ pub fn values(name: &str) -> Option<Values> {
     match name {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
-        TIDY_DAILY | AUTOMOUNT | OPEN_WHERE_LAUNCHED | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY
-        | PROXY_LOCAL_NETWORK | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES | BACKGROUND_YIELDS
-        | UNFREE | PREVIEW | HELD | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE | UPDATE_BITWARDEN
-        | UPDATE_NIX | NOISE_SUPPRESSION | ECHO_CANCELLATION | TAKEOVER => Some(Values::Bool),
+        TIDY_DAILY | AUTOMOUNT | FOLDER_SIZES | OPEN_WHERE_LAUNCHED | GREETING | MAC_ACCENTS | KEEP_AWAKE
+        | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK | DND | PANEL_POWER_SAVING | CRITICAL_WARNING | BATTERY_NOTES
+        | BACKGROUND_YIELDS | UNFREE | PREVIEW | HELD | BLUETOOTH_UNNAMED | DEPTH | DEPTH_SKIPPED | FIRMWARE
+        | UPDATE_BITWARDEN | UPDATE_NIX | NOISE_SUPPRESSION | ECHO_CANCELLATION | TAKEOVER => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ if name.strip_prefix(SUITES).and_then(catalog::find).is_some() => Some(Values::Bool),
         _ => None,
@@ -414,6 +418,7 @@ impl Places {
             files.extend([
                 user_layer.tidy.path().to_path_buf(),
                 user_layer.automount.path().to_path_buf(),
+                user_layer.folder_sizes.path().to_path_buf(),
                 user_layer.launches.path().to_path_buf(),
                 user_layer.no_greeting,
                 user_layer.phone.path().to_path_buf(),
@@ -449,6 +454,7 @@ impl Places {
 struct Files {
     tidy: kubaos_files::tidy::Setting,
     automount: kubaos_automount::settings::Settings,
+    folder_sizes: kubaos_files::folder_sizes::Setting,
     launches: kubaos_launches::settings::Settings,
     no_greeting: PathBuf,
     phone: kubaos_phone::setting::Setting,
@@ -469,6 +475,7 @@ impl Files {
         Files {
             tidy: kubaos_files::tidy::Setting::new(config),
             automount: kubaos_automount::settings::Settings::new(config),
+            folder_sizes: kubaos_files::folder_sizes::Setting::new(config),
             launches: kubaos_launches::settings::Settings::new(config),
             no_greeting: kubaos_user_layer::dir(config, App::Zsh).join(NO_GREETING),
             phone: kubaos_phone::setting::Setting::new(config),
