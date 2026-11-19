@@ -589,6 +589,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element = span("ov-win", face(win));
     element.dataset.window = id;
     element.dataset.app = win.app;
+    element.toggleAttribute("data-floating", win.float !== undefined);
     winEls.set(id, element);
     return element;
   }
@@ -655,14 +656,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     readonly id: string;
     readonly element: HTMLElement;
     /** The point held, in the thing's own unscaled pixels. */
-    readonly grab: Point;
+    grab: Point;
     /** Where it was lifted from: its workspace (a window's) or group and place (a workspace's). */
     readonly from: string;
     readonly fromIndex: number;
     /** Its scale where it was lifted: a window's workspace's, a workspace's own. */
     readonly scale: number;
     /** Its own box, in the same pixels as `grab`: a window's tile, a workspace's miniature. */
-    readonly size: { readonly w: number; readonly h: number };
+    size: { readonly w: number; readonly h: number };
     target: Target | null;
     point: Point;
   }
@@ -687,14 +688,26 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    * one it is over, at the side of the window under the pointer, the others making room.
    */
   function tilesShown(space: string, area: model.Rect): Map<string, model.Rect> {
-    let tree = model.treeOf(desk.spaces.get(space)!);
-    // Lifted and not yet moved off, it still stands in its own place.
-    const home = carry?.kind === "window" && carry.target?.kind === "space" && carry.target.space === space && !carry.target.at && space === carry.from;
-    if (carry?.kind === "window" && !home) {
-      tree = model.remove(tree, carry.id);
-      if (carry.target?.kind === "space" && carry.target.space === space) tree = model.insert(tree, carry.id, carry.target.at);
+    const here = desk.spaces.get(space)!;
+    let tree = model.treeOf(here);
+    const carried = carry?.kind === "window" ? carry.id : null;
+    const over = carry?.target?.kind === "space" && carry.target.space === space;
+    const floating = carried !== null && desk.windows.get(carried)?.float !== undefined;
+    // Lifted, a tiled window leaves its tiling at once, and joins the tiling it is over.
+    if (carried && !floating) {
+      tree = model.remove(tree, carried);
+      if (over) tree = model.insert(tree, carried, (carry!.target as { at?: model.Place }).at);
     }
-    return model.layout(tree, area, L("space-s8"));
+    const rects = model.layout(tree, area, L("space-s8"));
+    // The floating windows over the tiles, each at its shares of the room; the carried one over the
+    // workspace it would land on.
+    const floats = here.windows.filter((id) => id !== carried && desk.windows.get(id)?.float);
+    if (floating && over) floats.push(carried!);
+    for (const id of floats) {
+      const share = desk.windows.get(id)!.float!;
+      rects.set(id, { x: area.x + share.x * area.w, y: area.y + share.y * area.h, w: share.w * area.w, h: share.h * area.h });
+    }
+    return rects;
   }
 
   /** Lays every screen out again and sends each element to its place, moving as `motion` says. */
@@ -1205,7 +1218,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    * with no other window: it takes the whole of it.
    */
   function placeAt(space: string, point: Point): model.Place | undefined {
-    if (!carry) return undefined;
+    if (!carry || (carry.kind === "window" && desk.windows.get(carry.id)?.float)) return undefined;
     const on = viewOfSpace(space);
     if (!on) return undefined;
     const base = model.layout(model.remove(model.treeOf(desk.spaces.get(space)!), carry.id), tilingArea(on.size.w, on.size.h), L("space-s8"));
@@ -1316,12 +1329,50 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-sy", String(slot.s));
     commit(element);
     const index = model.groupOf(desk, space).spaces.indexOf(space);
-    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, size: { w: rect.w, h: rect.h }, target: { kind: "space", space }, point };
+    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, size: { w: rect.w, h: rect.h }, target: null, point };
     posed.set(element, { x: point.x - grab.x, y: point.y - grab.y, k: 1 });
     root.dataset.carrying = "window";
     element.dataset.held = "";
     if (pending) dressBin();
+    // A tiled window lifted out of its tiling is split with nothing: it takes a lone window's shape,
+    // its screen's room, as it comes up. A floating one keeps its own.
+    if (!desk.windows.get(id)?.float) {
+      const room = tilingArea(on.size.w, on.size.h);
+      reshape(carry, { w: room.w, h: room.h });
+    }
     place("reflow");
+  }
+
+  /** A carried window's change of shape, while it runs. */
+  let reshaping = 0;
+
+  /**
+   * Eases the carried window `held` to `to`, its own size in its own pixels, over `short` on
+   * `standard` as the lift comes up, the point held keeping its share of the window so it stays under
+   * the pointer; with reduced motion, at once.
+   */
+  function reshape(held: Carry, to: { readonly w: number; readonly h: number }): void {
+    cancelAnimationFrame(reshaping);
+    const from = { ...held.size };
+    const share = { x: held.grab.x / from.w, y: held.grab.y / from.h };
+    const set = (p: number): void => {
+      if (carry !== held) return;
+      held.size = { w: from.w + (to.w - from.w) * p, h: from.h + (to.h - from.h) * p };
+      held.grab = { x: share.x * held.size.w, y: share.y * held.size.h };
+      held.element.style.setProperty("--ov-tw", css(held.size.w));
+      held.element.style.setProperty("--ov-th", css(held.size.h));
+      held.element.style.setProperty("--ov-gx", css(held.grab.x));
+      held.element.style.setProperty("--ov-gy", css(held.grab.y));
+      if (!caught && !flights.has(held.element)) pose(held, pointerPose());
+    };
+    if (settings().reduced || root.hasAttribute("data-still")) return set(1);
+    const start = performance.now();
+    const step = (now: number): void => {
+      const p = Math.min(1, (now - start) / ms("short"));
+      set(eased("standard", p));
+      if (p < 1 && carry === held) reshaping = requestAnimationFrame(step);
+    };
+    reshaping = requestAnimationFrame(step);
   }
 
   function liftSpace(id: string, point: Point): void {
@@ -1516,6 +1567,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (target?.kind !== "bin") delete was.element.dataset.held;
     delete was.element.dataset.refused;
     caught = false;
+    cancelAnimationFrame(reshaping);
     // Let go, it is no longer held: the slot calms from its solid red.
     lightBin(false);
     // Dropped mid-pull, a window's landing and a workspace's glide take its shrink from where it is.

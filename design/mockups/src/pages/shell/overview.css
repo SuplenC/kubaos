@@ -303,6 +303,11 @@
     --ov-held var(--motion-short) var(--easing-standard);
 }
 
+/* A floating window stands over the tiles; its shadow is every window's, as Hyprland draws one. */
+.ov-win[data-floating] {
+  z-index: 1;
+}
+
 /* The focused window's neon tube, as Hyprland draws the active border. */
 .ov-win[data-focused]::after {
   content: "";

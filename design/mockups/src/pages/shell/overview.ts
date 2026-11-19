@@ -170,14 +170,31 @@ const GAP_CLOSES: Move = {
 };
 
 /** The game's one window, carried over its `side`. */
+/**
+ * The window manager's tiling, as the mockup stands in for it with dwindle (`config/hypr/looks.lua`):
+ * the real Overview draws each window where the window manager has it, in whatever layout is set.
+ */
 const overGame = (side: "left" | "right" | "top" | "bottom"): Pin => ({ kind: "window", window: "w-term", to: { kind: "space", space: "s8", at: { window: "w-game", side } } });
 const onGame = (side: "left" | "right" | "top" | "bottom"): Pin => ({ kind: "placed", window: "w-term", to: { kind: "space", space: "s8", at: { window: "w-game", side } } });
 /** nvim, one of three on the centre's fourth, its left side. */
 const NVIM_LEFT = { kind: "space", space: "s9", at: { window: "w-nvim", side: "left" } } as const;
+/** On the portrait screen: lazygit carried over btop, alone on its tall workspace. */
+const BTOP_TOP = { kind: "space", space: "s5", at: { window: "w-btop", side: "top" } } as const;
+/** Telegram, floating over the centre's 2, carried to the game's workspace. */
+const CHAT_TO_GAME = { kind: "space", space: "s8" } as const;
+
+const CARRIED_TILED: Move = {
+  name: "A tiled window lifted",
+  what: "Out of its tiling it is split with nothing: over `short` it takes a lone window's shape, the grip kept under the pointer.",
+  tracks: [{ part: "its width", on: "the terminal", target: '[data-window="w-term"]', property: "--ov-tw", from: { length: "size-app_min_width" }, to: { length: "size-app_width" }, duration: "short", curve: "standard" }],
+  reduced: [{ part: "its width", on: "at once", target: '[data-window="w-term"]', property: "--ov-tw", from: { length: "size-app_width" }, to: { length: "size-app_width" }, duration: "instant", curve: "standard" }],
+  back: "cuts",
+  sample: () => still({ pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-ext2" } } }),
+};
 
 const PLACE_FOLLOWS: Move = {
   name: "The place following the pointer",
-  what: "The pointer picks the window under it and its nearest side: the dropped one takes that half, the window keeps the other.",
+  what: "A drop asks the window manager where it goes; here dwindle halves the window under the pointer, the dropped one taking that half.",
   tracks: [{ part: "the place it would take", on: "the game's workspace", target: ".ov-landing", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   reduced: "same",
   back: "plays",
@@ -285,12 +302,14 @@ export default page<Shown>({
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
     { name: "Over the game's left", for: "the terminal would take its left half", sample: at({ pin: overGame("left") }) },
     { name: "Over the game's right", for: "its right half", sample: at({ pin: overGame("right") }) },
-    { name: "Over the game's top", for: "its top half", sample: at({ pin: overGame("top") }) },
-    { name: "Over the game's bottom", for: "its bottom half", sample: at({ pin: overGame("bottom") }) },
+    { name: "Over btop, on the portrait", for: "a tall window halves top and bottom", sample: at({ focus: "portrait", pin: { kind: "window", window: "w-git", to: BTOP_TOP } }) },
     { name: "Dropped on the left", for: "the terminal left, the game right", sample: at({ pin: onGame("left") }) },
     { name: "Dropped on the right", for: "the game left, the terminal right", sample: at({ pin: onGame("right") }) },
-    { name: "Dropped on the top", for: "the terminal over the game", sample: at({ pin: onGame("top") }) },
-    { name: "Dropped on the bottom", for: "the game over the terminal", sample: at({ pin: onGame("bottom") }) },
+    { name: "Dropped over btop", for: "lazygit above btop, on the portrait", sample: at({ focus: "portrait", pin: { kind: "placed", window: "w-git", to: BTOP_TOP } }) },
+    { name: "A tiled window, carried", for: "a lone window's shape, its tiling closed up", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-ext2" } } }) },
+    { name: "A floating window", for: "Telegram over the centre's 2, above its tiles", sample: at({ pin: { kind: "lit", space: "s7" } }) },
+    { name: "A floating window, carried", for: "its own size and shape, over the game", sample: at({ pin: { kind: "window", window: "w-chat", to: CHAT_TO_GAME } }) },
+    { name: "A floating window, dropped", for: "floating on the game, at the same shares", sample: at({ pin: { kind: "placed", window: "w-chat", to: CHAT_TO_GAME } }) },
     { name: "Over one of three", for: "nvim's left: it gives up half, the rest stay", sample: at({ pin: { kind: "window", window: "w-term", to: NVIM_LEFT } }) },
     { name: "Dropped beside nvim", for: "the terminal where nvim's left half was", sample: at({ pin: { kind: "placed", window: "w-term", to: NVIM_LEFT } }) },
     { name: "Over an empty workspace", for: "no window there: it takes the whole", sample: at({ fill: "gap", pin: { kind: "window", window: "w-term", to: { kind: "space", space: "s8" } } }) },
@@ -327,7 +346,7 @@ export default page<Shown>({
     },
     rows: nonEmpty([{ name: "The centre screen", cell: screen((state: Shown) => stateOf(state)) }]),
     looks: {
-      rest: "open: the groups this screen holds",
+      rest: "each window where the window manager has it, any layout",
       lit: "the keyboard on a workspace: its tube",
       pressed: "a window carried over a workspace, its slot open",
       selected: "a workspace carried between two: they part",
@@ -355,7 +374,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING, SWIPE_OPENS],
     leaves: [CLOSING, SWIPE_CLOSES],
-    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, SLOT_REDDENS, TIMER, TIMES_OUT],
+    between: [LIFT, CARRIED_TILED, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, SLOT_REDDENS, TIMER, TIMES_OUT],
   },
   keyboard: {
     keys: [
@@ -393,6 +412,7 @@ export default page<Shown>({
       { part: "Window corners, on the desktop", token: "radius-surface" },
       { part: "Window corners, in a miniature", token: "radius-control" },
       { part: "Window gaps", token: "space-s8" },
+      { part: "A floating window's shadow", token: "shadow-panel-blur" },
       { part: "Wallpaper blur", token: "size-lock_blur" },
       { part: "Slit between two", token: "space-s4" },
       { part: "Held thing, its height", token: "size-drop_slot" },

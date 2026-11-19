@@ -33,6 +33,11 @@ export interface Win {
   readonly app: App;
   readonly title: string;
   readonly shell?: Shell;
+  /**
+   * A floating window's place and size, as shares of the room its workspace tiles in: it stands over
+   * the tiles, never in them, and keeps the same shares on any workspace it is moved to.
+   */
+  readonly float?: Rect;
 }
 
 export interface Space {
@@ -152,13 +157,16 @@ export interface Rect {
 export type Side = "left" | "right" | "top" | "bottom";
 
 /**
- * A workspace's tiling as Hyprland's dwindle holds it: a window, or a split in two, side by side
- * (`row`), one over the other (`column`), or along the longer side of the room it gets (`auto`),
- * as dwindle splits when nothing chose. `a` takes the left or top half.
+ * A workspace's tiled windows as Hyprland's dwindle holds them: a window, or a box split in two
+ * halves along its longer side, `a` taking the left or top half. Floating windows are not in it.
  */
-export type Node = { readonly window: string } | { readonly split: "row" | "column" | "auto"; readonly a: Node; readonly b: Node };
+export type Node = { readonly window: string } | { readonly split: "auto"; readonly a: Node; readonly b: Node };
 
-/** Where a window goes in a workspace: beside `window`, on its `side`. */
+/**
+ * Where a window goes in a workspace: splitting `window`'s box, on its `side`. The box is split along
+ * its longer side, as dwindle splits one; `side` only chooses which half, so it names a side across
+ * that length: left or right of a wide box, top or bottom of a tall one.
+ */
 export interface Place {
   readonly window: string;
   readonly side: Side;
@@ -170,9 +178,9 @@ function leaves(node: Node): string[] {
 }
 
 /**
- * `node` with `window` added. Placed, it splits that window: the new one takes the `side` half,
- * the window keeps the other, as a drop with a preselected direction does. Otherwise it splits the
- * last window along its longer side and takes the right or lower half, as `force_split = 2` does.
+ * `node` with `window` added: it splits a window's box along its longer side, as dwindle does. Placed,
+ * it splits that window and takes the `side` half; otherwise it splits the last window and takes the
+ * right or lower half, as `force_split = 2` does with the window opened last focused.
  */
 export function insert(node: Node | null | undefined, window: string, place?: Place): Node {
   const leaf: Node = { window };
@@ -182,9 +190,8 @@ export function insert(node: Node | null | undefined, window: string, place?: Pl
     if ("window" in at) {
       if (at.window !== target) return at;
       if (!place) return { split: "auto", a: at, b: leaf };
-      const split = place.side === "left" || place.side === "right" ? "row" : "column";
       const first = place.side === "left" || place.side === "top";
-      return { split, a: first ? leaf : at, b: first ? at : leaf };
+      return { split: "auto", a: first ? leaf : at, b: first ? at : leaf };
     }
     return { ...at, a: walk(at.a), b: walk(at.b) };
   };
@@ -221,7 +228,7 @@ export function layout(node: Node | null, area: Rect, gap: number): Map<string, 
       rects.set(at.window, room);
       return;
     }
-    const row = at.split === "row" || (at.split === "auto" && room.w >= room.h);
+    const row = room.w >= room.h;
     if (row) {
       const first = Math.round((room.w - gap) / 2);
       walk(at.a, { x: room.x, y: room.y, w: first, h: room.h });
@@ -237,14 +244,12 @@ export function layout(node: Node | null, area: Rect, gap: number): Map<string, 
 }
 
 /**
- * The side of `rect` `point` is nearest, the rect cut along its diagonals into four: the side a
- * window dropped there takes.
+ * The half of `rect` `point` is in, along the rect's longer side, the half dwindle splits it in: the
+ * side a window dropped there takes.
  */
 export function sideOf(rect: Rect, point: { readonly x: number; readonly y: number }): Side {
-  const dx = (point.x - (rect.x + rect.w / 2)) / rect.w;
-  const dy = (point.y - (rect.y + rect.h / 2)) / rect.h;
-  if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? "left" : "right";
-  return dy < 0 ? "top" : "bottom";
+  if (rect.w >= rect.h) return point.x < rect.x + rect.w / 2 ? "left" : "right";
+  return point.y < rect.y + rect.h / 2 ? "top" : "bottom";
 }
 
 // ── Changing ──────────────────────────────────────────────────────────────────────────────────
@@ -320,11 +325,14 @@ export function moveWindow(desk: Desk, window: string, landing: Landing, place?:
     groupById(desk, landing.group).spaces.splice(landing.index, 0, to.id);
     added.push(to.id);
   }
+  // A floating window floats on wherever it goes, at the same shares; only a tiled one is tiled.
+  const floating = desk.windows.get(window)?.float !== undefined;
   from.tree = remove(treeOf(from), window);
   from.windows = from.windows.filter((each) => each !== window);
   if (from.focused === window) from.focused = from.windows.at(-1) ?? null;
   const into = place && place.window !== window && to.windows.includes(place.window) ? place : undefined;
-  to.tree = insert(treeOf(to), window, into);
+  if (!floating) to.tree = insert(treeOf(to), window, into);
+  else to.tree = treeOf(to);
   to.windows.push(window);
   to.focused = window;
   return { added, removed: sweep(desk), closed: [] };
@@ -433,7 +441,9 @@ export function restore(desk: Desk, taken: Taken): Change {
   if (taken.kind === "window") {
     const now = treeOf(space);
     const same = taken.tree !== null && JSON.stringify(remove(taken.tree, taken.window)) === JSON.stringify(now);
-    space.tree = same ? taken.tree : insert(now, taken.window);
+    // A floating window comes back floating; a tiled one to its place if nothing else changed there.
+    if (desk.windows.get(taken.window)?.float) space.tree = now;
+    else space.tree = same ? taken.tree : insert(now, taken.window);
     space.windows.splice(Math.min(taken.index, space.windows.length), 0, taken.window);
     space.focused = taken.window;
   }
@@ -485,7 +495,7 @@ const SEEDS: readonly Seed[] = [
     name: "External 2",
     spaces: [
       [win("w-code", "vscode", "overview-parts.ts — kubaos"), win("w-term", "ghostty", "just mockups", "mockups")],
-      [win("w-pr", "chromium", "Pull requests · kubaos"), win("w-settings", "settings", "Settings")],
+      [win("w-pr", "chromium", "Pull requests · kubaos"), win("w-settings", "settings", "Settings"), { ...win("w-chat", "telegram", "Telegram — KubaOS"), float: { x: 0.04, y: 0.55, w: 0.32, h: 0.4 } }],
       [win("w-game", "steam", "Hades II")],
       [win("w-files", "yazi", "Pictures"), win("w-nvim", "ghostty", "nvim · tokens.toml", "nvim"), win("w-video", "showtime", "render-v3.mp4")],
     ],
@@ -554,7 +564,10 @@ export function sampleDesk(name: DeskName, fill: Fill = "everyday"): Desk {
     for (const list of lists) {
       const id = `s${++counter}`;
       for (const each of list) desk.windows.set(each.id, each);
-      desk.spaces.set(id, { id, windows: list.map((each) => each.id), focused: list[0]?.id ?? null });
+      // Its tiling as dwindle opens the tiled windows one after another; the floating ones over it.
+      let tree: Node | null = null;
+      for (const each of list) if (!each.float) tree = insert(tree, each.id);
+      desk.spaces.set(id, { id, windows: list.map((each) => each.id), focused: list[0]?.id ?? null, tree });
       group.spaces.push(id);
     }
     desk.groups.push(group);
