@@ -1,7 +1,7 @@
 // What KubaOS shows while something is on air: picking what to share, when an app asks (the
 // system's share prompt), the bar's sharing and camera pills and the panels they open, and the
-// marks on what is shared, a region's handles and grab band with them, which only the person sees,
-// never the stream.
+// marks on what is shared, a region's grab band and lit corners with them, which only the person
+// sees, never the stream.
 //
 // Picking is on the live desktop, no dialog and no dim: while a request waits the desktop works as
 // usual, each screen's frame holds a bar in the middle of its bottom edge (who asked, Share this
@@ -415,7 +415,7 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
   return drawn;
 }
 
-/** What a region's mark shows as a sample: its handles, as with the pointer near its line, or a move or a resize under way. */
+/** What a region's mark shows as a sample: its corners lit, as with the pointer near its line, or a move or a resize under way. */
 export type RegionShown = "near" | "moving" | "resizing";
 
 export interface RegionOptions {
@@ -434,7 +434,7 @@ const CORNERS: Record<"nw" | "ne" | "se" | "sw", Grab> = {
   sw: { across: "left", down: "bottom" },
 };
 
-/** The least a region moved or resized can be, each way: a large control's height, so it keeps room for its handles and stays easy to take hold of. */
+/** The least a region moved or resized can be, each way: a large control's height, so it keeps room for its corners' grips and stays easy to take hold of. */
 const leastRegion = () => length("size-control_lg");
 
 /** `began` moved by `dx`, `dy`, held inside `room`. */
@@ -461,26 +461,30 @@ function resized(began: Rect, grab: Grab, dx: number, dy: number, room: Room): R
 /**
  * Draft part, proposed: a shared region's mark, a line of `sharing_line` the thin stroke wide just
  * outside it, at a window's corner, so a region reads as a window's mark does. It can be moved and
- * resized live: its line is a grab band reaching `space.s8` either side of it, which moves the
- * region, and a handle at each corner, shown while the pointer is near the line, resizes it from
- * that corner, the opposite corner staying put. While it moves the drawing's size chip follows
- * under it. It stays inside its own screen and never gets smaller than `size.control_lg` each way.
- * Only the band and the handles take the pointer: inside, the desktop is as usual. The handles and
- * the band are the mark's own, which only the person sees, never the stream. Only a drag changes
- * it; the pointer moving near it only sets attributes.
+ * resized live, and draws no handle: its line is a grab band reaching `space.s8` either side of it.
+ * Each corner's stretch, the curve and `space.s32` of the line either side of it, resizes from that
+ * corner, the opposite corner staying put; the rest of the band moves it. While the pointer is near
+ * the line, each corner's stretch lights as a lit control's tube does, in the sharing tone (the
+ * library's ring, `focusRing`): the corner under the pointer fully, the others at
+ * `focus.near_opacity`; a corner being dragged holds the pressed, white-hot look. While it moves the
+ * drawing's size chip follows under it. It stays inside its own screen and never gets smaller than
+ * `size.control_lg` each way. Only the band takes the pointer: inside, the desktop is as usual. The
+ * band and the lit corners are the mark's own, which only the person sees, never the stream. Only a
+ * drag changes it; the pointer near it lights the corners by the stylesheet alone.
  */
 export function regionMark(start: Rect, room: Room, options: RegionOptions = {}): HTMLElement {
   const density = options.density ?? 1;
   let rect = start;
   const mark = document.createElement("span");
   mark.className = "share-region";
-  mark.style.setProperty("--corner", windowCorner().css);
+  mark.style.setProperty("--region-corner", windowCorner().css);
   place(mark, rect, room);
   const size = document.createElement("span");
   size.className = "share-region-size";
   const showSize = () => size.replaceChildren(chip({ label: regionSize(Math.round(rect.width * density), Math.round(rect.height * density)), icon: SHARE_ICONS.region }));
+  const lights = new Map<string, HTMLElement>();
   /** Follows the pointer from `event` until it lets go: `change` gives the box for how far it has gone, in the screen's logical pixels. */
-  const drag = (event: PointerEvent, doing: "moving" | "resizing", change: (began: Rect, dx: number, dy: number) => Rect) => {
+  const drag = (event: PointerEvent, doing: "moving" | "resizing", change: (began: Rect, dx: number, dy: number) => Rect, corner?: string) => {
     if (event.button !== 0) return;
     // The press is the drag's, not the window's under the band.
     event.preventDefault();
@@ -492,6 +496,8 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
     const began = rect;
     grabbed.setPointerCapture(event.pointerId);
     mark.dataset.dragging = doing;
+    const held = corner ? lights.get(corner) : undefined;
+    if (held) held.dataset.pinned = "pressed";
     showSize();
     const follow = (moving: PointerEvent) => {
       rect = change(began, (moving.clientX - event.clientX) * across, (moving.clientY - event.clientY) * down);
@@ -501,6 +507,7 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
     const end = () => {
       grabbed.removeEventListener("pointermove", follow);
       delete mark.dataset.dragging;
+      if (held) delete held.dataset.pinned;
     };
     grabbed.addEventListener("pointermove", follow);
     grabbed.addEventListener("pointerup", end, { once: true });
@@ -514,16 +521,30 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
     mark.append(band);
   }
   for (const [name, grab] of Object.entries(CORNERS)) {
-    const handle = document.createElement("span");
-    handle.className = "share-region-handle";
-    handle.dataset.corner = name;
-    handle.addEventListener("pointerdown", (event) => drag(event, "resizing", (began, dx, dy) => resized(began, grab, dx, dy, room)));
-    mark.append(handle);
+    // The corner's light: a control of its own holding the library's ring in the sharing tone,
+    // its tube laid on the line, shown only at the corner's stretch; it takes no pointer.
+    const corner = document.createElement("span");
+    corner.className = "share-region-corner";
+    corner.dataset.corner = name;
+    const light = document.createElement("span");
+    light.className = "share-region-light k-control";
+    light.toggleAttribute("data-hot", true);
+    const ring = focusRing(light, "surface", "sharing", false);
+    ring.style.setProperty("--corner", "calc(var(--region-corner) + var(--region-line))");
+    corner.append(light);
+    lights.set(name, light);
+    // Its grip: the band along the corner's stretch, which resizes from that corner.
+    const grip = document.createElement("span");
+    grip.className = "share-region-grip";
+    grip.dataset.corner = name;
+    grip.addEventListener("pointerdown", (event) => drag(event, "resizing", (began, dx, dy) => resized(began, grab, dx, dy, room), name));
+    mark.append(corner, grip);
   }
   mark.append(size);
-  if (options.shown === "near") mark.dataset.near = "";
+  if (options.shown === "near") mark.dataset.near = "se";
   else if (options.shown) {
     mark.dataset.dragging = options.shown;
+    if (options.shown === "resizing") lights.get("se")!.dataset.pinned = "pressed";
     showSize();
   }
   return mark;
@@ -760,7 +781,7 @@ export interface PickingOptions {
   readonly pill?: boolean;
   /** The asking app's hint drawn up, as under the pointer: a sample of it. */
   readonly hint?: "app";
-  /** A shared region's handles shown, or a move or a resize under way: a sample of it. */
+  /** A shared region's corners lit, or a move or a resize under way: a sample of it. */
   readonly regionShown?: RegionShown;
   /** A bar's button pointed at, on every screen's bar: a sample of it. */
   readonly barPointed?: "region" | "cancel";

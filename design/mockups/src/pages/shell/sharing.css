@@ -92,16 +92,17 @@
 }
 
 /* A shared region's mark: the thin stroke just outside the region, at a window's corner
-   (`--corner`). It takes no pointer: only its band and its handles do, so inside it the desktop is
-   as usual. */
+   (`--region-corner`). It takes no pointer: only its band does, so inside it the desktop is as
+   usual. */
 .share-region {
-  --line: max(1px, round(nearest, var(--stroke-thin), 1px));
-  --band: var(--space-s8);
-  --handle: var(--space-s12);
+  --region-line: max(1px, round(nearest, var(--stroke-thin), 1px));
+  --region-band: var(--space-s8);
+  /* How far from the region's corner each corner's stretch runs along the line. */
+  --region-stretch: var(--space-s32);
   position: absolute;
   display: block;
-  border-radius: var(--corner);
-  box-shadow: 0 0 0 var(--line) var(--color-sharing_line);
+  border-radius: var(--region-corner);
+  box-shadow: 0 0 0 var(--region-line) var(--color-sharing_line);
   pointer-events: none;
 }
 
@@ -113,88 +114,125 @@
 }
 
 .share-region-band:is([data-side="top"], [data-side="bottom"]) {
-  left: calc(-1 * (var(--line) + var(--band)));
-  right: calc(-1 * (var(--line) + var(--band)));
-  height: calc(var(--line) + 2 * var(--band));
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
+  height: calc(var(--region-line) + 2 * var(--region-band));
 }
 
 .share-region-band:is([data-side="left"], [data-side="right"]) {
-  top: calc(-1 * (var(--line) + var(--band)));
-  bottom: calc(-1 * (var(--line) + var(--band)));
-  width: calc(var(--line) + 2 * var(--band));
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
+  width: calc(var(--region-line) + 2 * var(--region-band));
 }
 
 .share-region-band[data-side="top"] {
-  top: calc(-1 * (var(--line) + var(--band)));
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
 }
 
 .share-region-band[data-side="bottom"] {
-  bottom: calc(-1 * (var(--line) + var(--band)));
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
 }
 
 .share-region-band[data-side="left"] {
-  left: calc(-1 * (var(--line) + var(--band)));
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
 }
 
 .share-region-band[data-side="right"] {
-  right: calc(-1 * (var(--line) + var(--band)));
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
 }
 
-/* A corner's handle, which resizes it from that corner: a `space.s12` disc of `sharing_container`
-   ringed in `sharing_line`, centred on the line where its corner turns, in a grab room the band
-   wide round it. It shows while the pointer is near the line, or on a handle, or a drag is under
-   way, fading over `short`; hidden, it takes no pointer, so the region's inside stays the
-   desktop's. */
-.share-region-handle {
-  --in: calc(var(--corner) - (var(--corner) + var(--line) / 2) * 0.7071);
+/* A corner's grip: the band along the corner's stretch, an L the band thick, over the band there,
+   which resizes from that corner. Drawn for the top left corner and turned for the others. */
+.share-region-grip {
+  --grip: calc(var(--region-line) + var(--region-band) + var(--region-stretch));
+  --thick: calc(var(--region-line) + 2 * var(--region-band));
   position: absolute;
   z-index: 1;
-  display: grid;
-  place-items: center;
-  width: calc(var(--handle) + 2 * var(--band));
-  height: calc(var(--handle) + 2 * var(--band));
-  margin: calc(-1 * (var(--handle) / 2 + var(--band)));
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-short) var(--easing-standard);
-}
-
-.share-region-handle::before {
-  content: "";
-  width: var(--handle);
-  height: var(--handle);
-  border-radius: var(--radius-full);
-  background: var(--color-sharing_container);
-  box-shadow: inset 0 0 0 var(--line) var(--color-sharing_line);
-}
-
-.share-region-handle[data-corner="nw"] {
-  top: var(--in);
-  left: var(--in);
-  cursor: nwse-resize;
-}
-
-.share-region-handle[data-corner="ne"] {
-  top: var(--in);
-  right: var(--in);
-  cursor: nesw-resize;
-}
-
-.share-region-handle[data-corner="se"] {
-  right: var(--in);
-  bottom: var(--in);
-  cursor: nwse-resize;
-}
-
-.share-region-handle[data-corner="sw"] {
-  bottom: var(--in);
-  left: var(--in);
-  cursor: nesw-resize;
-}
-
-.share-region:is([data-near], [data-dragging], :has(> .share-region-band:hover, > .share-region-handle:hover)) > .share-region-handle {
-  opacity: 1;
+  width: var(--grip);
+  height: var(--grip);
+  clip-path: polygon(0 0, 100% 0, 100% var(--thick), var(--thick) var(--thick), var(--thick) 100%, 0 100%);
   pointer-events: auto;
+}
+
+.share-region-grip[data-corner="nw"] {
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
+  cursor: nwse-resize;
+}
+
+.share-region-grip[data-corner="ne"] {
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
+  transform: scaleX(-1);
+  cursor: nesw-resize;
+}
+
+.share-region-grip[data-corner="se"] {
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
+  transform: scale(-1);
+  cursor: nwse-resize;
+}
+
+.share-region-grip[data-corner="sw"] {
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
+  transform: scaleY(-1);
+  cursor: nesw-resize;
+}
+
+/* A corner's light: the library's ring (`focusRing`, in the sharing tone) on a control as large as
+   the region and its line, its tube laid on the line at the line's outer corner, so lit it is the
+   line brightening and glowing as a lit control's tube does, and pressed it runs white-hot. The
+   corner holds it with room for its glow and shows only the corner's stretch of it, fading out
+   along the line. It takes no pointer. */
+.share-region-corner {
+  --reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
+  position: absolute;
+  inset: calc(-1 * (var(--region-line) + var(--reach)));
+  display: block;
+  pointer-events: none;
+  --stretch-end: calc(var(--reach) + var(--region-line) + var(--region-stretch));
+  mask-image: radial-gradient(circle at var(--at), var(--color-scrim) var(--stretch-end), transparent calc(var(--stretch-end) + var(--region-band)));
+}
+
+.share-region-corner[data-corner="nw"] {
+  --at: left top;
+}
+
+.share-region-corner[data-corner="ne"] {
+  --at: right top;
+}
+
+.share-region-corner[data-corner="se"] {
+  --at: right bottom;
+}
+
+.share-region-corner[data-corner="sw"] {
+  --at: left bottom;
+}
+
+.share-region-light {
+  position: absolute;
+  inset: var(--reach);
+  display: block;
+}
+
+.share-region-light > .k-ring {
+  --line: var(--region-line);
+}
+
+/* Near the line (on its band or a grip, a drag under way, or `data-near` for a sample): every
+   corner lit at `focus.near_opacity`, the one under the pointer (`data-near`'s corner) fully. */
+.share-region:is([data-near], [data-dragging], :has(> .share-region-band:hover, > .share-region-grip:hover)) .share-region-light:not([data-pinned]) {
+  --lit: var(--focus-near_opacity);
+}
+
+.share-region:is([data-near="nw"], :has(> .share-region-grip[data-corner="nw"]:hover)) > [data-corner="nw"] > .share-region-light,
+.share-region:is([data-near="ne"], :has(> .share-region-grip[data-corner="ne"]:hover)) > [data-corner="ne"] > .share-region-light,
+.share-region:is([data-near="se"], :has(> .share-region-grip[data-corner="se"]:hover)) > [data-corner="se"] > .share-region-light,
+.share-region:is([data-near="sw"], :has(> .share-region-grip[data-corner="sw"]:hover)) > [data-corner="sw"] > .share-region-light {
+  --lit: 1;
 }
 
 /* Its size while it moves or resizes: the drawing's chip, `space.s8` under its line from its start,
@@ -202,7 +240,7 @@
 .share-region-size {
   position: absolute;
   left: 0;
-  top: calc(100% + var(--line) + var(--space-s8));
+  top: calc(100% + var(--region-line) + var(--space-s8));
   display: flex;
   opacity: 0;
   pointer-events: none;

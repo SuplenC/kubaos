@@ -189,7 +189,7 @@ type Shown = "rest" | "lit" | "pressed";
 /** The asking app's name, as its icon's Tooltip says it. */
 const ASKER_NAME: Words = { short: "Zoom", long: "Visual Studio Code - Insiders" };
 
-/** Picking's region shared on DP-10 alone, its handles or a drag shown as `shown` says. */
+/** Picking's region shared on DP-10 alone, its corners lit or a drag shown as `shown` says. */
 const regionShared = (shown?: RegionShown) => one({ lit: { kind: "region", screen: 0, rect: REGION }, phase: "shared", ...(shown ? { regionShown: shown } : {}) });
 
 /** The window the pointer is on, its pill at rest; the pill pointed at, lit; pressed, shared. */
@@ -224,9 +224,9 @@ export default page<Shown>({
     {
       title: "A shared region, moved and resized",
       rows: [
-        { name: "Near its line", for: "four handles fade in; inside, the desktop as usual", sample: screen(() => regionShared("near")) },
+        { name: "Near its line", for: "its corners light; inside, the desktop as usual", sample: screen(() => regionShared("near")) },
         { name: "Moved by its line", for: "needs the portal to take a new box; it can't yet", sample: screen(() => regionShared("moving")) },
-        { name: "Resized by a corner", for: "the opposite corner stays; its size chip follows", sample: screen(() => regionShared("resizing")) },
+        { name: "Resized by a corner", for: "that corner white-hot; the opposite one stays", sample: screen(() => regionShared("resizing")) },
       ],
     },
   ],
@@ -256,7 +256,7 @@ export default page<Shown>({
     ],
     looks: {
       rest: "waiting: the desktop as usual, the bar out of its edge",
-      lit: "pointed at: the pill shows, a line previews, handles appear",
+      lit: "pointed at: the pill shows, a line previews, corners light",
       pressed: "a share starts; Region draws; a region moves",
     },
   },
@@ -328,9 +328,9 @@ export default page<Shown>({
         sample: screen(() => one({ lit: { kind: "screen", screen: 0 } })),
       },
       {
-        name: "A region's handles",
-        what: "The pointer near a shared region's line: its four handles fade in over `short`, and out as it leaves.",
-        tracks: [{ part: "the handles", on: "the region", target: ".share-region[data-near] > .share-region-handle", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+        name: "A region's corners light",
+        what: "The pointer near a shared region's line: its corners light over `short`, the nearest fully, and go out as it leaves.",
+        tracks: [{ part: "the corners", on: "the region", target: ".share-region[data-near] .share-region-light", property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
         sample: screen(() => regionShared("near")),
@@ -357,7 +357,7 @@ export default page<Shown>({
     samples: nonEmpty([
       { name: "Its Share pill pointed at", for: "the pill on the border, the line", sample: screen(() => one({ pointed: { ...FIREFOX_WINDOW, pill: true } })) },
       { name: "The bar alone", for: "the icon, the buttons, their gaps", sample: () => pickBar(MEET) },
-      { name: "A shared region, near its line", for: "the band, the handles, the corner", sample: screen(() => regionShared("near")) },
+      { name: "A shared region, near its line", for: "the band, the lit corners, the corner", sample: screen(() => regionShared("near")) },
     ]),
     measures: [
       { part: "Bar's padding, on its Sheet", token: "space-s16" },
@@ -372,7 +372,7 @@ export default page<Shown>({
       { part: "A screen's edge", token: "stroke-thin" },
       { part: "A region's line", token: "stroke-thin" },
       { part: "Region's grab band, either side", token: "space-s8" },
-      { part: "Region's handle", token: "space-s12" },
+      { part: "Region's lit corner, along each side", token: "space-s32" },
       { part: "Region's least size, each way", token: "size-control_lg" },
     ],
     reflow: { note: "The bar keeps to the middle of the bottom edge, one row at every width.", sample: screen(() => picking({ monitors: [NARROW] })) },
