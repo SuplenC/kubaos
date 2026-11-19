@@ -197,7 +197,7 @@ export function about(values: Values): SettingsSection {
       },
       {
         title: "Updates",
-        before: () => glanceCard(a, act),
+        before: (sub) => glanceCard(a, act, sub.partTip),
         wells: [],
       },
       {

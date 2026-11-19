@@ -97,10 +97,19 @@ export interface SettingsSub {
   readonly title: string;
   readonly body?: string;
   readonly wells: readonly (readonly Setting[])[];
-  /** A part more than rows, before its wells: the screens' arrangement, the networks in range; none while it has nothing to show. */
-  readonly before?: () => HTMLElement | null;
+  /**
+   * A part more than rows, before its wells: the screens' arrangement, the networks in range; none
+   * while it has nothing to show. It is handed its sub-section, so it can draw the sub-section's
+   * `partTip` inside itself.
+   */
+  readonly before?: (sub: SettingsSub) => HTMLElement | null;
   /** A tip about the whole sub-section, a sentence as a setting's is: under its heading, over its wells. */
   readonly tip?: string;
+  /**
+   * A tip about the part before its wells, drawn inside that part as a row's tip is drawn under its
+   * row (About's update card): Home's search finds the sub-section by it as by a heading's tip.
+   */
+  readonly partTip?: string;
 }
 
 /** A page a row opens, inside its section: its heading, its line and its wells. */
@@ -281,7 +290,7 @@ export function specOf(setting: Setting): ListRowSpec {
 
 /** The sub-sections as the template reads them, for the sidebar and Home's search. */
 export function subsOf(section: SettingsSection): SubSection[] {
-  return section.subs.map((sub) => ({ title: sub.title, ...(sub.body ? { body: sub.body } : {}), ...(sub.tip ? { tip: sub.tip } : {}), wells: sub.wells.map((well) => shownIn(well).map(specOf)) }));
+  return section.subs.map((sub) => ({ title: sub.title, ...(sub.body ? { body: sub.body } : {}), ...((sub.tip ?? sub.partTip) ? { tip: sub.tip ?? sub.partTip } : {}), wells: sub.wells.map((well) => shownIn(well).map(specOf)) }));
 }
 
 /** Where `id` is among `section`'s rows as they show now: its sub-section, and its index among the page's rows. */
@@ -646,7 +655,7 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
 
     /** A sub-section: its heading and its reset, then its wells. */
     const subOf = (sub: SettingsSub, index: number): HTMLElement =>
-      section(headed(sub.title, defaults.ofSub(sub), `sub:${index}`, sub.tip), sub.body, ...[sub.before?.() ?? null].filter((part): part is HTMLElement => part !== null), ...wellsOf(sub.wells));
+      section(headed(sub.title, defaults.ofSub(sub), `sub:${index}`, sub.tip), sub.body, ...[sub.before?.(sub) ?? null].filter((part): part is HTMLElement => part !== null), ...wellsOf(sub.wells));
 
     /** A sub-page: Back to where it was opened, then its heading and its reset over its wells. */
     const pageOf = (sub: SubPage): HTMLElement[] => {

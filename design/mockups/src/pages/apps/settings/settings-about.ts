@@ -7,7 +7,7 @@ import { dialogOver, type DialogOptions } from "../../../lib/dialog.ts";
 import { type Move, screen, type Track, type Variant } from "../../../site/page.ts";
 import { ABOUT, type Values } from "./settings-data.ts";
 import { sectionPage } from "./settings-section-page.ts";
-import { settingsWindow } from "./settings-window.ts";
+import { MINIMUM, settingsWindow } from "./settings-window.ts";
 import { copiedFact, copiedWords, HIDDEN, MACHINES, renameDialog, toastStill } from "./sections/about-parts.ts";
 import { channelQuestion, FAILS_AT, rollBackQuestion } from "./sections/updates-parts.ts";
 
@@ -55,7 +55,7 @@ const asking = (about: object, question: DialogOptions) =>
 const copied = (about: object, count: number, left: number) => () => toastStill(settingsWindow({ section: ABOUT, sub: IDENTITY, values: own(about) }), copiedWords(count, left));
 
 const VARIANTS: Variant[] = [
-  { name: "Up to date", for: "one line: the state, Updates, Check now; the tip", sample: at(UPDATES) },
+  { name: "Up to date", for: "one line: the state, Settings, Check now; the tip", sample: at(UPDATES) },
   { name: "Checking", for: "Check now off while it asks", sample: at(UPDATES, CHECKING) },
   { name: "An update is ready", for: "the release and its size; Update", sample: at(UPDATES, WAITING) },
   { name: "Updating", for: "the step running; its bar under the line", sample: at(UPDATES, UPDATING) },
@@ -69,14 +69,16 @@ const VARIANTS: Variant[] = [
   { name: "Renamed, longest", for: "the banner's line wraps", sample: at(NAME, { ...LONGEST, was: "kuba-pc" }) },
   { name: "One disk, one screen", for: "the laptop: a line each, a battery", sample: at(HARDWARE) },
   { name: "Four disks, three screens", for: "the desktop: numbered lines; no battery", sample: at(HARDWARE, DESKTOP) },
-  { name: "Nearly full", for: "memory and disk past their margin", sample: at(HARDWARE, LONGEST) },
+  { name: "Nearly full", for: "a long processor cut; memory and disk past their margin", sample: at(HARDWARE, LONGEST) },
   { name: "Identity, hidden", for: "Show in place of each value", sample: at(IDENTITY) },
   { name: "Identity, shown", for: "each value in `mono`, kept for the window", sample: at(IDENTITY, { shown: [...HIDDEN] }) },
   { name: "A line's copy button", for: "at the line's end while pointed at; lit", sample: at(SYSTEM, { pinCopy: "Kernel" }) },
   { name: "A shown fact's copy button", for: "only once its value shows", sample: at(IDENTITY, { shown: [...HIDDEN], pinCopy: "Serial number" }) },
   { name: "A hidden fact", for: "no copy button until shown", sample: at(IDENTITY, { pinCopy: "Serial number" }) },
+  { name: "Tiles, no kind's word", for: "one line each; cores and threads; the kind in the hint", sample: at(HARDWARE) },
+  { name: "Tiles at the minimum", for: "two to a row below a text column", sample: screen(() => settingsWindow({ section: ABOUT, sub: HARDWARE, values: own({}) }, MINIMUM)) },
   { name: "One fact copied", for: "“Label: value”; the toast names it", sample: screen(() => toastStill(settingsWindow({ section: ABOUT, sub: SYSTEM, values: own({}) }), copiedFact({ label: "Kernel", value: "" }))) },
-  { name: "Reporting a problem?", for: "Info banner: title, line, Copy all inside", sample: at(IDENTITY) },
+  { name: "Reporting a problem?", for: "Info banner: Copy all beside the words", sample: at(IDENTITY) },
   { name: "Copied, hidden left out", for: "the toast says what stayed out", sample: screen(copied({}, 22, 3)) },
   { name: "Copied, everything", for: "every fact shown first", sample: screen(copied({ shown: [...HIDDEN] }, 25, 0)) },
   { name: "Updates, checking", for: "the page's card while it asks", sample: updates(CHECKING) },
@@ -99,7 +101,7 @@ const MOVES: Move[] = [
   {
     name: "A line's copy button shows",
     what: "Pointed at or reached by the keyboard, it fades in over `short` on `standard`; nothing moves.",
-    tracks: [{ part: "its fade", on: COPY, target: ".ab-copy[data-shown]", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+    tracks: [{ part: "its fade", on: COPY, target: ".k-fact-action > .k-button[data-pinned]", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
     reduced: "same",
     back: "plays",
     sample: at(SYSTEM, { pinCopy: "Kernel" }),
@@ -144,9 +146,12 @@ export default sectionPage({
     { part: "Mark to name", token: "space-s16" },
     { part: "Tiles apart", token: "space-s16" },
     { part: "A tile's meter", token: "size-progress" },
+    { part: "A tile's symbol to figure", token: "space-s8" },
+    { part: "Four tiles a row from", token: "size-column" },
     { part: "Update line to its tip", token: "space-s12" },
     { part: "Update line's buttons apart", token: "space-s8" },
-    { part: "A line's copy button", token: "size-control_sm" },
+    { part: "A fact's action column", token: "size-control_sm" },
+    { part: "Banner's words to Copy all", token: "space-s16" },
     { part: "A rename's dialog", token: "size-dialog" },
     { part: "Field to its message", token: "space-s4" },
   ],

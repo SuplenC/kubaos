@@ -11,27 +11,21 @@
   display: none;
 }
 
-/* A fact's line holds its copy button at its end, over the value, centred down the line. */
-.ab-facts > .k-fact-value {
-  position: relative;
+/* A hidden fact's Show hangs its padding outside it, as a Text button at a line's start does, so
+   its symbol starts where every value does; a card would otherwise keep it in. */
+.ab-hidden {
+  --hang: 1;
 }
 
-.ab-copy {
-  position: absolute;
-  inset-inline-end: 0;
-  top: 50%;
-  translate: 0 -50%;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-short) var(--easing-standard);
+/* Its box is a value's line tall, its press fill reaching past it, so a hidden fact's line is as
+   tall as a shown one's. */
+.ab-hidden .k-button {
+  margin-block: calc((var(--type-body-line) - var(--size-control_sm)) / 2);
 }
 
-/* Shown while the pointer is on the line, its label or its value, or the keyboard is on it; a
-   sample pins one shown. */
-.ab-facts > :hover + .k-fact-value > .ab-copy,
-.ab-facts > .k-fact-value:hover > .ab-copy,
-.ab-facts > .k-fact-value:focus-within > .ab-copy,
-.ab-copy[data-shown] {
-  opacity: 1;
-  pointer-events: auto;
+/* While hidden, the label and its Show share one centre line: their baselines would leave the
+   label riding low beside a button. */
+.ab-hidden-label,
+.ab-hidden-value {
+  align-self: center;
 }

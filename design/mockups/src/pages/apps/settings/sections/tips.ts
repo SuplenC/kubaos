@@ -1,21 +1,28 @@
 // Tips: a faster or hidden way to do what a setting is about, so none of it is a secret. Each is one
 // whole sentence naming its keys as `[Key]` where they fall, true of KubaOS as it is, and says where:
 // the bind or the Command menu Item it teaches. A Command menu tip always reads "Press [Super] [Space]
-// and type “…” to …". They are laid on the sections' rows and headings by the setting's id and the
-// heading's title, so a section is written without them.
+// and type “…” to …". They are laid on the sections' rows, headings and parts by the setting's id
+// and the heading's title, so a section is written without them. A part's tip is drawn by the part
+// before a sub-section's wells, inside it (About's update card); search finds it as a heading's.
 
 import type { SettingsSection, SettingsSub, SubPage } from "../settings-parts.ts";
 
-/** One section's tips: by a setting's id, and by a sub-section's title. */
+/** One section's tips: by a setting's id, by a sub-section's title, and by the title of the sub-section whose part draws it. */
 export interface SectionTips {
   readonly rows?: Readonly<Record<string, string>>;
   readonly subs?: Readonly<Record<string, string>>;
+  readonly parts?: Readonly<Record<string, string>>;
 }
 
 /** Every section's tips, by its place in the sidebar. */
 export const TIPS: readonly SectionTips[] = [
-  // About: its update tip sits inside the update's card (`UPDATE_TIP` in about-parts.ts).
-  {},
+  // About
+  {
+    parts: {
+      // config/kotodama/kubaos.toml: "Update KubaOS". Inside the update's card.
+      Updates: "Press [Super] [Space] and type “update KubaOS” to update now.",
+    },
+  },
   // Appearance
   {
     rows: {
@@ -153,6 +160,8 @@ function lay<T extends SettingsSub | SubPage>(list: readonly T[], tips: SectionT
   for (const part of list) {
     const heading = "back" in part ? undefined : tips.subs?.[part.title];
     if (heading) Object.assign(part, { tip: heading });
+    const inside = "back" in part ? undefined : tips.parts?.[part.title];
+    if (inside) Object.assign(part, { partTip: inside });
     for (const setting of part.wells.flat()) {
       const tip = tips.rows?.[setting.id];
       if (tip) Object.assign(setting, { tip });

@@ -13,16 +13,20 @@ import { banner, tipLine } from "../../../../lib/banner.ts";
 import { button } from "../../../../lib/button.ts";
 import { buttonBar, hangs } from "../../../../lib/button-bar.ts";
 import { card, cardHeader } from "../../../../lib/card.ts";
-import { descriptionList, type Fact } from "../../../../lib/description.ts";
+import { actionCell, descriptionList, type Fact } from "../../../../lib/description.ts";
 import { type DialogOptions, dialogOver } from "../../../../lib/dialog.ts";
 import { errorBlock } from "../../../../lib/error-block.ts";
 import { field, labelled, note, setInvalid } from "../../../../lib/field.ts";
 import { iconButton } from "../../../../lib/icon-button.ts";
 import { iconTile } from "../../../../lib/icon-tile.ts";
 import { filling, grid, row, stack } from "../../../../lib/layout.ts";
+import { scaleOf } from "../../../../lib/list.ts";
+import { length } from "../../../../lib/tokens.ts";
 import { level, meter, tint } from "../../../../lib/meter.ts";
 import { progressBar } from "../../../../lib/progress.ts";
-import { text, wrapped } from "../../../../lib/text.ts";
+import { clamped, text, wrapped } from "../../../../lib/text.ts";
+import { icon } from "../../../../lib/icon.ts";
+import { withHint } from "../../../../lib/hint.ts";
 import { toast, type ToastOptions, toastRoom } from "../../../../lib/toast.ts";
 import { RELEASE } from "../../../kobo/kobo-data.ts";
 import { NEXT, releaseName, STEPS, type UpdateValues } from "./updates-parts.ts";
@@ -47,7 +51,7 @@ export interface Machine {
   readonly maker: string;
   readonly model: string;
   readonly firmware: string;
-  readonly processor: { readonly name: string; readonly cores: number };
+  readonly processor: { readonly name: string; readonly cores: number; readonly threads: number };
   readonly memory: { readonly total: number; readonly used: number };
   readonly graphics: { readonly name: string; readonly kind: string };
   readonly disks: readonly Disk[];
@@ -65,7 +69,7 @@ export const MACHINES: readonly Machine[] = [
     maker: "Lenovo",
     model: "ThinkPad X1 Carbon Gen 12",
     firmware: "N3YET62W (1.27)",
-    processor: { name: "Core Ultra 7 155H", cores: 16 },
+    processor: { name: "Core Ultra 7 155H", cores: 16, threads: 22 },
     memory: { total: 32, used: 11 },
     graphics: { name: "Intel Arc", kind: "integrated" },
     disks: [{ name: "Samsung PM9C1a", size: 1000, used: 588 }],
@@ -80,7 +84,7 @@ export const MACHINES: readonly Machine[] = [
     maker: "ASUS",
     model: "ProArt B650-Creator",
     firmware: "3024 (2026-09-12)",
-    processor: { name: "Ryzen 9 7950X", cores: 16 },
+    processor: { name: "Ryzen 9 7950X", cores: 16, threads: 32 },
     memory: { total: 64, used: 41 },
     graphics: { name: "Radeon RX 7800 XT", kind: "16 GB" },
     disks: [
@@ -103,7 +107,7 @@ export const MACHINES: readonly Machine[] = [
     maker: "Lenovo",
     model: "ThinkPad X1 Carbon Gen 12 Aura Edition (21KC00BWPB) with Intel vPro",
     firmware: "N3YET62W (1.27)",
-    processor: { name: "Core Ultra 7 165U vPro Enterprise", cores: 12 },
+    processor: { name: "Core Ultra 7 165U vPro Enterprise", cores: 12, threads: 14 },
     memory: { total: 64, used: 58 },
     graphics: { name: "Intel Graphics", kind: "integrated" },
     disks: [{ name: "Samsung PM9C1a", size: 2000, used: 1960 }],
@@ -118,6 +122,16 @@ export const MACHINES: readonly Machine[] = [
 /** A size in GB as a person reads it: TB from a thousand. */
 export function size(gb: number): string {
   return gb >= 1000 ? `${(gb / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })} TB` : `${gb} GB`;
+}
+
+/** `n` of a thing, its word in the singular or the plural, as a whole phrase: "1 core", "16 cores". */
+function counted(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** A processor's cores and threads, as its tile and its fact say them. */
+export function coresAndThreads(processor: Machine["processor"]): string {
+  return `${counted(processor.cores, "core", "cores")}, ${counted(processor.threads, "thread", "threads")}`;
 }
 
 /** How full `used` of `total` is, 0 to 1. */
@@ -147,15 +161,13 @@ export interface GlanceActions {
   readonly open: () => void;
 }
 
-/** How to update from anywhere, under the card's line as a row's tip is (config/kotodama/kubaos.toml: "Update KubaOS"). */
-export const UPDATE_TIP = "Press [Super] [Space] and type “update KubaOS” to update now.";
-
 /**
  * The update's card on About, one shape in every state: its first line the state with its symbol
- * and the release's line, the page's button and the quick action at that line's end; under it the
- * progress or the reason where there is one, then the tip, as a Settings row carries its tip.
+ * and the release's line, Settings (the Updates page) and the quick action at that line's end; under
+ * it the progress or the reason where there is one, then `tip`, its sub-section's part tip
+ * (`tips.ts`), as a Settings row carries its tip.
  */
-export function glanceCard(values: UpdateValues, act: GlanceActions): HTMLElement {
+export function glanceCard(values: UpdateValues, act: GlanceActions, tip?: string): HTMLElement {
   const last = "Last updated 16 November";
   const shape = {
     current: { glyph: "check_circle", title: "Up to date", subtitle: `Checked today at 09:12 · ${last}`, quick: { label: "Check now", kind: "Tonal" as const, icon: "manage_search" } },
@@ -164,7 +176,8 @@ export function glanceCard(values: UpdateValues, act: GlanceActions): HTMLElemen
     updating: { glyph: "progress_activity", title: `Updating to ${releaseName(NEXT)}`, subtitle: `Step ${values.at + 1} of ${STEPS.length}: ${STEPS[values.at]!.title}`, quick: null },
     failed: { glyph: "error", title: "Couldn't update", subtitle: `Tried today at 09:40 · ${last}`, quick: { label: "Try again", kind: "Filled" as const, icon: "restart_alt" } },
   }[values.update];
-  const page = button({ label: "Updates", kind: "Text", size: "Sm" });
+  // Not "Updates": beside Update, the two read alike. It opens the update settings.
+  const page = button({ label: "Settings", kind: "Text", size: "Sm", icon: "settings" });
   page.addEventListener("click", act.open);
   const buttons: HTMLElement[] = [page];
   if (shape.quick) {
@@ -177,36 +190,55 @@ export function glanceCard(values: UpdateValues, act: GlanceActions): HTMLElemen
   if (values.update === "updating") body.push(progressBar({ fraction: values.at / STEPS.length }));
   if (values.update === "failed") body.push(errorBlock({ message: "A system migration failed, so the update stopped.", hint: `Nothing after step ${values.at + 1} ran; ${releaseName(values.version)} is still here.` }));
   // The line, what it brings, and the tip `space.s12` apart, as a Settings row keeps its tip close.
-  const made = card({ body: [stack("s12", "start", ...[...body, tipLine(UPDATE_TIP)].map((each) => filling(each)))] });
+  const made = card({ body: [stack("s12", "start", ...[...body, ...(tip ? [tipLine(tip)] : [])].map((each) => filling(each)))] });
   // The Updates page's playback finds the card by these and moves its bar and its line in place.
   made.classList.add("up-card");
   made.dataset.update = values.update;
   return made;
 }
 
-/** One tile at a glance: what the part is, its figure, a line, and how full it is where that applies. */
-function glanceTile(glyph: string, title: string, subtitle: string, fullness?: number): HTMLElement {
-  const made = card({ header: { glyph, title, subtitle }, ...(fullness === undefined ? {} : { body: [meter([{ share: fullness, color: filled(fullness) }])] }) });
+/**
+ * One tile at a glance: the part's symbol and its figure on one line, cut with an ellipsis, a line
+ * under it, and how full it is where that applies. The symbol says which part it is, so the line
+ * doesn't; the part's name is the tile's accessible name and, with the whole figure, its hint.
+ */
+function glanceTile(kind: string, glyph: string, title: string, subtitle: string, fullness?: number): HTMLElement {
+  const head = row("s8", "centre", icon(glyph, "var(--type-subheading-icon)", "var(--color-on_surface)"), filling(clamped(title, "subheading")));
+  const parts: HTMLElement[] = [filling(stack("s4", "start", filling(head), filling(clamped(subtitle, "small", "on_surface_variant"))))];
+  if (fullness !== undefined) parts.push(meter([{ share: fullness, color: filled(fullness) }]));
+  const made = card({ body: parts });
   made.classList.add("ab-glance");
-  return made;
+  made.setAttribute("role", "group");
+  made.setAttribute("aria-label", kind);
+  // The figure and the line may be cut at a narrow window: the hint says both whole.
+  return withHint(made, `${kind}: ${title}, ${subtitle}`);
 }
 
-/** The hardware at a glance: processor, memory, disk and graphics, memory and disk with their meters. */
+/**
+ * The hardware at a glance: processor, memory, disk and graphics, memory and disk with their meters.
+ * Four to a row while the room is wider than a text column (`size.column`), two to a row below
+ * it, so a narrow window cuts no figure to a letter.
+ */
 export function glance(machine: Machine): HTMLElement {
   const total = machine.disks.reduce((sum, each) => sum + each.size, 0);
   const used = machine.disks.reduce((sum, each) => sum + each.used, 0);
-  const disks = machine.disks.length === 1 ? `Disk, ${size(total - used)} free` : `${machine.disks.length} disks, ${size(total - used)} free`;
-  return grid(
-    4,
-    "s16",
-    [
-      glanceTile("memory", machine.processor.name, `Processor, ${machine.processor.cores} cores`),
-      glanceTile("memory_alt", `${machine.memory.total} GB`, `Memory, ${machine.memory.used} GB in use`, share(machine.memory.used, machine.memory.total)),
-      glanceTile("hard_drive", size(total), disks, share(used, total)),
-      glanceTile("developer_board", machine.graphics.name, `Graphics, ${machine.graphics.kind}`),
-    ].map(filling),
-    { uniformRows: true },
-  );
+  const disks = machine.disks.length === 1 ? `${size(total - used)} free` : `${machine.disks.length} disks, ${size(total - used)} free`;
+  const tiles = [
+      glanceTile("Processor", "memory", machine.processor.name, coresAndThreads(machine.processor)),
+      glanceTile("Memory", "memory_alt", `${machine.memory.total} GB`, `${machine.memory.used} GB in use`, share(machine.memory.used, machine.memory.total)),
+      glanceTile(machine.disks.length === 1 ? "Disk" : "Disks", "hard_drive", size(total), disks, share(used, total)),
+      glanceTile("Graphics", "developer_board", machine.graphics.name, machine.graphics.kind.charAt(0).toUpperCase() + machine.graphics.kind.slice(1)),
+  ].map(filling);
+  const room = stack(0, "start");
+  let columns = 0;
+  const lay = (wanted: number) => {
+    if (wanted === columns) return;
+    columns = wanted;
+    room.replaceChildren(filling(grid(wanted, "s16", tiles, { uniformRows: true })));
+  };
+  lay(4);
+  new ResizeObserver(() => lay(room.clientWidth > length("size-column") * scaleOf(room) ? 4 : 2)).observe(room);
+  return filling(room);
 }
 
 /** Which hidden facts have been shown, and how one is marked shown, by its label. */
@@ -215,51 +247,52 @@ export interface Shown {
   readonly add: (label: string) => void;
 }
 
-/**
- * The copy button at the end of a fact's line: an IconButton (Text, sm) whose hint names what it
- * copies. It shows while the pointer is on the line or the keyboard is on it, fading over `short`,
- * and floats over the line's end, so it takes no room and no value moves as it comes and goes.
- */
+/** A fact's copy action: an IconButton whose hint names what it copies, pinned lit for a sample. */
 function copyButton(fact: Fact, copy: (fact: Fact) => void, pinned: boolean): HTMLElement {
   const made = iconButton({ icon: "content_paste", label: `Copy ${fact.label.toLowerCase()}`, kind: "Text", size: "Sm", ...(pinned ? { pinned: "lit" as const } : {}) });
-  made.classList.add("ab-copy");
-  made.toggleAttribute("data-shown", pinned);
   made.addEventListener("click", () => copy(fact));
   return made;
 }
 
 /**
- * A group of facts as a card, each line with its copy button; `hidden` names the labels whose
- * values wait for a click, and whose copy button comes only once they are shown.
+ * A group of facts as a card, each line with its copy action (the Description List's line action);
+ * `hidden` names the labels whose values wait for a click, and whose action comes only once shown.
  */
 export function factsCard(facts: readonly Fact[], copy: (fact: Fact) => void, hidden: readonly string[] = [], shown: Shown = { has: () => false, add: () => undefined }, pinned?: string): HTMLElement {
-  const list = descriptionList(facts);
-  list.classList.add("ab-facts");
+  const waiting = (each: Fact) => hidden.includes(each.label) && !shown.has(each.label);
+  const list = descriptionList(facts.map((each) => (waiting(each) ? each : { ...each, action: copyButton(each, copy, each.label === pinned) })));
   const values = [...list.querySelectorAll<HTMLElement>(".k-fact-value")];
   facts.forEach((each, index) => {
     const slot = values[index];
-    if (!slot) return;
-    const withCopy = () => slot.append(copyButton(each, copy, each.label === pinned));
-    if (!hidden.includes(each.label)) withCopy();
-    else slot.replaceChildren(hiddenFact(each.value, shown.has(each.label), () => shown.add(each.label), withCopy));
+    if (!slot || !hidden.includes(each.label)) return;
+    const label = slot.previousElementSibling;
+    // Hidden, the label and its Show button share one centre line; shown, the line is a fact's again.
+    const hiding = (on: boolean) => {
+      label?.classList.toggle("ab-hidden-label", on);
+      slot.classList.toggle("ab-hidden-value", on);
+    };
+    hiding(waiting(each));
+    slot.replaceChildren(
+      hiddenFact(each.value, !waiting(each), () => shown.add(each.label), () => {
+        hiding(false);
+        const cell = actionCell(slot);
+        if (cell && !cell.firstElementChild) cell.append(copyButton(each, copy, each.label === pinned));
+      }),
+    );
   });
   return card({ body: [list] });
 }
 
 /**
  * Draft part, proposed for the library: a fact hidden until it is clicked. Hidden, it is a Text sm
- * button, "Show", with the eye; pressed, the value takes its place in `mono`, and stays for the
- * window. `revealed` hears each time the value shows, so its line can take its copy button then.
+ * button, "Show", with the eye, its padding hung so its symbol starts where every value does;
+ * pressed, the value takes its place in `mono`, and stays for the window. `revealed` hears when a
+ * value is shown by a press, so its line can take its action then.
  */
 export function hiddenFact(value: string, open: boolean, opened: () => void, revealed: () => void = () => undefined): HTMLElement {
   const room = document.createElement("span");
   room.className = "ab-hidden";
-  const reveal = () => {
-    room.replaceChildren(text(value, "mono"));
-    delete room.dataset.hidden;
-    // The line is drawn first, then the button joins it beside the value.
-    requestAnimationFrame(revealed);
-  };
+  const reveal = () => room.replaceChildren(text(value, "mono"));
   if (open) {
     reveal();
     return room;
@@ -268,8 +301,9 @@ export function hiddenFact(value: string, open: boolean, opened: () => void, rev
   show.addEventListener("click", () => {
     opened();
     reveal();
+    delete room.dataset.hidden;
+    revealed();
   });
-  // A Text button hangs its padding outside it, so "Show" starts where every value does.
   room.append(hangs(row(0, "centre", show)));
   room.dataset.hidden = "";
   return room;
@@ -279,6 +313,7 @@ export function hiddenFact(value: string, open: boolean, opened: () => void, rev
 export function hardwareFacts(machine: Machine): Fact[] {
   return [
     { label: "Maker and model", value: `${machine.maker} ${machine.model}` },
+    { label: "Processor", value: `${machine.processor.name}, ${coresAndThreads(machine.processor)}` },
     { label: "Firmware (BIOS)", value: machine.firmware },
     ...machine.disks.map((each, index) => ({ label: machine.disks.length === 1 ? "Disk" : `Disk ${index + 1}`, value: `${each.name}, ${size(each.size)}`, detail: `${Math.round(share(each.used, each.size) * 100)}% full, ${size(each.size - each.used)} free` })),
     ...(machine.battery ? [{ label: "Battery", value: `${machine.battery.health}% of its first charge`, detail: `${machine.battery.cycles} cycles` }] : []),
@@ -347,11 +382,11 @@ export function factLine(fact: Fact): string {
   return `${fact.label}: ${fact.value}`;
 }
 
-/** Copy all as an Info banner: what it is for, what it gives, and the button inside it. */
+/** Copy all as an Info banner: what it is for and what it gives, the button beside them. */
 export function copyAll(copy: () => void): HTMLElement {
-  const bar = buttonBar({ actions: [{ label: "Copy all", kind: "Tonal", icon: "content_paste" }], size: "Sm" });
-  bar.actions[0]!.addEventListener("click", copy);
-  return banner({ tone: "Info", icon: "info", title: "Reporting a problem?", body: "Copy every fact on this page as text. Hidden ones go in once shown.", actions: bar.element });
+  const act = button({ label: "Copy all", kind: "Tonal", size: "Sm", icon: "content_paste" });
+  act.addEventListener("click", copy);
+  return banner({ tone: "Info", icon: "info", title: "Reporting a problem?", body: "Copy every fact on this page as text. Hidden ones go in once shown.", aside: act });
 }
 
 /** The toast room of `frame`, the window, made the first time it is asked for. */
