@@ -29,16 +29,18 @@
   min-width: 0;
 }
 
-/* A window's Share tab while a request waits: draft part, proposed (`shareTab`). Part of the
-   window's top left corner, flush with its edges, under the window's border and tube, so the
-   window's line runs on along the tab's outer edges; the tab's own line, the window line's width,
-   runs along its inner edges, shown while it is lit. Only the window under the pointer shows it,
-   fading in and out over `short`; hidden, it takes no pointer. The stylesheet does it all, so the
-   pointer moving across the windows builds nothing. */
-.share-tab {
+/* A window's Share pill while a request waits: draft part, proposed (`sharePill`). A full pill
+   centred on the window's top border line, half above it, `space.s8` past the end of the window's
+   corner, over the window's line, so pill and line are one piece, and over the neighbouring
+   windows, the gap and the bar where it reaches past its window. Only the window under the
+   pointer shows it, fading in and out over `short`; hidden, it takes no pointer. Being the
+   window's own, its half past the window keeps the window under the pointer. */
+.share-pill {
+  --border: max(1px, round(nearest, var(--stroke-thin), 1px));
   position: absolute;
-  top: 0;
-  left: 0;
+  z-index: 3;
+  top: round(nearest, calc((var(--border) - var(--size-control_sm)) / 2), 1px);
+  left: calc(var(--corner) + var(--space-s8));
   display: inline-flex;
   align-items: center;
   gap: var(--space-s4);
@@ -46,12 +48,13 @@
   height: var(--size-control_sm);
   margin: 0;
   padding: 0 var(--space-s12);
-  border: 0 solid transparent;
-  border-right-width: max(1px, round(nearest, var(--stroke-thin), 1px));
-  border-bottom-width: max(1px, round(nearest, var(--stroke-thin), 1px));
-  border-radius: var(--corner) 0 var(--radius-control) 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  --pill-fill: var(--color-sharing_container);
+  --pill-ink: var(--color-on_sharing_container);
   --layer: 0;
-  background: color-mix(in srgb, var(--color-sharing_container), var(--color-on_sharing_container) calc(var(--layer) * 100%));
+  background: color-mix(in srgb, var(--pill-fill), var(--pill-ink) calc(var(--layer) * 100%));
+  color: var(--pill-ink);
   font: inherit;
   cursor: pointer;
   opacity: 0;
@@ -59,25 +62,20 @@
   transition:
     opacity var(--motion-short) var(--easing-standard),
     background-color var(--motion-short) var(--easing-standard),
-    border-color var(--motion-short) var(--easing-standard);
+    color var(--motion-short) var(--easing-standard);
 }
 
-.share-window:is(:hover, [data-pointed]) > .share-tab {
+.share-window:is(:hover, [data-pointed]) > .share-pill {
   opacity: 1;
   pointer-events: auto;
 }
 
-/* The window's border and tube lie over the tab, so its line and the tab read as one shape. */
-.share-window > .k-ring {
-  z-index: 1;
+.share-pill:is(:hover, [data-pinned]) {
+  --pill-fill: var(--color-sharing);
+  --pill-ink: var(--color-on_sharing);
 }
 
-.share-tab:is(:hover, [data-pinned]) {
-  --layer: var(--opacity-hover);
-  border-color: var(--color-sharing_line);
-}
-
-.share-tab:is(:active, [data-pinned="pressed"]) {
+.share-pill:is(:active, [data-pinned="pressed"]) {
   --layer: var(--opacity-press);
 }
 
@@ -91,8 +89,6 @@
   grid-template-columns: repeat(var(--desk-columns, 1), minmax(0, 1fr));
   grid-template-rows: repeat(var(--desk-rows, 1), minmax(0, 1fr));
   gap: var(--space-s8);
-  /* Whatever a window lays over its tab stays among the windows, under the frame and the bar. */
-  isolation: isolate;
 }
 
 .share-window {
@@ -107,7 +103,7 @@
 }
 
 /* A shared window's border: `sharing_line`, the window border's width, over the neutral border,
-   shown while the window is shared or its Share tab is pointed at, whether or not it has the
+   shown while the window is shared or its Share pill is pointed at, whether or not it has the
    keyboard. The tube, while it has it, burns over it. */
 .share-border {
   position: absolute;
@@ -117,7 +113,7 @@
   transition: opacity var(--motion-short) var(--easing-standard);
 }
 
-.share-window:not([data-shared], :has(> .share-tab:is(:hover, [data-pinned]))) .share-border {
+.share-window:not([data-shared], :has(> .share-pill:is(:hover, [data-pinned]))) .share-border {
   opacity: 0;
 }
 

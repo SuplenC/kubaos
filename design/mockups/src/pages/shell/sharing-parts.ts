@@ -4,12 +4,12 @@
 //
 // Picking is on the live desktop, no dialog and no dim: while a request waits the desktop works as
 // usual, each screen's frame holds a bar in the middle of its bottom edge (who asked, Share this
-// screen, Region, Cancel), and the window under the pointer offers a violet Share tab in its corner.
-// Pointing at a way to share previews the very mark it keeps on air. Only drawing a region dims
-// the screen. The bar is Buttons, an IconTile, an IconButton and Tooltips from the library. The
-// desktop's windows, the window's Share tab, the on-air marks and the region's drawing are draft
-// parts, proposed for the library. The data is stand-ins: the camera's picture is one of the
-// site's photos.
+// screen, Region, Cancel), and the window under the pointer offers a violet Share pill riding its
+// top border. Pointing at a way to share previews the very mark it keeps on air. Only drawing a
+// region dims the screen. The bar is Buttons, an IconTile, an IconButton and Tooltips from the
+// library. The desktop's windows, the window's Share pill, the on-air marks and the region's
+// drawing are draft parts, proposed for the library. The data is stand-ins: the camera's picture
+// is one of the site's photos.
 
 import "./sharing.css";
 import chromium from "../../assets/apps/chromium.svg?url";
@@ -617,7 +617,7 @@ export function shareOf(lit: Lit, monitors: readonly Monitor[] = MONITORS, asker
 export interface PickHandlers {
   readonly onLight?: (lit: Lit) => void;
   readonly onShare?: (lit: Lit) => void;
-  /** A click on a window anywhere but its Share tab: it takes the keyboard, as on any day. */
+  /** A click on a window anywhere but its Share pill: it takes the keyboard, as on any day. */
   readonly onFocus?: (window: WindowAt) => void;
   readonly onCancel?: () => void;
 }
@@ -629,10 +629,10 @@ export interface PickingOptions {
   /** The window with the keyboard: the first screen's first, unless said. */
   readonly focused?: WindowAt;
   /**
-   * The window under the pointer, its Share tab shown, and the pointer on the tab, its line
+   * The window under the pointer, its Share pill shown, and the pointer on the pill, its line
    * previewed: a sample of what the pointer does.
    */
-  readonly pointed?: WindowAt & { readonly tab?: boolean };
+  readonly pointed?: WindowAt & { readonly pill?: boolean };
   /** Waiting, or shared: the bars gone, the mark kept, the pill in every bar. */
   readonly phase?: "waiting" | "shared";
   /** Built with its bars' Sheets shut, for `open` to bring them in: a request arriving live. */
@@ -691,25 +691,30 @@ export function pickBar(
 }
 
 /**
- * Draft part, proposed: the Share tab a window offers while a request waits, part of the window's
- * top left corner: flush with its top and left edges, its outer corner the window's own, its inner
- * corner the control radius, `size.control_sm` tall. It wears the on-air colour offering itself,
- * `sharing_container` with `on_sharing_container` for the window's share symbol and "Share" in
- * `button_small`; lit, the state layer's hover over its fill and `sharing_line` along its inner
- * edges, which meet the window's own line as one shape; pressed, the state layer's press. It shows
- * only on the window under the pointer (`:hover`, or `data-pointed` for a sample), and pointing at
- * it previews the window's on-air line, both by the stylesheet alone: the pointer moving builds
- * nothing. It takes no Tab: while a request waits the keyboard is the apps'. The library's Button
- * has no sharing kind and no attached shape, so it is drawn here.
+ * Draft part, proposed: the Share pill a window offers while a request waits, riding the window's
+ * top border like a tag clipped onto it: a full pill `size.control_sm` tall, centred on the
+ * border's line, half above it and half inside, starting `space.s8` past the end of the window's
+ * corner, so it never sits on the curve. The window's share symbol and "Share" in `button_small`,
+ * `space.s4` apart, `space.s12` at the ends. At rest it is the quiet sharing look,
+ * `sharing_container` with `on_sharing_container`; pointed at, it fills with `sharing` under
+ * `on_sharing` and the window's violet line previews behind it, pill and line one piece; pressed,
+ * the state layer's press. It shows only on the window under the pointer (`:hover`, which its
+ * half past the window's box keeps, being the window's own; or `data-pointed` for a sample), and
+ * lies over the neighbouring windows, the gap and the bar. The stylesheet does it all, so the
+ * pointer moving builds nothing. It takes no Tab: while a request waits the keyboard is the apps'.
+ * The library's Button would draw it with a `sharing` kind, placed on its host's edge.
  */
-export function shareTab(pinned?: "lit" | "pressed"): HTMLElement {
-  const tab = document.createElement("button");
-  tab.type = "button";
-  tab.className = "share-tab";
-  tab.tabIndex = -1;
-  if (pinned) tab.dataset.pinned = pinned;
-  tab.append(icon(SHARE_ICONS.window, "var(--type-button_small-icon)", "var(--color-on_sharing_container)"), text(WORDS.shareWindow, "button_small", "on_sharing_container"));
-  return tab;
+export function sharePill(pinned?: "lit" | "pressed"): HTMLElement {
+  const pill = document.createElement("button");
+  pill.type = "button";
+  pill.className = "share-pill";
+  pill.tabIndex = -1;
+  if (pinned) pill.dataset.pinned = pinned;
+  const word = text(WORDS.shareWindow, "button_small");
+  // The pill's ink changes as it is pointed at, so the word takes it rather than a role of its own.
+  word.style.color = "inherit";
+  pill.append(icon(SHARE_ICONS.window, "var(--type-button_small-icon)", "currentColor"), word);
+  return pill;
 }
 
 /** Workspaces 1 to 3, each with a window: what the bar shows once the person has gone to the third. */
@@ -770,11 +775,11 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     const here: WindowAt = { screen: index, index: at };
     if (!picked) {
       const under = pointed?.screen === index && pointed.index === at;
-      const offer = shareTab(under && pointed?.tab === true ? "lit" : undefined);
+      const offer = sharePill(under && pointed?.pill === true ? "lit" : undefined);
       drawn.append(offer);
       drawn.toggleAttribute("data-pointed", under);
       offer.addEventListener("click", (event) => {
-        // The tab shares; the click goes no further, so the window under it isn't focused too.
+        // The pill shares; the click goes no further, so the window under it isn't focused too.
         event.stopPropagation();
         handlers.onShare?.({ kind: "window", ...here });
       });
@@ -789,9 +794,9 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     const here = built.kind !== "none" && built.screen === index;
     const window = windows[here && built.kind === "window" ? built.index : -1];
     window?.toggleAttribute("data-shared", true);
-    // Shared by its tab, the window keeps the tab as the request gives way, for the move to sharing to fade.
+    // Shared by its pill, the window keeps the pill as the request gives way, for the move to sharing to fade.
     if (window && phase === "waiting") {
-      window.append(shareTab("lit"));
+      window.append(sharePill("lit"));
       window.toggleAttribute("data-pointed", true);
     }
     mark(element, "data-lit-screen", here && built.kind === "screen");
