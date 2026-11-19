@@ -112,11 +112,17 @@ const CLOSING: Move = {
 
 const LIFT: Move = {
   name: "Lifted",
-  what: "Pressed and moved `space.s8`: the window comes up to `scale.lift`, its shadow `shadow.lifted`.",
-  tracks: [{ part: "the window", on: "the terminal", target: ".ov-win[data-held]", property: "--ov-held", from: 0, to: 1, duration: "short", curve: "standard" }],
-  reduced: [{ part: "the window", on: "no lift", target: ".ov-win[data-held]", property: "--ov-held", from: 0, to: 0, duration: "instant", curve: "standard" }],
+  what: "Pressed and moved `space.s8`: its line lights; off every place it eases to `scale.carried`, a lone window's shape, over `short`.",
+  tracks: [
+    { part: "its lit line", on: "the terminal", target: ".ov-hold", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "its size", on: "the terminal", target: '[data-window="w-term"]', property: "--ov-shrink", from: 1, to: { scale: "carried" }, duration: "short", curve: "standard" },
+  ],
+  reduced: [
+    { part: "its lit line", on: "the terminal", target: ".ov-hold", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "its size", on: "at once", target: '[data-window="w-term"]', property: "--ov-shrink", from: { scale: "carried" }, to: { scale: "carried" }, duration: "instant", curve: "standard" },
+  ],
   back: "plays",
-  sample: () => still({ pin: WINDOW_OVER }),
+  sample: () => still({ pin: { kind: "window", window: "w-term", to: { kind: "space", space: "s6" } } }),
 };
 
 const ARRIVES: Move = {
@@ -183,31 +189,40 @@ const BTOP_TOP = { kind: "space", space: "s5", at: { window: "w-btop", side: "to
 /** Telegram, floating over the centre's 2, carried to the game's workspace. */
 const CHAT_TO_GAME = { kind: "space", space: "s8" } as const;
 
-const CARRIED_TILED: Move = {
-  name: "A tiled window lifted",
-  what: "Out of its tiling it is split with nothing: over `short` it takes a lone window's shape, the grip kept under the pointer.",
-  tracks: [{ part: "its width", on: "the terminal", target: '[data-window="w-term"]', property: "--ov-tw", from: { length: "size-app_min_width" }, to: { length: "size-app_width" }, duration: "short", curve: "standard" }],
-  reduced: [{ part: "its width", on: "at once", target: '[data-window="w-term"]', property: "--ov-tw", from: { length: "size-app_width" }, to: { length: "size-app_width" }, duration: "instant", curve: "standard" }],
-  back: "cuts",
-  sample: () => still({ pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-ext2" } } }),
-};
-
-const PLACE_FOLLOWS: Move = {
-  name: "The place following the pointer",
-  what: "A drop asks the window manager where it goes; here dwindle halves the window under the pointer, the dropped one taking that half.",
-  tracks: [{ part: "the place it would take", on: "the game's workspace", target: ".ov-landing", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
-  reduced: "same",
+const STICKS: Move = {
+  name: "Sitting where it would go",
+  what: "Where the window manager would put it, here a dwindle half, it leaves the pointer and sits there over `medium`; off it, back.",
+  tracks: [{ part: "its size", on: "the terminal", target: '[data-window="w-term"]', property: "--ov-shrink", from: { scale: "carried" }, to: 1, duration: "medium", curve: "standard_decel" }],
+  reduced: [{ part: "its size", on: "at once", target: '[data-window="w-term"]', property: "--ov-shrink", from: 1, to: 1, duration: "instant", curve: "standard" }],
   back: "plays",
   sample: () => still({ pin: overGame("left") }),
 };
 
 const DROP_SETTLES: Move = {
   name: "The drop settling",
-  what: "Let go: it comes down from `scale.lift` over `short` and flies into its place over `medium`.",
-  tracks: [{ part: "the lift", on: "the terminal", target: ".ov-win[data-held]", property: "--ov-held", from: 1, to: 0, duration: "short", curve: "standard" }],
-  reduced: [{ part: "the lift", on: "none", target: ".ov-win[data-held]", property: "--ov-held", from: 0, to: 0, duration: "instant", curve: "standard" }],
+  what: "Let go: it flies from where it is into its place over `medium`, then its line goes; let go where it sat, nothing moves.",
+  tracks: [{ part: "its lit line", on: "the terminal", target: ".ov-hold", property: "opacity", from: 1, to: 0, duration: "short", cue: "medium", curve: "standard" }],
+  reduced: [{ part: "its lit line", on: "the terminal", target: ".ov-hold", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
   back: "cuts",
   sample: () => still({ pin: overGame("right") }),
+};
+
+const SLOT_LIGHTS: Move = {
+  name: "The new slot lighting",
+  what: "Something lifted: the new-workspace slot's line and plus turn primary over `short`, its glass tinted; deeper as the place proposed.",
+  tracks: [{ part: "its tint", on: "the centre's slot", target: ".ov-plus", property: "--ov-plus-tint", from: 0, to: { opacity: "tint" }, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "plays",
+  sample: () => still({ pin: { kind: "loose", what: TERMINAL } }),
+};
+
+const COVERS: Move = {
+  name: "A second over the first",
+  what: "Pulled in over one that waits, it covers it: the first fades over `short`, its time still; pulled back out, its time restarts.",
+  tracks: [{ part: "the one waiting", on: "the terminal", target: '[data-window="w-term"]', property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "plays",
+  sample: () => still({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }),
 };
 
 const TIP_LEAVES: Move = {
@@ -242,7 +257,7 @@ const SLOT_ARRIVES: Move = {
 
 const PULLED: Move = {
   name: "Pulled into the slot",
-  what: "In the reach it leaves the pointer and flies into the slot over `medium`; out of it, back to the pointer the same way.",
+  what: "In the reach it leaves the pointer and fits the slot over `medium`, its line giving way to red; out, back again.",
   tracks: [{ part: "the carried thing", on: "the terminal", target: '[data-window="w-term"]', property: "--ov-shrink", from: 1, to: 0.25, duration: "medium", curve: "emphasized_decel" }],
   reduced: [{ part: "the carried thing", on: "there at once", target: '[data-window="w-term"]', property: "--ov-shrink", from: 0.25, to: 0.25, duration: "instant", curve: "standard" }],
   back: "plays",
@@ -295,24 +310,27 @@ export default page<Shown>({
     { name: "Ultrawide alone", for: "its group, three waiting", sample: at({ desk: "ultrawide" }) },
     { name: "The portrait screen", for: "External 1's group, upright", sample: at({ focus: "portrait" }) },
     { name: "Crossing to another screen", for: "the terminal over the screens' edge", sample: at({ view: "desk", pin: { kind: "window", window: "w-term", to: { kind: "space", space: "s4" }, crossing: 0.55 } }) },
-    { name: "On another screen's slot", for: "a window over the laptop's new slot", sample: at({ view: "desk", pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-laptop" } } }) },
+    { name: "On another screen's slot", for: "a lone window in the laptop's new slot, lit", sample: at({ view: "desk", pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-laptop" } } }) },
     { name: "Between two workspaces", for: "a window: a new workspace there", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "between", group: "g-ext2", index: 2 } } }) },
-    { name: "A workspace to another screen", for: "the centre's 4 into the portrait's group", sample: at({ view: "desk", pin: { kind: "space", space: "s9", to: { kind: "between", group: "g-ext1", index: 1 } } }) },
+    { name: "A workspace to another screen", for: "the centre's 4 in the room the portrait's group opens", sample: at({ view: "desk", pin: { kind: "space", space: "s9", to: { kind: "between", group: "g-ext1", index: 1 } } }) },
     { name: "Refused by a full group", for: "ten in use: it dims, no room", sample: at({ view: "desk", fill: "full", pin: { kind: "space", space: "s1", to: { kind: "refused", group: "g-ext2" } } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
-    { name: "Over the game's left", for: "the terminal would take its left half", sample: at({ pin: overGame("left") }) },
-    { name: "Over the game's right", for: "its right half", sample: at({ pin: overGame("right") }) },
-    { name: "Over btop, on the portrait", for: "a tall window halves top and bottom", sample: at({ focus: "portrait", pin: { kind: "window", window: "w-git", to: BTOP_TOP } }) },
+    { name: "Over the game's left", for: "the terminal sits in its left half", sample: at({ pin: overGame("left") }) },
+    { name: "Over the game's right", for: "it sits in its right half", sample: at({ pin: overGame("right") }) },
+    { name: "Over btop, on the portrait", for: "a tall window: it sits in the top half", sample: at({ focus: "portrait", pin: { kind: "window", window: "w-git", to: BTOP_TOP } }) },
     { name: "Dropped on the left", for: "the terminal left, the game right", sample: at({ pin: onGame("left") }) },
     { name: "Dropped on the right", for: "the game left, the terminal right", sample: at({ pin: onGame("right") }) },
     { name: "Dropped over btop", for: "lazygit above btop, on the portrait", sample: at({ focus: "portrait", pin: { kind: "placed", window: "w-git", to: BTOP_TOP } }) },
-    { name: "A tiled window, carried", for: "a lone window's shape, its tiling closed up", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-ext2" } } }) },
+    { name: "A tiled window, carried", for: "off every place: half its miniature's size, a lone window's shape", sample: at({ pin: { kind: "loose", what: TERMINAL } }) },
+    { name: "Over the new slot", for: "a lone window in it, the slot lit", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-ext2" } } }) },
+    { name: "A workspace, carried", for: "off every place: as lifted, under the pointer", sample: at({ pin: { kind: "loose", what: GAME } }) },
     { name: "A floating window", for: "Telegram over the centre's 2, above its tiles", sample: at({ pin: { kind: "lit", space: "s7" } }) },
-    { name: "A floating window, carried", for: "its own size and shape, over the game", sample: at({ pin: { kind: "window", window: "w-chat", to: CHAT_TO_GAME } }) },
-    { name: "A floating window, dropped", for: "floating on the game, at the same shares", sample: at({ pin: { kind: "placed", window: "w-chat", to: CHAT_TO_GAME } }) },
-    { name: "Over one of three", for: "nvim's left: it gives up half, the rest stay", sample: at({ pin: { kind: "window", window: "w-term", to: NVIM_LEFT } }) },
+    { name: "A floating window, carried", for: "its own shape at the game's scale, under the pointer", sample: at({ pin: { kind: "window", window: "w-chat", to: CHAT_TO_GAME } }) },
+    { name: "A floating one off every place", for: "its own shape, half its miniature's size", sample: at({ pin: { kind: "loose", what: { window: "w-chat" } } }) },
+    { name: "A floating window, dropped", for: "floating on the game where it was let go", sample: at({ pin: { kind: "placed", window: "w-chat", to: CHAT_TO_GAME } }) },
+    { name: "Over one of three", for: "it sits in nvim's left half, the rest stay", sample: at({ pin: { kind: "window", window: "w-term", to: NVIM_LEFT } }) },
     { name: "Dropped beside nvim", for: "the terminal where nvim's left half was", sample: at({ pin: { kind: "placed", window: "w-term", to: NVIM_LEFT } }) },
-    { name: "Over an empty workspace", for: "no window there: it takes the whole", sample: at({ fill: "gap", pin: { kind: "window", window: "w-term", to: { kind: "space", space: "s8" } } }) },
+    { name: "Over an empty workspace", for: "no window there: it sits in the whole", sample: at({ fill: "gap", pin: { kind: "window", window: "w-term", to: { kind: "space", space: "s8" } } }) },
     { name: "Dropped on the empty one", for: "the terminal fills the empty 3", sample: at({ fill: "gap", pin: { kind: "placed", window: "w-term", to: { kind: "space", space: "s8" } } }) },
     { name: "Three fingers up, half way", for: "arriving as far as the swipe has gone", sample: at({ closed: true, pin: { kind: "swiping", opening: true, progress: 0.5 } }) },
     { name: "Three fingers down, half way", for: "closing as far as the swipe has gone", sample: at({ pin: { kind: "swiping", opening: false, progress: 0.5 } }) },
@@ -323,7 +341,7 @@ export default page<Shown>({
     { name: "Over the delete slot", for: "pulled in and held: solid red; let go, it waits", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
     { name: "A workspace over the slot", for: "right-dragged: its miniature held in the slot", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
     { name: "Waiting to close", for: "red glass, three fifths of its time left", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }) },
-    { name: "A second one over it", for: "held while one waits: solid red, both in the slot", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
+    { name: "A second one over it", for: "it covers the one waiting, whose time stands still", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
     { name: "The second dropped", for: "the first deleted, the second waiting afresh", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
     { name: "Taken back out", for: "dragged out of the slot: carried again, its timer gone", sample: at({ pin: { kind: "picked", what: TERMINAL } }) },
     { name: "The tip, shown", for: "nothing learned yet: the bottom left corner, 1:1", sample: corner({}, "left", 720, 160) },
@@ -348,8 +366,8 @@ export default page<Shown>({
     looks: {
       rest: "each window where the window manager has it, any layout",
       lit: "the keyboard on a workspace: its tube",
-      pressed: "a window carried over a workspace, its slot open",
-      selected: "a workspace carried between two: they part",
+      pressed: "a window carried, sitting where it would go",
+      selected: "a workspace carried, sitting in the room opened",
       empty: "nothing open: one workspace, its slot",
     },
   },
@@ -357,6 +375,7 @@ export default page<Shown>({
     tubes: [
       { name: "A workspace, by the keyboard", tone: "accent", filled: false, content: false },
       { name: "A carry's target", tone: "accent", filled: false, content: false },
+      { name: "What is carried", tone: "accent", filled: false, content: false },
       { name: "The delete slot, held in", tone: "burn_error", filled: true, content: false },
     ],
     looks: { lit: "the tube round the miniature, its glow outside", signsOff: "the tube as glass, no glow" },
@@ -374,7 +393,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING, SWIPE_OPENS],
     leaves: [CLOSING, SWIPE_CLOSES],
-    between: [LIFT, CARRIED_TILED, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, SLOT_REDDENS, TIMER, TIMES_OUT],
+    between: [LIFT, STICKS, SLOT_LIGHTS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, SLOT_REDDENS, TIMER, COVERS, TIMES_OUT],
   },
   keyboard: {
     keys: [
@@ -415,8 +434,12 @@ export default page<Shown>({
       { part: "A floating window's shadow", token: "shadow-panel-blur" },
       { part: "Wallpaper blur", token: "size-lock_blur" },
       { part: "Slit between two", token: "space-s4" },
-      { part: "Held thing, its height", token: "size-drop_slot" },
-      { part: "Gap round a held thing", token: "space-s16" },
+      { part: "A carried window, of its miniature", token: "scale-carried" },
+      { part: "New slot's line", token: "stroke-thin" },
+      { part: "New slot lit, carrying", token: "opacity-tint" },
+      { part: "New slot lit, proposed", token: "opacity-selection" },
+      { part: "Slot's room, its height", token: "size-drop_slot" },
+      { part: "Slot's room, in from its line", token: "space-s16" },
       { part: "Slot in from the corner", token: "space-s48" },
       { part: "Slot's timer", token: "size-progress" },
       { part: "Slot warmed, carrying", token: "opacity-tint" },

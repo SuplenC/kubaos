@@ -903,9 +903,9 @@ window_shadow = 0.33
 # the lock comes up, shrinking to it as they fade, and growing from it as the
 # lock gives way.
 behind = 0.96
-# A thing picked up to be carried, a window or a workspace in the Overview: it comes toward you by
-# this much while it is held, so it reads as lifted off the desk rather than slid along it.
-lift = 1.04
+# A window carried in the Overview, away from any place it could take: drawn this share of the size
+# it has on its workspace's miniature, a lone window's shape, so it never hides what it is over.
+carried = 0.5
 # How far round a drop target a carried thing counts as on it, a share of its screen's shorter side,
 # measured from the target's middle: the Overview's delete zone takes a drop anywhere in the quarter
 # circle of the corner a person throws a drag at (270 on a 1080 tall screen, 360 on 1440), not only

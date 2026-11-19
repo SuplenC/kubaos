@@ -16,11 +16,12 @@
 
 import "./overview.css";
 import { tipLine } from "../../lib/banner.ts";
-import { focusRing } from "../../lib/focus.ts";
+import { focusRing, steadyGlow } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
 import { length, number, raw } from "../../lib/tokens.ts";
+import type { Easing } from "../../site/page.ts";
 import { eased } from "../../site/recipe.ts";
 import { settings } from "../../site/settings.ts";
 import { barScreen } from "./bar-parts.ts";
@@ -68,7 +69,9 @@ export type Pin =
   /** Three fingers on the touchpad, the Overview `progress` of the way open: opening from closed, or closing. */
   | { readonly kind: "swiping"; readonly opening: boolean; readonly progress: number }
   /** A thing dropped in the slot, then taken back out and carried half way home. */
-  | { readonly kind: "picked"; readonly what: Carried };
+  | { readonly kind: "picked"; readonly what: Carried }
+  /** A thing carried off every place: the pointer in the middle of the screen's bottom margin. */
+  | { readonly kind: "loose"; readonly what: Carried };
 
 /** A drag the tip teaches: a window's with the left button, a workspace's with the right. */
 export type Learned = "window" | "space";
@@ -488,7 +491,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   const labelEls = new Map<string, HTMLElement>();
   /** Each window's tile on its workspace's desktop, in the screen's logical pixels. */
   const tiles = new Map<string, model.Rect>();
-  const landing = span("ov-landing");
 
   // ── The screens ──
 
@@ -616,7 +618,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function plusEl(group: string): HTMLElement {
     let element = plusEls.get(group);
     if (element) return element;
-    element = span("ov-plus", icon("add", "var(--icon-s24)", "var(--color-outline)"));
+    element = span("ov-plus", icon("add", "var(--icon-s24)", "var(--ov-plus-ink)"));
     element.dataset.group = group;
     plusEls.set(group, element);
     return element;
@@ -651,19 +653,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   // ── Where everything goes ──
 
   /** What a carry is showing now: the thing carried, where it would land. */
-  interface Carry {
-    readonly kind: "window" | "space";
+  interface Carry extends Posed {
     readonly id: string;
-    readonly element: HTMLElement;
-    /** The point held, in the thing's own unscaled pixels. */
-    grab: Point;
+    /** The point held, as shares of the box drawn: it stays under the pointer whatever the size. */
+    readonly grab: Point;
     /** Where it was lifted from: its workspace (a window's) or group and place (a workspace's). */
     readonly from: string;
     readonly fromIndex: number;
-    /** Its scale where it was lifted: a window's workspace's, a workspace's own. */
-    readonly scale: number;
-    /** Its own box, in the same pixels as `grab`: a window's tile, a workspace's miniature. */
-    size: { readonly w: number; readonly h: number };
     target: Target | null;
     point: Point;
   }
@@ -684,8 +680,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * How a workspace tiles now, in `area`: a carried window out of the one it came from, and in the
-   * one it is over, at the side of the window under the pointer, the others making room.
+   * How a workspace tiles now, in `area`: a carried tiled window out of the one it came from, and in
+   * the one it is over, in the half the pointer proposes, the others making room. A carried floating
+   * window is in no tiling: it floats where it is let go.
    */
   function tilesShown(space: string, area: model.Rect): Map<string, model.Rect> {
     const here = desk.spaces.get(space)!;
@@ -699,10 +696,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (over) tree = model.insert(tree, carried, (carry!.target as { at?: model.Place }).at);
     }
     const rects = model.layout(tree, area, L("space-s8"));
-    // The floating windows over the tiles, each at its shares of the room; the carried one over the
-    // workspace it would land on.
+    // The floating windows over the tiles, each at its shares of the room.
     const floats = here.windows.filter((id) => id !== carried && desk.windows.get(id)?.float);
-    if (floating && over) floats.push(carried!);
     for (const id of floats) {
       const share = desk.windows.get(id)!.float!;
       rects.set(id, { x: area.x + share.x * area.w, y: area.y + share.y * area.h, w: share.w * area.w, h: share.h * area.h });
@@ -819,20 +814,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-ad", reduced ? "0s" : delay);
   }
 
-  /** Tiles workspace `id`'s windows on its desktop, a landing slot where a carried window would go. */
+  /** Tiles workspace `id`'s windows on its desktop, room left where a carried window would go. */
   function tileSpace(id: string, on: ScreenView, motion: Motion): void {
     const made = spaceEl(id);
     const rects = tilesShown(id, tilingArea(on.size.w, on.size.h));
     const focused = desk.spaces.get(id)!.focused;
     rects.forEach((rect, win) => {
-      if (carry?.kind === "window" && carry.id === win) {
-        // The place it would take, in its shape: it glides between sides as the pointer moves.
-        const fresh = landing.parentElement !== made.desk || !landing.hasAttribute("data-shown");
-        if (landing.parentElement !== made.desk) made.desk.append(landing);
-        setTile(landing, rect, fresh ? "none" : "reflow");
-        landing.dataset.shown = "";
-        return;
-      }
+      // The carried window sits in its place itself (`stuckPose`).
+      if (carry?.kind === "window" && carry.id === win) return;
       const element = windowEl(win);
       tiles.set(win, rect);
       if (element.parentElement !== made.desk && !element.hasAttribute("data-lifted") && !element.hasAttribute("data-landing")) {
@@ -844,7 +833,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       setTile(element, rect, motion);
       element.toggleAttribute("data-focused", win === focused);
     });
-    if (landing.parentElement === made.desk && !(carry?.kind === "window" && carry.target?.kind === "space" && carry.target.space === id)) delete landing.dataset.shown;
   }
 
   function setTile(element: HTMLElement, rect: model.Rect, motion: Motion): void {
@@ -913,6 +901,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       aim.dataset.shown = "";
     } else delete aim.dataset.shown;
     if (carry) carry.element.toggleAttribute("data-refused", target?.kind === "refused");
+    for (const [group, element] of plusEls) element.toggleAttribute("data-proposed", target?.kind === "plus" && target.group === group);
   }
 
   let selected: string | null = null;
@@ -1231,7 +1220,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * Where a carried workspace would go at `point`: the place in a section the point is in, among the
+   * Where a carried workspace would go with its middle at `point`: the place in a section the point is in, among the
    * workspaces of the grid as it will be drawn with the room opened there, in reading order, the
    * carried one left out; refused by a full group.
    *
@@ -1244,7 +1233,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    */
   function spaceTarget(point: Point): Target | null {
     if (!carry) return null;
-    if (overBin(point)) return { kind: "bin" };
     let target = spaceTargetIn(point, new Map(views.map((each) => [each.screen.id, each.layout])));
     for (let tries = 0; tries < 3 && target?.kind === "between"; tries++) {
       const at = roomOf(target);
@@ -1294,16 +1282,14 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return null;
   }
 
-  /** The scale a carried window is drawn at over `target`: the workspace's it would join. */
-  function scaleOver(target: Target | null): number {
-    if (!carry) return 1;
-    if (!target || target.kind === "refused" || target.kind === "bin") return carry.scale;
-    if (target.kind === "space") return worldBox(target)?.s ?? carry.scale;
-    for (const each of views) {
-      const section = each.layout.sections.find((s) => s.group === target.group);
-      if (section) return section.places[0]?.s ?? carry.scale;
-    }
-    return carry.scale;
+  /**
+   * A window's own box away from any place, in its screen's pixels: split with nothing, a tiled one
+   * takes a lone window's shape, its screen's room; a floating one keeps its own.
+   */
+  function ownOf(id: string, on: ScreenView, rect: model.Rect): { w: number; h: number } {
+    if (desk.windows.get(id)?.float) return { w: rect.w, h: rect.h };
+    const room = tilingArea(on.size.w, on.size.h);
+    return { w: room.w, h: room.h };
   }
 
   function liftWindow(id: string, point: Point): void {
@@ -1313,66 +1299,27 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const rect = tiles.get(id);
     const element = winEls.get(id);
     if (!on || !slot || !rect || !element) return;
-    const x = on.at.x + slot.x + rect.x * slot.s;
-    const y = on.at.y + slot.y + rect.y * slot.s;
-    const grab = { x: (point.x - x) / slot.s, y: (point.y - y) / slot.s };
-    // Off its miniature it keeps the corner the miniature gave it, as drawn at that moment.
-    element.style.setProperty("--ov-corner", getComputedStyle(element).getPropertyValue("--ov-corner"));
+    const at: Pose = { x: on.at.x + slot.x + rect.x * slot.s, y: on.at.y + slot.y + rect.y * slot.s, w: rect.w, h: rect.h, s: slot.s, k: 1 };
+    const grab = { x: (point.x - at.x) / (rect.w * slot.s), y: (point.y - at.y) / (rect.h * slot.s) };
     lift.append(element);
+    delete element.dataset.landing;
     element.dataset.lifted = "";
     glide(element, "none");
-    element.style.setProperty("--ov-gx", css(grab.x));
-    element.style.setProperty("--ov-gy", css(grab.y));
-    element.style.setProperty("--ov-tx", css(point.x - grab.x));
-    element.style.setProperty("--ov-ty", css(point.y - grab.y));
-    element.style.setProperty("--ov-sx", String(slot.s));
-    element.style.setProperty("--ov-sy", String(slot.s));
-    commit(element);
+    // Drawn from its top left corner: a pose is the box it is drawn in.
+    element.style.setProperty("--ov-gx", "0px");
+    element.style.setProperty("--ov-gy", "0px");
     const index = model.groupOf(desk, space).spaces.indexOf(space);
-    carry = { kind: "window", id, element, grab, from: space, fromIndex: index, scale: slot.s, size: { w: rect.w, h: rect.h }, target: null, point };
-    posed.set(element, { x: point.x - grab.x, y: point.y - grab.y, k: 1 });
+    carry = { kind: "window", id, element, own: ownOf(id, on, rect), scale: slot.s, grab, from: space, fromIndex: index, target: null, point };
+    pose(carry, at);
+    commit(element);
     root.dataset.carrying = "window";
     element.dataset.held = "";
+    holdRing(carry);
     if (pending) dressBin();
-    // A tiled window lifted out of its tiling is split with nothing: it takes a lone window's shape,
-    // its screen's room, as it comes up. A floating one keeps its own.
-    if (!desk.windows.get(id)?.float) {
-      const room = tilingArea(on.size.w, on.size.h);
-      reshape(carry, { w: room.w, h: room.h });
-    }
-    place("reflow");
-  }
-
-  /** A carried window's change of shape, while it runs. */
-  let reshaping = 0;
-
-  /**
-   * Eases the carried window `held` to `to`, its own size in its own pixels, over `short` on
-   * `standard` as the lift comes up, the point held keeping its share of the window so it stays under
-   * the pointer; with reduced motion, at once.
-   */
-  function reshape(held: Carry, to: { readonly w: number; readonly h: number }): void {
-    cancelAnimationFrame(reshaping);
-    const from = { ...held.size };
-    const share = { x: held.grab.x / from.w, y: held.grab.y / from.h };
-    const set = (p: number): void => {
-      if (carry !== held) return;
-      held.size = { w: from.w + (to.w - from.w) * p, h: from.h + (to.h - from.h) * p };
-      held.grab = { x: share.x * held.size.w, y: share.y * held.size.h };
-      held.element.style.setProperty("--ov-tw", css(held.size.w));
-      held.element.style.setProperty("--ov-th", css(held.size.h));
-      held.element.style.setProperty("--ov-gx", css(held.grab.x));
-      held.element.style.setProperty("--ov-gy", css(held.grab.y));
-      if (!caught && !flights.has(held.element)) pose(held, pointerPose());
-    };
-    if (settings().reduced || root.hasAttribute("data-still")) return set(1);
-    const start = performance.now();
-    const step = (now: number): void => {
-      const p = Math.min(1, (now - start) / ms("short"));
-      set(eased("standard", p));
-      if (p < 1 && carry === held) reshaping = requestAnimationFrame(step);
-    };
-    reshaping = requestAnimationFrame(step);
+    showBin(point);
+    // It comes up over the lift's `short`: to its place if the pointer proposes one, else to its
+    // carried size under the pointer.
+    retarget(targetOf(point), "short", "standard");
   }
 
   function liftSpace(id: string, point: Point): void {
@@ -1380,61 +1327,91 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const slot = on?.layout.spaces.get(id);
     const made = spaceEls.get(id);
     if (!on || !slot || !made) return;
-    const grab = { x: point.x - on.at.x - slot.x, y: point.y - on.at.y - slot.y };
+    const at: Pose = { x: on.at.x + slot.x, y: on.at.y + slot.y, w: slot.w, h: slot.h, s: slot.s, k: 1 };
+    const grab = { x: (point.x - at.x) / slot.w, y: (point.y - at.y) / slot.h };
     const group = model.groupOf(desk, id);
-    carry = { kind: "space", id, element: made.root, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: slot.s, size: { w: slot.w, h: slot.h }, target: null, point };
-    posed.set(made.root, { x: point.x - grab.x, y: point.y - grab.y, k: 1 });
     lift.append(made.root);
+    delete made.root.dataset.landing;
     made.root.dataset.lifted = "";
     for (const part of [made.root, made.desk, made.tag]) glide(part, "none");
-    made.root.style.setProperty("--ov-gx", css(grab.x));
-    made.root.style.setProperty("--ov-gy", css(grab.y));
-    made.root.style.setProperty("--ov-x", css(point.x - grab.x));
-    made.root.style.setProperty("--ov-y", css(point.y - grab.y));
+    made.root.style.setProperty("--ov-gx", "0px");
+    made.root.style.setProperty("--ov-gy", "0px");
+    carry = { kind: "space", id, element: made.root, own: { w: slot.w, h: slot.h }, scale: slot.s, grab, from: group.id, fromIndex: group.spaces.indexOf(id), target: null, point };
+    pose(carry, at);
     commit(made.root);
     root.dataset.carrying = "space";
-    carry.target = spaceTarget(point);
+    made.root.dataset.held = "";
+    holdRing(carry);
     if (pending) dressBin();
-    place("reflow");
+    showBin(point);
+    retarget(targetOf(point), "short", "standard");
+  }
+
+  /**
+   * Where the carried thing would go with the pointer at `point`. A window goes where the pointer
+   * is; a workspace where its own middle is, as drawn under the pointer, wherever it is held. The
+   * slot takes either by the pointer, as its reach is drawn round it.
+   */
+  function targetOf(point: Point): Target | null {
+    if (!carry) return null;
+    if (overBin(point)) return { kind: "bin" };
+    if (carry.kind === "window") return windowTarget(point);
+    const free = pointerPose();
+    return spaceTarget({ x: free.x + free.w / 2, y: free.y + free.h / 2 });
   }
 
   function moveCarry(point: Point): void {
     if (!carry) return;
     carry.point = point;
-    const element = carry.element;
-    if (!caught && !flights.has(element)) pose(carry, pointerPose());
     showBin(point);
-    const target = carry.kind === "window" ? windowTarget(point) : spaceTarget(point);
-    if (sameTarget(target, carry.target)) return;
-    carry.target = target;
-    lightBin(target?.kind === "bin");
-    if (carry.kind === "window") {
-      const scale = scaleOver(target);
-      element.style.setProperty("--ov-sx", String(scale));
-      element.style.setProperty("--ov-sy", String(scale));
-    }
-    if ((target?.kind === "bin") !== caught) catchCarry(target?.kind === "bin");
-    place("reflow");
+    const target = targetOf(point);
+    if (!sameTarget(target, carry.target)) return retarget(target, "medium", "standard_decel");
+    // Within the place it sits in it stays there; off every place it follows the pointer.
+    if (!flights.has(carry.element) && !stuckPose()) pose(carry, pointerPose());
   }
 
-  // ── The delete slot pulling things in ──
+  /**
+   * The carried thing aimed at `target`: the desk shows what it would do there, and the thing eases
+   * into the place the target offers, or back to the pointer, over `duration` on `curve`.
+   */
+  function retarget(target: Target | null, duration: string, curve: Easing): void {
+    const held = carry;
+    if (!held) return;
+    held.target = target;
+    const into = target?.kind === "bin";
+    if (into !== caught) {
+      caught = into;
+      slotTakes(into);
+    }
+    lightBin(into);
+    place("reflow");
+    fly(held, () => (carry === held ? (stuckPose() ?? pointerPose()) : posed.get(held.element)!), duration, curve);
+  }
 
-  /** Where a carried or waiting thing is drawn: its box's place, in world points, and its shrink. */
+  // ── Where a carried thing is drawn ──
+
+  /**
+   * Where a carried or waiting thing is drawn, in world points. A window's own box is `w` by `h` in
+   * its screen's pixels, drawn at the scale `s`; a workspace's box is `w` by `h` in the world, its
+   * desktop drawn at `s`. Either is shrunk by `k` about its top left corner, which only the slot
+   * does.
+   */
   interface Pose {
     readonly x: number;
     readonly y: number;
+    readonly w: number;
+    readonly h: number;
+    readonly s: number;
     readonly k: number;
   }
 
-  /** A thing the slot poses: carried, or waiting in it. */
+  /** A thing drawn off its miniature: carried, landing, or waiting in the slot. */
   interface Posed {
     readonly kind: "window" | "space";
     readonly element: HTMLElement;
-    /** The point it scales about, in its own pixels. */
-    readonly grab: Point;
-    /** Its own box, in the same pixels as `grab`. */
-    readonly size: { readonly w: number; readonly h: number };
-    /** A window's scale where it was lifted, which its box is drawn at; a workspace's own. */
+    /** Its box away from any place: a window's own (`ownOf`), a workspace's miniature as lifted. */
+    readonly own: { readonly w: number; readonly h: number };
+    /** The scale of the miniature it was lifted from. */
     readonly scale: number;
   }
 
@@ -1449,70 +1426,158 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** Whether the carried thing is in the slot's reach, so held in the slot and not under the pointer. */
   let caught = false;
 
-  /** Under the pointer at its carried size, the point held under it. */
-  function pointerPose(): Pose {
-    if (!carry) return { x: 0, y: 0, k: 1 };
-    return { x: carry.point.x - carry.grab.x, y: carry.point.y - carry.grab.y, k: 1 };
-  }
-
-  /** What the slot holds now, left to right: what waits there, then the carried thing pulled in. */
-  function held(): Posed[] {
-    return [...(pending ? [pending.posed] : []), ...(carry && caught ? [carry] : [])];
-  }
-
-  /** How wide `thing` is drawn in the slot: `size.drop_slot` tall, its own shape. */
-  function heldWidth(thing: Posed): number {
-    return (L("size-drop_slot") * thing.size.w) / thing.size.h;
+  /** The box `at` draws, in world points. */
+  function drawn(kind: "window" | "space", at: Pose): model.Rect {
+    const s = (kind === "window" ? at.s : 1) * at.k;
+    return { x: at.x, y: at.y, w: at.w * s, h: at.h * s };
   }
 
   /**
-   * In the slot, `size.drop_slot` tall, `space.s16` from the slot's line on the left, the right and
-   * the top, and `space.s16` above the timer's bar; two side by side the same `space.s16` apart, the
-   * waiting one on the left. The slot is as wide as what it holds makes it (`slotBox`). The thing
-   * scales about the point held, so its box stands where that point puts its top left corner.
+   * How the carried thing looks off every place: a workspace as lifted; a tiled window at
+   * `scale.carried` of its miniature's size; a floating one at the scale of the miniature it is over,
+   * where it would float, or at `scale.carried` over nothing.
+   */
+  function freeLook(held: Carry): { w: number; h: number; s: number } {
+    if (held.kind === "space") return { ...held.own, s: held.scale };
+    const over = held.target?.kind === "space" && desk.windows.get(held.id)?.float ? worldBox(held.target)?.s : undefined;
+    return { ...held.own, s: over ?? number("scale-carried") * held.scale };
+  }
+
+  /** Under the pointer, the point held under it. */
+  function pointerPose(): Pose {
+    if (!carry) return { x: 0, y: 0, w: 0, h: 0, s: 1, k: 1 };
+    const look = { ...freeLook(carry), k: 1 };
+    const box = drawn(carry.kind, { x: 0, y: 0, ...look });
+    return { ...look, x: carry.point.x - carry.grab.x * box.w, y: carry.point.y - carry.grab.y * box.h };
+  }
+
+  /**
+   * The place the carried thing sits in, if its target offers one: a tiled window in the tile it
+   * would take, laid out as the drop would leave the workspace, or a lone window's on the
+   * new-workspace slot; a workspace in the room opened for it, at the room's size; either in the slot.
+   * A floating window sits in no tile.
+   */
+  function stuckPose(): Pose | null {
+    const held = carry;
+    const target = held?.target;
+    if (!held || !target) return null;
+    if (target.kind === "bin") return slotPose(held);
+    if (held.kind === "space") {
+      const room = roomBox();
+      if (!room) return null;
+      const fit = Math.min(room.w / held.own.w, room.h / held.own.h);
+      const w = held.own.w * fit;
+      const h = held.own.h * fit;
+      return { x: room.x + (room.w - w) / 2, y: room.y + (room.h - h) / 2, w, h, s: held.scale * fit, k: 1 };
+    }
+    if (desk.windows.get(held.id)?.float) return null;
+    if (target.kind === "space") {
+      const on = viewOfSpace(target.space);
+      const slot = drawnSlot(target.space);
+      const rect = on ? tilesShown(target.space, tilingArea(on.size.w, on.size.h)).get(held.id) : undefined;
+      if (!slot || !rect) return null;
+      return { x: slot.x + rect.x * slot.s, y: slot.y + rect.y * slot.s, w: rect.w, h: rect.h, s: slot.s, k: 1 };
+    }
+    if (target.kind === "plus") {
+      const box = worldBox(target);
+      const on = views.find((each) => each.layout.sections.some((section) => section.group === target.group));
+      if (!box || !on) return null;
+      const room = tilingArea(on.size.w, on.size.h);
+      return { x: box.x + room.x * box.s, y: box.y + room.y * box.s, w: room.w, h: room.h, s: box.s, k: 1 };
+    }
+    return null;
+  }
+
+  /** The room held open for a carried workspace, in world points. */
+  function roomBox(): model.Rect | null {
+    const holder = views.find((each) => each.layout.room);
+    const slot = holder?.layout.room;
+    return holder && slot ? { x: holder.at.x + slot.x, y: holder.at.y + slot.y, w: slot.w, h: slot.h } : null;
+  }
+
+  /**
+   * A workspace's miniature as it is drawn this frame, gliding or not: its top left corner in world
+   * points and its desktop's scale. What sits on it follows it as it moves.
+   */
+  function drawnSlot(space: string): { x: number; y: number; s: number } | null {
+    const on = viewOfSpace(space);
+    const made = spaceEls.get(space);
+    if (!on || !made?.root.isConnected) return null;
+    const px = settings().scale;
+    const box = getComputedStyle(made.root);
+    const read = (name: string): number => Number.parseFloat(box.getPropertyValue(name)) / px;
+    const base = made.root.parentElement === lift ? { x: 0, y: 0 } : on.at;
+    return { x: base.x + read("--ov-x"), y: base.y + read("--ov-y"), s: Number.parseFloat(getComputedStyle(made.desk).getPropertyValue("--ov-s")) || 1 };
+  }
+
+  /**
+   * In the slot: the room inside its line, a workspace's shape `size.drop_slot` tall, `space.s16`
+   * from the line on the left, the right and the top and above the timer's bar. One thing at a
+   * time, fitted to that room keeping its shape, and centred in it; a second covers the first.
    */
   function slotPose(thing: Posed): Pose {
     const slot = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!);
     const gap = L("space-s16");
-    const things = held();
-    const at = Math.max(0, things.indexOf(thing));
-    const left = slot.x + gap + things.slice(0, at).reduce((sum, each) => sum + heldWidth(each) + gap, 0);
-    const lift = number("scale-lift");
-    const base = thing.kind === "window" ? thing.scale : 1;
-    const k = L("size-drop_slot") / (thing.size.h * base * lift);
-    const s = base * lift * k;
-    return { x: left - thing.grab.x * (1 - s), y: slot.y + gap - thing.grab.y * (1 - s), k };
+    const room = { x: slot.x + gap, y: slot.y + gap, w: slot.w - 2 * gap, h: L("size-drop_slot") };
+    const s = thing.kind === "window" ? number("scale-carried") * thing.scale : thing.scale;
+    const box = drawn(thing.kind, { x: 0, y: 0, ...thing.own, s, k: 1 });
+    const k = Math.min(room.w / box.w, room.h / box.h);
+    return { x: room.x + (room.w - box.w * k) / 2, y: room.y + (room.h - box.h * k) / 2, ...thing.own, s, k };
   }
 
   function pose(thing: Posed, at: Pose): void {
     posed.set(thing.element, at);
-    const [x, y] = thing.kind === "window" ? ["--ov-tx", "--ov-ty"] : ["--ov-x", "--ov-y"];
-    thing.element.style.setProperty(x, css(at.x));
-    thing.element.style.setProperty(y, css(at.y));
-    thing.element.style.setProperty("--ov-shrink", String(at.k));
+    const style = thing.element.style;
+    if (thing.kind === "window") {
+      style.setProperty("--ov-tx", css(at.x));
+      style.setProperty("--ov-ty", css(at.y));
+      style.setProperty("--ov-tw", css(at.w));
+      style.setProperty("--ov-th", css(at.h));
+      style.setProperty("--ov-sx", String(at.s));
+      style.setProperty("--ov-sy", String(at.s));
+    } else {
+      style.setProperty("--ov-x", css(at.x));
+      style.setProperty("--ov-y", css(at.y));
+      style.setProperty("--ov-w", css(at.w));
+      style.setProperty("--ov-h", css(at.h));
+      const made = spaceEls.get(thing.element.dataset.space!);
+      made?.desk.style.setProperty("--ov-s", String(at.s));
+      made?.desk.style.setProperty("--ov-unscale", String(1 / at.s));
+    }
+    style.setProperty("--ov-shrink", String(at.k));
+    if (thing.element === ringOn) drawRing(thing.kind, at);
   }
 
   /**
-   * Flies `thing` to `to` over `medium` on `emphasized_decel`, as a carried thing lands; with
-   * reduced motion, or in a still sample, it is there at once.
+   * Flies `thing` to `to` over `duration` on `curve`, then runs `done`; with reduced motion, or in a
+   * still sample, it is there at once.
    */
-  function fly(thing: Posed, to: () => Pose): void {
+  function fly(thing: Posed, to: () => Pose, duration = "medium", curve: Easing = "emphasized_decel", done?: () => void): void {
     land(thing.element);
     if (settings().reduced || root.hasAttribute("data-still")) {
       pose(thing, to());
+      done?.();
       return;
     }
     const from = posed.get(thing.element) ?? to();
     const flight = { start: performance.now(), frame: 0 };
     flights.set(thing.element, flight);
+    // The lit line round it changes size every frame: its glow is drawn again once it is there.
+    const ringed = thing.element === ringOn;
+    if (ringed) steadyGlow(ringLine, true);
     const step = (now: number): void => {
       if (flights.get(thing.element) !== flight) return;
-      const p = Math.min(1, (now - flight.start) / ms("medium"));
-      const e = eased("emphasized_decel", p);
+      const p = Math.min(1, (now - flight.start) / ms(duration));
+      const e = eased(curve, p);
       const end = to();
-      pose(thing, { x: from.x + (end.x - from.x) * e, y: from.y + (end.y - from.y) * e, k: from.k + (end.k - from.k) * e });
+      const mix = (a: number, b: number): number => a + (b - a) * e;
+      pose(thing, { x: mix(from.x, end.x), y: mix(from.y, end.y), w: mix(from.w, end.w), h: mix(from.h, end.h), s: mix(from.s, end.s), k: mix(from.k, end.k) });
       if (p < 1) flight.frame = requestAnimationFrame(step);
-      else flights.delete(thing.element);
+      else {
+        flights.delete(thing.element);
+        if (ringed) steadyGlow(ringLine, false);
+        done?.();
+      }
     };
     flight.frame = requestAnimationFrame(step);
   }
@@ -1524,23 +1589,48 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     flights.delete(element);
   }
 
-  /**
-   * The carried thing comes into the slot's reach or leaves it: into the slot, in front of one that
-   * waits there, which steps back to make room; or back to the pointer, the waiting one back to the
-   * middle.
-   */
-  function catchCarry(into: boolean): void {
-    if (!carry) return;
-    caught = into;
-    const carried = carry;
-    if (into) fly(carried, () => slotPose(carried));
-    else fly(carried, pointerPose);
-    if (pending) {
-      const waiting = pending.posed;
-      fly(waiting, () => slotPose(waiting));
-    }
-    lightBin(into);
-    showBin();
+  // ── The carried thing's lit line ──
+
+  // The focus tube in the accent, lit, round the carried thing from its lift until it lands: on the
+  // lift layer over what is carried, drawn to its box and its corner each time it moves.
+  const ring = span("ov-ring ov-hold");
+  const ringLine = focusRing(ring, "control", "accent", false);
+  ring.dataset.pinned = "";
+  lift.append(ring);
+  /** What the line is round, or nothing. */
+  let ringOn: HTMLElement | null = null;
+
+  function holdRing(thing: Posed | null): void {
+    ringOn = thing?.element ?? null;
+    steadyGlow(ringLine, false);
+    const at = thing ? posed.get(thing.element) : undefined;
+    if (thing && at) drawRing(thing.kind, at);
+    showRing();
+  }
+
+  /** The line shows round the carried or landing thing, and gives way to the slot's red in the slot. */
+  function showRing(): void {
+    const inSlot = carry !== null && caught && carry.element === ringOn;
+    ring.toggleAttribute("data-shown", ringOn !== null && !inSlot);
+  }
+
+  function drawRing(kind: "window" | "space", at: Pose): void {
+    const box = drawn(kind, at);
+    // A window's corner as its miniature gives it at the scale it is drawn at (`.ov-ws-desk`), a
+    // workspace's the miniature's own; both shrink with it.
+    const s = at.s;
+    const corner = (kind === "window" ? Math.max((L("radius-surface") - L("space-s8")) * s, L("radius-control") - L("space-s8") * s) : L("radius-control")) * at.k;
+    glide(ring, "none");
+    ring.style.setProperty("--ov-x", css(box.x));
+    ring.style.setProperty("--ov-y", css(box.y));
+    ring.style.setProperty("--ov-w", css(box.w));
+    ring.style.setProperty("--ov-h", css(box.h));
+    ringLine.style.setProperty("--corner", css(corner));
+  }
+
+  /** The line goes from `element` once it has landed. */
+  function ringLanded(element: HTMLElement): void {
+    if (ringOn === element) holdRing(null);
   }
 
   function sameTarget(a: Target | null, b: Target | null): boolean {
@@ -1555,80 +1645,66 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     let landed = false;
     if (was.kind === "window" && target && target.kind !== "refused" && target.kind !== "bin") {
       const landingAt: model.Landing = target.kind === "space" ? { space: target.space } : target.kind === "between" ? { group: target.group, index: target.index } : { group: target.group, index: model.groupById(desk, target.group).spaces.length };
-      landed = model.moveWindow(desk, was.id, landingAt, target.kind === "space" ? target.at : undefined) !== null;
+      // A floating window floats where it is let go over a workspace, drawn there at its scale.
+      const float = target.kind === "space" && desk.windows.get(was.id)?.float ? floatShare(was, target.space) : undefined;
+      landed = model.moveWindow(desk, was.id, landingAt, target.kind === "space" ? target.at : undefined, float) !== null;
     }
     if (was.kind === "space" && target && target.kind !== "refused" && target.kind !== "space" && target.kind !== "bin") {
       const at = roomOf(target)!;
       landed = model.moveSpace(desk, was.id, at.group, at.index) !== null;
     }
+    // Let go out of the reach after it was in it: what waits there shows again, its time from full.
+    if (caught && target?.kind !== "bin") slotTakes(false);
     carry = null;
+    caught = false;
     delete root.dataset.carrying;
-    // Let go in the reach it keeps its lift: it waits in the slot exactly as it is drawn.
+    // Let go in the reach it stays above the desk: it waits in the slot exactly as it is drawn.
     if (target?.kind !== "bin") delete was.element.dataset.held;
     delete was.element.dataset.refused;
-    caught = false;
-    cancelAnimationFrame(reshaping);
     // Let go, it is no longer held: the slot calms from its solid red.
     lightBin(false);
-    // Dropped mid-pull, a window's landing and a workspace's glide take its shrink from where it is.
-    if (was.kind === "space" && target?.kind !== "bin") {
-      glide(was.element, "land");
-      was.element.style.setProperty("--ov-shrink", "1");
-    }
-    delete landing.dataset.shown;
     if (target?.kind === "bin") {
+      holdRing(null);
       park(was);
       return;
     }
-    land(was.element);
-    if (was.kind === "window") landWindow(was.id, was.element);
-    else landSpace(was.id, was.element);
     sweepGone();
-    place("reflow");
+    if (was.kind === "window") landWindow(was);
+    else landSpace(was);
     if (pending) dressBin();
     showBin();
     root.toggleAttribute("data-landed", landed);
   }
 
-  /** Flies a carried window from where it is into its tile, then puts it on its workspace. */
-  function landWindow(id: string, element: HTMLElement): void {
-    const space = model.spaceOf(desk, id).id;
+  /** A floating window's box as drawn over workspace `space`, as shares of its tiling room. */
+  function floatShare(was: Carry, space: string): model.Rect | undefined {
+    const at = posed.get(was.element);
+    const slot = drawnSlot(space);
     const on = viewOfSpace(space);
+    if (!at || !slot || !on) return undefined;
+    const area = tilingArea(on.size.w, on.size.h);
+    const box = drawn("window", at);
+    return { x: ((box.x - slot.x) / slot.s - area.x) / area.w, y: ((box.y - slot.y) / slot.s - area.y) / area.h, w: box.w / slot.s / area.w, h: box.h / slot.s / area.h };
+  }
+
+  /**
+   * Flies a carried window from where it is drawn into its tile, then puts it on its workspace. Let
+   * go where it sat, it is in its tile already, and nothing moves.
+   */
+  function landWindow(was: Carry): void {
+    delete was.element.dataset.lifted;
+    was.element.dataset.landing = "";
     place("reflow");
-    const slot = on?.layout.spaces.get(space);
+    fly(was, () => tilePose(was.id) ?? posed.get(was.element)!, "medium", "emphasized_decel", () => settleWindow(was.id));
+  }
+
+  /** A window's tile on its workspace's miniature as drawn now, in world points. */
+  function tilePose(id: string): Pose | null {
+    const space = model.spaceOf(desk, id).id;
+    const slot = drawnSlot(space);
     const rect = tiles.get(id) ?? tileOf(id);
-    if (!on || !slot) return;
-    // From where it is drawn now, its grab point held, to its tile's place and size.
-    const style = getComputedStyle(element);
-    // As drawn now, the lift aside: its scale and what it still has of a pull's shrink.
-    const k = (Number.parseFloat(style.getPropertyValue("--ov-sx")) || 1) * (Number.parseFloat(style.getPropertyValue("--ov-shrink")) || 1);
-    const scale = settings().scale;
-    const tx = Number.parseFloat(style.getPropertyValue("--ov-tx")) / scale;
-    const ty = Number.parseFloat(style.getPropertyValue("--ov-ty")) / scale;
-    const gx = Number.parseFloat(style.getPropertyValue("--ov-gx")) / scale;
-    const gy = Number.parseFloat(style.getPropertyValue("--ov-gy")) / scale;
-    const ow = Number.parseFloat(style.getPropertyValue("--ov-tw")) / scale;
-    const oh = Number.parseFloat(style.getPropertyValue("--ov-th")) / scale;
-    const visible = { x: tx + gx * (1 - k), y: ty + gy * (1 - k), w: ow * k, h: oh * k };
-    delete element.dataset.lifted;
-    element.dataset.landing = "";
-    glide(element, "none");
-    element.style.setProperty("--ov-gx", "0px");
-    element.style.setProperty("--ov-gy", "0px");
-    element.style.setProperty("--ov-tx", css(visible.x));
-    element.style.setProperty("--ov-ty", css(visible.y));
-    element.style.setProperty("--ov-tw", css(rect.w));
-    element.style.setProperty("--ov-th", css(rect.h));
-    element.style.setProperty("--ov-sx", String(visible.w / rect.w));
-    element.style.setProperty("--ov-sy", String(visible.h / rect.h));
-    element.style.setProperty("--ov-shrink", "1");
-    commit(element);
-    glide(element, "land");
-    element.style.setProperty("--ov-tx", css(on.at.x + slot.x + rect.x * slot.s));
-    element.style.setProperty("--ov-ty", css(on.at.y + slot.y + rect.y * slot.s));
-    element.style.setProperty("--ov-sx", String(slot.s));
-    element.style.setProperty("--ov-sy", String(slot.s));
-    later(ms("medium"), () => settleWindow(id));
+    if (!slot || !rect) return null;
+    return { x: slot.x + rect.x * slot.s, y: slot.y + rect.y * slot.s, w: rect.w, h: rect.h, s: slot.s, k: 1 };
   }
 
   function tileOf(id: string): model.Rect {
@@ -1645,45 +1721,59 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const made = spaceEls.get(space);
     if (!made) return;
     delete element.dataset.landing;
+    posed.delete(element);
+    ringLanded(element);
     made.desk.append(element);
-    element.style.removeProperty("--ov-corner");
     glide(element, "none");
     element.style.setProperty("--ov-sx", "1");
     element.style.setProperty("--ov-sy", "1");
+    element.style.setProperty("--ov-shrink", "1");
     setTile(element, tiles.get(id) ?? tileOf(id), "none");
   }
 
-  /** Flies a carried workspace to its place, then puts it on its screen's layer. */
-  function landSpace(id: string, element: HTMLElement): void {
+  /** Flies a carried workspace from where it is drawn to its place, then puts it on its screen's layer. */
+  function landSpace(was: Carry): void {
+    const id = was.id;
     const made = spaceEls.get(id)!;
     const on = viewOfSpace(id);
-    delete element.dataset.lifted;
-    element.dataset.landing = "";
+    delete made.root.dataset.lifted;
+    made.root.dataset.landing = "";
     place("reflow");
-    const slot = on?.layout.spaces.get(id);
-    if (!on || !slot) return;
-    for (const part of [made.root, made.desk, made.tag]) glide(part, "land");
-    made.root.style.setProperty("--ov-x", css(on.at.x + slot.x));
-    made.root.style.setProperty("--ov-y", css(on.at.y + slot.y));
-    made.root.style.setProperty("--ov-w", css(slot.w));
-    made.root.style.setProperty("--ov-h", css(slot.h));
-    made.desk.style.setProperty("--ov-s", String(slot.s));
-    made.desk.style.setProperty("--ov-unscale", String(1 / slot.s));
+    if (!on) return;
+    // Onto a screen of another size its desktop takes that screen's size, drawn as wide as it is now.
+    const now = posed.get(made.root);
+    const wide = Number.parseFloat(getComputedStyle(made.desk).getPropertyValue("--ov-dw")) / settings().scale;
+    if (now && wide && Math.abs(wide - on.size.w) > 0.5) posed.set(made.root, { ...now, s: (now.s * wide) / on.size.w });
     made.desk.style.setProperty("--ov-dw", css(on.size.w));
     made.desk.style.setProperty("--ov-dh", css(on.size.h));
-    dressTag(id, made, on.screen);
     tileSpace(id, on, "land");
-    later(ms("medium"), () => {
-      if (!element.hasAttribute("data-landing")) return;
-      delete element.dataset.landing;
-      const home = viewOfSpace(id);
-      const final = home?.layout.spaces.get(id);
-      if (!home || !final) return;
-      home.layer.append(element);
-      for (const part of [made.root, made.desk, made.tag]) glide(part, "none");
-      made.root.style.setProperty("--ov-x", css(final.x));
-      made.root.style.setProperty("--ov-y", css(final.y));
-    });
+    fly(
+      was,
+      () => {
+        const home = viewOfSpace(id);
+        const slot = home?.layout.spaces.get(id);
+        return home && slot ? { x: home.at.x + slot.x, y: home.at.y + slot.y, w: slot.w, h: slot.h, s: slot.s, k: 1 } : posed.get(made.root)!;
+      },
+      "medium",
+      "emphasized_decel",
+      () => settleSpace(id),
+    );
+  }
+
+  /** A landed workspace goes onto its screen's layer, at its place there. */
+  function settleSpace(id: string): void {
+    const made = spaceEls.get(id);
+    if (!made?.root.hasAttribute("data-landing")) return;
+    delete made.root.dataset.landing;
+    posed.delete(made.root);
+    ringLanded(made.root);
+    const home = viewOfSpace(id);
+    const slot = home?.layout.spaces.get(id);
+    if (!home || !slot) return;
+    home.layer.append(made.root);
+    for (const part of [made.root, made.desk, made.tag]) glide(part, "none");
+    made.root.style.setProperty("--ov-shrink", "1");
+    putSpace(id, slot, home, "none");
   }
 
   /** Workspaces the model no longer has collapse where they stand, and go. */
@@ -1748,16 +1838,15 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /**
    * The slot's place on screen `on`: `space.s48` in from its bottom right corner, as far in as the
-   * miniatures' margin. It holds things `size.drop_slot` tall, `space.s16` from its line on every
-   * side and above the timer's bar, which keeps `space.s8` from its foot; so it is as wide as what it
-   * holds, and empty (or `empty`), as wide as a workspace of the screen's shape would be.
+   * miniatures' margin. It holds one thing in a room of a workspace's shape `size.drop_slot` tall,
+   * `space.s16` from its line on every side and above the timer's bar, which keeps `space.s8` from
+   * its foot. It is the one size whatever it holds.
    */
-  function slotBox(on: ScreenView, empty = false): model.Rect {
+  function slotBox(on: ScreenView): model.Rect {
     const gap = L("space-s16");
     const inner = L("size-drop_slot");
     const h = gap + inner + gap + L("size-progress") + L("space-s8");
-    const things = empty ? [] : held();
-    const w = things.length === 0 ? 2 * gap + (inner * on.size.w) / on.size.h : gap + things.reduce((sum, each) => sum + heldWidth(each) + gap, 0);
+    const w = 2 * gap + (inner * on.size.w) / on.size.h;
     const inset = L("space-s48");
     return { x: on.at.x + on.size.w - inset - w, y: on.at.y + on.size.h - inset - h, w, h };
   }
@@ -1826,8 +1915,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** The slot's middle, in world points. */
   function binCentre(): Point {
-    // The empty slot's middle: the reach stays put however wide what the slot holds makes it.
-    const box = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!, true);
+    const box = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!);
     return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
   }
 
@@ -1835,11 +1923,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    * The carried thing let go in the reach stays in the slot as it sat, out of the desk, its timer
    * running; one already waiting goes for good. A thing still on its way into the slot goes on there.
    */
-  function park(was: Posed & { readonly id: string }): void {
+  function park(was: Carry): void {
     if (pending) deleteWaiting();
     const what: Carried = was.kind === "window" ? { window: was.id } : { space: was.id };
     const { taken } = model.take(desk, what);
-    const thing: Posed = { kind: was.kind, element: was.element, grab: was.grab, size: was.size, scale: was.scale };
+    const thing: Posed = { kind: was.kind, element: was.element, own: was.own, scale: was.scale };
     pending = { taken, what, posed: thing, drain: null };
     was.element.dataset.waiting = "";
     fly(thing, () => slotPose(thing));
@@ -1866,8 +1954,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const sx = kind === "window" ? read("--ov-sx") : 1;
     const sy = kind === "window" ? read("--ov-sy") : 1;
     const shrink = read("--ov-shrink");
-    const lift = 1 + (number("scale-lift") - 1) * read("--ov-held");
-    const s = { x: sx * lift * shrink, y: sy * lift * shrink };
+    const s = { x: sx * shrink, y: sy * shrink };
     element.style.transition = "none";
     element.style.setProperty(x!, css(at.x + (origin.x - size.w / 2) * (1 - s.x)));
     element.style.setProperty(y!, css(at.y + (origin.y - size.h / 2) * (1 - s.y)));
@@ -1938,7 +2025,25 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       was.posed.element.remove();
     });
     bin.style.removeProperty("--hold");
-    if (carry && caught) fly(carry, () => slotPose(carry!));
+    showBin();
+  }
+
+  /**
+   * The carried thing comes into the slot's reach or leaves it. Over one that waits there it covers
+   * it, which steps out of sight, and the waiting one's time stands still; taken back out without
+   * being let go, the waiting one shows again and its time runs from full. The lit line gives way to
+   * the slot's red in it.
+   */
+  function slotTakes(into: boolean): void {
+    if (pending) {
+      pending.posed.element.toggleAttribute("data-covered", into);
+      if (into) pending.drain?.pause();
+      else {
+        pending.drain?.cancel();
+        drain(1);
+      }
+    }
+    showRing();
     showBin();
   }
 
@@ -1956,34 +2061,25 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     model.restore(desk, was.taken);
     const element = was.posed.element;
     delete element.dataset.waiting;
+    delete element.dataset.covered;
     place("reflow");
-    const size = was.posed.size;
-    const grab = { x: size.w / 2, y: size.h / 2 };
+    const grab = { x: 0.5, y: 0.5 };
     if (was.posed.kind === "window") {
       const id = (was.what as { window: string }).window;
       const space = model.spaceOf(desk, id).id;
-      const slot = viewOfSpace(space)?.layout.spaces.get(space);
-      const scale = slot?.s ?? was.posed.scale;
-      carry = { kind: "window", id, element, grab, from: space, fromIndex: model.groupOf(desk, space).spaces.indexOf(space), scale, size, target: { kind: "bin" }, point };
-      element.style.transition = "none";
-      element.style.setProperty("--ov-sx", String(scale));
-      element.style.setProperty("--ov-sy", String(scale));
+      const scale = viewOfSpace(space)?.layout.spaces.get(space)?.s ?? was.posed.scale;
+      carry = { kind: "window", id, element, own: was.posed.own, scale, grab, from: space, fromIndex: model.groupOf(desk, space).spaces.indexOf(space), target: { kind: "bin" }, point };
     } else {
       const id = (was.what as { space: string }).space;
       const group = model.groupOf(desk, id);
-      carry = { kind: "space", id, element, grab, from: group.id, fromIndex: group.spaces.indexOf(id), scale: was.posed.scale, size, target: { kind: "bin" }, point };
-        element.style.transition = "none";
+      carry = { kind: "space", id, element, own: was.posed.own, scale: was.posed.scale, grab, from: group.id, fromIndex: group.spaces.indexOf(id), target: { kind: "bin" }, point };
     }
-    // Held at its middle now: the same box, drawn about another point.
-    element.style.setProperty("--ov-gx", css(grab.x));
-    element.style.setProperty("--ov-gy", css(grab.y));
     caught = true;
     const held = carry;
     pose(held, slotPose(held));
-    commit(element);
-    element.style.removeProperty("transition");
     root.dataset.carrying = held.kind;
     held.element.dataset.held = "";
+    holdRing(held);
     lightBin(true);
     showBin();
     place("reflow");
@@ -2188,6 +2284,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       follow(pin.progress);
       return;
     }
+    if (pin.kind === "loose") {
+      liftThing(pin.what);
+      const on = viewOf(desk.focused) ?? views[0]!;
+      moveCarry({ x: on.at.x + on.size.w / 2, y: on.at.y + on.size.h - L("space-s48") / 2 });
+      settle();
+      return;
+    }
     if (pin.kind === "placed") {
       liftWindow(pin.window, centreOf({ window: pin.window }));
       moveCarry(pointOf(pin.to));
@@ -2208,14 +2311,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const start = centreOf({ space: pin.space });
     liftSpace(pin.space, start);
     moveCarry(pointOf(pin.to));
-    // Drawn over the room it would take, a little short of it, as a hand holds it there.
-    const holder = views.find((each) => each.layout.room);
-    const slot = holder?.layout.room;
-    if (holder && slot && carry) {
-      const at = { x: holder.at.x + slot.x + slot.w / 2 - L("space-s24"), y: holder.at.y + slot.y + slot.h / 2 - L("space-s24") };
-      carry.element.style.setProperty("--ov-x", css(at.x - carry.grab.x));
-      carry.element.style.setProperty("--ov-y", css(at.y - carry.grab.y));
-    }
     settle();
   }
 

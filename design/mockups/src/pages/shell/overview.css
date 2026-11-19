@@ -24,7 +24,7 @@
 @property --ov-arrive { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-veil { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-aside { syntax: "<number>"; inherits: false; initial-value: 0; }
-@property --ov-held { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-plus-tint { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
@@ -144,7 +144,7 @@
   opacity: var(--ov-arrive);
   scale: calc(var(--scale-behind) + (1 - var(--scale-behind)) * var(--ov-arrive));
   transform-origin: 50% 50%;
-  transform: scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
+  transform: scale(var(--ov-shrink));
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -152,8 +152,7 @@
     --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
-    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
-    --ov-held var(--motion-short) var(--easing-standard);
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear);
 }
 
 /* The screen's own desktop flies over the others, shrinking into its place and growing out of it. */
@@ -243,15 +242,11 @@
   pointer-events: none;
 }
 
-/* Carried: it rides over every screen, its grab point under the pointer, lifted toward you. */
+/* Carried: it rides over every screen, drawn where its pose puts it (`overview-parts.ts`). */
 .ov-ws[data-lifted],
 .ov-ws[data-landing] {
   z-index: 1;
   transform-origin: var(--ov-gx) var(--ov-gy);
-}
-
-.ov-ws[data-lifted] {
-  --ov-held: 1;
 }
 
 .ov-ws:is([data-lifted], [data-landing]) > .ov-ws-desk {
@@ -269,8 +264,8 @@
 
 /* ── A window ────────────────────────────────────────────────────────────────────────────────── */
 
-/* At its tile on its desktop; carried, at the pointer and scaled to the workspace below. Its
-   corner is the frame's less the gap round it, as Hyprland rounds it. */
+/* At its tile on its desktop; carried, where its pose puts it. Its corner is the frame's less the
+   gap round it, as Hyprland rounds it. */
 .ov-win {
   position: absolute;
   left: 0;
@@ -283,11 +278,10 @@
   scale: var(--ov-sx) var(--ov-sy);
   transform-origin: var(--ov-gx) var(--ov-gy);
   overflow: hidden;
-  /* The corner its miniature gives it (`.ov-ws-desk`), carried with it while it is lifted or waits;
-     a window's on the desktop where it has none. */
+  /* The corner its miniature gives it (`.ov-ws-desk`); a window's on the desktop where it has none. */
   border-radius: var(--ov-corner, calc(var(--radius-surface) - var(--space-s8)));
   background: var(--color-surface);
-  transform: scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
+  transform: scale(var(--ov-shrink));
   box-shadow:
     inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
     0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
@@ -299,8 +293,7 @@
     --ov-sx var(--ov-pt, 0s) var(--ov-pe, linear),
     --ov-sy var(--ov-pt, 0s) var(--ov-pe, linear),
     --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
-    opacity var(--motion-medium) var(--easing-emphasized_accel),
-    --ov-held var(--motion-short) var(--easing-standard);
+    opacity var(--motion-medium) var(--easing-emphasized_accel);
 }
 
 /* A floating window stands over the tiles; its shadow is every window's, as Hyprland draws one. */
@@ -321,15 +314,16 @@
 .ov-win[data-lifted] {
   z-index: 1;
   box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
-  transition:
-    --ov-sx var(--motion-short) var(--easing-standard),
-    --ov-sy var(--motion-short) var(--easing-standard),
-    opacity var(--motion-short) var(--easing-standard),
-    --ov-held var(--motion-short) var(--easing-standard);
+  transition: opacity var(--motion-short) var(--easing-standard);
 }
 
-.ov-win[data-held] {
-  --ov-held: 1;
+/* Off its miniature, the corner a miniature at the scale it is drawn at would give it, the same
+   rule as `.ov-ws-desk`'s: carried, in the tile it sits in, landing, or waiting in the slot. */
+.ov-win:is([data-lifted], [data-landing]) {
+  --ov-corner: max(
+    calc(var(--radius-surface) - var(--space-s8)),
+    calc((var(--radius-control) - var(--space-s8) * var(--ov-sx)) / var(--ov-sx))
+  );
 }
 
 .ov-win[data-refused] {
@@ -340,26 +334,23 @@
   z-index: 1;
 }
 
-/* Where a carried window would tile on the workspace below it. */
-.ov-landing {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: block;
-  width: var(--ov-tw);
-  height: var(--ov-th);
-  translate: var(--ov-tx) var(--ov-ty);
-  box-sizing: border-box;
-  border-radius: calc(var(--radius-surface) - var(--space-s8));
-  background: rgb(from var(--color-surface) r g b / var(--opacity-placeholder));
-  /* Drawn inside the scaled desktop, so its line is the miniature's scale undone. */
-  box-shadow: inset 0 0 0 calc(var(--stroke-thin) * var(--ov-unscale, 1)) var(--color-primary);
-  opacity: 0;
+/* What is carried rides over what waits in the slot, and the lit line round it over both. */
+.ov-lift > [data-held] {
+  z-index: 2;
+}
+
+.ov-lift > .ov-hold {
+  z-index: 3;
+}
+
+/* Covered by a second thing pulled into the slot, what waits there steps out of sight over
+   `short`, and shows again as it is taken back out. */
+.ov-lift > .ov-ws[data-waiting] {
   transition: opacity var(--motion-short) var(--easing-standard);
 }
 
-.ov-landing[data-shown] {
-  opacity: 1;
+.ov-lift > [data-covered] {
+  opacity: 0;
 }
 
 /* ── A group's slot, a waiting group's name ──────────────────────────────────────────────────── */
@@ -388,13 +379,43 @@
     opacity var(--motion-short) var(--easing-standard);
 }
 
+/* The new-workspace slot reads on any picture: on the frame's glass, as the numbers are, its line
+   and its plus in `outline` and `on_surface_variant`. While something is carried it is lit, its
+   line and plus in the primary over a primary tint, at `opacity.tint`, and deeper, at
+   `opacity.selection`, as the place proposed; each change over `short`. Under the pointer with
+   nothing carried, the glass lightens by `opacity.focus` of `surface`. */
 .ov-plus {
   opacity: var(--ov-arrive);
-  background: rgb(from var(--color-surface) r g b / calc(var(--opacity-hover)));
+  --ov-plus-ink: var(--color-on_surface_variant);
+  --ov-plus-line: var(--color-outline);
+  --ov-plus-wash: var(--color-primary);
+  background:
+    linear-gradient(rgb(from var(--ov-plus-wash) r g b / var(--ov-plus-tint)) 0 0),
+    rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--ov-plus-line);
+  transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-w var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
+    --ov-plus-tint var(--motion-short) var(--easing-standard),
+    box-shadow var(--motion-short) var(--easing-standard),
+    opacity var(--motion-short) var(--easing-standard);
 }
 
 .ov-plus > .k-icon {
-  opacity: var(--opacity-placeholder);
+  transition: color var(--motion-short) var(--easing-standard);
+}
+
+.ov[data-carrying] .ov-plus {
+  --ov-plus-ink: var(--color-primary);
+  --ov-plus-line: var(--color-primary);
+  --ov-plus-tint: var(--opacity-tint);
+}
+
+.ov[data-carrying] .ov-plus[data-proposed] {
+  --ov-plus-tint: var(--opacity-selection);
 }
 
 .ov-plus:not([data-shown]) {
@@ -402,7 +423,8 @@
 }
 
 .ov[data-open]:not([data-carrying]) .ov-plus:hover {
-  background: rgb(from var(--color-surface) r g b / var(--opacity-focus));
+  --ov-plus-wash: var(--color-surface);
+  --ov-plus-tint: var(--opacity-focus);
 }
 
 /* A waiting group's name on the same glass, as the bar names a borrowed group. */

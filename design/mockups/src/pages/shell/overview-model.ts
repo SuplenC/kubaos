@@ -35,7 +35,8 @@ export interface Win {
   readonly shell?: Shell;
   /**
    * A floating window's place and size, as shares of the room its workspace tiles in: it stands over
-   * the tiles, never in them, and keeps the same shares on any workspace it is moved to.
+   * the tiles, never in them. Dropped on a workspace it floats where it was let go; onto a new one
+   * it keeps the same shares.
    */
   readonly float?: Rect;
 }
@@ -310,10 +311,13 @@ const NOTHING: Change = { added: [], removed: [], closed: [] };
 
 /**
  * Moves `window` to `landing`: onto a workspace's end, or onto a new workspace. Refused (null) by
- * a full group; nothing changes on its own workspace.
+ * a full group; nothing changes on its own workspace. A floating window floats at `float` when it
+ * is given.
  */
-export function moveWindow(desk: Desk, window: string, landing: Landing, place?: Place): Change | null {
+export function moveWindow(desk: Desk, window: string, landing: Landing, place?: Place, float?: Rect): Change | null {
   const from = spaceOf(desk, window);
+  const was = desk.windows.get(window);
+  if (float && was?.float) desk.windows.set(window, { ...was, float });
   if ("space" in landing && landing.space === from.id && !place) return NOTHING;
   if (refuses(desk, landing)) return null;
   const added: string[] = [];
