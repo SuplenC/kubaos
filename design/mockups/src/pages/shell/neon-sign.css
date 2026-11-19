@@ -1,0 +1,36 @@
+/* The boot splash's sign (`neon-sign.ts`): its pictures at the splash's device size, in the exact
+   centre of the room, every offset whole device pixels, a tie toward the start as the splash's
+   `Math.Int` puts it. What stands under it starts at the picture's foot. */
+
+.neon-room {
+  position: absolute;
+  inset: 0;
+  --sign-w: round(down, calc(var(--sign-device-w, 0) * var(--px) / var(--splash-scale, 1)), 1px);
+  --sign-h: round(down, calc(var(--sign-device-h, 0) * var(--px) / var(--splash-scale, 1)), 1px);
+}
+
+.neon-sign {
+  position: absolute;
+  left: round(down, calc((100% - var(--sign-w)) / 2), 1px);
+  top: round(down, calc((100% - var(--sign-h)) / 2), 1px);
+  width: var(--sign-w);
+  height: var(--sign-h);
+}
+
+.neon-sign > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.neon-under {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(round(down, calc((100% - var(--sign-h)) / 2), 1px) + var(--sign-h));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}

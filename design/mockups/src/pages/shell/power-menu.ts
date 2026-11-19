@@ -282,7 +282,6 @@ export default page<Shown>({
       { part: "Sheet's corners, fillets", token: "radius-surface" },
       { part: "A leaving window's drop", token: "space-s64" },
       { part: "The blocker's rise", token: "space-s24" },
-      { part: "Room under the sign", token: "size-control_md" },
     ],
     reflow: doesntApply("the sheet keeps its size, centred on the bottom edge, on any screen."),
   },
