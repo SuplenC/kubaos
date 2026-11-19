@@ -28,8 +28,8 @@
   --panel-dim: 0;
 }
 
-/* The picking bar, on its Sheet in the middle of the frame's bottom edge: as wide as its row, never
-   wider than the screen less the frame and the Sheet's fillets on both sides; who asks gives way first. */
+/* The picking bar, on its Sheet in the middle of the frame's bottom edge: one row, as wide as its
+   content, never wider than the screen less the frame and the Sheet's fillets on both sides. */
 .share-pick-bar {
   box-sizing: border-box;
   max-width: calc(var(--screen-width) - 2 * (var(--frame-side) + var(--radius-surface)));
@@ -44,10 +44,6 @@
   min-width: 0;
 }
 
-.share-pick-who {
-  flex: 0 1 auto;
-  min-width: 0;
-}
 
 /* A window's label while picking: a Tooltip in the middle of the window, taking no pointer, shown
    while the window is lit; its Enter only while the keyboard is on it. */

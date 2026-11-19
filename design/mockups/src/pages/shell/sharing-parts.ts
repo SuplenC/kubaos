@@ -18,7 +18,6 @@ import steam from "../../assets/apps/steam.svg?url";
 import vscode from "../../assets/apps/vscode-insiders.svg?url";
 import rainy from "../../assets/lock/shibuya-rainy-corner.jpg?url";
 import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
-import { tipLine } from "../../lib/banner.ts";
 import { button } from "../../lib/button.ts";
 import { card } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
@@ -224,7 +223,8 @@ export const WORDS = {
   region: "Region",
   cancel: "Cancel",
   click: "Click to share",
-  rightDrag: "Drag with the right button anywhere to share a region at once.",
+  asked: (app: string) => `${app} asked to share`,
+  regionHint: "Or drag with the right button anywhere.",
   withWhom: (who: string, since: string) => `With ${who} since ${since}`,
   toWhom: (who: string, since: string) => `To ${who} since ${since}`,
   windowTitle: (app: string, title: string) => `${app} · ${title}`,
@@ -629,19 +629,27 @@ export interface PickingOptions {
    * wearing its mark, nothing else lit: the moment picking gives way to the share.
    */
   readonly pill?: boolean;
-  /** The right-button tip under each bar's row; shown unless said otherwise, as nothing else teaches the drag. */
-  readonly tip?: boolean;
+  /** A hint of the bar drawn up, as under the pointer: a sample of it. */
+  readonly hint?: "app" | "region";
   readonly handlers?: PickHandlers;
 }
 
 /**
- * The bar on one screen, which hangs on a Sheet in the middle of the frame's bottom edge: who asks,
- * Share this screen, Region and Cancel, each button saying its key in its Tooltip, and the
- * right-button tip under them where it is shown.
+ * The bar on one screen, which hangs on a Sheet in the middle of the frame's bottom edge, one row:
+ * the asking app's icon, which names it in its Tooltip, then Share this screen, Region and Cancel,
+ * each saying its key in its Tooltip. Region's Tooltip carries, in its body under the name, the
+ * right-button drag that also draws a region.
  */
-export function pickBar(asker: Asker, options: { lit?: "screen" | "region"; tip?: boolean; onScreen?: () => void; onPoint?: (on: boolean) => void; onRegion?: () => void; onCancel?: () => void } = {}): HTMLElement {
-  const who = clamped(WORDS.title(asker.site ?? asker.app), "body_strong", "on_surface");
-  who.classList.add("share-pick-who");
+export function pickBar(
+  asker: Asker,
+  options: { lit?: "screen" | "region"; hint?: "app" | "region"; onScreen?: () => void; onPoint?: (on: boolean) => void; onRegion?: () => void; onCancel?: () => void } = {},
+): HTMLElement {
+  // Who asked, as the system knows it: the app, not the site inside it.
+  const app = iconTile({ name: asker.app, size: "Sm", ...(asker.picture ? { picture: asker.picture } : {}) });
+  const appTip = tooltip(WORDS.asked(asker.app), "");
+  // The tile is no control, so its Tooltip shows on the pointer by its attribute, as a sample shows one.
+  app.addEventListener("pointerenter", () => appTip.toggleAttribute("data-shown", true));
+  app.addEventListener("pointerleave", () => appTip.toggleAttribute("data-shown", false));
   const share = button({ label: WORDS.screen, kind: "Tonal", size: "Sm", icon: SHARE_ICONS.screen, ...(options.lit === "screen" ? { pinned: "lit" as const } : {}) });
   share.classList.add("share-pick-screen");
   const region = button({ label: WORDS.region, kind: "Text", size: "Sm", icon: SHARE_ICONS.region, ...(options.lit === "region" ? { pinned: "pressed" as const } : {}) });
@@ -659,13 +667,13 @@ export function pickBar(asker: Asker, options: { lit?: "screen" | "region"; tip?
   const line = row(
     "s8",
     "centre",
-    who,
+    floatingTooltip(app, appTip, { side: "above", ...(options.hint === "app" ? { shown: true } : {}) }),
     floatingTooltip(share, keyTooltip(WORDS.screen, PICK_KEYS.screen), { side: "above" }),
-    floatingTooltip(region, keyTooltip(WORDS.region, PICK_KEYS.region), { side: "above" }),
+    floatingTooltip(region, tooltip(WORDS.region, WORDS.regionHint, row("s4", "centre", keycap(PICK_KEYS.region))), { side: "above", ...(options.hint === "region" ? { shown: true } : {}) }),
     floatingTooltip(cancel, keyTooltip(WORDS.cancel, "Esc"), { side: "above" }),
   );
   // What hangs on the bottom edge's Sheet: `space.s16` inside on every side, as the OSD's strip.
-  const bar = inset(options.tip ? stack("s8", "start", line, tipLine(WORDS.rightDrag)) : line, "s16", "s16");
+  const bar = inset(line, "s16", "s16");
   bar.classList.add("share-pick-bar");
   return bar;
 }
@@ -760,7 +768,7 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
   if (!options.arrive) element.dataset.open = "";
   let shown: Lit = NOTHING;
   const bar = pickBar(asker, {
-    ...(options.tip === false ? {} : { tip: true }),
+    ...(options.hint ? { hint: options.hint } : {}),
     onScreen: () => handlers.onShare?.({ kind: "screen", screen: index }),
     // Leaving the button undoes only its own light, this screen lit whole, never a pick made since.
     onPoint: (on) => {

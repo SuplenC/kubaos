@@ -14,10 +14,10 @@ import {
   DP10,
   EDP1,
   DP10_THIRD,
-  LONG_ASKER,
   type Lit,
   type Monitor,
   MEET,
+  NO_ICON,
   MONITORS,
   NARROW,
   NOTHING,
@@ -216,7 +216,8 @@ const SHARED: Move = {
 
 type Shown = "rest" | "lit";
 
-const SITE: Words = { short: "meet.google.com", long: LONG_ASKER.site! };
+/** The asking app's name, as its icon's Tooltip says it. */
+const ASKER_NAME: Words = { short: "Zoom", long: "Visual Studio Code - Insiders" };
 
 export default page<Shown>({
   level: "shell",
@@ -224,7 +225,7 @@ export default page<Shown>({
   title: "Share picker",
   lede: "Picking what to share on the desktop itself: each screen's bar, a window pointed at, a region drawn.",
   code: { qml: "SharePicker", unbuilt: "Not built yet" },
-  from: ["button", "icon-button", "tooltip", "keycap", "banner", "chip"],
+  from: ["icon-tile", "button", "icon-button", "tooltip", "keycap", "chip"],
   stage: { live, hint: "point and click; S, R, Tab, Enter, Esc; right-drag", daylight: true },
   variants: [
     { name: "Picking, at rest", for: "both screens dimmed, a bar on each", sample: screen(() => both()) },
@@ -233,14 +234,15 @@ export default page<Shown>({
     { name: "A region being drawn", for: "clear inside its on-air line; its size", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
     { name: "The keyboard on a window", for: "lit as pointed; the label says Enter", sample: screen(() => both({ lit: { kind: "window", screen: 1, index: 0, keyboard: true } })) },
     { name: "An app asks", for: "the app's name in each bar", sample: screen(() => both({ asker: DISCORD })) },
-    { name: "Without the tip", for: "the bar's row alone, were the tip dropped", sample: screen(() => both({ tip: false })) },
+    { name: "Who asked, its hint up", for: "the app's icon names it on hover", sample: screen(() => one({ hint: "app" })) },
+    { name: "Region's hint up", for: "its key, and the right-button drag under", sample: screen(() => one({ hint: "region" })) },
     { name: "Another workspace", for: "switched while picking: dim and bar follow", sample: screen(() => both({ monitors: [DP10_THIRD, EDP1] })) },
     { name: "Shared", for: "the dim and the bars gone; mark and pill stay", sample: screen(() => both({ lit: { kind: "window", screen: 0, index: 1 }, phase: "shared" })) },
   ],
   sizes: [
     { name: "Two screens, two sizes", for: "live: a bar on each; Tab walks both", sample: screen(() => livePicking(MONITORS)) },
-    { name: "The narrowest screen", for: "720 by 480: who asks gives way", sample: screen(() => picking({ monitors: [NARROW], asker: LONG_ASKER })) },
-    { name: "The bar alone", for: "as wide as its row", sample: () => pickBar(MEET, { tip: true }) },
+    { name: "The narrowest screen", for: "720 by 480: the one row fits whole", sample: screen(() => picking({ monitors: [NARROW] })) },
+    { name: "The bar alone", for: "one row, as wide as its content", sample: () => pickBar(MEET) },
   ],
   states: {
     shown: ["rest", "lit"],
@@ -270,8 +272,11 @@ export default page<Shown>({
     signsOff: (index: number) => (index === 0 ? one({ lit: { kind: "window", screen: 0, index: 1 } }) : pickBar(MEET, { lit: "screen" })),
   },
   content: {
-    text: [{ name: "Who asks", words: SITE, sample: (words: string) => pickBar({ ...MEET, site: words }) }],
-    missingPicture: [{ name: "A window's app with no icon", for: "its initial on the window's tile", sample: screen(() => both({ lit: { kind: "window", screen: 1, index: 1 } })) }],
+    text: [{ name: "Who asked, in its hint", words: ASKER_NAME, sample: (words: string) => pickBar({ ...MEET, app: words }, { hint: "app" }) }],
+    missingPicture: [
+      { name: "An asking app with no icon", for: "its initial on the bar's tile", sample: () => pickBar(NO_ICON, { hint: "app" }) },
+      { name: "A window's app with no icon", for: "its initial on the window's tile", sample: screen(() => both({ lit: { kind: "window", screen: 1, index: 1 } })) },
+    ],
     counts: [
       { name: "One screen", for: "one bar", sample: screen(() => one()) },
       { name: "Two screens", for: "a bar on each", sample: screen(() => both()) },
@@ -321,18 +326,19 @@ export default page<Shown>({
   measures: {
     samples: nonEmpty([
       { name: "A window lit", for: "the bar, the label, the edge", sample: screen(() => one({ lit: { kind: "window", screen: 0, index: 1 } })) },
-      { name: "The bar alone", for: "its row and its tip", sample: () => pickBar(MEET, { tip: true }) },
+      { name: "The bar alone", for: "the icon, the buttons, their gaps", sample: () => pickBar(MEET) },
     ]),
     measures: [
       { part: "Bar's padding, on its Sheet", token: "space-s16" },
       { part: "Sheet's fillets into the edge", token: "radius-surface" },
       { part: "Between the bar's parts", token: "space-s8" },
+      { part: "Who asked, its tile", token: "size-control_sm" },
       { part: "Buttons", token: "size-control_sm" },
       { part: "Label's width", token: "size-menu" },
       { part: "Dim", token: "opacity-panel_scrim" },
       { part: "A window's edge", token: "stroke-thin" },
       { part: "A screen's edge", token: "stroke-thin" },
     ],
-    reflow: { note: "The bar keeps to the middle of the bottom edge; on a narrow screen who asks is cut first.", sample: screen(() => picking({ monitors: [NARROW], asker: LONG_ASKER })) },
+    reflow: { note: "The bar keeps to the middle of the bottom edge, one row at every width.", sample: screen(() => picking({ monitors: [NARROW] })) },
   },
 });
