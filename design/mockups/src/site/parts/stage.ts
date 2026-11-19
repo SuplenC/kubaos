@@ -158,14 +158,18 @@ function statePicks(states: States<State>, focus: Focus | DoesntApply): Pick[] {
   });
 }
 
-/** What the stage's chips pin, in the bar's order: Live, then each state `states` shows. */
-export function stagePicks(spec: Stage, states?: { readonly states: States<State>; readonly focus: Focus | DoesntApply }): Pick[] {
-  return [{ name: "Live", hint: `live · ${spec.hint}`, draw: () => [spec.live()] }, ...(states ? statePicks(states.states, states.focus) : [])];
+/**
+ * What the stage's chips pin, in the bar's order: Live, drawn in the switches' picks `picked`, then
+ * each state `states` shows.
+ */
+export function stagePicks(spec: Stage, states?: { readonly states: States<State>; readonly focus: Focus | DoesntApply }, picked: readonly number[] = []): Pick[] {
+  return [{ name: "Live", hint: `live · ${spec.hint}`, draw: () => [spec.switches ? spec.switches.live(picked) : spec.live()] }, ...(states ? statePicks(states.states, states.focus) : [])];
 }
 
 /** The stage for `spec`; with `states`, the bar's chips pin each of them. */
 export function stage(spec: Stage, states?: { readonly states: States<State>; readonly focus: Focus | DoesntApply }): HTMLElement {
-  const picks = stagePicks(spec, states);
+  const switched = (spec.switches?.each ?? []).map(() => 0);
+  const picks = stagePicks(spec, states, switched);
   const now = settings();
   const day = applies(spec.daylight);
   const modes: Mode[] = !day ? ["dark"] : ALL || now.both ? ["dark", "light"] : [now.mode];
@@ -199,6 +203,7 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     });
     // A label is measured for its words, so each pick's hint is a label of its own.
     hint.replaceChildren(label(pick.hint, "mono", "on_surface_variant"));
+    switches.hidden = index !== 0;
     if (box.isConnected) relayout(box);
   };
 
@@ -256,7 +261,29 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     show,
     "What the stage shows",
   );
-  const bar = el("div", "page-stage-bar", chips.element, hint);
+  // The world Live is drawn in, each switch a labelled row of chips: picking one draws Live again.
+  const switches = el(
+    "div",
+    "page-stage-switches",
+    ...(spec.switches?.each ?? []).map((each, at) =>
+      el(
+        "div",
+        "page-stage-world",
+        label(each.label, "label", "on_surface_variant"),
+        picker(
+          each.choices,
+          0,
+          (index) => {
+            switched[at] = index;
+            if (shown === 0) show(0);
+          },
+          each.label,
+        ).element,
+      ),
+    ),
+  );
+  switches.hidden = switched.length === 0;
+  const bar = el("div", "page-stage-bar", chips.element, hint, switches);
   const box = el(
     "div",
     "page-hero",

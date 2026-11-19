@@ -1,0 +1,1642 @@
+/* The Overview (`overview-parts.ts`): each screen's desktop, its frame stepping aside and its
+   wallpaper blurred and dimmed as the lock's is, and over it the miniatures of every workspace the
+   screen holds. Every place is a registered custom property that glides: a change sets the new
+   value and its timing (`--ov-pt` and the rest), and the transition runs from wherever the element
+   is drawn now, so a move made mid-move turns smoothly toward its new place. None inherit: each
+   element carries its own, so a glide restyles only what moves, never a window's contents. */
+
+@property --ov-x { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-y { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-w { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-h { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-dw { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-dh { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-tx { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-ty { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-tw { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-th { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-gx { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-gy { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --ov-s { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-sx { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-sy { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-fly { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-arrive { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-veil { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-aside { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-cover { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-plus-tint { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-red { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-solid { syntax: "<number>"; inherits: true; initial-value: 0; }
+
+/* The sample: a whole screen, the size the stage or the full screen gives it. */
+.ov {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--screen-width);
+  height: var(--screen-height);
+  overflow: hidden;
+  background: var(--color-surface_container_lowest);
+  outline: none;
+  user-select: none;
+  touch-action: none;
+}
+
+/* The world: one screen at its size, or the desk scaled to fit and centred. */
+.ov-world {
+  position: absolute;
+  left: var(--ov-left, 0px);
+  top: var(--ov-top, 0px);
+  width: var(--ov-world-w);
+  height: var(--ov-world-h);
+  transform-origin: 0 0;
+  scale: var(--ov-fit, 1);
+}
+
+.ov-world > .ov-screen {
+  position: absolute;
+  left: var(--ov-at-x);
+  top: var(--ov-at-y);
+  isolation: isolate;
+}
+
+/* Screens apart on the desk, each its own glass. */
+.ov-world[data-view="desk"] > .ov-screen {
+  box-shadow: 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+/* The wallpaper reaches past the screen by its blur's reach, so blurred it still meets the edges. */
+.ov-screen > .k-screen-wallpaper {
+  inset: auto;
+  left: calc(-3 * var(--size-lock_blur));
+  top: calc(-3 * var(--size-lock_blur));
+  width: calc(100% + 6 * var(--size-lock_blur));
+  height: calc(100% + 6 * var(--size-lock_blur));
+  filter: blur(calc(var(--size-lock_blur) * var(--ov-veil))) brightness(calc(1 - var(--opacity-panel_scrim) * var(--ov-veil)));
+  transition: --ov-veil var(--ov-vt, 0s) var(--ov-ve, linear);
+}
+
+/* The frame steps aside: its hole grows past the screen's edges, and the bar slides up out. */
+.ov-screen .k-frame {
+  inset: calc(var(--frame-top) - var(--ov-aside) * (var(--frame-top) + var(--radius-surface)))
+    calc(var(--frame-side) - var(--ov-aside) * (var(--frame-side) + var(--radius-surface)));
+  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
+}
+
+.ov-screen .k-screen-glass {
+  opacity: calc(var(--opacity-frame) * (1 - var(--ov-aside)));
+  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
+}
+
+.ov-screen .k-bar {
+  translate: 0 calc(-1 * var(--ov-aside) * var(--frame-top));
+  opacity: calc(1 - var(--ov-aside));
+  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
+}
+
+.ov-screen[data-open] .k-screen-over {
+  pointer-events: none;
+}
+
+.ov-screen[data-open] .k-bar {
+  pointer-events: none;
+}
+
+.ov-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+/* ── The pointer ─────────────────────────────────────────────────────────────────────────────
+
+   The open hand over anything that can be carried, a window or a workspace, as OrderList's grip;
+   the closed hand everywhere while something is carried; a control's pointer over the "+" slot, as
+   the library's controls show it. */
+.ov[data-open] :is(.ov-ws, .ov-win) {
+  cursor: grab;
+}
+
+.ov[data-carrying],
+.ov[data-carrying] * {
+  cursor: grabbing;
+}
+
+.ov[data-open]:not([data-carrying]) .ov-plus {
+  cursor: pointer;
+}
+
+/* ── A workspace ─────────────────────────────────────────────────────────────────────────────── */
+
+/* Its box at its slot; flying, it travels to the screen's corner as its desktop grows to the
+   screen; arriving, it grows in from `scale.behind` as it fades in. */
+.ov-ws {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--ov-w);
+  height: var(--ov-h);
+  translate: calc(var(--ov-x) * (1 - var(--ov-fly))) calc(var(--ov-y) * (1 - var(--ov-fly)));
+  opacity: var(--ov-arrive);
+  scale: calc(var(--scale-behind) + (1 - var(--scale-behind)) * var(--ov-arrive));
+  transform-origin: 50% 50%;
+  transform: scale(var(--ov-shrink));
+  transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-w var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear);
+}
+
+/* The screen's own desktop flies over the others, shrinking into its place and growing out of it. */
+.ov-ws[data-rank="home"] {
+  z-index: 1;
+}
+
+/* The desktop drawn at the screen's own size and scaled into the box: the windows are the real
+   ones, seen from above. Its corners are the control radius at the miniature's size. */
+.ov-ws-desk {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--ov-dw);
+  height: var(--ov-dh);
+  overflow: hidden;
+  transform-origin: 0 0;
+  scale: calc(var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly));
+  border-radius: calc(var(--radius-control) * (1 - var(--ov-fly)) / (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly)));
+  /* Its windows' corner, in their own pixels, as the system nests a window in the frame: the
+     miniature's own corner less the windows' gap at its scale, as it is drawn now, flying or not;
+     never less than a window's on the desktop, `radius.surface` less `space.s8`, which it takes once
+     the miniature is the whole screen. Set here, where the miniature's scale is known, and read by
+     every window on it, which then scales it with itself. */
+  --ov-corner: max(
+    calc(var(--radius-surface) - var(--space-s8)),
+    calc(
+      (var(--radius-control) * (1 - var(--ov-fly)) - var(--space-s8) * (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))) /
+        (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))
+    )
+  );
+  background: var(--color-surface_container_lowest);
+  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / calc(var(--opacity-window_shadow) * (1 - var(--ov-fly))));
+  transition:
+    --ov-s var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-dw var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-dh var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s);
+}
+
+.ov-ws-wallpaper {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* A place's number, `space.s8` in from its top left corner, over the miniature and its windows. It
+   belongs to the place, not to the workspace in it: it stands still while workspaces move between
+   places, and shows once the miniature has come to rest there (`--ov-tag`), fading with a place
+   that comes or goes (`--ov-arrive`), and as something settles under it or leaves it
+   (`--ov-cover`, `overview-parts.ts`). */
+.ov-numbers {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.ov-place {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  translate: var(--ov-x) var(--ov-y);
+  opacity: calc(var(--ov-tag) * var(--ov-arrive) * var(--ov-cover));
+  transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-tag var(--ov-tt, 0s) var(--easing-standard) var(--ov-td, 0s),
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
+    --ov-cover var(--ov-ct, 0s) var(--easing-standard);
+}
+
+/* A number on the frame's glass, as the bar draws its workspaces on its own pill: it reads on any
+   picture, by night and by day. The screen's shown one sits on the indicator. */
+.ov-ws-number {
+  display: flex;
+  align-items: center;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+}
+
+/* Its figures centred on whole device pixels: centring alone puts them half a pixel out when the
+   badge and the figures differ by an odd number of them. */
+.ov-ws-number > .k-rolling {
+  margin-left: round(down, calc((var(--size-chip) - var(--slots) * var(--slot) - var(--marks, 0px)) / 2), 1px);
+}
+
+.ov-ws-number[data-shown] {
+  background: var(--color-primary);
+}
+
+.ov:not([data-open]) .ov-ws:not([data-shown-here]),
+.ov-ws[data-gone] {
+  pointer-events: none;
+}
+
+/* Carried: it rides over every screen, drawn where its pose puts it (`overview-parts.ts`). */
+.ov-ws[data-lifted],
+.ov-ws[data-landing] {
+  z-index: 1;
+  transform-origin: var(--ov-gx) var(--ov-gy);
+}
+
+.ov-ws:is([data-lifted], [data-landing]) > .ov-ws-desk {
+  box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
+}
+
+/* Refused by a full group: it dims, and goes back where it came from when let go. */
+.ov-ws[data-refused] {
+  opacity: var(--opacity-locked);
+}
+
+/* ── A window ────────────────────────────────────────────────────────────────────────────────── */
+
+/* At its tile on its desktop; carried, where its pose puts it. Its corner is the frame's less the
+   gap round it, as Hyprland rounds it. */
+.ov-win {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  box-sizing: border-box;
+  width: var(--ov-tw);
+  height: var(--ov-th);
+  translate: var(--ov-tx) var(--ov-ty);
+  scale: var(--ov-sx) var(--ov-sy);
+  transform-origin: var(--ov-gx) var(--ov-gy);
+  overflow: hidden;
+  /* The corner its miniature gives it (`.ov-ws-desk`); a window's on the desktop where it has none. */
+  border-radius: var(--ov-corner, calc(var(--radius-surface) - var(--space-s8)));
+  background: var(--color-surface);
+  transform: scale(var(--ov-shrink));
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
+    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
+  transition:
+    --ov-tx var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-ty var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-tw var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-th var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-sx var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-sy var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
+    opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+/* A floating window stands over the tiles; its shadow is every window's, as Hyprland draws one. */
+.ov-win[data-floating] {
+  z-index: 1;
+}
+
+/* The focused window's neon tube, as Hyprland draws the active border. */
+.ov-win[data-focused]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.ov-win[data-lifted] {
+  z-index: 1;
+  box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Off its miniature, the corner a miniature at the scale it is drawn at would give it, the same
+   rule as `.ov-ws-desk`'s: carried, in the tile it sits in, landing, or waiting in the slot. */
+.ov-win:is([data-lifted], [data-landing]) {
+  --ov-corner: max(
+    calc(var(--radius-surface) - var(--space-s8)),
+    calc((var(--radius-control) - var(--space-s8) * var(--ov-sx)) / var(--ov-sx))
+  );
+}
+
+.ov-win[data-refused] {
+  opacity: var(--opacity-locked);
+}
+
+.ov-win[data-landing] {
+  z-index: 1;
+}
+
+/* The places' numbers are under everything carried, at the hand or flying: no number shows over a
+   carried thing. What is carried rides over what waits in the slot; the number of the place a
+   carried workspace sits in is over it, in a layer of its own over what is carried, as is a number
+   fading while something settles under it or leaves it; a carried window is over that too, and the
+   lit line round either over all. */
+.ov-lift > .ov-numbers {
+  z-index: 1;
+}
+
+.ov-lift > [data-held] {
+  z-index: 2;
+}
+
+.ov-lift > .ov-numbers-over {
+  z-index: 3;
+}
+
+.ov-lift > .ov-win[data-held] {
+  z-index: 4;
+}
+
+.ov-lift > .ov-hold {
+  z-index: 5;
+}
+
+/* Covered by a second thing pulled into the slot, what waits there steps out of sight over
+   `short`, and shows again as it is taken back out. */
+.ov-lift > .ov-ws[data-waiting] {
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.ov-lift > [data-covered] {
+  opacity: 0;
+}
+
+/* ── A group's slot, a waiting group's name ──────────────────────────────────────────────────── */
+
+.ov-plus,
+.ov-room {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: var(--ov-w);
+  height: var(--ov-h);
+  translate: var(--ov-x) var(--ov-y);
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-placeholder));
+  transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-w var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
+    background-color var(--motion-short) var(--easing-standard),
+    opacity var(--motion-short) var(--easing-standard);
+}
+
+/* The new-workspace slot reads on any picture: on the frame's glass, as the numbers are, its line
+   and its plus in `outline` and `on_surface_variant`. While something is carried it is lit, its
+   line and plus in the primary over a primary tint, at `opacity.tint`, and deeper, at
+   `opacity.selection`, as the place proposed; each change over `short`. Under the pointer with
+   nothing carried, the glass lightens by `opacity.focus` of `surface`. */
+.ov-plus {
+  opacity: var(--ov-arrive);
+  --ov-plus-ink: var(--color-on_surface_variant);
+  --ov-plus-line: var(--color-outline);
+  --ov-plus-wash: var(--color-primary);
+  background:
+    linear-gradient(rgb(from var(--ov-plus-wash) r g b / var(--ov-plus-tint)) 0 0),
+    rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--ov-plus-line);
+  transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-w var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
+    --ov-plus-tint var(--motion-short) var(--easing-standard),
+    box-shadow var(--motion-short) var(--easing-standard),
+    opacity var(--motion-short) var(--easing-standard);
+}
+
+.ov-plus > .k-icon {
+  position: absolute;
+  left: round(down, calc((100% - var(--icon-s24)) / 2), 1px);
+  top: round(down, calc((100% - var(--icon-s24)) / 2), 1px);
+  transition: color var(--motion-short) var(--easing-standard);
+}
+
+.ov[data-carrying] .ov-plus {
+  --ov-plus-ink: var(--color-primary);
+  --ov-plus-line: var(--color-primary);
+  --ov-plus-tint: var(--opacity-tint);
+}
+
+.ov[data-carrying] .ov-plus[data-proposed] {
+  --ov-plus-tint: var(--opacity-selection);
+}
+
+.ov-plus:not([data-shown]) {
+  display: none;
+}
+
+.ov[data-open]:not([data-carrying]) .ov-plus:hover {
+  --ov-plus-wash: var(--color-surface);
+  --ov-plus-tint: var(--opacity-focus);
+}
+
+/* A waiting group's name on the same glass, as the bar names a borrowed group. */
+.ov-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: var(--size-chip);
+  padding: 0 var(--space-s8);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+  translate: var(--ov-x) var(--ov-y);
+  opacity: var(--ov-arrive);
+  transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s);
+}
+
+.ov-label:not([data-shown]) {
+  display: none;
+}
+
+/* ── The marks over the screens ──────────────────────────────────────────────────────────────── */
+
+.ov-marks,
+.ov-lift {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
+}
+
+/* The room a carried workspace would take: an empty slot. */
+.ov-room {
+  opacity: 0;
+}
+
+.ov-room[data-shown] {
+  opacity: 1;
+}
+
+/* Between two miniatures: a carried window dropped here makes a new workspace there. */
+.ov-slit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--ov-w);
+  height: var(--ov-h);
+  translate: var(--ov-x) var(--ov-y);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.ov-slit[data-shown] {
+  opacity: 1;
+}
+
+/* The keyboard's selection and a carry's target: the focus tube, gliding between miniatures. */
+.ov-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--ov-w);
+  height: var(--ov-h);
+  translate: var(--ov-x) var(--ov-y);
+  opacity: 0;
+  transition:
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-w var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-h var(--ov-pt, 0s) var(--ov-pe, linear),
+    opacity var(--motion-short) var(--easing-standard);
+}
+
+.ov-ring[data-shown] {
+  opacity: 1;
+}
+
+/* ── The tip and the delete slot ─────────────────────────────────────────────────────────────── */
+
+/* The tip on the frame's glass, as the numbers are, so its line reads on any picture: centred down
+   the bottom margin, under every miniature. It comes and goes with the miniatures. */
+.ov-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  padding: var(--space-s4) var(--space-s12);
+  border-radius: var(--radius-control);
+  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+  translate: var(--ov-x) calc(var(--ov-y) + var(--space-s16) * var(--ov-sink));
+  opacity: 0;
+  transition: opacity var(--motion-medium) var(--easing-standard);
+}
+
+.ov[data-open] .ov-tip {
+  opacity: 1;
+  transition-delay: var(--motion-medium);
+}
+
+/* Both drags learned: it sinks `space.s16` into the margin as it fades over `medium`, for good. */
+.ov .ov-tip[data-learned] {
+  --ov-sink: 1;
+  opacity: 0;
+  transition:
+    --ov-sink var(--motion-medium) var(--easing-emphasized_accel),
+    opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+[data-reduced] .ov .ov-tip[data-learned] {
+  --ov-sink: 0;
+}
+
+/* A sample's annotation, not the Overview's: the delete slot's reach, a dashed circle in `outline`
+   round the slot, the screen's edges cutting it to its corner. */
+.ov-reach {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  box-sizing: border-box;
+  width: var(--ov-w);
+  height: var(--ov-w);
+  translate: var(--ov-x) var(--ov-y);
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) dashed var(--color-outline);
+  border-radius: var(--radius-full);
+  pointer-events: none;
+}
+
+/* The delete slot: on the frame's glass at the miniatures' radius, what it holds with `space.s16`
+   round it on all four sides (`slotBox`), a workspace's shape while empty, in the corner while something
+   is carried or waits in it. It rises `space.s24` into place and fades in over `medium`, and leaves
+   the same way, faster. It takes the shape of what it holds by its box, never by scaling, so its
+   line, `focus.tube` wide, keeps its width.
+
+   Its red says how near a delete is, each state easing into the next over `short` on `standard`:
+   - nothing carried: the glass, its line the Danger tone's unlit glass, the symbol in Danger;
+   - something carried: the line full Danger, the glass warmed by Danger at `opacity.tint`;
+   - something pulled in and still held: solid Danger (`burn_error`, the Danger fill) with its glow,
+     what is drawn on it in `on_burn_error`;
+   - let go, waiting out its time: red glass, Danger at `opacity.error_fill` over the glass, the line
+     full Danger and no glow, so what waits and the timer read clearly. */
+.ov-bin {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  box-sizing: border-box;
+  width: var(--ov-w);
+  height: var(--ov-h);
+  border-radius: var(--radius-control);
+  /* `--ov-red` is how much Danger warms the glass, `--ov-solid` how far it is solid Danger. */
+  background: color-mix(
+    in srgb,
+    var(--color-burn_error) calc(var(--ov-solid) * 100%),
+    color-mix(in srgb, rgb(from var(--color-burn_error) r g b / var(--ov-red)), rgb(from var(--color-surface_container) r g b / var(--opacity-frame)))
+  );
+  --ov-slot-ink: color-mix(in srgb, var(--color-on_burn_error) calc(var(--ov-solid) * 100%), var(--color-burn_error));
+  translate: var(--ov-x) calc(var(--ov-y) + var(--space-s24));
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    translate var(--motion-short) var(--easing-emphasized_accel),
+    opacity var(--motion-short) var(--easing-emphasized_accel);
+}
+
+.ov-bin[data-shown] {
+  translate: var(--ov-x) var(--ov-y);
+  opacity: 1;
+  transition:
+    translate var(--motion-medium) var(--easing-emphasized_decel),
+    opacity var(--motion-medium) var(--easing-emphasized_decel),
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-w var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-h var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-red var(--motion-short) var(--easing-standard),
+    --ov-solid var(--motion-short) var(--easing-standard);
+}
+
+.ov[data-carrying] .ov-bin {
+  --ov-red: var(--opacity-tint);
+}
+
+.ov-bin[data-pending] {
+  --ov-red: var(--opacity-error_fill);
+}
+
+.ov-bin[data-pinned] {
+  --ov-solid: 1;
+}
+
+/* The line at rest: the tube shown as unlit glass, with no glow. */
+.ov-bin > .k-ring > .k-tube {
+  opacity: 1;
+}
+
+.ov-bin:not([data-pinned]) > .k-ring > .k-tube {
+  border-color: var(--tube-unlit);
+  transition: border-color var(--motion-short) var(--easing-standard);
+}
+
+/* Something carried, or waiting: the line full Danger, with no glow. */
+.ov[data-carrying] .ov-bin:not([data-pinned]) > .k-ring > .k-tube,
+.ov-bin[data-pending]:not([data-pinned]) > .k-ring > .k-tube {
+  border-color: var(--tube-lit);
+}
+
+/* Something waits in it: anywhere on the slot takes it back out, with the open hand. */
+.ov-bin[data-pending] {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+/* The delete symbol, in its middle. While something sits in the slot it steps aside: it fades and
+   falls back to `scale.behind` over `short`, and comes back as the slot empties. */
+.ov-slot-symbol {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    scale var(--motion-short) var(--easing-standard);
+}
+
+/* Centred in the slot on whole device pixels, whatever the slot's size. */
+.ov-slot-symbol > .k-icon {
+  position: absolute;
+  left: round(down, calc((100% - var(--icon-s32)) / 2), 1px);
+  top: round(down, calc((100% - var(--icon-s32)) / 2), 1px);
+}
+
+.ov-bin[data-holding] > .ov-slot-symbol {
+  opacity: 0;
+  scale: var(--scale-behind);
+}
+
+/* The timer: a bar `size.progress` tall in the slot's bottom margin, centred in it, as wide as what
+   waits above it, so it takes no room of its own and the margin round what waits is the same on
+   all four sides; in the Danger tone, its fill the time left (`--hold`). It shows while something
+   waits and goes at once when it is taken back out. */
+.ov-slot-timer {
+  position: absolute;
+  left: var(--space-s16);
+  right: var(--space-s16);
+  bottom: calc((var(--space-s16) - var(--size-progress)) / 2);
+  display: block;
+  height: var(--size-progress);
+  border-radius: var(--radius-full);
+  background: rgb(from var(--ov-slot-ink) r g b / var(--opacity-tint));
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.ov-bin[data-pending] > .ov-slot-timer {
+  opacity: 1;
+}
+
+.ov-slot-fill {
+  display: block;
+  width: calc(var(--hold, 0) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ov-slot-ink);
+}
+
+/* A thing waiting in the slot takes the pointer too, with the open hand. */
+.ov-lift > [data-waiting] {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+/* A thing deleted from the slot: it shrinks to nothing about its middle as it fades, over `medium`. */
+.ov-win[data-binned],
+.ov-ws[data-binned] {
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    --ov-tx var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-ty var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-sx var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-sy var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
+    opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+/* A still sample: every value is drawn where it is set, nothing glides to it. */
+.ov[data-still],
+.ov[data-still] * {
+  transition: none !important;
+}
+
+/* A corner of a screen cut out at its true size, for a sample: the screen stands where it would. */
+.ov-detail {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--detail-w);
+  height: var(--detail-h);
+  overflow: hidden;
+}
+
+.ov-detail > .ov {
+  position: absolute;
+  left: var(--detail-x);
+  top: var(--detail-y);
+}
+
+/* ── Reduced motion: places change at once, only fades play ──────────────────────────────────── */
+
+[data-reduced] .ov :is(.ov-ws, .ov-ws-desk, .ov-win, .ov-plus, .ov-room, .ov-label, .ov-ring, .ov-place) {
+  --ov-pt: 0s !important;
+  --ov-ft: 0s !important;
+}
+
+/* ══ What the apps show (`overview-apps.ts`) ═══════════════════════════════════════════════════ */
+
+.ova-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  --ova-pitch: var(--type-body-line);
+}
+
+.ova-line {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s4);
+  height: var(--ova-pitch);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ova-bar {
+  flex: 0 1 calc(var(--share) * 100%);
+  min-width: 0;
+  height: var(--space-s8);
+  border-radius: var(--radius-small);
+  background: var(--ink);
+}
+
+.ova-words {
+  flex: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ova-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ova-dot {
+  flex: none;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  background: var(--ink);
+}
+
+.ova-picked {
+  border-radius: var(--radius-small);
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+}
+
+/* Terminals: Ghostty on the lowest surface, monospace pitch. */
+.ova-terminal {
+  gap: 0;
+  padding: var(--space-s16);
+  background: var(--color-surface_container_lowest);
+  --ova-pitch: var(--type-mono_large-line, var(--space-s20));
+}
+
+.ova-btop {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--space-s8);
+  min-height: 0;
+}
+
+.ova-btop-box,
+.ova-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-s8);
+  border-radius: var(--radius-small);
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-outline_variant);
+}
+
+.ova-btop-wide {
+  grid-column: 1 / -1;
+}
+
+.ova-btop-graph {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  gap: var(--space-s4);
+}
+
+.ova-btop-bar {
+  flex: 1;
+  height: calc(var(--level) * 100%);
+  border-radius: var(--radius-small);
+  background: var(--ink);
+}
+
+.ova-editor {
+  display: flex;
+  flex: 1;
+  gap: var(--space-s16);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ova-gutter {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--space-s24);
+  opacity: var(--opacity-placeholder);
+}
+
+.ova-code {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ova-nvim-tabs,
+.ova-nvim-status {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s8);
+  margin-bottom: var(--space-s8);
+}
+
+.ova-nvim-tabs > .ova-line {
+  flex: 0 0 calc(var(--size-menu));
+  padding: 0 var(--space-s8);
+  border-radius: var(--radius-small);
+  background: var(--color-primary);
+}
+
+.ova-nvim-status {
+  margin: var(--space-s8) 0 0;
+  border-radius: var(--radius-small);
+  background: var(--color-surface_container_high);
+}
+
+.ova-nvim-status > .ova-line {
+  flex: 1;
+}
+
+.ova-nvim-mode {
+  flex: none;
+  width: var(--size-control_lg);
+  height: var(--ova-pitch);
+  border-radius: var(--radius-small);
+  background: var(--color-primary);
+}
+
+.ova-lazygit {
+  display: flex;
+  flex: 1;
+  gap: var(--space-s8);
+  min-height: 0;
+}
+
+.ova-stack {
+  display: flex;
+  flex: 0 0 calc(var(--size-panel));
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.ova-stack > .ova-pane {
+  flex: 1;
+}
+
+.ova-grow {
+  flex: 1;
+}
+
+.ova-added {
+  background: rgb(from var(--color-success) r g b / var(--opacity-tint));
+}
+
+.ova-removed {
+  background: rgb(from var(--color-error) r g b / var(--opacity-tint));
+}
+
+/* yazi: the parent folder, the folder, a preview; the status line. */
+.ova-yazi-cols {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 1fr 2fr 2fr;
+  gap: var(--space-s16);
+  min-height: 0;
+  margin: var(--space-s8) 0;
+}
+
+.ova-yazi-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ova-yazi-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s8);
+  height: var(--ova-pitch);
+  padding: 0 var(--space-s4);
+}
+
+.ova-yazi-row > .ova-line {
+  flex: 1;
+}
+
+.ova-yazi-row[data-picked] {
+  border-radius: var(--radius-small);
+  background: var(--color-surface_container_highest);
+}
+
+.ova-yazi-preview > .ova-picture {
+  height: auto;
+  aspect-ratio: var(--aspect-wallpaper);
+  border-radius: var(--radius-small);
+}
+
+.ova-yazi-status {
+  border-radius: var(--radius-small);
+  background: var(--color-surface_container_high);
+}
+
+/* An editor: the activity bar, the files, the tabs over the code, the status bar. */
+.ova-vscode-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.ova-activity {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-s24);
+  width: var(--size-control_lg);
+  padding-top: var(--space-s16);
+  background: var(--color-surface_container);
+}
+
+.ova-tree {
+  display: flex;
+  flex: 0 0 var(--size-sidebar);
+  flex-direction: column;
+  padding: var(--space-s12);
+  background: var(--color-surface_container_low);
+}
+
+.ova-vscode-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ova-tabs {
+  display: flex;
+  flex: none;
+  height: var(--size-control_md);
+  background: var(--color-surface_container);
+}
+
+.ova-tab {
+  display: flex;
+  flex: 0 0 var(--size-thumbnail_height);
+  align-items: center;
+  padding: 0 var(--space-s16);
+}
+
+.ova-tab > .ova-line {
+  flex: 1;
+}
+
+.ova-tab-on {
+  background: var(--color-surface);
+  box-shadow: inset 0 calc(var(--stroke-thin)) 0 var(--color-primary);
+}
+
+.ova-vscode .ova-editor {
+  padding: var(--space-s12) var(--space-s16);
+}
+
+.ova-status {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: var(--size-chip);
+  padding: 0 var(--space-s12);
+  background: var(--color-primary);
+}
+
+.ova-status > .ova-line {
+  flex: 1;
+}
+
+/* Browsers: the tabs and the toolbar, then the page. */
+.ova-browser-top {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  background: var(--color-surface_container);
+}
+
+.ova-tabstrip {
+  display: flex;
+  gap: var(--space-s4);
+  height: var(--size-control_md);
+  padding: var(--space-s4) var(--space-s8) 0;
+}
+
+.ova-btab {
+  display: flex;
+  flex: 0 1 var(--size-sidebar);
+  align-items: center;
+  gap: var(--space-s8);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-row) var(--radius-row) 0 0;
+}
+
+.ova-btab > .ova-line {
+  flex: 1;
+}
+
+.ova-btab-on {
+  background: var(--color-surface_container_high);
+}
+
+.ova-favicon {
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+}
+
+.ova-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s16);
+  height: var(--size-control_lg);
+  padding: 0 var(--space-s16);
+  background: var(--color-surface_container_high);
+}
+
+.ova-address {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-s8);
+  height: var(--size-control_sm);
+  padding: 0 var(--space-s12);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_highest);
+}
+
+.ova-address > .ova-line {
+  flex: 1;
+}
+
+.ova-site {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-surface_container_lowest);
+}
+
+.ova-site-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s24);
+  height: var(--size-row_two_line);
+  padding: 0 var(--space-s32);
+  box-shadow: inset 0 calc(-1 * var(--stroke-hairline_device_px)) 0 var(--color-outline_variant);
+}
+
+.ova-site-nav > .ova-line {
+  flex: 1;
+}
+
+.ova-logo {
+  width: var(--size-control_sm);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-small);
+}
+
+.ova-site-body {
+  display: flex;
+  flex: 1;
+  gap: var(--space-s48);
+  min-height: 0;
+  padding: var(--space-s32);
+}
+
+.ova-site-side {
+  display: flex;
+  flex: 0 0 var(--size-rail);
+  flex-direction: column;
+}
+
+.ova-site-article {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-s8);
+  min-width: 0;
+  max-width: var(--size-column);
+}
+
+.ova-figure {
+  display: block;
+  flex: none;
+  width: 100%;
+  aspect-ratio: var(--aspect-wallpaper);
+  margin: var(--space-s16) 0;
+  object-fit: cover;
+  border-radius: var(--radius-content);
+}
+
+.ova-snippet {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  margin: var(--space-s8) 0;
+  padding: var(--space-s16);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container);
+}
+
+.ova-pulls {
+  padding: var(--space-s32) var(--space-s48);
+  gap: var(--space-s24);
+}
+
+.ova-pulls-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.ova-pull-list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-content);
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+.ova-pull {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s16);
+  height: var(--size-row_two_line);
+  padding: 0 var(--space-s16);
+  box-shadow: inset 0 calc(-1 * var(--stroke-hairline_device_px)) 0 var(--color-outline_variant);
+}
+
+.ova-pull-dot {
+  width: var(--icon-s16);
+  height: var(--icon-s16);
+}
+
+.ova-message-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.ova-avatar {
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+}
+
+/* Chats: servers, channels, the conversation. */
+.ova-chat,
+.ova-telegram,
+.ova-mail {
+  flex-direction: row;
+}
+
+.ova-servers {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-s12);
+  width: var(--size-control_lg);
+  padding: var(--space-s12) var(--space-s8);
+  background: var(--color-surface_container_lowest);
+}
+
+.ova-server {
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+  border-radius: var(--radius-control);
+}
+
+.ova-channels,
+.ova-folders {
+  display: flex;
+  flex: 0 0 var(--size-sidebar);
+  flex-direction: column;
+  padding: var(--space-s16);
+  background: var(--color-surface_container_low);
+}
+
+.ova-conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ova-conversation-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: var(--size-row_two_line);
+  padding: 0 var(--space-s16);
+  box-shadow: inset 0 calc(-1 * var(--stroke-hairline_device_px)) 0 var(--color-outline_variant);
+}
+
+.ova-conversation-head > .ova-line {
+  flex: 1;
+}
+
+.ova-messages,
+.ova-bubbles {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-s16);
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-s16);
+}
+
+.ova-message {
+  display: flex;
+  flex: none;
+  gap: var(--space-s12);
+}
+
+.ova-input {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: var(--size-control_md);
+  margin: 0 var(--space-s16) var(--space-s16);
+  padding: 0 var(--space-s16);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+}
+
+.ova-input > .ova-line {
+  flex: 1;
+}
+
+.ova-chats {
+  display: flex;
+  flex: 0 0 calc(var(--size-panel));
+  flex-direction: column;
+  padding: var(--space-s8);
+  background: var(--color-surface_container_low);
+}
+
+.ova-chat-row,
+.ova-mail-row,
+.ova-library-row,
+.ova-folder {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s12);
+  height: var(--size-row_two_line);
+  padding: 0 var(--space-s8);
+  border-radius: var(--radius-row);
+}
+
+.ova-folder {
+  height: var(--size-row);
+}
+
+.ova-folder > .ova-line {
+  flex: 1;
+}
+
+:is(.ova-chat-row, .ova-mail-row, .ova-folder)[data-picked] {
+  background: var(--color-secondary_container);
+}
+
+.ova-bubble {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  width: var(--size-dialog);
+  max-width: 70%;
+  padding: var(--space-s8) var(--space-s12);
+  border-radius: var(--radius-content);
+  background: var(--color-surface_container_high);
+}
+
+.ova-bubble[data-mine] {
+  align-self: flex-end;
+  background: var(--color-primary_container);
+}
+
+.ova-mail-list {
+  display: flex;
+  flex: 0 0 calc(var(--size-panel));
+  flex-direction: column;
+  padding: var(--space-s8);
+  box-shadow: inset calc(-1 * var(--stroke-hairline_device_px)) 0 0 var(--color-outline_variant);
+}
+
+.ova-unread,
+.ova-read {
+  flex: none;
+  width: var(--size-badge_dot);
+  height: var(--size-badge_dot);
+  border-radius: var(--radius-full);
+}
+
+.ova-unread {
+  background: var(--color-primary);
+}
+
+.ova-reading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-s4);
+  min-width: 0;
+  padding: var(--space-s32);
+}
+
+/* A game, a video: the picture fills the window; the game's meters, the player's bar over it. */
+.ova-scene {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ova-hud {
+  position: absolute;
+  left: var(--space-s32);
+  bottom: var(--space-s32);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: var(--size-sidebar);
+}
+
+.ova-meter {
+  height: var(--space-s12);
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-on_surface);
+}
+
+.ova-meter {
+  background: linear-gradient(to right, var(--ink) calc(var(--share) * 100%), transparent calc(var(--share) * 100%));
+}
+
+.ova-boons {
+  position: absolute;
+  right: var(--space-s32);
+  top: var(--space-s32);
+  display: flex;
+  gap: var(--space-s8);
+}
+
+.ova-boon {
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-on_surface);
+}
+
+.ova-player {
+  position: absolute;
+  left: var(--space-s24);
+  right: var(--space-s24);
+  bottom: var(--space-s24);
+  display: flex;
+  align-items: center;
+  gap: var(--space-s16);
+  height: var(--size-control_lg);
+  padding: 0 var(--space-s16);
+  border-radius: var(--radius-control);
+  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
+}
+
+.ova-player > .ova-line {
+  flex: 0 0 var(--size-control_lg);
+}
+
+.ova-progress {
+  flex: 1;
+  height: var(--size-progress);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_highest);
+}
+
+.ova-progress-fill {
+  display: block;
+  width: calc(var(--share) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+}
+
+/* Music: the library, the playlist, the player. */
+.ova-music-main {
+  display: flex;
+  flex: 1;
+  gap: var(--space-s8);
+  min-height: 0;
+  padding: var(--space-s8);
+}
+
+.ova-library,
+.ova-collection {
+  display: flex;
+  flex: 0 0 var(--size-sidebar);
+  flex-direction: column;
+  padding: var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_low);
+}
+
+.ova-collection {
+  padding: var(--space-s16);
+}
+
+.ova-cover {
+  width: var(--size-control_md);
+  height: var(--size-control_md);
+  border-radius: var(--radius-small);
+}
+
+.ova-music-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-s16);
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: linear-gradient(var(--color-primary_container), var(--color-surface_container_low) var(--size-thumbnail_width));
+}
+
+.ova-playlist-head {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: var(--space-s24);
+  padding: var(--space-s32) var(--space-s24) 0;
+}
+
+.ova-playlist-head > .ova-cover {
+  width: var(--size-thumbnail_height);
+  height: var(--size-thumbnail_height);
+  border-radius: var(--radius-control);
+}
+
+.ova-playlist-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-s8);
+  min-width: 0;
+}
+
+.ova-tracks {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-s16);
+}
+
+.ova-track {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s12);
+  height: var(--size-row_two_line);
+}
+
+.ova-track > .ova-line:first-child {
+  flex: 0 0 var(--space-s16);
+}
+
+.ova-track > .ova-line:last-child {
+  flex: 0 0 var(--size-control_lg);
+}
+
+.ova-now {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s16);
+  height: var(--size-row_two_line);
+  padding: 0 var(--space-s16);
+  background: var(--color-surface_container_lowest);
+}
+
+.ova-now > .ova-message-words {
+  flex: 0 0 var(--size-sidebar);
+}
+
+.ova-strawberry .ova-music-main {
+  gap: var(--space-s8);
+}
+
+.ova-table {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--space-s8);
+}
+
+.ova-album {
+  display: flex;
+  flex: 0 0 var(--size-sidebar);
+  flex-direction: column;
+  gap: var(--space-s8);
+  padding: var(--space-s16);
+}
+
+.ova-album > .ova-cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: var(--radius-control);
+}
+
+/* Settings: its own mockup, filling the window. */
+.ova-settings > * {
+  flex: 1;
+  min-height: 0;
+}

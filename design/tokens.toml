@@ -196,6 +196,10 @@ two_line = 24
 control_sm = 32
 control_md = 40
 control_lg = 48
+# How tall the Overview's delete slot draws what it holds, a carried or waiting window or workspace:
+# large enough to tell it at a glance. The slot keeps `space.s16` round it on all four sides, its
+# timer's bar running in the bottom margin, so it is 96 tall and as wide as what it holds makes it.
+drop_slot = 64
 # A list row with one line, with a title over a subtitle, and with a title over a
 # subtitle that wraps to its second line (a menu item's or a select option's
 # description): each a `small` line taller, with the same inset at its top and foot.
@@ -703,6 +707,13 @@ use = "A toast staying: long enough to read twice."
 ms = 1100
 use = "A held control until it acts: Install, erasing a disk, a held menu item."
 
+# How long a window or a workspace let go in the Overview's delete slot waits before it is closed for
+# good: long enough to see what went and take it back out, short enough that a second rarely comes
+# first. Not a move: reduce motion doesn't cap it.
+[duration.undo]
+ms = 5000
+use = "A deletion that can still be undone: the Overview's delete slot."
+
 # How long the awake lock waits for a key, a press or a touch of the reader
 # before it goes back to rest. Not a move: reduce motion doesn't cap it.
 [duration.lock_idle]
@@ -892,6 +903,25 @@ window_shadow = 0.33
 # the lock comes up, shrinking to it as they fade, and growing from it as the
 # lock gives way.
 behind = 0.96
+# A window carried in the Overview, away from any place it could take: drawn this share of the size
+# it has on its workspace's miniature, a lone window's shape, so it never hides what it is over.
+carried = 0.5
+# How far round a drop target a carried thing counts as on it, a share of its screen's shorter side,
+# measured from the target's middle: the Overview's delete slot takes a drop anywhere in the quarter
+# circle of the corner a person throws a drag at (270 on a 1080 tall screen, 360 on 1440), not only
+# on the slot, which the carried thing covers.
+drop_reach = 0.25
+# The zone of a place in the Overview's grid that catches a carried workspace, a share of the place's
+# width and height: a rectangle of the place's shape centred in it. The pointer in it proposes that
+# place, the room opens there and the workspace snaps in; out of it, the workspace is at the hand.
+snap = 0.65
+# The least that zone's shorter side reaches, a share of the screen's shorter side, the zone never
+# past its place: a waiting group's places are drawn at half size, and this keeps them as easy to
+# catch, 0.9 of a small place on a 1080 tall screen (140 of 156), while the large places keep 0.65.
+snap_least = 0.13
+# How far three fingers travel to open the Overview all the way, a share of the screen's height: the
+# Overview arrives as far as the swipe has gone, and settles open past half of it when they lift.
+swipe = 0.3
 # The wallpaper coming toward you as the lock comes up, and going back to 1:1 as it gives way, round
 # the middle of the screen's bottom edge: the picture behind the city, its sky and its plate. A
 # gentle dolly, held still at rest and awake.

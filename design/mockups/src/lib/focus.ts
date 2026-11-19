@@ -313,6 +313,8 @@ function planContent(ring: HTMLElement, scale: number): Drawing | null {
 function plan(ring: HTMLElement, scale: number): Drawing | null {
   const glowing = ring.querySelector<HTMLElement>(".k-glow");
   if (!glowing || !ring.isConnected) return null;
+  // A ring changing size every frame keeps the mask it has, stretched with it (`steadyGlow`).
+  if (ring.hasAttribute("data-steady") && glowing.dataset.drawn) return null;
   const content = planContent(ring, scale);
   const width = ring.offsetWidth;
   const height = ring.offsetHeight;
@@ -423,6 +425,17 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
   rings.add(ring);
   resized.observe(ring);
   return ring;
+}
+
+/**
+ * Holds `ring`'s glow while its control changes size every frame, as a carried thing does as it
+ * flies: its mask, worked out per pixel, is kept and stretched with the ring, not worked out afresh
+ * each frame. Let go, it is drawn for the size the control has.
+ */
+export function steadyGlow(ring: HTMLElement, steady: boolean): void {
+  if (ring.hasAttribute("data-steady") === steady) return;
+  ring.toggleAttribute("data-steady", steady);
+  if (!steady) drawAll([ring]);
 }
 
 /** Draws every ring on the page for its control's size at the scale picked, and lets go of those
