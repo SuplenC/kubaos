@@ -6,7 +6,8 @@
 // as `--card-fill`). In it the symbol in the tone at `subheading`'s 24 on the title's first line,
 // `space.s16` from a `subheading` title in `on_surface` over a `body` line and any paragraphs more in
 // `on_surface_variant`, `space.s4` apart, all wrapping; its button bar `space.s16` under the words,
-// across their width; an optional foot `space.s16` under the rest (a held button's timed bar).
+// across their width, or one button beside them at the end, centred against them (`aside`); an
+// optional foot `space.s16` under the rest (a held button's timed bar).
 //
 // Small, it stands outside a card, under a section's heading or alone on a page: the symbol at
 // `label`'s 16 beside a `label` title in the tone, `space.s8` apart, the lines under them in
@@ -46,6 +47,11 @@ export interface BannerOptions {
   readonly paragraphs?: readonly string[];
   /** What to do about it: its button bar, `lib/button-bar.ts`. */
   readonly actions?: Element;
+  /**
+   * One button beside the words instead of a bar under them (Regular only): at the end, `space.s16`
+   * from them, centred against the title and its lines, so it takes no row of its own.
+   */
+  readonly aside?: Element;
   /** A line across its foot: how far a held button is. */
   readonly foot?: Element;
 }
@@ -67,7 +73,8 @@ function boxed(tone: StatusTone, small: boolean, options: BannerOptions): HTMLEl
   const said = small
     ? stack("s4", "start", row("s8", "centre", glyph, text(title, "label", tone)), ...more.map((each) => filling(sentence(each, "small", "on_surface_variant"))))
     : row("s16", "start", glyph, filling(stack("s4", "start", sentence(title, "subheading", "on_surface"), ...more.map((each) => sentence(each, "body", "on_surface_variant")))));
-  const parts = [said, ...(options.actions ? [options.actions] : []), ...(options.foot ? [options.foot] : [])];
+  const beside = !small && options.aside ? row("s16", "centre", filling(said), options.aside) : said;
+  const parts = [beside, ...(options.actions ? [options.actions] : []), ...(options.foot ? [options.foot] : [])];
   return stack(small ? "s12" : "s16", "start", ...parts.map((part) => (part instanceof HTMLElement ? filling(part) : part)));
 }
 

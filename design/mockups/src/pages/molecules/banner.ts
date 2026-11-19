@@ -4,6 +4,7 @@
 // card and a Line inside one, as a tip is.
 
 import { type BannerOptions, type BannerTone, BANNER_TONES, banner, tip, tipLine } from "../../lib/banner.ts";
+import { button } from "../../lib/button.ts";
 import { buttonBar } from "../../lib/button-bar.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { within } from "../../lib/layout.ts";
@@ -33,6 +34,9 @@ const BESIDE: Omit<BannerOptions, "actions" | "foot"> & { readonly title: string
   title: "KubaOS goes into the free space on Samsung 990 Pro (nvme0n1, 2 TB).",
   body: "Windows 11 stays where it is.",
 };
+/** Settings › About's Copy all: one button beside the words, on their rows. */
+const ASIDE = (): HTMLElement =>
+  banner({ tone: "Info", icon: "info", title: "Reporting a problem?", body: "Copy every fact on this page as text.", aside: button({ label: "Copy all", kind: "Tonal", size: "Sm", icon: "content_paste" }) });
 const BATTERY: BannerOptions = { tone: "Warning", icon: "battery_1_bar", title: "12% left. Plug the damn thing in.", body: "" };
 const SECURE_BOOT: BannerOptions = {
   tone: "Warning",
@@ -138,6 +142,7 @@ export default page<"rest">({
     { name: "Title alone", for: "says it all in a line", sample: () => plain(BATTERY) },
     { name: "With paragraphs", for: "the steps, `space.s4` apart", sample: () => plain(SECURE_BOOT) },
     { name: "With actions and a foot", for: "a button bar, the held action's timed bar along its foot", sample: () => confirm(BESIDE) },
+    { name: "A button beside the words", for: "`aside`: at the end, centred, no row of its own", sample: () => within(ROOM, ASIDE()) },
     { name: "Tip outside a card", for: "titled, under a heading or alone", sample: () => within(LIST, tip(SPACES)) },
     { name: "Tip inside a card", for: "a line under its setting, the symbol first", sample: () => within(LIST, tipLine(SPACES, true)) },
     { name: "Tip inside, wrapping", for: "the rail down every line", sample: () => within("var(--size-find)", tipLine(RESIZE, true)) },
@@ -195,6 +200,7 @@ export default page<"rest">({
     samples: nonEmpty([
       { name: "With actions and a foot", for: "padding, rail, symbol, words, button bar, foot", sample: () => confirm(ERASE, false, 0.4) },
       { name: "With paragraphs", for: "gaps between title, body and paragraphs", sample: () => plain(SECURE_BOOT) },
+      { name: "A button beside the words", for: "the words, the gap, the button centred", sample: () => within(ROOM, ASIDE()) },
     ]),
     measures: [
       { part: "Inset, rail ends, gaps to foot", token: "space-s16" },
@@ -203,6 +209,7 @@ export default page<"rest">({
       { part: "Rail at night", token: "banner-rail" },
       { part: "Rail by day", token: "banner-rail_day" },
       { part: "Between buttons", token: "space-s8" },
+      { part: "Words to a button beside them", token: "space-s16" },
       { part: "Between title, body, paragraphs", token: "space-s4" },
       { part: "Symbol", token: "type-subheading-icon" },
       { part: "Title line", token: "type-subheading-line" },
