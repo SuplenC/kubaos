@@ -36,7 +36,7 @@ import { row } from "./layout.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { text } from "./text.ts";
 import { tooltip } from "./tooltip.ts";
-import { raw } from "./tokens.ts";
+import { durationMs, raw } from "./tokens.ts";
 import { CHROME, settings } from "../site/settings.ts";
 
 export interface Tab {
@@ -95,7 +95,7 @@ let made = 0;
 
 /** The duration token `name` in milliseconds under the speed setting. */
 function duration(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 export function tabs(options: TabsOptions): HTMLElement {

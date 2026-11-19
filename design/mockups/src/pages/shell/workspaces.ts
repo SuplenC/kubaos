@@ -23,7 +23,7 @@ import { icon } from "../../lib/icon.ts";
 import { withHint } from "../../lib/hint.ts";
 import { probe } from "../../lib/probe.ts";
 import { advance, text, type TypeStyle } from "../../lib/text.ts";
-import { cubic, length, raw } from "../../lib/tokens.ts";
+import { cubic, durationMs, length } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 
 /** A workspace: its id (1–10 in the first block, 11–20 in the second), and whether it has windows. */
@@ -123,7 +123,7 @@ function widthOf(entry: Entry, kanji: boolean): number {
 
 /** The duration token `name` in milliseconds under the speed setting, nothing with reduce motion. */
 function ms(name: string): number {
-  return settings().reduced ? 0 : Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return settings().reduced ? 0 : durationMs(name) / settings().speed;
 }
 
 function easing(name: string): string {

@@ -8,7 +8,7 @@ import { doesntApply, type Move, nonEmpty, page, screen } from "../../site/page.
 import { CHROME, settings } from "../../site/settings.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { row, stack } from "../../lib/layout.ts";
-import { raw } from "../../lib/tokens.ts";
+import { durationMs, raw } from "../../lib/tokens.ts";
 import { barScreen } from "../shell/bar-parts.ts";
 import { SCREEN_WIDTH, TALL } from "../shell/screen-parts.ts";
 import {
@@ -169,7 +169,7 @@ function playLength(url: string): Promise<number | null> {
 
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** The live player, driven by the pointer and mpv's keys: every control and key acts. */
@@ -282,7 +282,7 @@ function live(): HTMLElement {
     cancelAnimationFrame(ramp);
     const from = sound.volume;
     const start = performance.now();
-    const length = Number.parseFloat(raw("duration-micro"));
+    const length = durationMs("micro");
     // A frame's time is its start, which can lie before `start`: unclamped, the level would run
     // back past `from` and out of the range a sound's volume takes.
     const step = (now: number) => {
@@ -316,7 +316,7 @@ function live(): HTMLElement {
       const over = root.querySelector(".mp-controller:hover, .mp-popover:hover, .mp-corner:hover, .mp-sidebar:hover");
       if (!over && free()) set({ shown: false });
       else wake();
-    }, Number.parseFloat(raw("duration-controller_rest")));
+    }, durationMs("controller_rest"));
   };
 
   const lengthOf = () => now().file?.length ?? 1;

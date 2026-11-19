@@ -17,7 +17,7 @@
 
 import "./sheet.css";
 import { probe } from "./probe.ts";
-import { raw } from "./tokens.ts";
+import { durationMs, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
 export interface ScreenOptions {
@@ -172,7 +172,7 @@ export interface Twins {
 
 /** The duration token `name` in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /**

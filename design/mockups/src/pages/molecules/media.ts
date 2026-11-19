@@ -9,7 +9,7 @@ import { shown, type Words } from "../../lib/content.ts";
 import { row, stack, within } from "../../lib/layout.ts";
 import { type Arrival, type MediaOptions, media, settle } from "../../lib/media.ts";
 import { role } from "../../lib/radius.ts";
-import { raw } from "../../lib/tokens.ts";
+import { durationMs } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
@@ -43,7 +43,7 @@ function live(): HTMLElement {
     window.clearTimeout(timer);
     settle(loaded, "loading");
     // Three of the placeholder's half breaths: long enough to see it breathe in and out.
-    timer = window.setTimeout(() => settle(loaded, "loaded"), (3 * Number.parseFloat(raw("duration-hum"))) / settings().speed);
+    timer = window.setTimeout(() => settle(loaded, "loaded"), (3 * durationMs("hum")) / settings().speed);
   });
   return within(COLUMN, stack("s16", "start", loaded, again));
 }

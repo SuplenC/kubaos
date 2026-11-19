@@ -21,7 +21,7 @@ import { makeHints, withHint } from "./hint.ts";
 import { iconButton } from "./icon-button.ts";
 import { filling, row } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
-import { raw } from "./tokens.ts";
+import { durationMs, raw } from "./tokens.ts";
 import { text } from "./text.ts";
 import { settings } from "../site/settings.ts";
 
@@ -105,7 +105,7 @@ function weeks(year: number, month: number, first: number): Day[][] {
 
 /** The duration token `name` in milliseconds under the speed setting. */
 function duration(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** `words` in `style`, centred in its box on whole device pixels, the odd one after it. */

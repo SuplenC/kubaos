@@ -5,12 +5,12 @@
 // divides the hold as it does every duration; reduced motion keeps it, since a hold is a timer, not
 // a move.
 
-import { raw } from "./tokens.ts";
+import { durationMs, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** What holds a held part: pressing starts its hold, letting go runs it back. */

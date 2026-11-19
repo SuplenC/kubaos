@@ -8,7 +8,7 @@ import { buttonBar } from "../../lib/button-bar.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { within } from "../../lib/layout.ts";
 import { progressBar, setProgress } from "../../lib/progress.ts";
-import { number } from "../../lib/tokens.ts";
+import { durationMs } from "../../lib/tokens.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { settings } from "../../site/settings.ts";
@@ -89,7 +89,7 @@ function wireHold(pressed: HTMLButtonElement, bar: HTMLElement, cta: string): vo
     if (words) words.textContent = label;
   };
   const tickHold = (now: number) => {
-    const fraction = Math.min(1, (now - start) / (number("duration-hold") / settings().speed));
+    const fraction = Math.min(1, (now - start) / (durationMs("hold") / settings().speed));
     setProgress(bar, fraction);
     if (fraction < 1) frame = requestAnimationFrame(tickHold);
     else say("Installing");

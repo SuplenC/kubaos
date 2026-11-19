@@ -2,7 +2,7 @@
 // the keyframes the player animates, and as the JSON a library reads to build the same move. Both
 // come from the page's `Move`, so what plays and what is written down are one thing.
 
-import { cubic, length, number, raw } from "../lib/tokens.ts";
+import { cubic, durationMs, length, number } from "../lib/tokens.ts";
 import type { Curve, Duration, Easing, Move, NonEmpty, Strike, Track, Value } from "./page.ts";
 import { PATHS } from "./recolour.ts";
 import { type Mode, settings } from "./settings.ts";
@@ -13,13 +13,9 @@ export const FRAME = 1000 / 60;
 /** How long the player holds each end of a move: long enough to see the state. */
 export const HOLD: Duration = "scene";
 
-/**
- * A duration token in milliseconds, as the tokens write it; the browser hands it back in seconds.
- */
+/** A duration token in milliseconds. */
 export function milliseconds(duration: Duration): number {
-  const value = raw(`duration-${duration}`);
-  const amount = Number.parseFloat(value);
-  return Math.round(value.endsWith("ms") ? amount : amount * 1000);
+  return durationMs(duration);
 }
 
 /** A curve token's four numbers. */

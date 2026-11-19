@@ -24,7 +24,7 @@ import { icon } from "./icon.ts";
 import { row } from "./layout.ts";
 import { declare, FIXED_HEIGHT, probe, variant } from "./probe.ts";
 import { advance, clamped, text, type TypeStyle, wrapped } from "./text.ts";
-import { length, number, raw } from "./tokens.ts";
+import { durationMs, length, number, raw } from "./tokens.ts";
 
 /** How a field shows its value: editable, wrong, read-only, or not usable now. */
 export const FIELD_STATES = ["Normal", "Invalid", "Locked", "Disabled"] as const;
@@ -116,7 +116,7 @@ function wordStep(words: string, pos: number, by: -1 | 1): number {
 
 /** The duration token `name` in milliseconds under the speed setting. */
 function motion(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** The scale `part` is drawn at: the page's, or that of a box drawn at a scale of its own. */

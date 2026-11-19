@@ -40,7 +40,7 @@ import { withHint } from "./hint.ts";
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
 import { advance, centreFor, shaped, text, type TypeStyle, typeset } from "./text.ts";
-import { length, raw } from "./tokens.ts";
+import { durationMs, length, raw } from "./tokens.ts";
 
 /** The most stops a slider marks with dots. */
 const MOST_MARKED = 8;
@@ -164,7 +164,7 @@ export interface SliderToggle {
 
 /** The duration token `name` in milliseconds under the speed setting, none with reduce motion. */
 function motion(name: string): number {
-  return settings().reduced ? 0 : Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return settings().reduced ? 0 : durationMs(name) / settings().speed;
 }
 
 /** The scale `part` is drawn at: the page's, or that of a box drawn at a scale of its own. */

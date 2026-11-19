@@ -26,7 +26,7 @@ import { type ListRowSpec, listRow, scaleOf, well } from "./list.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { scroll } from "./scroll.ts";
 import { clamped, type Run, text, type TypeStyle } from "./text.ts";
-import { cubic, length, raw } from "./tokens.ts";
+import { cubic, durationMs, length } from "./tokens.ts";
 import { popover } from "./tooltip.ts";
 import { settings } from "../site/settings.ts";
 
@@ -190,7 +190,7 @@ interface Turn {
 
 /** A duration token in milliseconds under the speed setting, whatever reduced motion says. */
 function played(name: string): number {
-  return Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return durationMs(name) / settings().speed;
 }
 
 /** The easing token `name` as a CSS timing function. */
@@ -206,7 +206,7 @@ function moving(element: HTMLElement, from: readonly [number, number], to: reado
 
 /** The duration token `name` in milliseconds, as the page plays it: none with reduced motion. */
 function ms(name: string): number {
-  return settings().reduced ? 0 : Number.parseFloat(raw(`duration-${name}`)) / settings().speed;
+  return settings().reduced ? 0 : durationMs(name) / settings().speed;
 }
 
 /** The easing token `name` as a function of time, 0 to 1, solved from its cubic Bézier. */

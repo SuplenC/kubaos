@@ -6,7 +6,7 @@ import { emptyState } from "../../../../lib/empty-state.ts";
 import { row, stack, filling } from "../../../../lib/layout.ts";
 import { well } from "../../../../lib/list.ts";
 import { orderList } from "../../../../lib/order-list.ts";
-import { number } from "../../../../lib/tokens.ts";
+import { durationMs } from "../../../../lib/tokens.ts";
 import { settings } from "../../../../site/settings.ts";
 import { type Reading as Shown, type SysmonStyle, sysmonPill } from "../../../shell/bar-parts.ts";
 
@@ -75,7 +75,7 @@ export function readingsPart(options: ReadingsOptions): HTMLElement {
       keyboardOn = items[[...list.box.children].indexOf(document.activeElement?.closest(".k-order-row") ?? list.box)]?.id ?? null;
       options.changed(items.map((each) => ({ ...each })), refused);
       // The region is drawn again once the rows have glided into place, so the resets follow.
-      const settle = number("duration-medium") / settings().speed;
+      const settle = durationMs("medium") / settings().speed;
       setTimeout(() => list.box.closest(".st-region")?.dispatchEvent(new CustomEvent("st-redraw")), settle);
     },
   });
