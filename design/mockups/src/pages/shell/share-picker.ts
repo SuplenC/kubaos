@@ -29,6 +29,7 @@ import {
   buildPicking,
   type PickingOptions,
   REGION,
+  type RegionShown,
   type WindowAt,
 } from "./sharing-parts.ts";
 
@@ -188,6 +189,9 @@ type Shown = "rest" | "lit" | "pressed";
 /** The asking app's name, as its icon's Tooltip says it. */
 const ASKER_NAME: Words = { short: "Zoom", long: "Visual Studio Code - Insiders" };
 
+/** Picking's region shared on DP-10 alone, its handles or a drag shown as `shown` says. */
+const regionShared = (shown?: RegionShown) => one({ lit: { kind: "region", screen: 0, rect: REGION }, phase: "shared", ...(shown ? { regionShown: shown } : {}) });
+
 /** The window the pointer is on, its pill at rest; the pill pointed at, lit; pressed, shared. */
 function windowState(state: Shown): HTMLElement {
   if (state === "pressed") return one({ lit: { kind: "window", ...FIREFOX_WINDOW }, phase: "shared" });
@@ -216,6 +220,16 @@ export default page<Shown>({
     { name: "A region shared", for: "its line stays; the pill in the bar", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION }, phase: "shared" })) },
     { name: "Shared", for: "the bars gone; mark and pill stay", sample: screen(() => both({ lit: { kind: "window", ...FIREFOX_WINDOW }, phase: "shared" })) },
   ],
+  groups: [
+    {
+      title: "A shared region, moved and resized",
+      rows: [
+        { name: "Near its line", for: "four handles fade in; inside, the desktop as usual", sample: screen(() => regionShared("near")) },
+        { name: "Moved by its line", for: "needs the portal to take a new box; it can't yet", sample: screen(() => regionShared("moving")) },
+        { name: "Resized by a corner", for: "the opposite corner stays; its size chip follows", sample: screen(() => regionShared("resizing")) },
+      ],
+    },
+  ],
   sizes: [
     { name: "Two screens, two sizes", for: "live: a bar on each; Share on either", sample: screen(() => livePicking(MONITORS)) },
     { name: "The narrowest screen", for: "720 by 480: the one row fits whole", sample: screen(() => picking({ monitors: [NARROW] })) },
@@ -237,12 +251,13 @@ export default page<Shown>({
         name: "Share this screen",
         cell: (state: Shown) => (state === "pressed" ? one({ lit: { kind: "screen", screen: 0 }, phase: "shared" }) : one(state === "lit" ? { lit: { kind: "screen", screen: 0 } } : {})),
       },
+      { name: "A shared region", cell: (state: Shown) => regionShared(state === "rest" ? undefined : state === "lit" ? "near" : "moving") },
       { name: "Region", cell: (state: Shown) => (state === "pressed" ? one({ lit: { kind: "region", screen: 0, rect: REGION } }) : one(state === "lit" ? { barPointed: "region" } : {})) },
     ],
     looks: {
       rest: "waiting: the desktop as usual, the bar out of its edge",
-      lit: "pointed at: the Share pill shows, or a line previews",
-      pressed: "a window: nothing; a share starts; Region draws",
+      lit: "pointed at: the pill shows, a line previews, handles appear",
+      pressed: "a share starts; Region draws; a region moves",
     },
   },
   focus: {
@@ -258,6 +273,7 @@ export default page<Shown>({
         () => one({ pointed: FIREFOX_WINDOW }),
         () => one({ pointed: { ...FIREFOX_WINDOW, pill: true } }),
         () => pickBar(MEET, { pinned: "screen" }),
+        () => regionShared("near"),
         () => pickBar(MEET, { pinned: "region" }),
       ][index]!(),
   },
@@ -312,6 +328,14 @@ export default page<Shown>({
         sample: screen(() => one({ lit: { kind: "screen", screen: 0 } })),
       },
       {
+        name: "A region's handles",
+        what: "The pointer near a shared region's line: its four handles fade in over `short`, and out as it leaves.",
+        tracks: [{ part: "the handles", on: "the region", target: ".share-region[data-near] > .share-region-handle", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+        reduced: "same",
+        back: "plays",
+        sample: screen(() => regionShared("near")),
+      },
+      {
         name: "A window focused",
         what: "The pointer onto a window: it takes the focus, its tube in over `short`, the last one's out.",
         tracks: [{ part: "the tube", on: "the window", target: ".share-window[data-pinned] > .k-ring", property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" }],
@@ -333,6 +357,7 @@ export default page<Shown>({
     samples: nonEmpty([
       { name: "Its Share pill pointed at", for: "the pill on the border, the line", sample: screen(() => one({ pointed: { ...FIREFOX_WINDOW, pill: true } })) },
       { name: "The bar alone", for: "the icon, the buttons, their gaps", sample: () => pickBar(MEET) },
+      { name: "A shared region, near its line", for: "the band, the handles, the corner", sample: screen(() => regionShared("near")) },
     ]),
     measures: [
       { part: "Bar's padding, on its Sheet", token: "space-s16" },
@@ -345,6 +370,10 @@ export default page<Shown>({
       { part: "Drawing's dim", token: "opacity-panel_scrim" },
       { part: "A window's line", token: "stroke-thin" },
       { part: "A screen's edge", token: "stroke-thin" },
+      { part: "A region's line", token: "stroke-thin" },
+      { part: "Region's grab band, either side", token: "space-s8" },
+      { part: "Region's handle", token: "space-s12" },
+      { part: "Region's least size, each way", token: "size-control_lg" },
     ],
     reflow: { note: "The bar keeps to the middle of the bottom edge, one row at every width.", sample: screen(() => picking({ monitors: [NARROW] })) },
   },

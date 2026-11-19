@@ -1,6 +1,7 @@
 // What KubaOS shows while something is on air: picking what to share, when an app asks (the
 // system's share prompt), the bar's sharing and camera pills and the panels they open, and the
-// marks on what is shared, which only the person sees, never the stream.
+// marks on what is shared, a region's handles and grab band with them, which only the person sees,
+// never the stream.
 //
 // Picking is on the live desktop, no dialog and no dim: while a request waits the desktop works as
 // usual, each screen's frame holds a bar in the middle of its bottom edge (who asked, Share this
@@ -33,6 +34,7 @@ import { panelPage } from "../../lib/panel-page.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
+import { length } from "../../lib/tokens.ts";
 import { centreOnInk, clamped, text } from "../../lib/text.ts";
 import { floatingTooltip, tooltip } from "../../lib/tooltip.ts";
 import { mutePill } from "./bar-audio-parts.ts";
@@ -413,11 +415,117 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
   return drawn;
 }
 
-/** Draft part, proposed: a shared region's mark, a line of `sharing` the thin stroke wide just outside it. */
-export function regionMark(rect: Rect, room: Room): HTMLElement {
+/** What a region's mark shows as a sample: its handles, as with the pointer near its line, or a move or a resize under way. */
+export type RegionShown = "near" | "moving" | "resizing";
+
+export interface RegionOptions {
+  /** The screen's real pixels to a logical one, for the size its chip says. */
+  readonly density?: number;
+  readonly shown?: RegionShown;
+}
+
+/** A region's corner where a resize takes it: across, its left or right side; down, its top or bottom. */
+type Grab = { readonly across: "left" | "right"; readonly down: "top" | "bottom" };
+
+const CORNERS: Record<"nw" | "ne" | "se" | "sw", Grab> = {
+  nw: { across: "left", down: "top" },
+  ne: { across: "right", down: "top" },
+  se: { across: "right", down: "bottom" },
+  sw: { across: "left", down: "bottom" },
+};
+
+/** The least a region moved or resized can be, each way: a large control's height, so it keeps room for its handles and stays easy to take hold of. */
+const leastRegion = () => length("size-control_lg");
+
+/** `began` moved by `dx`, `dy`, held inside `room`. */
+function moved(began: Rect, dx: number, dy: number, room: Room): Rect {
+  return {
+    ...began,
+    x: Math.round(Math.min(Math.max(began.x + dx, 0), room.width - began.width)),
+    y: Math.round(Math.min(Math.max(began.y + dy, 0), room.height - began.height)),
+  };
+}
+
+/** `began` resized from its corner `grab` by `dx`, `dy`, the opposite corner staying put, held inside `room` and never under the least. */
+function resized(began: Rect, grab: Grab, dx: number, dy: number, room: Room): Rect {
+  const least = leastRegion();
+  const right = began.x + began.width;
+  const bottom = began.y + began.height;
+  const left = grab.across === "left" ? Math.min(Math.max(began.x + dx, 0), right - least) : began.x;
+  const top = grab.down === "top" ? Math.min(Math.max(began.y + dy, 0), bottom - least) : began.y;
+  const toRight = grab.across === "right" ? Math.max(Math.min(right + dx, room.width), left + least) : right;
+  const toBottom = grab.down === "bottom" ? Math.max(Math.min(bottom + dy, room.height), top + least) : bottom;
+  return { x: Math.round(left), y: Math.round(top), width: Math.round(toRight - left), height: Math.round(toBottom - top) };
+}
+
+/**
+ * Draft part, proposed: a shared region's mark, a line of `sharing_line` the thin stroke wide just
+ * outside it, at a window's corner, so a region reads as a window's mark does. It can be moved and
+ * resized live: its line is a grab band reaching `space.s8` either side of it, which moves the
+ * region, and a handle at each corner, shown while the pointer is near the line, resizes it from
+ * that corner, the opposite corner staying put. While it moves the drawing's size chip follows
+ * under it. It stays inside its own screen and never gets smaller than `size.control_lg` each way.
+ * Only the band and the handles take the pointer: inside, the desktop is as usual. The handles and
+ * the band are the mark's own, which only the person sees, never the stream. Only a drag changes
+ * it; the pointer moving near it only sets attributes.
+ */
+export function regionMark(start: Rect, room: Room, options: RegionOptions = {}): HTMLElement {
+  const density = options.density ?? 1;
+  let rect = start;
   const mark = document.createElement("span");
   mark.className = "share-region";
+  mark.style.setProperty("--corner", windowCorner().css);
   place(mark, rect, room);
+  const size = document.createElement("span");
+  size.className = "share-region-size";
+  const showSize = () => size.replaceChildren(chip({ label: regionSize(Math.round(rect.width * density), Math.round(rect.height * density)), icon: SHARE_ICONS.region }));
+  /** Follows the pointer from `event` until it lets go: `change` gives the box for how far it has gone, in the screen's logical pixels. */
+  const drag = (event: PointerEvent, doing: "moving" | "resizing", change: (began: Rect, dx: number, dy: number) => Rect) => {
+    if (event.button !== 0) return;
+    // The press is the drag's, not the window's under the band.
+    event.preventDefault();
+    event.stopPropagation();
+    const grabbed = event.currentTarget as HTMLElement;
+    const bounds = mark.parentElement!.getBoundingClientRect();
+    const across = room.width / bounds.width;
+    const down = room.height / bounds.height;
+    const began = rect;
+    grabbed.setPointerCapture(event.pointerId);
+    mark.dataset.dragging = doing;
+    showSize();
+    const follow = (moving: PointerEvent) => {
+      rect = change(began, (moving.clientX - event.clientX) * across, (moving.clientY - event.clientY) * down);
+      place(mark, rect, room);
+      showSize();
+    };
+    const end = () => {
+      grabbed.removeEventListener("pointermove", follow);
+      delete mark.dataset.dragging;
+    };
+    grabbed.addEventListener("pointermove", follow);
+    grabbed.addEventListener("pointerup", end, { once: true });
+    grabbed.addEventListener("pointercancel", end, { once: true });
+  };
+  for (const side of ["top", "right", "bottom", "left"] as const) {
+    const band = document.createElement("span");
+    band.className = "share-region-band";
+    band.dataset.side = side;
+    band.addEventListener("pointerdown", (event) => drag(event, "moving", (began, dx, dy) => moved(began, dx, dy, room)));
+    mark.append(band);
+  }
+  for (const [name, grab] of Object.entries(CORNERS)) {
+    const handle = document.createElement("span");
+    handle.className = "share-region-handle";
+    handle.dataset.corner = name;
+    handle.addEventListener("pointerdown", (event) => drag(event, "resizing", (began, dx, dy) => resized(began, grab, dx, dy, room)));
+    mark.append(handle);
+  }
+  mark.append(size);
+  if (options.shown === "near") mark.dataset.near = "";
+  else if (options.shown) {
+    mark.dataset.dragging = options.shown;
+    showSize();
+  }
   return mark;
 }
 
@@ -516,7 +624,7 @@ export function desktop(options: DesktopOptions = {}): HTMLElement {
   const desk = tiling(document.createElement("span"), tracks(DESK).columns, tracks(DESK).rows);
   desk.append(...DESK.map((each, index) => deskWindow({ ...each, focused: index === (options.focused ?? 0), shared: shared?.kind === "window" && shared.index === index })));
   made.element.querySelector(".k-screen-dim")!.before(desk);
-  if (shared?.kind === "region") made.element.append(regionMark(shared.rect ?? REGION, DP10));
+  if (shared?.kind === "region") made.element.append(regionMark(shared.rect ?? REGION, DP10, { density: DP10.density }));
   if (shared?.kind === "screen") made.element.append(screenMark());
   return made.element;
 }
@@ -548,6 +656,8 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
   surface.tabIndex = 0;
   const box = document.createElement("span");
   box.className = "share-draw-box";
+  // Drawn, it is already the region's mark: at a window's corner.
+  box.style.setProperty("--corner", windowCorner().css);
   const size = document.createElement("span");
   size.className = "share-draw-size";
   surface.append(box, size);
@@ -650,6 +760,8 @@ export interface PickingOptions {
   readonly pill?: boolean;
   /** The asking app's hint drawn up, as under the pointer: a sample of it. */
   readonly hint?: "app";
+  /** A shared region's handles shown, or a move or a resize under way: a sample of it. */
+  readonly regionShown?: RegionShown;
   /** A bar's button pointed at, on every screen's bar: a sample of it. */
   readonly barPointed?: "region" | "cancel";
   readonly handlers?: PickHandlers;
@@ -811,7 +923,7 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
       window.toggleAttribute("data-pointed", true);
     }
     mark(element, "data-lit-screen", here && built.kind === "screen");
-    if (here && built.kind === "region" && built.rect) element.append(regionMark(built.rect, monitor));
+    if (here && built.kind === "region" && built.rect) element.append(regionMark(built.rect, monitor, { density: monitor.density, ...(options.regionShown ? { shown: options.regionShown } : {}) }));
   }
   const focus = (window: WindowAt) => windows.forEach((drawn, at) => mark(drawn, "data-pinned", window.screen === index && window.index === at, "lit"));
   if (phase === "shared") return { element, light: () => undefined, focus, open: () => undefined, close: () => undefined };

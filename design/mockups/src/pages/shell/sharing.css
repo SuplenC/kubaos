@@ -91,12 +91,126 @@
   opacity: 0;
 }
 
-/* A shared region's mark: the thin stroke just outside the region. */
+/* A shared region's mark: the thin stroke just outside the region, at a window's corner
+   (`--corner`). It takes no pointer: only its band and its handles do, so inside it the desktop is
+   as usual. */
 .share-region {
+  --line: max(1px, round(nearest, var(--stroke-thin), 1px));
+  --band: var(--space-s8);
+  --handle: var(--space-s12);
   position: absolute;
   display: block;
-  box-shadow: 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line);
+  border-radius: var(--corner);
+  box-shadow: 0 0 0 var(--line) var(--color-sharing_line);
   pointer-events: none;
+}
+
+/* Its grab band: the line and `space.s8` either side of it, one strip a side, which moves it. */
+.share-region-band {
+  position: absolute;
+  pointer-events: auto;
+  cursor: move;
+}
+
+.share-region-band:is([data-side="top"], [data-side="bottom"]) {
+  left: calc(-1 * (var(--line) + var(--band)));
+  right: calc(-1 * (var(--line) + var(--band)));
+  height: calc(var(--line) + 2 * var(--band));
+}
+
+.share-region-band:is([data-side="left"], [data-side="right"]) {
+  top: calc(-1 * (var(--line) + var(--band)));
+  bottom: calc(-1 * (var(--line) + var(--band)));
+  width: calc(var(--line) + 2 * var(--band));
+}
+
+.share-region-band[data-side="top"] {
+  top: calc(-1 * (var(--line) + var(--band)));
+}
+
+.share-region-band[data-side="bottom"] {
+  bottom: calc(-1 * (var(--line) + var(--band)));
+}
+
+.share-region-band[data-side="left"] {
+  left: calc(-1 * (var(--line) + var(--band)));
+}
+
+.share-region-band[data-side="right"] {
+  right: calc(-1 * (var(--line) + var(--band)));
+}
+
+/* A corner's handle, which resizes it from that corner: a `space.s12` disc of `sharing_container`
+   ringed in `sharing_line`, centred on the line where its corner turns, in a grab room the band
+   wide round it. It shows while the pointer is near the line, or on a handle, or a drag is under
+   way, fading over `short`; hidden, it takes no pointer, so the region's inside stays the
+   desktop's. */
+.share-region-handle {
+  --in: calc(var(--corner) - (var(--corner) + var(--line) / 2) * 0.7071);
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: calc(var(--handle) + 2 * var(--band));
+  height: calc(var(--handle) + 2 * var(--band));
+  margin: calc(-1 * (var(--handle) / 2 + var(--band)));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-region-handle::before {
+  content: "";
+  width: var(--handle);
+  height: var(--handle);
+  border-radius: var(--radius-full);
+  background: var(--color-sharing_container);
+  box-shadow: inset 0 0 0 var(--line) var(--color-sharing_line);
+}
+
+.share-region-handle[data-corner="nw"] {
+  top: var(--in);
+  left: var(--in);
+  cursor: nwse-resize;
+}
+
+.share-region-handle[data-corner="ne"] {
+  top: var(--in);
+  right: var(--in);
+  cursor: nesw-resize;
+}
+
+.share-region-handle[data-corner="se"] {
+  right: var(--in);
+  bottom: var(--in);
+  cursor: nwse-resize;
+}
+
+.share-region-handle[data-corner="sw"] {
+  bottom: var(--in);
+  left: var(--in);
+  cursor: nesw-resize;
+}
+
+.share-region:is([data-near], [data-dragging], :has(> .share-region-band:hover, > .share-region-handle:hover)) > .share-region-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Its size while it moves or resizes: the drawing's chip, `space.s8` under its line from its start,
+   following it, shown only while a drag is under way. */
+.share-region-size {
+  position: absolute;
+  left: 0;
+  top: calc(100% + var(--line) + var(--space-s8));
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-region[data-dragging] > .share-region-size {
+  opacity: 1;
 }
 
 /* A shared screen's mark: the thin stroke inside the screen's whole edge, at its own corners, in
@@ -149,6 +263,7 @@
 .share-draw-box {
   position: absolute;
   display: none;
+  border-radius: var(--corner);
   box-shadow:
     0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line),
     0 0 0 calc(var(--screen-width) + var(--screen-height)) rgb(from var(--color-scrim) r g b / var(--opacity-panel_scrim));

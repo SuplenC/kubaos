@@ -1,8 +1,9 @@
 // The on-air marks: what is shared, marked on the desktop for the person alone, never in the stream.
-// A shared window keeps a violet border, and its tube burns violet while it is focused; a
-// shared region has a violet line just outside it; a shared screen has the same line round its
-// whole edge, inside it. One mark for all three. Nothing else changes. The windows and the marks
-// are draft parts, proposed for the library (`sharing-parts.ts`).
+// A shared window keeps a violet border, and its tube burns violet while it is focused; a shared
+// region has a violet line just outside it, at a window's corner, by which it moves and resizes
+// live; a shared screen has the same line round its whole edge, inside it. One mark for all three.
+// Nothing else changes. The windows and the marks are draft parts, proposed for the library
+// (`sharing-parts.ts`).
 
 import { stack } from "../../lib/layout.ts";
 import { tabs } from "../../lib/tabs.ts";
@@ -110,7 +111,7 @@ export default page<State>({
   level: "shell",
   slug: "on-air-marks",
   title: "On-air marks",
-  lede: "What is shared, marked in violet for the person alone, never in the stream.",
+  lede: "What is shared, marked in violet for the person alone, never in the stream; a region's handles and grab band too.",
   code: { unbuilt: "Not built: Hyprland, the shell" },
   stage: { live, hint: "pick what is shared; point at a window to focus it", daylight: true },
   variants: [
@@ -129,7 +130,7 @@ export default page<State>({
         { name: "Window, at rest", for: "draft: a desktop window, Hyprland's border", sample: () => windowAlone(false, false) },
         { name: "Window, shared", for: "draft: the violet border over it", sample: () => windowAlone(true, false) },
         { name: "Window, shared and focused", for: "draft: the tube in `sharing`", sample: () => windowAlone(true, true) },
-        { name: "Region mark", for: "draft: `stroke.thin` outside the region", sample: () => sampleOf(regionMark({ x: 16, y: 16, width: 240, height: 120 }, sampleRoom())) },
+        { name: "Region mark", for: "draft: `stroke.thin` outside it; drag its line or a corner", sample: () => sampleOf(regionMark({ x: 16, y: 16, width: 240, height: 120 }, sampleRoom())) },
         { name: "Screen mark", for: "draft: `stroke.thin` inside the screen's edge", sample: () => sampleOf(screenMark()) },
       ],
     },
@@ -160,7 +161,7 @@ export default page<State>({
     },
   },
   content: {
-    text: doesntApply("the marks hold no words; the pill's hint names what is shared."),
+    text: doesntApply("no words but a region's size while it moves; the pill's hint names what is shared."),
     missingPicture: [{ name: "An app with no icon", for: "its initial on the window's tile", sample: () => windowAlone(true, false, GHOSTTY) }],
     counts: doesntApply("one share at a time: its marks alone."),
   },
