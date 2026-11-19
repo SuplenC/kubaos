@@ -12,10 +12,14 @@ import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, scr
 import { mutePill } from "./bar-audio-parts.ts";
 import { barStrip, bellPill, type CameraUse, cameraPill, EVERYDAY, ON_AIR_WORDS, onAirOptions, type Share, sharingContent, sharingPill, statusPill } from "./bar-parts.ts";
 import { SCREEN_WIDTH } from "./screen-parts.ts";
-import { CAMERAS, cameraPanel, cameraShot, NO_ICON, onCorner, SHARES, sharingPanel, sharingShot } from "./sharing-parts.ts";
+import { CAMERAS, cameraPanel, cameraShot, LONG_VIEW, NO_ICON, onCorner, shareFor, SHARES, type ShareView, sharingPanel, sharingShot, VIEWS } from "./sharing-parts.ts";
 
 const CAMERA: CameraUse = CAMERAS.first.use;
-const TWO_SHARES: readonly Share[] = [SHARES.screen, SHARES.second];
+/** Two shares at once: the left screen to Meet, Firefox's window to Discord. */
+const TWO_VIEWS: readonly ShareView[] = [VIEWS.three.screen, VIEWS.three.window];
+const TWO_SHARES: readonly Share[] = TWO_VIEWS.map(shareFor);
+/** Each kind of share on a desk, a card each. */
+const kinds = (desk: { readonly screen: ShareView; readonly window: ShareView; readonly region: ShareView }) => [desk.screen, desk.window, desk.region];
 const TWO_CAMERAS: readonly CameraUse[] = [CAMERAS.first.use, CAMERAS.second.use];
 
 /** The bar's right end from the on-air pills on: the pills, the mute pill, the bell, status. */
@@ -46,12 +50,12 @@ function live(): HTMLElement {
   // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
   // with none (`contents`) reads as reaching from the page's edge.
   holder.style.display = "inline-block";
-  let shares: readonly Share[] = TWO_SHARES;
+  let shares: readonly ShareView[] = TWO_VIEWS;
   let open: "sharing" | "camera" | null = "sharing";
   const draw = () => {
     const bar: Element[] = [];
     if (shares.length > 0) {
-      const sharing = sharingPill(shares);
+      const sharing = sharingPill(shares.map(shareFor));
       sharing.addEventListener("click", () => toggle("sharing"));
       bar.push(sharing);
     }
@@ -173,8 +177,11 @@ export default page<State>({
     {
       title: "The sharing panel",
       rows: [
-        { name: "A screen shared", for: "a card: what, with whom, Change, Stop", sample: screen(() => sharingShot()) },
-        { name: "Two shares", for: "a card each, each with its own Stop", sample: screen(() => sharingShot({ shares: TWO_SHARES })) },
+        { name: "Two 16:9 screens and a laptop", for: "a screen, a window, a region: a card each", sample: screen(() => sharingShot({ shares: kinds(VIEWS.three) })) },
+        { name: "An ultrawide and a laptop", for: "the same three on a second desk", sample: screen(() => sharingShot({ shares: kinds(VIEWS.wide) })) },
+        { name: "One screen", for: "named This screen, the map one rectangle", sample: screen(() => sharingShot({ shares: kinds(VIEWS.one) })) },
+        { name: "Two shares at once", for: "a card each, each with its own Stop", sample: screen(() => sharingShot({ shares: TWO_VIEWS })) },
+        { name: "A long window title", for: "cut with an ellipsis; the card keeps its width", sample: screen(() => sharingShot({ shares: [LONG_VIEW] })) },
         { name: "Alone, no camera", for: "only the sharing pill in the bar", sample: screen(() => sharingShot({}, false)) },
       ],
     },
@@ -237,7 +244,7 @@ export default page<State>({
   },
   motion: {
     arrives: [
-      arrives("The sharing pill arrives", "Its room opens, it strikes on, then burns lit for a beat so the eye finds it.", () => sharingPill(SHARES.screen)),
+      arrives("The sharing pill arrives", "It strikes on where it stands, then burns lit for a beat so the eye finds it.", () => sharingPill(SHARES.screen)),
       arrives("The camera pill arrives", "The same: room, strike, a beat lit, then rest on its red.", () => cameraPill(CAMERA)),
     ],
     leaves: [leaves("The sharing pill leaves", () => sharingPill(SHARES.screen)), leaves("The camera pill leaves", () => cameraPill(CAMERA))],
@@ -261,7 +268,7 @@ export default page<State>({
   measures: {
     samples: nonEmpty([
       { name: "Both pills, counted", for: "circle, count, gaps", sample: () => end(TWO_SHARES, CAMERA) },
-      { name: "The sharing panel, two shares", for: "cards and their actions", sample: screen(() => sharingShot({ shares: TWO_SHARES })) },
+      { name: "The sharing panel, each kind", for: "the map, the lines, the actions", sample: screen(() => sharingShot({ shares: kinds(VIEWS.three) })) },
       { name: "The camera panel", for: "preview, row, quality, Close", sample: screen(() => cameraShot()) },
     ]),
     measures: [
@@ -270,6 +277,10 @@ export default page<State>({
       { part: "Symbol to count", token: "space-s4" },
       { part: "Panel's width", token: "size-panel" },
       { part: "Between cards", token: "space-s16" },
+      { part: "Map's height, at most", token: "size-row_three_line" },
+      { part: "Map to the words", token: "space-s16" },
+      { part: "Between the card's lines", token: "space-s4" },
+      { part: "Workspace from its corner", token: "space-s4" },
       { part: "Between a card's buttons", token: "space-s8" },
       { part: "Quality's label to Tabs", token: "space-s8" },
     ],

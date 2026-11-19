@@ -172,3 +172,62 @@
   border-radius: var(--radius-surface);
   background: var(--color-surface_container_lowest);
 }
+
+/* A share's card: each line cut with an ellipsis where it runs past the card, never growing it. */
+.share-card .share-card-line {
+  min-width: 0;
+}
+
+/* A map of the desk, a draft part: as wide as the card, never taller than a three-line row, its
+   screens in their real places, each parted from the next by the thin stroke. */
+.share-map {
+  --map-gap: max(1px, round(nearest, calc(var(--stroke-thin) / 2), 1px));
+  position: relative;
+  display: block;
+  align-self: center;
+  width: min(100%, calc(var(--size-row_three_line) * var(--map-ratio)));
+  aspect-ratio: var(--map-ratio);
+  margin-inline: auto;
+}
+
+.share-map-screen {
+  position: absolute;
+  box-sizing: border-box;
+  display: block;
+  left: calc(var(--x) * 1% + var(--map-gap));
+  top: calc(var(--y) * 1% + var(--map-gap));
+  width: calc(var(--w) * 1% - 2 * var(--map-gap));
+  height: calc(var(--h) * 1% - 2 * var(--map-gap));
+  border-radius: var(--radius-small);
+  background: var(--color-surface_container_highest);
+}
+
+/* The screen shared whole: the on-air line and a faint violet fill. */
+.share-map-screen[data-shared="whole"] {
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line);
+  background: rgb(from var(--color-sharing) r g b / var(--opacity-tint));
+}
+
+/* The screen a window or a region is on: a quiet outline. */
+.share-map-screen[data-shared="part"] {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline);
+}
+
+/* The window or the region, solid violet at its real place and size on its screen. */
+.share-map-taken {
+  position: absolute;
+  display: block;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  width: calc(var(--w) * 1%);
+  height: calc(var(--h) * 1%);
+  background: var(--color-sharing);
+}
+
+/* A window's workspace, in its screen's top left corner, where the bar shows it. */
+.share-map-workspace {
+  position: absolute;
+  left: var(--space-s4);
+  top: var(--space-s4);
+}
+

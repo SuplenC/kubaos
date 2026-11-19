@@ -36,7 +36,7 @@ import { tabs } from "../../lib/tabs.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { floatingTooltip, keyTooltip, popover, tooltip } from "../../lib/tooltip.ts";
 import { mutePill } from "./bar-audio-parts.ts";
-import { barScreen, bellPill, type CameraUse, cameraPill, EVERYDAY, type Share, SHARE_ICONS, sharingPill, statusPill, wallpaper } from "./bar-parts.ts";
+import { barScreen, bellPill, type CameraUse, cameraPill, EVERYDAY, type Share, SHARE_ICONS, type ShareKind, sharingPill, statusPill, wallpaper } from "./bar-parts.ts";
 import { CORNER, TALL } from "./control-center-parts.ts";
 import { SCREEN_WIDTH } from "./screen-parts.ts";
 import type { Group } from "./workspaces.ts";
@@ -87,11 +87,23 @@ export interface Placed {
   readonly rect: Rect;
 }
 
-/** A screen: its connector, its size in logical pixels, the screen's own pixels to one, and its windows. */
-export interface Monitor {
+/**
+ * A screen on the desk: its connector, its model, its size in logical pixels and its place among
+ * the others, top left at `x`, `y`, and whether it is the laptop's own panel. The connector is
+ * never shown: a person reads a screen by where it stands (`placeOf`).
+ */
+export interface DeskScreen {
   readonly connector: string;
+  readonly model: string;
   readonly width: number;
   readonly height: number;
+  readonly x: number;
+  readonly y: number;
+  readonly laptop?: boolean;
+}
+
+/** A screen with what picking draws on it: the screen's own pixels to one, and its windows. */
+export interface Monitor extends DeskScreen {
   readonly density: number;
   readonly windows: readonly Placed[];
   /** The workspace it shows, where it isn't the first. */
@@ -105,12 +117,16 @@ export const DESK: readonly Placed[] = [
   { app: DISCORD_APP, title: DISCORD_APP.titles[0]!, rect: { x: 804, y: 520, width: 780, height: 464 } },
 ];
 
-export const DP10: Monitor = { connector: "DP-10", width: SCREEN_WIDTH, height: 1000, density: 1.6, windows: DESK };
+export const DP10: Monitor = { connector: "DP-10", model: "Dell U2723QE", width: SCREEN_WIDTH, height: 1000, x: 0, y: 0, density: 1.6, windows: DESK };
 /** The laptop's screen beside it, smaller: Spotify and a terminal side by side. */
 export const EDP1: Monitor = {
   connector: "eDP-1",
+  model: "Built-in display",
+  laptop: true,
   width: 1440,
   height: 900,
+  x: SCREEN_WIDTH,
+  y: 0,
   density: 2,
   windows: [
     { app: SPOTIFY, title: SPOTIFY.titles[0]!, rect: { x: 16, y: 48, width: 700, height: 836 } },
@@ -129,8 +145,11 @@ export const DP10_THIRD: Monitor = {
 /** The narrowest screen the bar is laid out for, an app's least window wide. */
 export const NARROW: Monitor = {
   connector: "HDMI-A-1",
+  model: "Dell P2423",
   width: 720,
   height: 480,
+  x: 0,
+  y: 0,
   density: 1,
   windows: [{ app: FIREFOX, title: FIREFOX.titles[0]!, rect: { x: 16, y: 48, width: 688, height: 416 } }],
 };
@@ -150,11 +169,36 @@ export const SINCE = { sharing: "21:32", camera: "21:30" } as const;
 
 // What a share says, one message each, the names as placeholders.
 
-/** The words for what a share takes, by its kind. */
+/** Where a screen stands on the desk, which names it: a person never reads its connector. */
+export type Place = "left" | "middle" | "right" | "laptop" | "only";
+
+/**
+ * The place of the screen at `index` on `desk`: the only one, the laptop's own panel, or by where
+ * it stands among the others from left to right, the first left, the last right, any between middle.
+ */
+export function placeOf(desk: readonly DeskScreen[], index: number): Place {
+  if (desk.length === 1) return "only";
+  const screen = desk[index]!;
+  if (screen.laptop) return "laptop";
+  const order = [...desk].sort((a, b) => a.x - b.x);
+  const at = order.indexOf(screen);
+  return at === 0 ? "left" : at === order.length - 1 ? "right" : "middle";
+}
+
+/** A screen's words by its place, each a whole message: its name, as an object, a part of it, a window on it. */
+export const SCREEN_WORDS: Record<Place, { readonly name: string; readonly the: string; readonly part: string; readonly partOf: string; readonly workspace: (workspace: number) => string }> = {
+  left: { name: "Left screen", the: "the left screen", part: "Part of the left screen", partOf: "part of the left screen", workspace: (n) => `Left screen, workspace ${n}` },
+  middle: { name: "Middle screen", the: "the middle screen", part: "Part of the middle screen", partOf: "part of the middle screen", workspace: (n) => `Middle screen, workspace ${n}` },
+  right: { name: "Right screen", the: "the right screen", part: "Part of the right screen", partOf: "part of the right screen", workspace: (n) => `Right screen, workspace ${n}` },
+  laptop: { name: "Laptop screen", the: "the laptop screen", part: "Part of the laptop screen", partOf: "part of the laptop screen", workspace: (n) => `Laptop screen, workspace ${n}` },
+  only: { name: "This screen", the: "this screen", part: "Part of this screen", partOf: "part of this screen", workspace: (n) => `This screen, workspace ${n}` },
+};
+
+/** The words for what a share takes, by its kind, as the sharing pill's hint says it. */
 export const SHARE_WHAT = {
-  screen: (connector: string) => connector,
+  screen: (place: Place) => SCREEN_WORDS[place].the,
   window: (app: string) => `${app}'s window`,
-  region: (connector: string) => `A region of ${connector}`,
+  region: (place: Place) => SCREEN_WORDS[place].partOf,
 } as const;
 
 /** A region's size, in the screen's own pixels, as its chip shows it. */
@@ -171,6 +215,10 @@ export const WORDS = {
   click: "Click to share",
   rightDrag: "Drag with the right button anywhere to share a region at once.",
   withWhom: (who: string, since: string) => `With ${who} since ${since}`,
+  toWhom: (who: string, since: string) => `To ${who} since ${since}`,
+  windowTitle: (app: string, title: string) => `${app} · ${title}`,
+  /** A card's where line with the monitor's model after it, quiet and last: "1280 × 720 · Dell U2723QE". */
+  withModel: (where: string, model: string) => `${where} · ${model}`,
   cameras: (count: number) => (PLURAL.select(count) === "one" ? `${count} camera in use` : `${count} cameras in use`),
   held: "Notifications held until you stop",
   change: "Change what's shared",
@@ -183,12 +231,85 @@ export const WORDS = {
 /** The keys picking takes, besides Tab, Enter and Esc. */
 export const PICK_KEYS = { screen: "S", region: "R" } as const;
 
-/** The shares the pills and panels show: Meet in Chromium, and a second, Firefox's window to Discord. */
+/** A share as its card shows it: the desk, the screen it is on, and what it takes there. */
+export interface ShareView {
+  readonly kind: ShareKind;
+  readonly desk: readonly DeskScreen[];
+  /** The screen it is on, by its index on the desk. */
+  readonly screen: number;
+  /** A window's or a region's box, in its screen's own pixels. */
+  readonly rect?: Rect;
+  /** The workspace a shared window is on. */
+  readonly workspace?: number;
+  readonly app?: AppWindows;
+  /** A shared window's title. */
+  readonly title?: string;
+  readonly who: string;
+  readonly site?: string;
+  readonly since: string;
+}
+
+/** The Share a view gives the bar's pill: what it takes, named from the desk, and with whom. */
+export function shareFor(view: ShareView): Share {
+  const place = placeOf(view.desk, view.screen);
+  const what = view.kind === "screen" ? SHARE_WHAT.screen(place) : view.kind === "window" ? SHARE_WHAT.window(view.app?.app ?? "") : SHARE_WHAT.region(place);
+  return { kind: view.kind, what, who: view.who, since: view.since, ...(view.site ? { site: view.site } : {}) };
+}
+
+const DELL = "Dell U2723QE";
+const BUILT_IN = "Built-in display";
+
+/** Two 16:9 monitors side by side and the laptop on their right, its panel's foot level with theirs. */
+export const DESK_THREE: readonly DeskScreen[] = [
+  { connector: "DP-3", model: DELL, width: 2560, height: 1440, x: 0, y: 0 },
+  { connector: "DP-4", model: DELL, width: 2560, height: 1440, x: 2560, y: 0 },
+  { connector: "eDP-1", model: BUILT_IN, laptop: true, width: 1536, height: 960, x: 5120, y: 480 },
+];
+/** One 21:9 ultrawide and the laptop on its right. */
+export const DESK_WIDE: readonly DeskScreen[] = [
+  { connector: "DP-1", model: "LG 34WN80C", width: 3440, height: 1440, x: 0, y: 0 },
+  { connector: "eDP-1", model: BUILT_IN, laptop: true, width: 1536, height: 960, x: 3440, y: 480 },
+];
+/** One monitor alone. */
+export const DESK_ONE: readonly DeskScreen[] = [{ connector: "DP-1", model: DELL, width: 2560, height: 1440, x: 0, y: 0 }];
+
+/**
+ * The three kinds of share on `desk`: the first screen whole to Meet; Firefox's window on workspace
+ * 4 of the second screen, or the only one, to Discord; a region of the first screen to Meet.
+ */
+export function viewsOn(desk: readonly DeskScreen[]): { readonly screen: ShareView; readonly window: ShareView; readonly region: ShareView } {
+  const second = Math.min(1, desk.length - 1);
+  const on = desk[second]!;
+  const first = desk[0]!;
+  const meet = { who: MEET.app, site: MEET.site!, since: "21:47" };
+  return {
+    screen: { kind: "screen", desk, screen: 0, ...meet },
+    window: {
+      kind: "window",
+      desk,
+      screen: second,
+      workspace: 4,
+      app: FIREFOX,
+      title: "MDN Web Docs",
+      rect: { x: Math.round(on.width * 0.52), y: Math.round(on.height * 0.1), width: Math.round(on.width * 0.45), height: Math.round(on.height * 0.42) },
+      who: DISCORD.app,
+      since: "21:40",
+    },
+    region: { kind: "region", desk, screen: 0, rect: { x: Math.round(first.width * 0.14), y: Math.round(first.height * 0.26), width: 1280, height: 720 }, ...meet },
+  };
+}
+
+export const VIEWS = { three: viewsOn(DESK_THREE), wide: viewsOn(DESK_WIDE), one: viewsOn(DESK_ONE) } as const;
+
+/** A window whose title runs long: the card cuts it with an ellipsis rather than growing. */
+export const LONG_VIEW: ShareView = { ...VIEWS.three.window, title: "The Rust Programming Language: Understanding Ownership, References and Borrowing — Mozilla Firefox" };
+
+/** The shares the pills show: the three kinds on the first desk, and a second, Firefox's window to Discord. */
 export const SHARES = {
-  screen: { kind: "screen", what: SHARE_WHAT.screen("DP-10"), who: MEET.app, site: MEET.site!, since: SINCE.sharing },
-  window: { kind: "window", what: SHARE_WHAT.window("Firefox"), who: MEET.app, site: MEET.site!, since: SINCE.sharing },
-  region: { kind: "region", what: SHARE_WHAT.region("DP-10"), who: MEET.app, site: MEET.site!, since: SINCE.sharing },
-  second: { kind: "window", what: SHARE_WHAT.window("Firefox"), who: DISCORD.app, since: "21:40" },
+  screen: shareFor(VIEWS.three.screen),
+  window: shareFor({ ...VIEWS.three.window, who: MEET.app, site: MEET.site!, since: "21:47" }),
+  region: shareFor(VIEWS.three.region),
+  second: shareFor(VIEWS.three.window),
 } as const satisfies Record<string, Share>;
 
 /** A camera in use as its panel shows it: the app with its icon, the camera, its picture and its mode. */
@@ -270,6 +391,60 @@ export function screenMark(): HTMLElement {
   return mark;
 }
 
+/** What a share map shows on the desk: the kind, the screen it is on, its box there, a window's workspace. */
+export interface MapShare {
+  readonly kind: ShareKind;
+  readonly screen: number;
+  readonly rect?: Rect;
+  readonly workspace?: number;
+}
+
+/**
+ * Draft part, proposed: a map of the desk for a share's card. Every screen a rectangle in its real
+ * place and proportions, the whole as wide as the card and no taller than `size.row_three_line`,
+ * centred where it is narrower. A screen shared wears `sharing_line` with a faint `sharing` fill;
+ * a window or a region is a solid `sharing` box at its real place and size, its screen outlined
+ * quietly, and a window's screen carries the window's workspace in its top left corner, where the
+ * bar shows it. Nothing else: no picture, no other window.
+ */
+export function shareMap(desk: readonly DeskScreen[], shared: MapShare): HTMLElement {
+  const left = Math.min(...desk.map((each) => each.x));
+  const top = Math.min(...desk.map((each) => each.y));
+  const wide = Math.max(...desk.map((each) => each.x + each.width)) - left;
+  const tall = Math.max(...desk.map((each) => each.y + each.height)) - top;
+  const map = document.createElement("span");
+  map.className = "share-map";
+  map.style.setProperty("--map-ratio", String(wide / tall));
+  // Each box's place and size as a share of what holds it, which the CSS turns into lengths.
+  const placed = (element: HTMLElement, x: number, y: number, width: number, height: number, ofWidth: number, ofHeight: number) => {
+    element.style.setProperty("--x", String((x / ofWidth) * 100));
+    element.style.setProperty("--y", String((y / ofHeight) * 100));
+    element.style.setProperty("--w", String((width / ofWidth) * 100));
+    element.style.setProperty("--h", String((height / ofHeight) * 100));
+  };
+  desk.forEach((screen, index) => {
+    const box = document.createElement("span");
+    box.className = "share-map-screen";
+    placed(box, screen.x - left, screen.y - top, screen.width, screen.height, wide, tall);
+    if (index === shared.screen) {
+      box.dataset.shared = shared.kind === "screen" ? "whole" : "part";
+      if (shared.rect && shared.kind !== "screen") {
+        const taken = document.createElement("span");
+        taken.className = "share-map-taken";
+        placed(taken, shared.rect.x, shared.rect.y, shared.rect.width, shared.rect.height, screen.width, screen.height);
+        box.append(taken);
+      }
+      if (shared.kind === "window" && shared.workspace !== undefined) {
+        const number = text(String(shared.workspace), "label", "on_surface_variant");
+        number.classList.add("share-map-workspace");
+        box.append(number);
+      }
+    }
+    map.append(box);
+  });
+  return map;
+}
+
 /** A region of the left window, as a share would draw it. */
 export const REGION: Rect = { x: 120, y: 200, width: 560, height: 360 };
 
@@ -286,10 +461,10 @@ export function desktop(options: DesktopOptions = {}): HTMLElement {
   const shared = options.shared;
   const share: Share | undefined = shared
     ? shared.kind === "screen"
-      ? SHARES.screen
+      ? shareOf({ kind: "screen", screen: 0 }, [DP10])
       : shared.kind === "window"
         ? { kind: "window", what: SHARE_WHAT.window(DESK[shared.index]?.app.app ?? FIREFOX.app), who: MEET.app }
-        : SHARES.region
+        : shareOf({ kind: "region", screen: 0 }, [DP10])
     : undefined;
   const made = barScreen(SCREEN_WIDTH, TALL, { content: { ...EVERYDAY, ...(share ? { sharing: share } : {}), ...(options.camera ? { camera: { who: DISCORD.app } } : {}) } });
   const desk = document.createElement("span");
@@ -389,8 +564,9 @@ export function shareOf(lit: Lit, monitors: readonly Monitor[] = MONITORS, asker
   if (lit.kind === "none") return undefined;
   const monitor = monitors[lit.screen] ?? monitors[0]!;
   if (lit.kind === "window") return { kind: "window", what: SHARE_WHAT.window(monitor.windows[lit.index]?.app.app ?? ""), who: asker.app };
-  if (lit.kind === "screen") return { kind: "screen", what: SHARE_WHAT.screen(monitor.connector), who: asker.app };
-  return { kind: "region", what: SHARE_WHAT.region(monitor.connector), who: asker.app };
+  const place = placeOf(monitors, lit.screen);
+  if (lit.kind === "screen") return { kind: "screen", what: SHARE_WHAT.screen(place), who: asker.app };
+  return { kind: "region", what: SHARE_WHAT.region(place), who: asker.app };
 }
 
 /** What each part of picking does, for a live stage. */
@@ -635,32 +811,63 @@ export function onCorner(panel: HTMLElement, bar: Element[], reveal?: number): H
 }
 
 export interface SharingPanelOptions {
-  readonly shares?: readonly Share[];
+  readonly shares?: readonly ShareView[];
   /** Change what's shared, on a share by its index: picking opens again, and its pick replaces the share. */
   readonly onChange?: (index: number) => void;
   /** Stop sharing, on a share by its index. */
   readonly onStop?: (index: number) => void;
 }
 
-/** One share's card: what is shared, with whom since when, Change what's shared and Stop sharing. */
-function shareCard(share: Share, index: number, options: SharingPanelOptions): HTMLElement {
-  const change = button({ label: WORDS.change, kind: "Tonal", size: "Sm", icon: SHARE_ICONS[share.kind] });
+/**
+ * What a share's card says: what is shared, and where it is, the monitor's model last on that
+ * line as the quiet detail; a screen's where line is its model alone.
+ */
+function shareWords(view: ShareView): { readonly title: string; readonly where: string } {
+  const place = SCREEN_WORDS[placeOf(view.desk, view.screen)];
+  const model = view.desk[view.screen]!.model;
+  if (view.kind === "screen") return { title: place.name, where: model };
+  if (view.kind === "window") return { title: WORDS.windowTitle(view.app?.app ?? "", view.title ?? ""), where: WORDS.withModel(place.workspace(view.workspace ?? 1), model) };
+  return { title: place.part, where: WORDS.withModel(regionSize(view.rect?.width ?? 0, view.rect?.height ?? 0), model) };
+}
+
+/**
+ * One share's card: the desk's map, then what is shared (a window's app icon before it), where it
+ * is, to whom since when, and its own Change what's shared and Stop sharing. Each line is cut with
+ * an ellipsis where it runs past the card, so a long title never grows it.
+ */
+function shareCard(view: ShareView, index: number, options: SharingPanelOptions): HTMLElement {
+  const words = shareWords(view);
+  const title = clamped(words.title, "body_strong", "on_surface");
+  title.classList.add("share-card-line");
+  const app = view.kind === "window" && view.app ? view.app : undefined;
+  const head = app ? row("s8", "centre", iconTile({ name: app.app, size: "Sm", ...(app.picture ? { picture: app.picture } : {}) }), title) : title;
+  head.classList.add("share-card-line");
+  const said = stack(
+    "s4",
+    "start",
+    filling(head),
+    filling(clamped(words.where, "small", "on_surface_variant")),
+    filling(clamped(WORDS.toWhom(view.site ?? view.who, view.since), "small", "on_surface_variant")),
+  );
+  const change = button({ label: WORDS.change, kind: "Tonal", size: "Sm", icon: SHARE_ICONS[view.kind] });
   const stop = button({ label: WORDS.stop, kind: "Tonal", size: "Sm", icon: "stop" });
   if (options.onChange) change.addEventListener("click", () => options.onChange?.(index));
   if (options.onStop) stop.addEventListener("click", () => options.onStop?.(index));
-  return card({
-    header: { glyph: SHARE_ICONS[share.kind], title: share.what, subtitle: WORDS.withWhom(share.site ?? share.who, share.since ?? SINCE.sharing) },
+  const made = card({
+    body: [shareMap(view.desk, { kind: view.kind, screen: view.screen, ...(view.rect ? { rect: view.rect } : {}), ...(view.workspace !== undefined ? { workspace: view.workspace } : {}) }), said],
     actions: row("s8", "centre", change, stop),
   });
+  made.classList.add("share-card");
+  return made;
 }
 
 /**
  * The sharing panel, a PanelPage: that notifications are held under the title, then a Card for
- * each share, saying what is shared, with whom and since when, with its own Change what's shared,
- * which opens picking again, and Stop sharing.
+ * each share, saying on a map of the desk and in words what is shared, where it is, and to whom
+ * since when, with its own Change what's shared, which opens picking again, and Stop sharing.
  */
 export function sharingPanel(options: SharingPanelOptions = {}): HTMLElement {
-  const shares = options.shares ?? [SHARES.screen];
+  const shares = options.shares ?? [VIEWS.three.screen];
   const body = stack("s16", "start", ...shares.map((share, index) => filling(shareCard(share, index, options))));
   const page = panelPage({ title: "Sharing", subtitle: WORDS.held, body });
   page.element.classList.add("share-panel");
@@ -724,7 +931,7 @@ export function cameraPanel(options: CameraPanelOptions = {}): HTMLElement {
 
 /** The sharing panel open under its pill, the camera's pill beside it. */
 export function sharingShot(options: SharingPanelOptions = {}, camera = true): HTMLElement {
-  return onCorner(sharingPanel(options), cornerBar(options.shares ?? [SHARES.screen], camera ? [CAMERAS.first.use] : undefined));
+  return onCorner(sharingPanel(options), cornerBar((options.shares ?? [VIEWS.three.screen]).map(shareFor), camera ? [CAMERAS.first.use] : undefined));
 }
 
 /** The camera panel open under its pill, the sharing pill beside it. */

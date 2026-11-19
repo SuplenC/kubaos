@@ -219,7 +219,7 @@ export const ON_AIR_WORDS = {
   camera: (who: string) => `Camera · ${who}`,
 } as const;
 
-// The locale's list joins the hint's messages: "Sharing DP-10 · Chromium, Sharing … · Discord".
+// The locale's list joins the hint's messages: "Sharing the left screen · Chromium, Sharing … · Discord".
 const LISTED = new Intl.ListFormat("en-GB", { style: "narrow", type: "unit" });
 // The locale's number says the count.
 const COUNT = new Intl.NumberFormat("en-GB");
