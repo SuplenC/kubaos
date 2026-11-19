@@ -61,7 +61,7 @@
   opacity: 1;
 }
 
-.share-window:not([data-keyboard]) .share-pick-enter {
+.share-window:not([data-keyboard]) .share-pick-label .k-tooltip-keys {
   display: none;
 }
 

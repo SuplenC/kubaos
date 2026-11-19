@@ -210,6 +210,9 @@ row_compact = 28
 lock_date_least = 12
 # A menu's width: an item's symbol, its words and a shortcut's keycaps side by side.
 menu = 240
+# A tooltip at its widest: a short sentence of `small` text stays on one line, and a longer
+# one breaks in a measure still quick to read beside the control it explains.
+tooltip = 320
 chip = 24
 # A badge over an icon's corner: a count's pill, a line of label text tall, and
 # a dot, the size of a picked radio button's.

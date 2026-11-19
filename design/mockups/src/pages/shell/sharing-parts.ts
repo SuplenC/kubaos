@@ -24,7 +24,6 @@ import { chip } from "../../lib/chip.ts";
 import { focusRing, windowRing } from "../../lib/focus.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
-import { keycap } from "../../lib/keycap.ts";
 import { filling, inset, row, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
 import { media } from "../../lib/media.ts";
@@ -669,7 +668,7 @@ export function pickBar(
     "centre",
     floatingTooltip(app, appTip, { side: "above", ...(options.hint === "app" ? { shown: true } : {}) }),
     floatingTooltip(share, keyTooltip(WORDS.screen, PICK_KEYS.screen), { side: "above" }),
-    floatingTooltip(region, tooltip(WORDS.region, WORDS.regionHint, row("s4", "centre", keycap(PICK_KEYS.region))), { side: "above", ...(options.hint === "region" ? { shown: true } : {}) }),
+    floatingTooltip(region, keyTooltip(WORDS.region, PICK_KEYS.region, WORDS.regionHint), { side: "above", ...(options.hint === "region" ? { shown: true } : {}) }),
     floatingTooltip(cancel, keyTooltip(WORDS.cancel, "Esc"), { side: "above" }),
   );
   // What hangs on the bottom edge's Sheet: `space.s16` inside on every side, as the OSD's strip.
@@ -683,9 +682,7 @@ export function pickBar(
  * click does, and the window's name; Enter, while the keyboard is on it (`data-keyboard`).
  */
 export function pickLabel(title: string): HTMLElement {
-  const enter = row("s4", "centre", keycap("Enter"));
-  enter.classList.add("share-pick-enter");
-  const label = tooltip(WORDS.click, title, enter);
+  const label = keyTooltip(WORDS.click, "Enter", title);
   label.classList.add("share-pick-label");
   return label;
 }
