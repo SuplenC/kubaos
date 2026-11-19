@@ -35,8 +35,9 @@ function live(): HTMLElement {
   // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
   // with none (`contents`) reads as reaching from the page's edge.
   holder.style.display = "inline-block";
+  // The desktop's own room, a box as large as the desktop, so the check reads the desktop inside it.
   const room = document.createElement("span");
-  room.style.display = "contents";
+  room.style.display = "block";
   let mark = 0;
   let focused = 0;
   const draw = () => {

@@ -351,28 +351,36 @@
 }
 
 /* A map of the desk, a draft part: as wide as the card, never taller than a three-line row, its
-   screens in their real places, each parted from the next by the thin stroke. It is its boxes'
-   container, so their corners scale with its width: each corner's share of the desk's width
-   (`--screen-corner`, `--window-corner`) times the map's. */
+   screens in their real places on whole pixels, each parted from the next by the thin stroke. It
+   stands in a room as wide as the card, centred in it, its width, height and place rounded to
+   whole pixels so the card's lines under it stay on them. It is its boxes' container, so their
+   corners scale with its width: each corner's share of the desk's width (`--screen-corner`,
+   `--window-corner`) times the map's. */
+.share-map-room {
+  container-type: inline-size;
+  display: block;
+  align-self: stretch;
+}
+
 .share-map {
   --map-gap: max(1px, round(nearest, calc(var(--stroke-thin) / 2), 1px));
+  --map-width: round(down, min(100cqw, calc(var(--size-row_three_line) * var(--map-ratio))), 1px);
   container-type: inline-size;
   position: relative;
   display: block;
-  align-self: center;
-  width: min(100%, calc(var(--size-row_three_line) * var(--map-ratio)));
-  aspect-ratio: var(--map-ratio);
-  margin-inline: auto;
+  width: var(--map-width);
+  height: round(nearest, calc(var(--map-width) / var(--map-ratio)), 1px);
+  margin-left: round(down, calc((100cqw - var(--map-width)) / 2), 1px);
 }
 
 .share-map-screen {
   position: absolute;
   box-sizing: border-box;
   display: block;
-  left: calc(var(--x) * 1% + var(--map-gap));
-  top: calc(var(--y) * 1% + var(--map-gap));
-  width: calc(var(--w) * 1% - 2 * var(--map-gap));
-  height: calc(var(--h) * 1% - 2 * var(--map-gap));
+  left: round(nearest, calc(var(--x) * 1% + var(--map-gap)), 1px);
+  top: round(nearest, calc(var(--y) * 1% + var(--map-gap)), 1px);
+  width: round(nearest, calc(var(--w) * 1% - 2 * var(--map-gap)), 1px);
+  height: round(nearest, calc(var(--h) * 1% - 2 * var(--map-gap)), 1px);
   border-radius: max(var(--radius-small), calc(var(--screen-corner) * 100cqw));
   background: var(--color-surface_container_highest);
 }
@@ -393,10 +401,10 @@
 .share-map-taken {
   position: absolute;
   display: block;
-  left: calc(var(--x) * 1%);
-  top: calc(var(--y) * 1%);
-  width: calc(var(--w) * 1%);
-  height: calc(var(--h) * 1%);
+  left: round(nearest, calc(var(--x) * 1%), 1px);
+  top: round(nearest, calc(var(--y) * 1%), 1px);
+  width: round(nearest, calc(var(--w) * 1%), 1px);
+  height: round(nearest, calc(var(--h) * 1%), 1px);
   border-radius: max(var(--radius-small), calc(var(--window-corner) * 100cqw));
   background: var(--color-sharing);
 }

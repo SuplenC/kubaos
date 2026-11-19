@@ -31,6 +31,7 @@ import { filling, inset, row, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
 import { media } from "../../lib/media.ts";
 import { panelPage } from "../../lib/panel-page.ts";
+import { declare } from "../../lib/probe.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
@@ -402,7 +403,8 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
   drawn.style.gridColumn = options.column;
   drawn.style.gridRow = options.row;
   const tile = iconTile({ name: options.app.app, size: "Sm", ...(options.app.picture ? { picture: options.app.picture } : {}) });
-  drawn.append(row("s8", "centre", tile, clamped(options.title, "body_strong", "on_surface")));
+  // A window's title varies, cut with an ellipsis where it runs past the window.
+  drawn.append(row("s8", "centre", tile, declare(clamped(options.title, "body_strong", "on_surface"), { variable: true })));
   const ring = focusRing(drawn, "surface", options.shared ? "sharing" : "accent", false);
   windowRing(ring, "stroke-thin", corner.css);
   // The violet border, the on-air mark, is always there and shows while the window is shared
@@ -611,7 +613,12 @@ export function shareMap(desk: readonly DeskScreen[], shared: MapShare): HTMLEle
     }
     map.append(box);
   });
-  return map;
+  // The map's room, the card's whole width, which the map is centred in: it lines up with the
+  // card's words, and the map's size and place are worked out from it on whole pixels.
+  const room = document.createElement("span");
+  room.className = "share-map-room";
+  room.append(map);
+  return room;
 }
 
 /** A region of the left window, as a share would draw it. */
@@ -1083,7 +1090,8 @@ function shareWords(view: ShareView): { readonly title: string; readonly where: 
  */
 function shareCard(view: ShareView, index: number, options: SharingPanelOptions): HTMLElement {
   const words = shareWords(view);
-  const title = clamped(words.title, "body_strong", "on_surface");
+  // Every line names what varies (a title, a place, a site), cut with an ellipsis where it runs long.
+  const title = declare(clamped(words.title, "body_strong", "on_surface"), { variable: true });
   title.classList.add("share-card-line");
   // Beside a tile the eye sets the title's capitals against the tile's symbol, so every title is
   // centred on a capital's height, whatever its words weigh: the cards' titles sit alike.
@@ -1092,14 +1100,15 @@ function shareCard(view: ShareView, index: number, options: SharingPanelOptions)
   // the kind's own symbol, the one its Change what's shared button carries.
   const app = view.kind === "window" && view.app ? view.app : undefined;
   const tile = app ? iconTile({ name: app.app, size: "Sm", ...(app.picture ? { picture: app.picture } : {}) }) : iconTile({ glyph: SHARE_ICONS[view.kind], size: "Sm" });
-  const head = row("s8", "centre", tile, title);
+  // The title takes the room the tile leaves, so a long one ends in its ellipsis at the card's edge.
+  const head = row("s8", "centre", tile, filling(title));
   head.classList.add("share-card-line");
   const said = stack(
     "s4",
     "start",
     filling(head),
-    filling(clamped(words.where, "small", "on_surface_variant")),
-    filling(clamped(WORDS.toWhom(view.site ?? view.who, view.since), "small", "on_surface_variant")),
+    filling(declare(clamped(words.where, "small", "on_surface_variant"), { variable: true })),
+    filling(declare(clamped(WORDS.toWhom(view.site ?? view.who, view.since), "small", "on_surface_variant"), { variable: true })),
   );
   const change = button({ label: WORDS.change, kind: "Tonal", size: "Sm", icon: SHARE_ICONS[view.kind] });
   const stop = button({ label: WORDS.stop, kind: "Tonal", size: "Sm", icon: "stop" });
