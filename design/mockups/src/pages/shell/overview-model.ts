@@ -382,7 +382,7 @@ export function go(desk: Desk, space: string): Change {
 // ── Deleting with a way back ──────────────────────────────────────────────────────────────────
 
 /**
- * A window or a workspace dropped on the delete zone: out of the overview, but kept as it was until
+ * A window or a workspace let go in the delete slot: out of the overview, but kept as it was until
  * its timer ends, so undoing it never reopens an app. A workspace keeps its windows with it.
  */
 export type Taken =
@@ -398,7 +398,7 @@ export type Taken =
     }
   | { readonly kind: "space"; readonly space: Space; readonly group: string; readonly index: number };
 
-/** Takes `what` out of the overview into the delete zone. A screen left showing nothing shows a neighbour. */
+/** Takes `what` out of the overview into the delete slot. A screen left showing nothing shows a neighbour. */
 export function take(desk: Desk, what: { readonly window: string } | { readonly space: string }): { taken: Taken; change: Change } {
   if ("window" in what) {
     const space = spaceOf(desk, what.window);

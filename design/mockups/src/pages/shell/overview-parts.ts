@@ -2598,7 +2598,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       const from = liftThing(pin.what);
       const goal = binPoint();
       if (pin.over === "edge") {
-        // Toward the round from where it was taken, a tenth of the reach inside its edge.
+        // Toward the slot from where it was taken, a tenth of the reach inside its edge.
         const centre = binCentre();
         const away = Math.hypot(from.x - centre.x, from.y - centre.y);
         const at = (reachOf(viewOf(binOn ?? desk.focused) ?? views[0]!) * 0.9) / away;

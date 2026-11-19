@@ -115,8 +115,8 @@
 /* ── The pointer ─────────────────────────────────────────────────────────────────────────────
 
    The open hand over anything that can be carried, a window or a workspace, as OrderList's grip;
-   the closed hand everywhere while something is carried; a control's pointer over the "+" slot and
-   the delete zone's Undo, as the library's controls show it. */
+   the closed hand everywhere while something is carried; a control's pointer over the "+" slot, as
+   the library's controls show it. */
 .ov[data-open] :is(.ov-ws, .ov-win) {
   cursor: grab;
 }
@@ -542,7 +542,7 @@
   opacity: 1;
 }
 
-/* ── The tip and the delete zone ─────────────────────────────────────────────────────────────── */
+/* ── The tip and the delete slot ─────────────────────────────────────────────────────────────── */
 
 /* The tip on the frame's glass, as the numbers are, so its line reads on any picture: centred down
    the bottom margin, under every miniature. It comes and goes with the miniatures. */
@@ -577,8 +577,8 @@
   --ov-sink: 0;
 }
 
-/* A sample's annotation, not the Overview's: the delete zone's reach, a dashed circle in `outline`
-   round the round, the screen's edges cutting it to its corner. */
+/* A sample's annotation, not the Overview's: the delete slot's reach, a dashed circle in `outline`
+   round the slot, the screen's edges cutting it to its corner. */
 .ov-reach {
   position: absolute;
   left: 0;
