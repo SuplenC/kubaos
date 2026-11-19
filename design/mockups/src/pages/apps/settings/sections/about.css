@@ -1,0 +1,44 @@
+/* About's organisms (`about-parts.ts`). */
+
+/* A machine's name has no spaces to break at: it breaks anywhere rather than run past its card. */
+.ab-name {
+  overflow-wrap: anywhere;
+}
+
+/* The installer's message under the rename field sits as a labelled field's note does; with
+   nothing to say it takes no room, nor the column's gap. */
+.ab-rule:empty {
+  display: none;
+}
+
+/* A hidden fact's Show hangs its padding outside it, as a Text button at a line's start does, so
+   its symbol starts where every value does; a card would otherwise keep it in. */
+.ab-hidden {
+  --hang: 1;
+}
+
+/* Its box is a value's line tall, its press fill reaching past it, so a hidden fact's line is as
+   tall as a shown one's; split on whole device pixels, the odd one after. */
+.ab-hidden .k-button {
+  --over: calc(var(--size-control_sm) - var(--type-body-line));
+  margin-top: calc(-1 * round(down, calc(var(--over) / 2), 1px));
+  margin-bottom: calc(round(down, calc(var(--over) / 2), 1px) - var(--over));
+}
+
+/* While hidden, the label and its Show share one centre line, the label moved down to the middle
+   of the value's line on a whole device pixel: their baselines would leave it riding low beside a
+   button. */
+.ab-hidden-label,
+.ab-hidden-value {
+  align-self: start;
+}
+
+.ab-hidden-label {
+  margin-top: round(down, calc((var(--type-body-line) - var(--type-small-line)) / 2), 1px);
+}
+
+/* Shown, its value in `mono` starts at the top of its line: lined up by baseline with the label in
+   `small`, it would sit a fraction of a pixel low and leave its line off the device grid. */
+.k-fact-value:has(> .ab-hidden:not([data-hidden])) {
+  align-self: start;
+}

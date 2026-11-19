@@ -533,6 +533,36 @@
   min-width: 0;
 }
 
+/* A list with actions: each fact a line of the grid, its action in a column of its own at the
+   right, `size.control_sm` wide, so a value wraps before it and is never covered. The action is
+   centred down its line and adds nothing to its height. */
+.k-facts[data-actions] > .k-fact-line {
+  display: contents;
+}
+
+.k-fact-action {
+  position: relative;
+  align-self: stretch;
+}
+
+.k-fact-action > .k-button {
+  position: absolute;
+  inset-inline-end: 0;
+  /* Centred down its line on a whole device pixel, the odd one after it. */
+  top: round(down, calc((100% - var(--size-control_sm)) / 2), 1px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Shown while the pointer is on its line or the keyboard is on it; a sample pins it lit. */
+.k-fact-line:hover > .k-fact-action > .k-button,
+.k-fact-action:focus-within > .k-button,
+.k-fact-action > .k-button[data-pinned] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* A scroll (`lib/scroll.ts`): its box in the layout, and the view that reaches past it, `focus.far`
    at the sides and `--above` and `--below` into the room above and below, its content that far in
    and `space.s16` more at its end, the thumb's room. */

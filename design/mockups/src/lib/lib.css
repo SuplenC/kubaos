@@ -388,7 +388,8 @@
   z-index: 1;
   top: calc(100% + var(--space-s8));
   --width: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s8));
-  left: round(nearest, calc((100% - var(--width)) / 2), 1px);
+  /* `--shift` moves it across, whole, where centring would run it past the box that cuts it (`lib/hint.ts`). */
+  left: calc(round(nearest, calc((100% - var(--width)) / 2), 1px) + var(--shift, 0px));
   display: block;
   box-sizing: border-box;
   width: var(--width);
@@ -416,13 +417,13 @@
 /* A control at the window's end: its bubble is held inside the window, its end on the window's. */
 .k-hint[data-held="end"] {
   left: auto;
-  right: 0;
+  right: calc(-1 * var(--shift, 0px));
 }
 
 /* A control at the start of something wider (a slider's icon): its bubble starts where it does, so
    a long name never hangs past that edge. */
 .k-hint[data-held="start"] {
-  left: 0;
+  left: var(--shift, 0px);
 }
 
 .k-hinted:is(:hover, :focus-visible, [data-pinned], [data-keyed]) > .k-hint,
