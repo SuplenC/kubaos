@@ -578,7 +578,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       };
       // The desk scaled to fit the sample with a margin round it, centred: a picture of the desk.
       const margin = L("space-s48");
-      const fit = Math.min((size.w - 2 * margin) / worldSize.w, (size.h - 2 * margin) / worldSize.h);
+      // A ratio of whole 64ths, as layout measures boxes: every scaled box lands where it is reported.
+      const fit = Math.floor(Math.min((size.w - 2 * margin) / worldSize.w, (size.h - 2 * margin) / worldSize.h) * 64) / 64;
       world.style.setProperty("--ov-fit", String(fit));
       world.style.setProperty("--ov-left", css((size.w - worldSize.w * fit) / 2));
       world.style.setProperty("--ov-top", css((size.h - worldSize.h * fit) / 2));
@@ -896,11 +897,15 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     showTip();
   }
 
+  /** The tip centred down the bottom margin, its top on a whole device pixel. */
   function showTip(): void {
     const on = viewOf(desk.focused) ?? views[0]!;
+    const tall = tip.offsetHeight / settings().scale;
     tip.style.setProperty("--ov-x", css(on.at.x + L("space-s48")));
-    tip.style.setProperty("--ov-y", css(on.at.y + on.size.h - L("space-s48") / 2));
+    tip.style.setProperty("--ov-y", css(on.at.y + on.size.h - L("space-s48") / 2 - tall / 2));
   }
+  // Its height is known once it is laid out, and changes with the scale and the words.
+  new ResizeObserver(() => showTip()).observe(tip);
 
   /** Sets a box's place and size, in its parent's logical pixels. */
   function setSlot(element: HTMLElement, slot: model.Rect, motion: Motion): void {

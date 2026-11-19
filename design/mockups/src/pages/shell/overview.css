@@ -237,11 +237,16 @@
 .ov-ws-number {
   display: flex;
   align-items: center;
-  justify-content: center;
   width: var(--size-chip);
   height: var(--size-chip);
   border-radius: var(--radius-full);
   background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+}
+
+/* Its figures centred on whole device pixels: centring alone puts them half a pixel out when the
+   badge and the figures differ by an odd number of them. */
+.ov-ws-number > .k-rolling {
+  margin-left: round(down, calc((var(--size-chip) - var(--slots) * var(--slot) - var(--marks, 0px)) / 2), 1px);
 }
 
 .ov-ws-number[data-shown] {
@@ -428,6 +433,9 @@
 }
 
 .ov-plus > .k-icon {
+  position: absolute;
+  left: round(down, calc((100% - var(--icon-s24)) / 2), 1px);
+  top: round(down, calc((100% - var(--icon-s24)) / 2), 1px);
   transition: color var(--motion-short) var(--easing-standard);
 }
 
@@ -546,7 +554,7 @@
   padding: var(--space-s4) var(--space-s12);
   border-radius: var(--radius-control);
   background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
-  translate: var(--ov-x) calc(var(--ov-y) - 50% + var(--space-s16) * var(--ov-sink));
+  translate: var(--ov-x) calc(var(--ov-y) + var(--space-s16) * var(--ov-sink));
   opacity: 0;
   transition: opacity var(--motion-medium) var(--easing-standard);
 }
@@ -675,12 +683,17 @@
 .ov-slot-symbol {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   transition:
     opacity var(--motion-short) var(--easing-standard),
     scale var(--motion-short) var(--easing-standard);
+}
+
+/* Centred in the slot on whole device pixels, whatever the slot's size. */
+.ov-slot-symbol > .k-icon {
+  position: absolute;
+  left: round(down, calc((100% - var(--icon-s32)) / 2), 1px);
+  top: round(down, calc((100% - var(--icon-s32)) / 2), 1px);
 }
 
 .ov-bin[data-holding] > .ov-slot-symbol {

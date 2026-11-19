@@ -366,6 +366,15 @@ const FACES: Record<App, (win: Win) => HTMLElement> = {
 };
 
 /** What `win`'s app shows, filling its window. */
+/**
+ * `win`'s content: a picture of an app's window, not more of it. Its parts say nothing to the
+ * geometry check, which holds the page's own parts, not what a window shows at a miniature's scale.
+ */
 export function face(win: Win): HTMLElement {
-  return FACES[win.app](win);
+  const drawn = FACES[win.app](win);
+  for (const each of [drawn, ...drawn.querySelectorAll<HTMLElement | SVGElement>("[data-probe], [data-scroll-probe]")]) {
+    delete each.dataset.probe;
+    delete each.dataset.scrollProbe;
+  }
+  return drawn;
 }
