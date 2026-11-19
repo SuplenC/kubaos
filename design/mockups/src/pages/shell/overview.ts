@@ -191,11 +191,11 @@ const CHAT_TO_GAME = { kind: "space", space: "s8" } as const;
 
 const SPACE_SNAPS: Move = {
   name: "A workspace snapping in",
-  what: "Its middle within `scale.snap` of a place's middle: the room opens there and it snaps in over `medium`; pulled `space.s40` off, back.",
+  what: "Its middle in a place's zone: the room opens there and it snaps in over `medium`; out of the zone, back to the hand.",
   tracks: [{ part: "the room", on: "between the first two", target: ".ov-room", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
   reduced: "same",
   back: "plays",
-  sample: () => still({ pin: { ...SPACE_BETWEEN, hand: true } }),
+  sample: () => still({ pin: SPACE_BETWEEN }),
 };
 
 const STICKS: Move = {
@@ -322,7 +322,8 @@ export default page<Shown>({
     { name: "On another screen's slot", for: "a lone window in the laptop's new slot, lit", sample: at({ view: "desk", pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-laptop" } } }) },
     { name: "Between two workspaces", for: "a window: a new workspace there", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "between", group: "g-ext2", index: 2 } } }) },
     { name: "A workspace to another screen", for: "the centre's 4 in the room the portrait's group opens", sample: at({ view: "desk", pin: { kind: "space", space: "s9", to: { kind: "between", group: "g-ext1", index: 1 } } }) },
-    { name: "A workspace near its room", for: "pulled off its place: at the hand, the room still open", sample: at({ pin: { ...SPACE_BETWEEN, hand: true } }) },
+    { name: "Into its group's new slot", for: "it takes the slot as the last; its own place stays open", sample: at({ pin: { kind: "space", space: "s7", to: { kind: "plus", group: "g-ext2" } } }) },
+    { name: "Into a small group's new slot", for: "the 4 into Studio's slot, as its last", sample: at({ pin: { kind: "space", space: "s9", to: { kind: "plus", group: "g-studio" } } }) },
     { name: "Refused by a full group", for: "ten in use: it dims, no room", sample: at({ view: "desk", fill: "full", pin: { kind: "space", space: "s1", to: { kind: "refused", group: "g-ext2" } } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
     { name: "Over the game's left", for: "the terminal sits in its left half", sample: at({ pin: overGame("left") }) },
@@ -449,7 +450,7 @@ export default page<Shown>({
       { part: "New slot lit, carrying", token: "opacity-tint" },
       { part: "New slot lit, proposed", token: "opacity-selection" },
       { part: "Catch, of a place's side", token: "scale-snap" },
-      { part: "It lets go, pulled off", token: "space-s40" },
+      { part: "Catch at least, of the screen", token: "scale-snap_least" },
       { part: "Slot's room, its height", token: "size-drop_slot" },
       { part: "Slot's room, in from its line", token: "space-s16" },
       { part: "Slot in from the corner", token: "space-s48" },

@@ -55,8 +55,8 @@ export type Target =
 export type Pin =
   | { readonly kind: "lit"; readonly space: string }
   | { readonly kind: "window"; readonly window: string; readonly to: Target; readonly crossing?: number }
-  /** A workspace carried toward `to`: its middle on the room it opens, snapped in, or with `hand`, at the pointer over `to`. */
-  | { readonly kind: "space"; readonly space: string; readonly to: Target; readonly hand?: boolean }
+  /** A workspace carried by its middle onto the middle of the place `to`: snapped in there. */
+  | { readonly kind: "space"; readonly space: string; readonly to: Target }
   /** A window or a workspace carried toward the delete slot: `over`, pulled in with the pointer on
    * the slot; `edge`, pulled in with the pointer just inside the reach; neither, on its way. */
   | { readonly kind: "binning"; readonly what: Carried; readonly over: boolean | "edge" }
@@ -114,6 +114,11 @@ export interface Driver {
   readonly between: (group: string, index: number) => Point;
   readonly target: () => Target | null;
   readonly lifted: () => string | null;
+  /**
+   * Where the carried thing would be drawn at the hand and in the place its target offers, in the
+   * browser's viewport: for a check that it is drawn at one of them, and which.
+   */
+  readonly carried: () => { readonly hand: model.Rect; readonly place: model.Rect | null } | null;
   readonly isOpen: () => boolean;
   /** Every element's place the overview is gliding it to, by its id: a script holds the glide to it. */
   readonly element: (id: string) => HTMLElement | null;
@@ -196,7 +201,8 @@ interface Section {
 interface Layout {
   readonly sections: readonly Section[];
   readonly spaces: Map<string, Slot>;
-  readonly room: Slot | null;
+  /** The rooms held open for a carried workspace, by group. */
+  readonly rooms: Map<string, Slot>;
   /** The size a miniature of the screen's own group is drawn at. */
   readonly scale: number;
 }
@@ -246,7 +252,7 @@ function arrange(width: number, height: number, specs: readonly SectionSpec[]): 
   const plans = plan(Math.floor(high));
   let y = margin + (roomH - tall(plans)) / 2;
   const spaces = new Map<string, Slot>();
-  let room: Slot | null = null;
+  const rooms = new Map<string, Slot>();
   const sections = specs.map((spec, i): Section => {
     const { tile, cols } = plans[i]!;
     const th = device(tile * aspect);
@@ -272,7 +278,7 @@ function arrange(width: number, height: number, specs: readonly SectionSpec[]): 
     }
     y += apart - gap;
     spec.items.forEach((id, k) => {
-      if (id === ROOM) room = places[k]!;
+      if (id === ROOM) rooms.set(spec.group, places[k]!);
       else spaces.set(id, places[k]!);
     });
     const plus = spec.plus ? places.at(-1)! : null;
@@ -287,7 +293,7 @@ function arrange(width: number, height: number, specs: readonly SectionSpec[]): 
       box: { x: margin, y: top, w: roomW, h: y - apart - top },
     };
   });
-  return { sections, spaces, room, scale: (plans[0]?.tile ?? 0) / width };
+  return { sections, spaces, rooms, scale: (plans[0]?.tile ?? 0) / width };
 }
 
 // ── Elements ──────────────────────────────────────────────────────────────────────────────────
@@ -666,11 +672,18 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
   let carry: Carry | null = null;
 
-  /** The sections `screen` shows: a carried workspace taken out, and a room held where it would go. */
-  function specsOf(screen: model.Screen, roomAt?: { group: string; index: number }): SectionSpec[] {
+  /** A room held open in a group, before its workspace at `index`, the carried one left out. */
+  interface RoomAt {
+    readonly group: string;
+    readonly index: number;
+  }
+
+  /** The sections `screen` shows: a carried workspace taken out, and a room held at each of `rooms`. */
+  function specsOf(screen: model.Screen, rooms: readonly RoomAt[] = []): SectionSpec[] {
     return model.groupsOn(desk, screen).map((group) => {
       let items = group.spaces.filter((id) => !(carry?.kind === "space" && carry.id === id));
-      if (roomAt && roomAt.group === group.id) items = [...items.slice(0, roomAt.index), ROOM, ...items.slice(roomAt.index)];
+      const roomAt = rooms.find((each) => each.group === group.id);
+      if (roomAt) items = [...items.slice(0, roomAt.index), ROOM, ...items.slice(roomAt.index)];
       return { group: group.id, items, plus: items.length < model.MOST, waiting: model.waits(desk, group) };
     });
   }
@@ -708,11 +721,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** Lays every screen out again and sends each element to its place, moving as `motion` says. */
   function place(motion: Motion): void {
-    // A carried workspace's room is open where it is proposed, and otherwise at its own place.
-    const proposed = carry?.kind === "space" && carry.target ? roomOf(carry.target) : undefined;
-    const roomAt = carry?.kind === "space" ? (proposed ?? { group: carry.from, index: carry.fromIndex }) : undefined;
+    const rooms = roomsNow();
     for (const each of views) {
-      each.layout = arrange(each.size.w, each.size.h, specsOf(each.screen, roomAt));
+      each.layout = arrange(each.size.w, each.size.h, specsOf(each.screen, rooms));
       const groups = model.groupsOn(desk, each.screen);
       for (const section of each.layout.sections) {
         const group = groups.find((g) => g.id === section.group)!;
@@ -854,13 +865,27 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return undefined;
   }
 
-  /** The room held open for a carried workspace, or the slit between two for a carried window. */
+  /**
+   * The rooms a carried workspace holds open: at its own place all the while it is carried, so its
+   * group stands still, and at the place proposed in another group; a place proposed in its own
+   * group moves its one room there. The new-workspace slot opens none: it takes the workspace itself.
+   */
+  function roomsNow(): RoomAt[] {
+    if (carry?.kind !== "space") return [];
+    const home = { group: carry.from, index: carry.fromIndex };
+    const target = carry.target;
+    if (target?.kind !== "between") return [home];
+    const there = { group: target.group, index: target.index };
+    return target.group === home.group ? [there] : [home, there];
+  }
+
+  /** The room drawn open, the one proposed or else its own place, or the slit for a carried window. */
   function showRoom(): void {
-    const holder = views.find((each) => each.layout.room);
-    if (carry?.kind === "space" && holder?.layout.room) {
-      const slot = holder.layout.room;
+    const at = carry?.kind === "space" ? (roomsNow().at(-1) ?? null) : null;
+    const box = at ? roomBoxOf(at.group) : null;
+    if (box) {
       const first = !room.hasAttribute("data-shown");
-      setSlot(room, { x: holder.at.x + slot.x, y: holder.at.y + slot.y, w: slot.w, h: slot.h }, first ? "none" : "reflow");
+      setSlot(room, box, first ? "none" : "reflow");
       room.dataset.shown = "";
     } else delete room.dataset.shown;
     const target = carry?.kind === "window" ? carry.target : null;
@@ -1223,42 +1248,87 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * Where a carried workspace would go with its middle at `centre`. Every place of the grid as it is
-   * drawn is a zone: in the group the room is open in, each of its places, the room's among them; in
-   * every other group, each workspace's place and the new-workspace slot after them. A middle within
-   * `scale.snap` of a zone's shorter side of the zone's middle proposes that place: the room opens
-   * there, the workspaces of the group keeping their order round it, and the carried one snaps in
-   * (`magnet`), one event on one threshold. Between zones the place proposed stays while the middle
-   * is over that group; off every group, none. A full group refuses.
-   *
-   * The zones are the grid's places, which stand still as the room moves: a workspace stepping aside
-   * never carries the place proposed away from the hand.
+   * Where a carried workspace would go with its middle at `centre`, as it would be at the hand:
+   * the place whose zone (`zonesOf`) it is in, the nearer middle winning where two meet. A
+   * workspace's place opens the room there, the group keeping its order round it; the
+   * new-workspace slot takes it as it is, the group's last place, which nothing goes after and
+   * which never steps aside. In no zone, none; over a full group, refused. The same boundary takes
+   * it in and lets it out, with nothing remembered between moves.
    */
   function spaceTarget(centre: Point): Target | null {
     if (!carry) return null;
-    const gap = L("space-s24");
-    const proposed = carry.target?.kind === "between" ? carry.target : null;
     let best: { target: Target; off: number } | null = null;
-    let over: Target | null = null;
+    for (const zone of zonesOf(carry)) {
+      const off = Math.hypot(centre.x - zone.x, centre.y - zone.y);
+      if (off <= zone.reach && (!best || off < best.off)) best = { target: zone.target, off };
+    }
+    if (best) return best.target;
+    // Over a full group anywhere, refused.
+    const gap = L("space-s24");
     for (const each of views) {
       const local = { x: centre.x - each.at.x, y: centre.y - each.at.y };
       for (const section of each.layout.sections) {
         const group = model.groupById(desk, section.group);
-        const full = group.spaces.length >= model.MOST && !group.spaces.includes(carry.id);
-        const zones = section.items.map((_, k) => ({ slot: section.places[k]!, index: k }));
-        if (section.plus && !section.items.includes(ROOM)) zones.push({ slot: section.plus, index: section.items.length });
-        for (const zone of zones) {
-          const off = Math.hypot(local.x - (zone.slot.x + zone.slot.w / 2), local.y - (zone.slot.y + zone.slot.h / 2));
-          if (off > number("scale-snap") * Math.min(zone.slot.w, zone.slot.h) || (best && off >= best.off)) continue;
-          best = { target: full ? { kind: "refused", group: group.id } : { kind: "between", group: group.id, index: zone.index }, off };
-        }
-        const reach = { x: section.box.x - gap, y: section.box.y - gap, w: section.box.w + 2 * gap, h: section.box.h + 2 * gap };
-        if (!inside(local, reach)) continue;
-        if (full) over = { kind: "refused", group: group.id };
-        else if (proposed?.group === group.id) over = proposed;
+        if (group.spaces.length < model.MOST || group.spaces.includes(carry.id)) continue;
+        if (inside(local, { x: section.box.x - gap, y: section.box.y - gap, w: section.box.w + 2 * gap, h: section.box.h + 2 * gap })) return { kind: "refused", group: group.id };
       }
     }
-    return best?.target ?? over;
+    return null;
+  }
+
+  /** A place's zone: its middle in world points, how far from it a carried middle is in it, what it proposes. */
+  interface Zone {
+    readonly x: number;
+    readonly y: number;
+    readonly reach: number;
+    readonly target: Target;
+  }
+
+  /** The zones worked out for a carry: the desk does not change while a thing is carried. */
+  let zoneCache: { readonly held: Carry; readonly zones: readonly Zone[] } | null = null;
+
+  /**
+   * Every zone for `held`, a workspace. A group's places stand where the grid draws them with its
+   * room open (the room open in a group re-lays its places, and its row centres again), and also,
+   * for a group the workspace is not from, where they stand at rest, before that room opens: a place
+   * is caught from either, so the middle over a workspace at rest proposes its place, and stays
+   * proposed as the room opening moves the places under it. The new-workspace slot likewise.
+   */
+  function zonesOf(held: Carry): readonly Zone[] {
+    if (zoneCache?.held === held) return zoneCache.zones;
+    const zones: Zone[] = [];
+    const home = { group: held.from, index: held.fromIndex };
+    for (const each of views) {
+      const rest = arrange(each.size.w, each.size.h, specsOf(each.screen, [home]));
+      const add = (slot: model.Rect, target: Target): void => {
+        zones.push({ x: each.at.x + slot.x + slot.w / 2, y: each.at.y + slot.y + slot.h / 2, reach: catchOf(slot, each), target });
+      };
+      for (const group of model.groupsOn(desk, each.screen)) {
+        const atRest = rest.sections.find((section) => section.group === group.id);
+        if (!atRest) continue;
+        if (group.spaces.length >= model.MOST && !group.spaces.includes(held.id)) {
+          atRest.places.forEach((slot) => add(slot, { kind: "refused", group: group.id }));
+          continue;
+        }
+        const opened = group.id === home.group ? atRest : arrange(each.size.w, each.size.h, specsOf(each.screen, [home, { group: group.id, index: 0 }])).sections.find((section) => section.group === group.id)!;
+        const sections = opened === atRest ? [atRest] : [opened, atRest];
+        for (const section of sections) {
+          section.items.forEach((_, k) => add(section.places[k]!, { kind: "between", group: group.id, index: k }));
+          if (section.plus) add(section.plus, { kind: "plus", group: group.id });
+        }
+      }
+    }
+    zoneCache = { held, zones };
+    return zones;
+  }
+
+  /**
+   * How far from a place's middle a carried workspace's middle is in its zone: `scale.snap` of the
+   * place's shorter side, and never less than `scale.snap_least` of its screen's shorter side, so a
+   * waiting group's small places catch as readily as the large ones.
+   */
+  function catchOf(slot: model.Rect, on: ScreenView): number {
+    return Math.max(number("scale-snap") * Math.min(slot.w, slot.h), number("scale-snap_least") * Math.min(on.size.w, on.size.h));
   }
 
   /**
@@ -1323,8 +1393,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     holdRing(carry);
     if (pending) dressBin();
     showBin(point);
-    // Lifted, it is in the room its own place opens: it stays at the hand from the first move.
-    pulledFree = true;
     retarget(targetOf(point), "short", "standard");
   }
 
@@ -1348,7 +1416,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const target = targetOf(point);
     if (!sameTarget(target, carry.target)) return retarget(target, "medium", "standard_decel");
     // Within the place it sits in it stays there; off every place it follows the pointer.
-    if (magnet()) return void fly(carry, wanted(carry), "medium", "standard_decel");
     if (!flights.has(carry.element) && !stuckPose()) pose(carry, pointerPose());
   }
 
@@ -1358,57 +1425,12 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * A carried workspace snapped into the room opened for it: the nearest its middle, as it would be
-   * at the hand, has come to the room's middle since; null while it is at the hand.
-   */
-  let snapped: { closest: number } | null = null;
-  /** Let go of its room, it snaps in again only once its middle has been out of the capture. */
-  let pulledFree = false;
-
-  /**
-   * A light magnet on a carried workspace: proposed a place (`spaceTarget`), the room opens there
-   * and it snaps in, its own middle being within `scale.snap` of the room's shorter side of the
-   * room's middle. Pulled `space.s40` further off the room's middle than the nearest it came, it
-   * lets go, back at the hand where it would be had it never snapped: moving on toward the room
-   * never pulls it out. Returns whether it snapped in or let go.
-   */
-  function magnet(): boolean {
-    const held = carry;
-    if (held?.kind !== "space") return false;
-    const room = held.target?.kind === "between" ? roomBox() : null;
-    if (!room) {
-      const was = snapped !== null;
-      snapped = null;
-      pulledFree = false;
-      return was;
-    }
-    const free = pointerPose();
-    const off = Math.hypot(free.x + free.w / 2 - (room.x + room.w / 2), free.y + free.h / 2 - (room.y + room.h / 2));
-    if (snapped) {
-      snapped.closest = Math.min(snapped.closest, off);
-      if (off - snapped.closest < L("space-s40")) return false;
-      snapped = null;
-      pulledFree = true;
-      return true;
-    }
-    if (off > number("scale-snap") * Math.min(room.w, room.h)) {
-      pulledFree = false;
-      return false;
-    }
-    if (pulledFree) return false;
-    snapped = { closest: off };
-    return true;
-  }
-
-  /**
    * The carried thing aimed at `target`: the desk shows what it would do there, and the thing eases
    * into the place the target offers, or back to the pointer, over `duration` on `curve`.
    */
   function retarget(target: Target | null, duration: string, curve: Easing): void {
     const held = carry;
     if (!held) return;
-    // A workspace's new place catches afresh; straight from the lift it stays at the hand.
-    if (held.kind === "space" && held.target !== null) pulledFree = false;
     held.target = target;
     const into = target?.kind === "bin";
     if (into !== caught) {
@@ -1416,11 +1438,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       slotTakes(into);
     }
     lightBin(into);
-    // A workspace's room moves with its target: out of the room it was in, then in this one, which
-    // its middle is near enough to catch as it is proposed.
-    snapped = null;
     place("reflow");
-    magnet();
     fly(held, wanted(held), duration, curve);
   }
 
@@ -1490,8 +1508,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /**
    * The place the carried thing sits in, if its target offers one: a tiled window in the tile it
    * would take, laid out as the drop would leave the workspace, or a lone window's on the
-   * new-workspace slot; a workspace in the room opened for it, at the room's size, once it has
-   * snapped in (`magnet`); either in the slot.
+   * new-workspace slot; a workspace in the room opened for it, at the room's size, or in the
+   * new-workspace slot; either in the slot. Nothing else: a workspace proposed no place is at the
+   * hand at the size it was lifted at.
    * A floating window sits in no tile.
    */
   function stuckPose(): Pose | null {
@@ -1500,7 +1519,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!held || !target) return null;
     if (target.kind === "bin") return slotPose(held);
     if (held.kind === "space") {
-      const room = snapped ? roomBox() : null;
+      const room = target.kind === "between" ? roomBox() : target.kind === "plus" ? worldBox(target) : null;
       if (!room) return null;
       const fit = Math.min(room.w / held.own.w, room.h / held.own.h);
       const w = held.own.w * fit;
@@ -1527,9 +1546,17 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** The room held open for a carried workspace, in world points. */
   function roomBox(): model.Rect | null {
-    const holder = views.find((each) => each.layout.room);
-    const slot = holder?.layout.room;
-    return holder && slot ? { x: holder.at.x + slot.x, y: holder.at.y + slot.y, w: slot.w, h: slot.h } : null;
+    const target = carry?.target;
+    return target?.kind === "between" ? roomBoxOf(target.group) : null;
+  }
+
+  /** The room open in `group`, in world points. */
+  function roomBoxOf(group: string): model.Rect | null {
+    for (const each of views) {
+      const slot = each.layout.rooms.get(group);
+      if (slot) return { x: each.at.x + slot.x, y: each.at.y + slot.y, w: slot.w, h: slot.h };
+    }
+    return null;
   }
 
   /**
@@ -1693,7 +1720,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     // Let go out of the reach after it was in it: what waits there shows again, its time from full.
     if (caught && target?.kind !== "bin") slotTakes(false);
     carry = null;
-    snapped = null;
     caught = false;
     delete root.dataset.carrying;
     // Let go in the reach it stays above the desk: it waits in the slot exactly as it is drawn.
@@ -2348,11 +2374,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     }
     const start = centreOf({ space: pin.space });
     liftSpace(pin.space, start);
-    // Held by its middle, brought onto the middle of the place it is carried to: it snaps in; with
-    // `hand`, pulled off it again, at the hand with the room still open.
-    const to = pin.to.kind === "between" ? zonePoint(pin.to.group, pin.to.index) : pointOf(pin.to);
-    moveCarry(to);
-    if (pin.hand) moveCarry({ x: to.x - L("space-s48"), y: to.y });
+    // Held by its middle, brought onto the middle of the place it is carried to: it snaps in.
+    moveCarry(pin.to.kind === "between" ? zonePoint(pin.to.group, pin.to.index) : pointOf(pin.to));
     settle();
   }
 
@@ -2517,6 +2540,18 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     learned: () => [...learned].sort(),
     tipShown: () => !tip.hasAttribute("data-learned"),
     pending: () => pending?.what ?? null,
+    carried() {
+      if (!carry) return null;
+      const held = carry;
+      const toClientBox = (at: Pose): model.Rect => {
+        const box = drawn(held.kind, at);
+        const a = toClient({ x: box.x, y: box.y });
+        const b = toClient({ x: box.x + box.w, y: box.y + box.h });
+        return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
+      };
+      const place = stuckPose();
+      return { hand: toClientBox(pointerPose()), place: place ? toClientBox(place) : null };
+    },
   };
 
   // A pin drawn mid-move plays the move once the sample is on the page, held at its moment.
@@ -2543,6 +2578,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     driver,
     resize(width, height) {
       size = { w: width, h: height };
+      zoneCache = null;
       if (view === "screen") views[0]!.size = { ...size };
       standViews();
       for (const each of views) each.bar.replaceChildren(...barRow(each.screen, each.size.w));

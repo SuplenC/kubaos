@@ -915,6 +915,10 @@ drop_reach = 0.25
 # that place is proposed, a share of the place's shorter side: the room opens there and the
 # workspace snaps in, one event on this one threshold; elsewhere it follows the hand.
 snap = 0.55
+# The least that zone reaches, a share of the screen's shorter side: a waiting group's places are
+# drawn at half size, and this keeps them as easy to catch, 0.9 of a small place's shorter side on a
+# 1080 tall screen (122 of 136), while the large places keep their 0.55.
+snap_least = 0.113
 # How far three fingers travel to open the Overview all the way, a share of the screen's height: the
 # Overview arrives as far as the swipe has gone, and settles open past half of it when they lift.
 swipe = 0.3
