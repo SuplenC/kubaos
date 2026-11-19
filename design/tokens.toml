@@ -914,7 +914,7 @@ drop_reach = 0.25
 # How near a carried workspace's middle comes to the middle of the room opened for it before it
 # snaps in, a share of the room's shorter side: a light magnet, so it follows the hand until it is
 # nearly there.
-snap = 0.25
+snap = 0.33
 # How far three fingers travel to open the Overview all the way, a share of the screen's height: the
 # Overview arrives as far as the swipe has gone, and settles open past half of it when they lift.
 swipe = 0.3

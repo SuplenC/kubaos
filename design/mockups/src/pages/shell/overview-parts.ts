@@ -1390,7 +1390,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /**
    * A light magnet on a carried workspace: the room opened for it shows where it would go, and it
    * snaps in only once its own middle is within `scale.snap` of the room's shorter side of the
-   * room's middle. Pulled `space.s24` further off the room's middle than the nearest it came, it
+   * room's middle. Pulled `space.s32` further off the room's middle than the nearest it came, it
    * lets go, back at the hand where it would be had it never snapped: moving on toward the room
    * never pulls it out. Returns whether it snapped in or let go.
    */
@@ -1408,7 +1408,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const off = Math.hypot(free.x + free.w / 2 - (room.x + room.w / 2), free.y + free.h / 2 - (room.y + room.h / 2));
     if (snapped) {
       snapped.closest = Math.min(snapped.closest, off);
-      if (off - snapped.closest < L("space-s24")) return false;
+      if (off - snapped.closest < L("space-s32")) return false;
       snapped = null;
       pulledFree = true;
       return true;
