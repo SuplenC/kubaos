@@ -1272,6 +1272,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const x = on.at.x + slot.x + rect.x * slot.s;
     const y = on.at.y + slot.y + rect.y * slot.s;
     const grab = { x: (point.x - x) / slot.s, y: (point.y - y) / slot.s };
+    // Off its miniature it keeps the corner the miniature gave it, as drawn at that moment.
+    element.style.setProperty("--ov-corner", getComputedStyle(element).getPropertyValue("--ov-corner"));
     lift.append(element);
     element.dataset.lifted = "";
     glide(element, "none");
@@ -1372,31 +1374,33 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return { x: carry.point.x - carry.grab.x, y: carry.point.y - carry.grab.y, k: 1 };
   }
 
+  /** What the slot holds now, left to right: what waits there, then the carried thing pulled in. */
+  function held(): Posed[] {
+    return [...(pending ? [pending.posed] : []), ...(carry && caught ? [carry] : [])];
+  }
+
+  /** How wide `thing` is drawn in the slot: `size.drop_slot` tall, its own shape. */
+  function heldWidth(thing: Posed): number {
+    return (L("size-drop_slot") * thing.size.w) / thing.size.h;
+  }
+
   /**
-   * In the slot, clear of its timer's bar at its foot: alone, centred in the room above the bar, its
-   * box `space.s16` clear of the slot's edges; or, two at once, side by side, the waiting one on the
-   * left (`back`) and the carried one on the right (`front`), over it where they meet, each in a box
-   * two thirds of the room's width, so both read. The thing scales about the point held, so its box
-   * stands where that point puts its middle on the place's.
+   * In the slot, `size.drop_slot` tall, `space.s16` from the slot's line on the left, the right and
+   * the top, and `space.s16` above the timer's bar; two side by side the same `space.s16` apart, the
+   * waiting one on the left. The slot is as wide as what it holds makes it (`slotBox`). The thing
+   * scales about the point held, so its box stands where that point puts its top left corner.
    */
-  function slotPose(thing: Posed, place: "centre" | "back" | "front"): Pose {
+  function slotPose(thing: Posed): Pose {
     const slot = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!);
-    const pad = L("space-s16");
-    const room = { x: slot.x + pad, y: slot.y + pad / 2, w: slot.w - 2 * pad, h: slot.h - pad - L("size-progress") - L("space-s8") };
+    const gap = L("space-s16");
+    const things = held();
+    const at = Math.max(0, things.indexOf(thing));
+    const left = slot.x + gap + things.slice(0, at).reduce((sum, each) => sum + heldWidth(each) + gap, 0);
     const lift = number("scale-lift");
     const base = thing.kind === "window" ? thing.scale : 1;
-    const wide = place === "centre" ? room.w : (room.w * 2) / 3;
-    const k = Math.min(1, wide / (thing.size.w * base * lift), room.h / (thing.size.h * base * lift));
-    const at = {
-      x: place === "centre" ? room.x + room.w / 2 : place === "back" ? room.x + wide / 2 : room.x + room.w - wide / 2,
-      y: room.y + room.h / 2,
-    };
+    const k = L("size-drop_slot") / (thing.size.h * base * lift);
     const s = base * lift * k;
-    return {
-      x: at.x - thing.grab.x - (thing.size.w / 2 - thing.grab.x) * s,
-      y: at.y - thing.grab.y - (thing.size.h / 2 - thing.grab.y) * s,
-      k,
-    };
+    return { x: left - thing.grab.x * (1 - s), y: slot.y + gap - thing.grab.y * (1 - s), k };
   }
 
   function pose(thing: Posed, at: Pose): void {
@@ -1447,14 +1451,15 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function catchCarry(into: boolean): void {
     if (!carry) return;
     caught = into;
-    const held = carry;
-    if (into) fly(held, () => slotPose(held, pending ? "front" : "centre"));
-    else fly(held, pointerPose);
+    const carried = carry;
+    if (into) fly(carried, () => slotPose(carried));
+    else fly(carried, pointerPose);
     if (pending) {
       const waiting = pending.posed;
-      fly(waiting, () => slotPose(waiting, into ? "back" : "centre"));
+      fly(waiting, () => slotPose(waiting));
     }
     lightBin(into);
+    showBin();
   }
 
   function sameTarget(a: Target | null, b: Target | null): boolean {
@@ -1557,6 +1562,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!made) return;
     delete element.dataset.landing;
     made.desk.append(element);
+    element.style.removeProperty("--ov-corner");
     glide(element, "none");
     element.style.setProperty("--ov-sx", "1");
     element.style.setProperty("--ov-sy", "1");
@@ -1658,12 +1664,16 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /**
    * The slot's place on screen `on`: `space.s48` in from its bottom right corner, as far in as the
-   * miniatures' margin, `size.drop_slot` tall and as wide as the screen's shape makes it, a
-   * workspace's miniature in small.
+   * miniatures' margin. It holds things `size.drop_slot` tall, `space.s16` from its line on every
+   * side and above the timer's bar, which keeps `space.s8` from its foot; so it is as wide as what it
+   * holds, and empty (or `empty`), as wide as a workspace of the screen's shape would be.
    */
-  function slotBox(on: ScreenView): model.Rect {
-    const h = L("size-drop_slot");
-    const w = Math.round((h * on.size.w) / on.size.h);
+  function slotBox(on: ScreenView, empty = false): model.Rect {
+    const gap = L("space-s16");
+    const inner = L("size-drop_slot");
+    const h = gap + inner + gap + L("size-progress") + L("space-s8");
+    const things = empty ? [] : held();
+    const w = things.length === 0 ? 2 * gap + (inner * on.size.w) / on.size.h : gap + things.reduce((sum, each) => sum + heldWidth(each) + gap, 0);
     const inset = L("space-s48");
     return { x: on.at.x + on.size.w - inset - w, y: on.at.y + on.size.h - inset - h, w, h };
   }
@@ -1732,7 +1742,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** The slot's middle, in world points. */
   function binCentre(): Point {
-    const box = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!);
+    // The empty slot's middle: the reach stays put however wide what the slot holds makes it.
+    const box = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!, true);
     return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
   }
 
@@ -1747,7 +1758,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const thing: Posed = { kind: was.kind, element: was.element, grab: was.grab, size: was.size, scale: was.scale };
     pending = { taken, what, posed: thing, drain: null };
     was.element.dataset.waiting = "";
-    fly(thing, () => slotPose(thing, "centre"));
+    fly(thing, () => slotPose(thing));
     sweepGone();
     place("reflow");
     showBin();
@@ -1843,7 +1854,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       was.posed.element.remove();
     });
     bin.style.removeProperty("--hold");
-    if (carry && caught) fly(carry, () => slotPose(carry!, "centre"));
+    if (carry && caught) fly(carry, () => slotPose(carry!));
     showBin();
   }
 
@@ -1885,12 +1896,13 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.style.setProperty("--ov-gy", css(grab.y));
     caught = true;
     const held = carry;
-    pose(held, slotPose(held, "centre"));
+    pose(held, slotPose(held));
     commit(element);
     element.style.removeProperty("transition");
     root.dataset.carrying = held.kind;
     held.element.dataset.held = "";
     lightBin(true);
+    showBin();
     place("reflow");
   }
 

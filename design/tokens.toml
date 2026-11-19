@@ -196,11 +196,10 @@ two_line = 24
 control_sm = 32
 control_md = 40
 control_lg = 48
-# The Overview's delete slot, its height: a workspace's miniature in small, as wide as its screen's
-# shape makes it (171 on a 16:9 screen). A carried window or workspace pulled into it sits inside
-# with `space.s16` clear on every side, and the timer's bar runs along its foot, so it reads at a
-# glance from across the screen without crowding the miniatures.
-drop_slot = 96
+# How tall the Overview's delete slot draws what it holds, a carried or waiting window or workspace:
+# large enough to tell it at a glance. The slot keeps `space.s16` round it on every side and above
+# its timer's bar, so it is 112 tall and as wide as what it holds.
+drop_slot = 64
 # A list row with one line, with a title over a subtitle, and with a title over a
 # subtitle that wraps to its second line (a menu item's or a select option's
 # description): each a `small` line taller, with the same inset at its top and foot.

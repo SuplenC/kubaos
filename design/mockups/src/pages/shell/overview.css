@@ -172,6 +172,18 @@
   transform-origin: 0 0;
   scale: calc(var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly));
   border-radius: calc(var(--radius-control) * (1 - var(--ov-fly)) / (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly)));
+  /* Its windows' corner, in their own pixels, as the system nests a window in the frame: the
+     miniature's own corner less the windows' gap at its scale, as it is drawn now, flying or not;
+     never less than a window's on the desktop, `radius.surface` less `space.s8`, which it takes once
+     the miniature is the whole screen. Set here, where the miniature's scale is known, and read by
+     every window on it, which then scales it with itself. */
+  --ov-corner: max(
+    calc(var(--radius-surface) - var(--space-s8)),
+    calc(
+      (var(--radius-control) * (1 - var(--ov-fly)) - var(--space-s8) * (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))) /
+        (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))
+    )
+  );
   background: var(--color-surface_container_lowest);
   box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / calc(var(--opacity-window_shadow) * (1 - var(--ov-fly))));
   transition:
@@ -269,7 +281,9 @@
   scale: var(--ov-sx) var(--ov-sy);
   transform-origin: var(--ov-gx) var(--ov-gy);
   overflow: hidden;
-  border-radius: calc(var(--radius-surface) - var(--space-s8));
+  /* The corner its miniature gives it (`.ov-ws-desk`), carried with it while it is lifted or waits;
+     a window's on the desktop where it has none. */
+  border-radius: var(--ov-corner, calc(var(--radius-surface) - var(--space-s8)));
   background: var(--color-surface);
   transform: scale(calc((1 + (var(--scale-lift) - 1) * var(--ov-held)) * var(--ov-shrink)));
   box-shadow:
@@ -519,8 +533,8 @@
   pointer-events: none;
 }
 
-/* The delete slot: a workspace's miniature in small, `size.drop_slot` tall and as wide as its screen's
-   shape, on the frame's glass at the miniatures' radius, in the corner while something is carried
+/* The delete slot: on the frame's glass at the miniatures' radius, as wide as what it holds with
+   `space.s16` round it (`slotBox`), a workspace's shape while empty, in the corner while something is carried
    or waits in it. It rises `space.s24` into place and fades in over `medium`, and leaves the same
    way, faster. Its line is the Danger tone's glass at rest, `focus.tube` wide; lit while something
    is pulled in, the line burns and glows as a lit Danger control's does. It never grows, so the line
@@ -549,7 +563,8 @@
   transition:
     translate var(--motion-medium) var(--easing-emphasized_decel),
     opacity var(--motion-medium) var(--easing-emphasized_decel),
-    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear);
+    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-w var(--motion-medium) var(--easing-emphasized_decel);
 }
 
 /* The line at rest: the tube shown as unlit glass, with no glow. */
