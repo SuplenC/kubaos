@@ -411,7 +411,10 @@ export interface PickingOptions {
   readonly lit?: Lit;
   /** Picking, or shared: the dim and the bars gone, the mark kept, the pill in every bar. */
   readonly phase?: "picking" | "shared";
-  /** The pill in the bars while still picking, shut: the sample the move to sharing plays on. */
+  /**
+   * The pill in the bars while still picking, and what was picked shown as its mark: the moment
+   * picking gives way to the share, which the move to sharing plays on.
+   */
   readonly pill?: boolean;
   /** The right-button tip under each bar's row; shown unless said otherwise, as nothing else teaches the drag. */
   readonly tip?: boolean;
@@ -431,7 +434,9 @@ export function pickBar(asker: Asker, options: { lit?: "screen" | "region"; tip?
   if (options.onScreen) share.addEventListener("click", options.onScreen);
   if (options.onPoint) {
     const point = options.onPoint;
-    share.addEventListener("pointerenter", () => point(true));
+    // The pointer moving, not entering: each light draws the bar again, and a new button under a
+    // still pointer is entered at once, which would undo a pick made from the keyboard.
+    share.addEventListener("pointermove", () => point(true));
     share.addEventListener("pointerleave", () => point(false));
   }
   if (options.onRegion) region.addEventListener("click", options.onRegion);
@@ -485,19 +490,22 @@ export function pickingScreen(monitor: Monitor, index: number, options: PickingO
     }
     if (phase === "picking") {
       const window: Lit = { kind: "window", screen: index, index: at };
-      drawn.addEventListener("pointerenter", () => handlers.onLight?.(window));
+      // On the pointer moving over it, not on entering: see `pickBar`.
+      drawn.addEventListener("pointermove", () => handlers.onLight?.(window));
       drawn.addEventListener("click", () => handlers.onShare?.(window));
     }
     desk.append(drawn);
   });
   element.querySelector(".k-screen-dim")!.before(desk);
   if (here && lit.kind === "screen") element.append(screenMarks());
-  if (here && lit.kind === "region" && phase === "shared" && lit.rect) element.append(regionMark(lit.rect));
+  // Shared, or picked and giving way to the share, a region shows its mark; still picking, it is drawn.
+  const picked = phase === "shared" || options.pill === true;
+  if (here && lit.kind === "region" && picked && lit.rect) element.append(regionMark(lit.rect));
   if (phase === "picking") {
     element.dataset.picking = "";
     // A little dim on every screen; a screen lit whole comes out of it.
     if (!(here && lit.kind === "screen")) element.dataset.open = "";
-    if (here && lit.kind === "region") {
+    if (here && lit.kind === "region" && !picked) {
       element.dataset.drawing = "";
       element.append(
         regionDraw({
@@ -525,6 +533,9 @@ export function pickingScreen(monitor: Monitor, index: number, options: PickingO
     element.addEventListener("contextmenu", (event) => event.preventDefault());
     element.addEventListener("pointerdown", (event) => {
       if (event.button !== 2) return;
+      // The press draws the drawing surface, which takes the keyboard; left to its default, the
+      // press would then move the keyboard to the page, and Enter would not share the region.
+      event.preventDefault();
       const bounds = element.getBoundingClientRect();
       const from = { x: ((event.clientX - bounds.left) / bounds.width) * monitor.width, y: ((event.clientY - bounds.top) / bounds.height) * monitor.height };
       handlers.onLight?.({ kind: "region", screen: index, from });

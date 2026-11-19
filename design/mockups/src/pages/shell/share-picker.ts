@@ -15,6 +15,7 @@ import {
   DP10_THIRD,
   LONG_ASKER,
   type Lit,
+  type Monitor,
   MEET,
   MONITORS,
   NARROW,
@@ -31,8 +32,8 @@ const both = (options: PickingOptions = {}) => picking(options);
 const one = (options: PickingOptions = {}) => picking({ monitors: [DP10], ...options });
 
 /** Every place Tab stops on, in order: each screen's windows, then its bar's Share this screen. */
-function stops(): Lit[] {
-  return MONITORS.flatMap((monitor, screenAt) => [
+function stops(monitors: readonly Monitor[]): Lit[] {
+  return monitors.flatMap((monitor, screenAt) => [
     ...monitor.windows.map((_, index): Lit => ({ kind: "window", screen: screenAt, index, keyboard: true })),
     { kind: "screen", screen: screenAt, keyboard: true } as Lit,
   ]);
@@ -49,11 +50,12 @@ function playShared(root: HTMLElement): void {
 }
 
 /**
- * The stage, picking live: point at a window and click it, point at Share this screen and click it,
- * Region or a right-button drag to draw, or the keys. Shared, the move to sharing plays as its
- * recipe says; cancelled, the desktop is left as it was. A double-click on the desktop asks again.
+ * Picking live on `monitors`: point at a window and click it, point at Share this screen and click
+ * it, Region or a right-button drag to draw, or the keys, Tab walking every screen's windows and
+ * bar. Shared, the move to sharing plays as its recipe says; cancelled, the desktop is left as it
+ * was. A double-click on the desktop asks again.
  */
-function live(): HTMLElement {
+function livePicking(monitors: readonly Monitor[]): HTMLElement {
   const holder = document.createElement("span");
   // A box of its own, as wide as what it holds: the stage measures a sample by its box, and one
   // with none (`contents`) reads as reaching from the page's edge.
@@ -78,17 +80,17 @@ function live(): HTMLElement {
 
   const share = (picked: Lit) => {
     if (picked.kind === "none") return;
-    const shown = picking({ lit: picked, pill: true });
+    const shown = picking({ monitors, lit: picked, pill: true });
     again(shown);
     if (!ALL) playShared(shown);
   };
 
-  const cancel = () => again(picking({ phase: "shared" }));
+  const cancel = () => again(picking({ monitors, phase: "shared" }));
 
   const keys = (event: KeyboardEvent) => {
     const screenAt = lit.kind === "none" ? 0 : lit.screen;
     if (event.key === "Tab") {
-      const all = stops();
+      const all = stops(monitors);
       at = (at + (event.shiftKey ? -1 : 1) + all.length) % all.length;
       light(all[at]!);
     } else if (event.key.toLowerCase() === "s") light({ kind: "screen", screen: screenAt, keyboard: true });
@@ -103,17 +105,27 @@ function live(): HTMLElement {
   };
 
   function draw(): void {
-    const shown = picking({ lit, handlers: { onLight: light, onShare: share, onCancel: cancel } });
+    const shown = picking({ monitors, lit, handlers: { onLight: light, onShare: share, onCancel: cancel } });
     shown.tabIndex = 0;
     shown.addEventListener("keydown", keys);
     holder.replaceChildren(shown);
     if (ALL) return;
     const drawing = shown.querySelector<HTMLElement>(".share-draw");
-    requestAnimationFrame(() => (drawing ?? shown).focus({ preventScroll: true }));
+    const focus = () => (drawing ?? shown).focus({ preventScroll: true });
+    // Each key draws the picker again: the new one takes the keyboard at once, or a quick next key
+    // would reach the page. Drawn before the holder is on the page, it takes it a frame later.
+    if (holder.isConnected) focus();
+    else requestAnimationFrame(focus);
   }
   draw();
   return holder;
 }
+
+/**
+ * The stage: picking live on DP-10 alone, so the stage draws one screen large enough to read; the
+ * bar is on every screen, as the two screens beside each other show live among the sizes.
+ */
+const live = () => livePicking([DP10]);
 
 const DIM = "the dim";
 const BARS = "the bars";
@@ -194,7 +206,7 @@ export default page<Shown>({
     { name: "Shared", for: "the dim and the bars gone; mark and pill stay", sample: screen(() => both({ lit: { kind: "window", screen: 0, index: 1 }, phase: "shared" })) },
   ],
   sizes: [
-    { name: "Two screens, two sizes", for: "DP-10 1600 by 1000, eDP-1 1440 by 900", sample: screen(() => both()) },
+    { name: "Two screens, two sizes", for: "live: a bar on each; Tab walks both", sample: screen(() => livePicking(MONITORS)) },
     { name: "The narrowest screen", for: "720 by 480: who asks gives way", sample: screen(() => picking({ monitors: [NARROW], asker: LONG_ASKER })) },
     { name: "The bar alone", for: "as wide as its row", sample: () => pickBar(MEET, { tip: true }) },
   ],
