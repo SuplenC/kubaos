@@ -7,25 +7,10 @@
   gap: var(--space-s24);
 }
 
-/* While picking, the frame, the bar and the picking bar stay over the dim and over a window lifted
-   out of it; the lifted window stays over the dim. */
-.k-screen[data-picking] > :is(.k-screen-glass, .k-screen-over) {
-  z-index: 2;
-}
-
-.share-window[data-lifted] {
-  z-index: 1;
-}
-
-/* The dim lies over the windows but is no target: the pointer picks the window under it. */
-.k-screen[data-picking] > .k-screen-dim {
+/* The screen's dim never shows while a request waits, and it is no target: the pointer reaches
+   the windows under it. */
+.k-screen.share-screen > .k-screen-dim {
   pointer-events: none;
-}
-
-/* Drawing a region, the screen's own dim gives way to the drawing's, which leaves the box clear;
-   a screen lit whole comes out of it. */
-.k-screen.share-screen:is([data-drawing], [data-lit-screen]) > .k-screen-dim {
-  --panel-dim: 0;
 }
 
 /* The picking bar, on its Sheet in the middle of the frame's bottom edge: one row, as wide as its
@@ -36,7 +21,7 @@
 }
 
 /* Drawing a region, the frame and the bar's Sheet stay over the drawing's dim, Region held pressed. */
-.k-screen[data-picking][data-drawing] > :is(.k-screen-glass, .k-screen-over) {
+.k-screen.share-screen[data-drawing] > :is(.k-screen-glass, .k-screen-over) {
   z-index: 4;
 }
 
@@ -44,25 +29,56 @@
   min-width: 0;
 }
 
-
-/* A window's label while picking: a Tooltip in the middle of the window, taking no pointer, shown
-   while the window is lit; its Enter only while the keyboard is on it. */
-.share-pick-label {
+/* A window's Share tab while a request waits: draft part, proposed (`shareTab`). Part of the
+   window's top left corner, flush with its edges, under the window's border and tube, so the
+   window's line runs on along the tab's outer edges; the tab's own line, the window line's width,
+   runs along its inner edges, shown while it is lit. Only the window under the pointer shows it,
+   fading in and out over `short`; hidden, it takes no pointer. The stylesheet does it all, so the
+   pointer moving across the windows builds nothing. */
+.share-tab {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s4);
+  box-sizing: border-box;
+  height: var(--size-control_sm);
+  margin: 0;
+  padding: 0 var(--space-s12);
+  border: 0 solid transparent;
+  border-right-width: max(1px, round(nearest, var(--stroke-thin), 1px));
+  border-bottom-width: max(1px, round(nearest, var(--stroke-thin), 1px));
+  border-radius: var(--corner) 0 var(--radius-control) 0;
+  --layer: 0;
+  background: color-mix(in srgb, var(--color-sharing_container), var(--color-on_sharing_container) calc(var(--layer) * 100%));
+  font: inherit;
+  cursor: pointer;
   opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    background-color var(--motion-short) var(--easing-standard),
+    border-color var(--motion-short) var(--easing-standard);
 }
 
-.share-window[data-lifted] > .share-pick-label {
+.share-window:is(:hover, [data-pointed]) > .share-tab {
   opacity: 1;
+  pointer-events: auto;
 }
 
-.share-window:not([data-keyboard]) .share-pick-label .k-tooltip-keys {
-  display: none;
+/* The window's border and tube lie over the tab, so its line and the tab read as one shape. */
+.share-window > .k-ring {
+  z-index: 1;
+}
+
+.share-tab:is(:hover, [data-pinned]) {
+  --layer: var(--opacity-hover);
+  border-color: var(--color-sharing_line);
+}
+
+.share-tab:is(:active, [data-pinned="pressed"]) {
+  --layer: var(--opacity-press);
 }
 
 /* A window on the desktop: draft part, proposed. */
@@ -75,6 +91,8 @@
   grid-template-columns: repeat(var(--desk-columns, 1), minmax(0, 1fr));
   grid-template-rows: repeat(var(--desk-rows, 1), minmax(0, 1fr));
   gap: var(--space-s8);
+  /* Whatever a window lays over its tab stays among the windows, under the frame and the bar. */
+  isolation: isolate;
 }
 
 .share-window {
@@ -89,8 +107,8 @@
 }
 
 /* A shared window's border: `sharing_line`, the window border's width, over the neutral border,
-   shown while the window is shared or lit while picking, whether or not it has the keyboard. The
-   tube, while it has it, burns over it. */
+   shown while the window is shared or its Share tab is pointed at, whether or not it has the
+   keyboard. The tube, while it has it, burns over it. */
 .share-border {
   position: absolute;
   inset: 0;
@@ -99,7 +117,7 @@
   transition: opacity var(--motion-short) var(--easing-standard);
 }
 
-.share-window:not([data-shared]) .share-border {
+.share-window:not([data-shared], :has(> .share-tab:is(:hover, [data-pinned]))) .share-border {
   opacity: 0;
 }
 
@@ -113,7 +131,8 @@
 
 /* A shared screen's mark: the thin stroke inside the screen's whole edge, at its own corners, in
    `sharing_line`, as a window's and a region's. It lies within the bar's room above and below
-   its pills and takes no pointer. In picking it shows while its screen is lit whole. */
+   its pills and takes no pointer. While a request waits it shows while Share this screen is
+   pointed at. */
 .share-edge {
   position: absolute;
   z-index: 3;
@@ -129,8 +148,8 @@
   opacity: 0;
 }
 
-/* Drawing a region: draft part, proposed. Picking's dim is the box's own spread, so the box stays
-   clear, and its line is the region's on-air mark. */
+/* Drawing a region: draft part, proposed. The dim, the one picking shows, is the box's own spread,
+   so the box stays clear, and its line is the region's on-air mark. */
 .share-draw {
   position: absolute;
   z-index: 3;
@@ -140,6 +159,17 @@
   cursor: crosshair;
   outline: none;
   background: rgb(from var(--color-scrim) r g b / var(--opacity-panel_scrim));
+}
+
+/* Drawing's dim fades in as drawing starts, the one modal moment. */
+@starting-style {
+  .share-draw {
+    opacity: 0;
+  }
+}
+
+.share-draw {
+  transition: opacity var(--motion-short) var(--easing-standard);
 }
 
 .share-draw[data-drawn] {

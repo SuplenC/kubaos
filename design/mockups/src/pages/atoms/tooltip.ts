@@ -14,11 +14,11 @@ import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const TITLE: Words = { short: "Mac accents", long: "Mac accents on Left Alt, for every layout" };
-/** A control with a key and a line to add: the share picker's Region. */
-const REGION = { name: "Region", key: "R" } as const;
-const REGION_LINE: Words = {
-  short: "Or drag with the right button anywhere.",
-  long: "Or drag with the right button anywhere, on any screen, from one corner of the region to the other.",
+/** A control with a key and a line to add: the power menu's Restart, held. */
+const RESTART = { name: "Restart, held", key: "R" } as const;
+const RESTART_LINE: Words = {
+  short: "No undo once the sign shows.",
+  long: "No undo once the sign shows: every app closes, and what isn't saved is lost.",
 };
 
 const BODY: Words = {
@@ -83,7 +83,7 @@ export default page({
     { name: "A title alone", for: "when the title says it all", sample: () => tooltip(shown(TITLE), "") },
     { name: "A name and its key", for: "a button whose key isn't shown: one line", sample: () => keyTooltip("Desktop", "2") },
     { name: "A name and a combination", for: "each key a cap, `space.s4` apart", sample: () => keyTooltip("Full screen", "F") },
-    { name: "Name, key and a line", for: "the key on the name's line, a quiet line under", sample: () => keyTooltip(REGION.name, REGION.key, shown(REGION_LINE)) },
+    { name: "Name, key and a line", for: "the key on the name's line, a quiet line under", sample: () => keyTooltip(RESTART.name, RESTART.key, shown(RESTART_LINE)) },
     { name: "A term in a sentence", for: "a word dotted under, its card over it", sample: () => inSentence() },
     { name: "Answering a press", for: "shown for two holds after a press", sample: () => answering() },
   ],
@@ -104,7 +104,7 @@ export default page({
       { name: "Without keys", cell: () => card(false) },
       { name: "A title alone", cell: () => tooltip(shown(TITLE), "") },
       { name: "A name and its key", cell: () => keyTooltip("Desktop", "2") },
-      { name: "Name, key and a line", cell: () => keyTooltip(REGION.name, REGION.key, shown(REGION_LINE)) },
+      { name: "Name, key and a line", cell: () => keyTooltip(RESTART.name, RESTART.key, shown(RESTART_LINE)) },
     ],
     looks: {
       rest: "step 4 on `surface_container`, `radius.control`; no line, no glow",
@@ -116,7 +116,7 @@ export default page({
       { name: "Its title", words: TITLE, sample: (words: string) => tooltip(words, shown(BODY)) },
       { name: "Its body", words: BODY, sample: (words: string) => tooltip(shown(TITLE), words) },
       { name: "A name beside its key", words: { short: "Apply", long: "Apply and keep this wallpaper" }, sample: (words: string) => keyTooltip(words, "↵") },
-      { name: "The line under name and key", words: REGION_LINE, sample: (words: string) => keyTooltip(REGION.name, REGION.key, words) },
+      { name: "The line under name and key", words: RESTART_LINE, sample: (words: string) => keyTooltip(RESTART.name, RESTART.key, words) },
     ],
     missingPicture: doesntApply("words and keys only."),
     counts: [
@@ -161,7 +161,7 @@ export default page({
     samples: nonEmpty([
       { name: "The card", for: "width, padding, corners, gaps", sample: () => card() },
       { name: "Over its control", for: "the gap, from its start", sample: () => explained({ shown: true }) },
-      { name: "Name, key and a line", for: "the key on the name's line", sample: () => keyTooltip(REGION.name, REGION.key, shown(REGION_LINE)) },
+      { name: "Name, key and a line", for: "the key on the name's line", sample: () => keyTooltip(RESTART.name, RESTART.key, shown(RESTART_LINE)) },
     ]),
     measures: [
       { part: "Widest", token: "size-tooltip" },

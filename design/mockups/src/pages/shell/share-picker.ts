@@ -1,9 +1,10 @@
 // Picking what to share: the system's share prompt, which an app's request to share opens in place
-// of the portal's own. No dialog: every screen dims a little and its frame grows a bar out of the
-// middle of its bottom edge (who asks, Share this screen, Region, Cancel), on the Sheet the shell's
-// attached surfaces use, a window is picked by pointing at it, and a region
-// is drawn after Region or by a right-button drag anywhere. What lights while picking is the mark
-// it keeps on air. Its parts are `sharing-parts.ts`'.
+// of the portal's own. No dialog, no dim: while the request waits the desktop works as usual, and
+// a click on a window only gives it the keyboard. Each screen's frame grows a bar out of the middle
+// of its bottom edge (who asked, Share this screen, Region, Cancel), on the Sheet the shell's
+// attached surfaces use, the standing sign that a request waits. The window under the pointer
+// offers a violet Share tab in its corner. Pointing at a way to share previews the mark it keeps on
+// air. Region alone is modal: it dims the screen for drawing. Its parts are `sharing-parts.ts`'.
 
 import type { Words } from "../../lib/content.ts";
 import { type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
@@ -27,6 +28,7 @@ import {
   buildPicking,
   type PickingOptions,
   REGION,
+  type WindowAt,
 } from "./sharing-parts.ts";
 
 /** Picking on both screens, as `options` say. */
@@ -34,13 +36,8 @@ const both = (options: PickingOptions = {}) => picking(options);
 /** Picking on DP-10 alone, for the samples that compare states. */
 const one = (options: PickingOptions = {}) => picking({ monitors: [DP10], ...options });
 
-/** Every place Tab stops on, in order: each screen's windows, then its bar's Share this screen. */
-function stops(monitors: readonly Monitor[]): Lit[] {
-  return monitors.flatMap((monitor, screenAt) => [
-    ...monitor.windows.map((_, index): Lit => ({ kind: "window", screen: screenAt, index, keyboard: true })),
-    { kind: "screen", screen: screenAt, keyboard: true } as Lit,
-  ]);
-}
+/** Firefox's window on DP-10, the one the samples point at. */
+const FIREFOX_WINDOW: WindowAt = { screen: 0, index: 1 };
 
 /** Plays the move to sharing on `root` from its start to its last state, as its player does. */
 function playShared(root: HTMLElement): void {
@@ -53,11 +50,12 @@ function playShared(root: HTMLElement): void {
 }
 
 /**
- * Picking live on `monitors`: point at a window and click it, point at Share this screen and click
- * it, Region or a right-button drag to draw, or the keys, Tab walking every screen's windows and
- * bar. The screens are built once as picking opens and only lit after that; shared, the move to
- * sharing plays as its recipe says; cancelled, the desktop is left as it was. A double-click on
- * the desktop asks again.
+ * A request waiting live on `monitors`: a click on a window gives it the keyboard; its Share tab,
+ * on the window under the pointer, shares it; Share this screen shares the screen; Region
+ * draws, Enter sharing the region and Esc going back to waiting; × cancels. The screens are built
+ * once as the request arrives and only change attributes after that; shared, the move to sharing
+ * plays as its recipe says; cancelled, the desktop is left as it was. A double-click on the
+ * desktop asks again.
  */
 function livePicking(monitors: readonly Monitor[]): HTMLElement {
   const holder = document.createElement("span");
@@ -65,25 +63,24 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
   // with none (`contents`) reads as reaching from the page's edge.
   holder.style.display = "inline-block";
   let lit: Lit = NOTHING;
-  let at = -1;
+  let focused: WindowAt = { screen: 0, index: 0 };
   let picker: Picking | null = null;
 
-  /** The keyboard to the region being drawn, or else to picking; a frame later while not yet on the page. */
-  const focus = () => {
+  /** The keyboard to the region being drawn, a frame later while it isn't on the page yet. */
+  const toDrawing = () => {
     if (ALL || !picker) return;
     const shown = picker.element;
-    const take = () => (shown.querySelector<HTMLElement>(".share-draw") ?? shown).focus({ preventScroll: true });
+    const take = () => shown.querySelector<HTMLElement>(".share-draw")?.focus({ preventScroll: true });
     if (holder.isConnected) take();
     else requestAnimationFrame(take);
   };
 
   const light = (next: Lit) => {
     if (JSON.stringify(next) === JSON.stringify(lit)) return;
-    const drawing = lit.kind === "region" || next.kind === "region";
     lit = next;
     picker?.light(lit);
-    // Only drawing a region changes what holds the keyboard; anything else leaves it where it is.
-    if (drawing) focus();
+    // Drawing takes the keyboard; it goes back to the app as drawing ends.
+    if (lit.kind === "region") toDrawing();
   };
 
   const settled = (shown: HTMLElement) => {
@@ -94,51 +91,32 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
 
   const share = (picked: Lit) => {
     if (picked.kind === "none") return;
-    const shown = picking({ monitors, lit: picked, pill: true });
+    const shown = picking({ monitors, lit: picked, pill: true, focused });
     settled(shown);
     if (!ALL) playShared(shown);
   };
 
-  // Cancelled, each bar sinks back into its edge and the dim lifts, as the Sheet leaves, before the desktop is left as it was.
+  // Cancelled, each bar sinks back into its edge, as the Sheet leaves, before the desktop is left as it was.
   const cancel = () => {
     const leaving = picker;
-    if (!leaving || ALL) return settled(picking({ monitors, phase: "shared" }));
+    if (!leaving || ALL) return settled(picking({ monitors, phase: "shared", focused }));
     leaving.close();
     window.setTimeout(() => {
-      if (picker === leaving) settled(picking({ monitors, phase: "shared" }));
+      if (picker === leaving) settled(picking({ monitors, phase: "shared", focused }));
     }, milliseconds("medium"));
   };
 
-  const keys = (event: KeyboardEvent) => {
-    const screenAt = lit.kind === "none" ? 0 : lit.screen;
-    if (event.key === "Tab") {
-      const all = stops(monitors);
-      at = (at + (event.shiftKey ? -1 : 1) + all.length) % all.length;
-      light(all[at]!);
-    } else if (event.key.toLowerCase() === "s") light({ kind: "screen", screen: screenAt, keyboard: true });
-    else if (event.key.toLowerCase() === "r") light({ kind: "region", screen: screenAt });
-    else if (event.key === "Enter" && (lit.kind === "window" || lit.kind === "screen")) share(lit);
-    else if (event.key === "Escape") {
-      if (lit.kind === "region") light(NOTHING);
-      else cancel();
-    } else return;
-    event.preventDefault();
-    event.stopPropagation();
+  const focus = (window: WindowAt) => {
+    focused = window;
+    picker?.focus(window);
   };
 
   function ask(): void {
     lit = NOTHING;
-    at = -1;
-    picker = buildPicking({ monitors, arrive: !ALL, handlers: { onLight: light, onShare: share, onCancel: cancel } });
+    picker = buildPicking({ monitors, arrive: !ALL, focused, handlers: { onLight: light, onShare: share, onFocus: focus, onCancel: cancel } });
     picker.light(lit);
-    picker.element.tabIndex = 0;
-    picker.element.addEventListener("keydown", keys);
-    // The pointer coming onto the screens hands them the keyboard, as picking holds it on every
-    // screen: the page draws the stage twice, by night and by day, and the keys follow the one in use.
-    picker.element.addEventListener("pointerenter", focus);
     holder.replaceChildren(picker.element);
-    focus();
-    // Built shut, it arrives on the next frame: the dim comes in and each bar's Sheet opens.
+    // Built shut, it arrives on the next frame: each bar's Sheet opens.
     const arriving = picker;
     if (!ALL) requestAnimationFrame(() => arriving.open());
   }
@@ -147,66 +125,56 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
 }
 
 /**
- * The stage: picking live on DP-10 alone, so the stage draws one screen large enough to read; the
- * bar is on every screen, as the two screens beside each other show live among the sizes.
+ * The stage: a request waiting live on DP-10 alone, so the stage draws one screen large enough to
+ * read; the bar is on every screen, as the two screens beside each other show live among the sizes.
  */
 const live = () => livePicking([DP10]);
 
-const DIM = "the dim";
 const BARS = "the bars";
 
 /** The bars' Sheets: their depth, as every attached surface moves; under reduced motion, a fade. */
 const SHEETS = ".k-sheet-part";
 
-function asking(reduced: boolean): NonEmpty<Track<Easing>> {
-  const duration = reduced ? "short" : "long";
+/** The bars rising out of their edges, or sinking back into them. */
+function bars(on: boolean, reduced: boolean): NonEmpty<Track<Easing>> {
+  const duration = reduced ? "short" : on ? "long" : "medium";
+  const curve = on ? "emphasized_decel" : "emphasized_accel";
+  const [from, to] = on ? [0, 1] : [1, 0];
   return [
-    { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 0, to: 1, duration, curve: "emphasized_decel" },
     reduced
-      ? { part: BARS, on: "every screen", target: SHEETS, property: "opacity", from: 0, to: 1, duration, curve: "emphasized_decel" }
-      : { part: BARS, on: "every screen", target: SHEETS, property: "--reveal", from: 0, to: 1, duration, curve: "emphasized_decel" },
+      ? { part: BARS, on: "every screen", target: SHEETS, property: "opacity", from, to, duration, curve }
+      : { part: BARS, on: "every screen", target: SHEETS, property: "--reveal", from, to, duration, curve },
   ];
 }
 
-function cancelling(reduced: boolean): NonEmpty<Track<Easing>> {
-  const duration = reduced ? "short" : "medium";
-  return [
-    { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 1, to: 0, duration, curve: "emphasized_accel" },
-    reduced
-      ? { part: BARS, on: "every screen", target: SHEETS, property: "opacity", from: 1, to: 0, duration, curve: "emphasized_accel" }
-      : { part: BARS, on: "every screen", target: SHEETS, property: "--reveal", from: 1, to: 0, duration, curve: "emphasized_accel" },
-  ];
-}
-
-/** Picking giving way to the share: the label fades, the bars sink into their edges, the dim lifts, the mark stays, the pill arrives. */
+/** The request giving way to the share: the Share tab fades, the bars sink, the mark stays, the pill arrives. */
 function onAir(power: Strike | Easing, reduced: boolean): NonEmpty<Track> {
   const pill = ".shell-on-air";
+  const tab = ".share-tab";
   if (reduced) {
     return [
-      { part: "the label", on: "the window", target: ".share-pick-label", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+      { part: "the Share tab", on: "the window", target: tab, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
       { part: BARS, on: "every screen", target: SHEETS, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-      { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
       { part: "the pill", on: "every bar", target: pill, property: "opacity", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
     ];
   }
   return [
-    { part: "the label", on: "the window", target: ".share-pick-label", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
+    { part: "the Share tab", on: "the window", target: tab, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
     { part: BARS, on: "every screen", target: SHEETS, property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: DIM, on: "every screen", target: ".k-screen-dim", property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the pill's power", on: "every bar", target: pill, property: "opacity", from: 0, to: 1, duration: "medium", cue: "medium", curve: power },
     { part: "the pill's beat lit", on: "every bar", target: pill, property: "--lit", from: 0, to: 1, duration: "short", cue: ["medium", "medium"], curve: "standard" },
     { part: "the pill's beat lit", on: "every bar", target: pill, property: "--lit", from: 1, to: 0, duration: "long", cue: ["medium", "medium", "short", "scene"], curve: "standard" },
   ];
 }
 
-/** Picking with a window lit and the pill in every bar: what the move to sharing plays on, the pill out at its start. */
+/** Firefox's window shared by its tab, the pill in every bar: what the move to sharing plays on, the pill out at its start. */
 function aboutToShare(): HTMLElement {
-  return both({ lit: { kind: "window", screen: 0, index: 1 }, pill: true });
+  return both({ lit: { kind: "window", ...FIREFOX_WINDOW }, pill: true });
 }
 
 const SHARED: Move = {
-  name: "Picked, then on air",
-  what: "A click: the label fades, the bars sink, the dim lifts; the violet edge stays; the pill strikes on.",
+  name: "Shared, then on air",
+  what: "A click on Share: the tab fades, the bars sink; the violet line stays; the pill strikes on.",
   tracks: onAir("neon.strike", false),
   reduced: onAir("standard", true) as NonEmpty<Track<Easing>>,
   unflickered: onAir("standard", false) as NonEmpty<Track<Easing>>,
@@ -214,68 +182,81 @@ const SHARED: Move = {
   sample: screen(aboutToShare),
 };
 
-type Shown = "rest" | "lit";
+type Shown = "rest" | "lit" | "pressed";
 
 /** The asking app's name, as its icon's Tooltip says it. */
 const ASKER_NAME: Words = { short: "Zoom", long: "Visual Studio Code - Insiders" };
+
+/** The window the pointer is on, its tab at rest; the tab pointed at, lit; pressed, shared. */
+function windowState(state: Shown): HTMLElement {
+  if (state === "pressed") return one({ lit: { kind: "window", ...FIREFOX_WINDOW }, phase: "shared" });
+  return one({ pointed: { ...FIREFOX_WINDOW, tab: state === "lit" } });
+}
 
 export default page<Shown>({
   level: "shell",
   slug: "share-picker",
   title: "Share picker",
-  lede: "Picking what to share on the desktop itself: each screen's bar, a window pointed at, a region drawn.",
+  lede: "A share request on the live desktop: a bar on each screen, Share on the pointed window.",
   code: { qml: "SharePicker", unbuilt: "Not built yet" },
-  from: ["icon-tile", "button", "icon-button", "tooltip", "keycap", "chip"],
-  stage: { live, hint: "point and click; S, R, Tab, Enter, Esc; right-drag", daylight: true },
+  from: ["icon-tile", "button", "icon-button", "tooltip", "chip"],
+  stage: { live, hint: "point at a window, then its Share tab; a click focuses it", daylight: true },
   variants: [
-    { name: "Picking, at rest", for: "both screens dimmed, a bar on each", sample: screen(() => both()) },
-    { name: "A window pointed at", for: "out of the dim, its on-air edge, the label", sample: screen(() => both({ lit: { kind: "window", screen: 0, index: 1 } })) },
-    { name: "This screen pointed at", for: "out of the dim, its violet edge", sample: screen(() => both({ lit: { kind: "screen", screen: 0 } })) },
-    { name: "A region being drawn", for: "clear inside its on-air line; its size", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
-    { name: "The keyboard on a window", for: "lit as pointed; the label says Enter", sample: screen(() => both({ lit: { kind: "window", screen: 1, index: 0, keyboard: true } })) },
-    { name: "An app asks", for: "the app's name in each bar", sample: screen(() => both({ asker: DISCORD })) },
+    { name: "Waiting", for: "the desktop as usual, no dim; a bar on each screen", sample: screen(() => both()) },
+    { name: "A window pointed at", for: "its violet Share tab on its top left corner", sample: screen(() => both({ pointed: FIREFOX_WINDOW })) },
+    { name: "Its Share tab pointed at", for: "tab and line one violet shape", sample: screen(() => both({ pointed: { ...FIREFOX_WINDOW, tab: true } })) },
+    { name: "This screen pointed at", for: "its violet edge previewed", sample: screen(() => both({ lit: { kind: "screen", screen: 0 } })) },
+    { name: "A region being drawn", for: "the one dim; clear inside its line; its size", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
+    { name: "A window clicked", for: "it takes the keyboard; nothing is shared", sample: screen(() => both({ focused: FIREFOX_WINDOW })) },
+    { name: "Pointed on the other screen", for: "the tab on the window under the pointer", sample: screen(() => both({ pointed: { screen: 1, index: 0 } })) },
+    { name: "An app asks", for: "the app's icon in each bar", sample: screen(() => both({ asker: DISCORD })) },
     { name: "Who asked, its hint up", for: "the app's icon names it on hover", sample: screen(() => one({ hint: "app" })) },
-    { name: "Region's hint up", for: "its key, and the right-button drag under", sample: screen(() => one({ hint: "region" })) },
-    { name: "Another workspace", for: "switched while picking: dim and bar follow", sample: screen(() => both({ monitors: [DP10_THIRD, EDP1] })) },
-    { name: "Shared", for: "the dim and the bars gone; mark and pill stay", sample: screen(() => both({ lit: { kind: "window", screen: 0, index: 1 }, phase: "shared" })) },
+    { name: "Region's hint up", for: "its name alone", sample: screen(() => one({ hint: "region" })) },
+    { name: "Another workspace", for: "switched while waiting: the bar stays", sample: screen(() => both({ monitors: [DP10_THIRD, EDP1] })) },
+    { name: "Shared", for: "the bars gone; mark and pill stay", sample: screen(() => both({ lit: { kind: "window", ...FIREFOX_WINDOW }, phase: "shared" })) },
   ],
   sizes: [
-    { name: "Two screens, two sizes", for: "live: a bar on each; Tab walks both", sample: screen(() => livePicking(MONITORS)) },
+    { name: "Two screens, two sizes", for: "live: a bar on each; Share on either", sample: screen(() => livePicking(MONITORS)) },
     { name: "The narrowest screen", for: "720 by 480: the one row fits whole", sample: screen(() => picking({ monitors: [NARROW] })) },
     { name: "The bar alone", for: "one row, as wide as its content", sample: () => pickBar(MEET) },
   ],
   states: {
-    shown: ["rest", "lit"],
+    shown: ["rest", "lit", "pressed"],
     absent: {
-      pressed: "a click shares at once",
-      disabled: "picking is up or gone",
-      selected: "what is lit is the pick",
-      loading: "the screens are there as it opens",
+      disabled: "a request waits or is gone",
+      selected: "what is pointed at is the pick",
+      loading: "the bars are there as it opens",
       empty: "a screen with no window still has its bar",
       error: "a failed share ends; a notification says so",
     },
     rows: [
-      { name: "A window", cell: (state: Shown) => one(state === "lit" ? { lit: { kind: "window", screen: 0, index: 1 } } : {}) },
-      { name: "This screen", cell: (state: Shown) => one(state === "lit" ? { lit: { kind: "screen", screen: 0 } } : {}) },
+      { name: "A window", cell: (state: Shown) => (state === "pressed" ? one({ focused: FIREFOX_WINDOW }) : one(state === "lit" ? { pointed: FIREFOX_WINDOW } : {})) },
+      { name: "Its Share tab", cell: windowState },
+      {
+        name: "Share this screen",
+        cell: (state: Shown) => (state === "pressed" ? one({ lit: { kind: "screen", screen: 0 }, phase: "shared" }) : one(state === "lit" ? { lit: { kind: "screen", screen: 0 } } : {})),
+      },
+      { name: "Region", cell: (state: Shown) => (state === "pressed" ? one({ lit: { kind: "region", screen: 0, rect: REGION } }) : one(state === "lit" ? { hint: "region" } : {})) },
     ],
     looks: {
-      rest: "dimmed a little, the bar out of the bottom edge",
-      lit: "out of the dim, wearing the mark it keeps on air",
+      rest: "waiting: the desktop as usual, the bar out of its edge",
+      lit: "pointed at: the Share tab shows, or a line previews",
+      pressed: "a window focused; shared; or a region drawn",
     },
   },
   focus: {
     tubes: [
-      { name: "A window lit", tone: "sharing", filled: false, content: false },
+      { name: "The window with the keyboard", tone: "accent", filled: false, content: false },
       { name: "The bar's buttons", tone: "accent", filled: false, content: false },
     ],
-    looks: { lit: "the window's violet border; a button's tube and glow", signsOff: "the border stays; a button's tube as glass" },
-    signsOff: (index: number) => (index === 0 ? one({ lit: { kind: "window", screen: 0, index: 1 } }) : pickBar(MEET, { lit: "screen" })),
+    looks: { lit: "a window's tube; a button's tube and glow", signsOff: "the tubes as glass; the violet line stays" },
+    signsOff: (index: number) => (index === 0 ? one({ focused: FIREFOX_WINDOW }) : pickBar(MEET, { lit: "screen" })),
   },
   content: {
     text: [{ name: "Who asked, in its hint", words: ASKER_NAME, sample: (words: string) => pickBar({ ...MEET, app: words }, { hint: "app" }) }],
     missingPicture: [
       { name: "An asking app with no icon", for: "its initial on the bar's tile", sample: () => pickBar(NO_ICON, { hint: "app" }) },
-      { name: "A window's app with no icon", for: "its initial on the window's tile", sample: screen(() => both({ lit: { kind: "window", screen: 1, index: 1 } })) },
+      { name: "A window's app with no icon", for: "its initial on the window's tile", sample: screen(() => both({ pointed: { screen: 1, index: 1 } })) },
     ],
     counts: [
       { name: "One screen", for: "one bar", sample: screen(() => one()) },
@@ -284,48 +265,64 @@ export default page<Shown>({
     ],
   },
   motion: {
-    arrives: [{ name: "Asked", what: "An app asks: every screen dims a little and each bar rises out of its bottom edge.", tracks: asking(false), reduced: asking(true), back: "cuts", sample: screen(() => both()) }],
-    leaves: [
-      { name: "Cancelled", what: "Esc or ×: each bar sinks back into its edge and the dim lifts.", tracks: cancelling(false), reduced: cancelling(true), back: "cuts", sample: screen(() => both()) },
-      SHARED,
+    arrives: [
+      { name: "Asked", what: "An app asks: each bar rises out of its screen's bottom edge; nothing dims.", tracks: bars(true, false), reduced: bars(true, true), back: "cuts", sample: screen(() => both()) },
+      {
+        name: "Drawing a region",
+        what: "Region: the screen's dim fades in over `short`, the one modal moment.",
+        tracks: [{ part: "the dim", on: "the screen", target: ".share-draw", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+        reduced: "same",
+        back: "cuts",
+        sample: screen(() => one({ lit: { kind: "region", screen: 0 } })),
+      },
     ],
+    leaves: [{ name: "Cancelled", what: "×: each bar sinks back into its edge.", tracks: bars(false, false), reduced: bars(false, true), back: "cuts", sample: screen(() => both()) }, SHARED],
     between: [
       {
-        name: "A window lit",
-        what: "Pointed at: its violet edge and its label fade in over `short`; a light, not a power change.",
-        tracks: [
-          { part: "the edge", on: "the window", target: ".share-window[data-lifted] .share-border", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-          { part: "the label", on: "the window", target: ".share-pick-label", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-        ],
+        name: "A window's tab",
+        what: "The pointer onto a window: its Share tab fades in over `short`, and out as it leaves.",
+        tracks: [{ part: "the tab", on: "the window", target: ".share-window[data-pointed] > .share-tab", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
-        sample: screen(() => one({ lit: { kind: "window", screen: 0, index: 1 } })),
+        sample: screen(() => one({ pointed: FIREFOX_WINDOW })),
       },
       {
-        name: "This screen lit",
+        name: "A window previewed",
+        what: "Its Share tab pointed at: the window's violet line and the tab's lift fade in over `short`.",
+        tracks: [{ part: "the line", on: "the window", target: ".share-window[data-pointed] .share-border", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+        reduced: "same",
+        back: "plays",
+        sample: screen(() => one({ pointed: { ...FIREFOX_WINDOW, tab: true } })),
+      },
+      {
+        name: "This screen previewed",
         what: "Share this screen pointed at: its violet edge fades in over `short`.",
         tracks: [{ part: "the edge", on: "the screen", target: ".share-edge", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
         sample: screen(() => one({ lit: { kind: "screen", screen: 0 } })),
       },
+      {
+        name: "A window focused",
+        what: "A click on a window: its tube fades in over `short`, the last one's out.",
+        tracks: [{ part: "the tube", on: "the window", target: ".share-window[data-pinned] > .k-ring", property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" }],
+        reduced: "same",
+        back: "plays",
+        sample: screen(() => one({ focused: FIREFOX_WINDOW })),
+      },
     ],
   },
   keyboard: {
     keys: [
-      { keys: ["Tab", "Shift+Tab"], does: "the next or last window, then the screen's bar, round" },
-      { keys: ["S"], does: "lights this screen; Enter shares it" },
-      { keys: ["R"], does: "draws a region on this screen" },
-      { keys: ["Enter"], does: "shares what is lit, or the region drawn" },
-      { keys: ["Esc"], does: "leaves drawing; else cancels" },
-      { keys: ["Right-button drag"], does: "draws a region at once, anywhere" },
+      { keys: ["Enter"], does: "while drawing: shares the region" },
+      { keys: ["Esc"], does: "while drawing: back to waiting" },
     ],
-    order: "Tab walks a screen's windows, then its bar's Share this screen, screen by screen, round.",
-    lands: "Opening, nothing lit, the keys on the pointer's screen; Esc from drawing, back to picking.",
+    order: "None while waiting: the keyboard stays with the apps.",
+    lands: "Region hands the drawing the keyboard; Esc hands it back to the app.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "A window lit", for: "the bar, the label, the edge", sample: screen(() => one({ lit: { kind: "window", screen: 0, index: 1 } })) },
+      { name: "Its Share tab pointed at", for: "the tab, its corners, the line", sample: screen(() => one({ pointed: { ...FIREFOX_WINDOW, tab: true } })) },
       { name: "The bar alone", for: "the icon, the buttons, their gaps", sample: () => pickBar(MEET) },
     ]),
     measures: [
@@ -334,9 +331,13 @@ export default page<Shown>({
       { part: "Between the bar's parts", token: "space-s8" },
       { part: "Who asked, its tile", token: "size-control_sm" },
       { part: "Buttons", token: "size-control_sm" },
-      { part: "Label's width", token: "size-menu" },
-      { part: "Dim", token: "opacity-panel_scrim" },
-      { part: "A window's edge", token: "stroke-thin" },
+      { part: "Share tab's height", token: "size-control_sm" },
+      { part: "Share tab's inner corner", token: "radius-control" },
+      { part: "Share tab's sides", token: "space-s12" },
+      { part: "Share tab's symbol to word", token: "space-s4" },
+      { part: "Share tab's inner line", token: "stroke-thin" },
+      { part: "Drawing's dim", token: "opacity-panel_scrim" },
+      { part: "A window's line", token: "stroke-thin" },
       { part: "A screen's edge", token: "stroke-thin" },
     ],
     reflow: { note: "The bar keeps to the middle of the bottom edge, one row at every width.", sample: screen(() => picking({ monitors: [NARROW] })) },

@@ -2,12 +2,14 @@
 // system's share prompt), the bar's sharing and camera pills and the panels they open, and the
 // marks on what is shared, which only the person sees, never the stream.
 //
-// Picking is on the desktop itself, no dialog: every screen dims a little and holds a bar at its
-// bottom left, the asking site or app, Share this screen, Region and Cancel; a window is picked by
-// pointing at it. Whatever is lit while picking wears the very mark it keeps on air. The bar and
-// the window's label are Popovers, Buttons, an IconButton and Tooltips from the library. The
-// desktop's windows, the on-air marks and the region's drawing are draft parts, proposed for the
-// library. The data is stand-ins: the camera's picture is one of the site's photos.
+// Picking is on the live desktop, no dialog and no dim: while a request waits the desktop works as
+// usual, each screen's frame holds a bar in the middle of its bottom edge (who asked, Share this
+// screen, Region, Cancel), and the window under the pointer offers a violet Share tab in its corner.
+// Pointing at a way to share previews the very mark it keeps on air. Only drawing a region dims
+// the screen. The bar is Buttons, an IconTile, an IconButton and Tooltips from the library. The
+// desktop's windows, the window's Share tab, the on-air marks and the region's drawing are draft
+// parts, proposed for the library. The data is stand-ins: the camera's picture is one of the
+// site's photos.
 
 import "./sharing.css";
 import chromium from "../../assets/apps/chromium.svg?url";
@@ -22,6 +24,7 @@ import { button } from "../../lib/button.ts";
 import { card } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
 import { focusRing, windowRing } from "../../lib/focus.ts";
+import { icon } from "../../lib/icon.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { filling, inset, row, stack } from "../../lib/layout.ts";
@@ -32,7 +35,7 @@ import { nested, role } from "../../lib/radius.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { centreOnInk, clamped, text } from "../../lib/text.ts";
-import { floatingTooltip, keyTooltip, tooltip } from "../../lib/tooltip.ts";
+import { floatingTooltip, tooltip } from "../../lib/tooltip.ts";
 import { mutePill } from "./bar-audio-parts.ts";
 import { barScreen, bellPill, type CameraUse, cameraPill, EVERYDAY, type Share, SHARE_ICONS, type ShareKind, sharingPill, statusPill, wallpaper } from "./bar-parts.ts";
 import { CORNER, TALL } from "./control-center-parts.ts";
@@ -221,9 +224,9 @@ export const WORDS = {
   screen: "Share this screen",
   region: "Region",
   cancel: "Cancel",
-  click: "Click to share",
+  /** The button on the window under the pointer. */
+  shareWindow: "Share",
   asked: (app: string) => `${app} asked to share`,
-  regionHint: "Or drag with the right button anywhere.",
   withWhom: (who: string, since: string) => `With ${who} since ${since}`,
   toWhom: (who: string, since: string) => `To ${who} since ${since}`,
   windowTitle: (app: string, title: string) => `${app} · ${title}`,
@@ -237,9 +240,6 @@ export const WORDS = {
   close: (app: string) => `Close ${app}`,
   cameraNote: "Only closing it turns the camera off",
 } as const;
-
-/** The keys picking takes, besides Tab, Enter and Esc. */
-export const PICK_KEYS = { screen: "S", region: "R" } as const;
 
 /** A share as its card shows it: the desk, the screen it is on, and what it takes there. */
 export interface ShareView {
@@ -523,17 +523,15 @@ export interface DrawOptions {
   readonly height?: number;
   /** The screen's real pixels to a logical one, for the size the chip says. */
   readonly density?: number;
-  /** A drag already under way, from a right-button press: drawing follows it at once. */
-  readonly from?: { readonly x: number; readonly y: number };
   readonly onDone?: (rect: Rect) => void;
   readonly onBack?: () => void;
 }
 
 /**
- * Draft part, proposed: drawing a region on the screen. Outside the box the screen keeps picking's
- * dim; the box is clear, with the mark it keeps on air just outside it, `sharing` the thin stroke
- * wide, and its size in the screen's pixels in a Neutral chip under its start. A drag draws it,
- * from either button; Enter shares it and Esc goes back to picking.
+ * Draft part, proposed: drawing a region on the screen, the one modal moment of picking. The
+ * screen dims outside the box; the box is clear, with the mark it keeps on air just outside it,
+ * `sharing` the thin stroke wide, and its size in the screen's pixels in a Neutral chip under its
+ * start. A drag with the main button draws it; Enter shares it and Esc goes back to waiting.
  */
 export function regionDraw(options: DrawOptions = {}): HTMLElement {
   const density = options.density ?? DP10.density;
@@ -561,7 +559,7 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
     const bounds = surface.getBoundingClientRect();
     return { x: ((event.clientX - bounds.left) / bounds.width) * width, y: ((event.clientY - bounds.top) / bounds.height) * height };
   };
-  // The window takes the drag's moves, so a drag begun before the surface was drawn still lands on it.
+  // The window takes the drag's moves, so a drag carried past the screen's edge still lands on it.
   const follow = (from: { x: number; y: number }) => {
     const drag = (moved: PointerEvent) => {
       const to = logical(moved);
@@ -571,12 +569,10 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
     window.addEventListener("pointermove", drag);
     window.addEventListener("pointerup", () => window.removeEventListener("pointermove", drag), { once: true });
   };
-  if (options.from) follow(options.from);
   surface.addEventListener("pointerdown", (event) => {
     event.stopPropagation();
-    follow(logical(event));
+    if (event.button === 0) follow(logical(event));
   });
-  surface.addEventListener("contextmenu", (event) => event.preventDefault());
   surface.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && rect && rect.width > 0 && rect.height > 0) options.onDone?.(rect);
     else if (event.key === "Escape") options.onBack?.();
@@ -589,14 +585,23 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
 
 // Picking.
 
-/** What is lit while picking: nothing, a window, a whole screen, or a region being drawn. */
+/**
+ * What picking shows a way to share on: nothing, a whole screen (Share this screen pointed at),
+ * a region being drawn, or, picked, a window.
+ */
 export type Lit =
   | { readonly kind: "none" }
-  | { readonly kind: "window"; readonly screen: number; readonly index: number; readonly keyboard?: boolean }
-  | { readonly kind: "screen"; readonly screen: number; readonly keyboard?: boolean }
-  | { readonly kind: "region"; readonly screen: number; readonly rect?: Rect; readonly from?: { readonly x: number; readonly y: number } };
+  | { readonly kind: "window"; readonly screen: number; readonly index: number }
+  | { readonly kind: "screen"; readonly screen: number }
+  | { readonly kind: "region"; readonly screen: number; readonly rect?: Rect };
 
 export const NOTHING: Lit = { kind: "none" };
+
+/** A window on a screen of picking's desk: the screen's index and the window's on it. */
+export interface WindowAt {
+  readonly screen: number;
+  readonly index: number;
+}
 
 /** What a share of `lit` on `monitors` is, as its pill and panel name it. */
 export function shareOf(lit: Lit, monitors: readonly Monitor[] = MONITORS, asker: Asker = MEET): Share | undefined {
@@ -612,6 +617,8 @@ export function shareOf(lit: Lit, monitors: readonly Monitor[] = MONITORS, asker
 export interface PickHandlers {
   readonly onLight?: (lit: Lit) => void;
   readonly onShare?: (lit: Lit) => void;
+  /** A click on a window anywhere but its Share tab: it takes the keyboard, as on any day. */
+  readonly onFocus?: (window: WindowAt) => void;
   readonly onCancel?: () => void;
 }
 
@@ -619,13 +626,20 @@ export interface PickingOptions {
   readonly asker?: Asker;
   readonly monitors?: readonly Monitor[];
   readonly lit?: Lit;
-  /** Picking, or shared: the dim and the bars gone, the mark kept, the pill in every bar. */
-  readonly phase?: "picking" | "shared";
-  /** Built with its dim off and its bars' Sheets shut, for `open` to bring them in: picking arriving live. */
+  /** The window with the keyboard: the first screen's first, unless said. */
+  readonly focused?: WindowAt;
+  /**
+   * The window under the pointer, its Share tab shown, and the pointer on the tab, its line
+   * previewed: a sample of what the pointer does.
+   */
+  readonly pointed?: WindowAt & { readonly tab?: boolean };
+  /** Waiting, or shared: the bars gone, the mark kept, the pill in every bar. */
+  readonly phase?: "waiting" | "shared";
+  /** Built with its bars' Sheets shut, for `open` to bring them in: a request arriving live. */
   readonly arrive?: boolean;
   /**
-   * Picked: the pill in the bars while picking's dim and bars are still there, and what was picked
-   * wearing its mark, nothing else lit: the moment picking gives way to the share.
+   * Picked: the pill in the bars while the bars are still there, and what was picked wearing its
+   * mark, nothing else shown: the moment the request gives way to the share.
    */
   readonly pill?: boolean;
   /** A hint of the bar drawn up, as under the pointer: a sample of it. */
@@ -636,8 +650,7 @@ export interface PickingOptions {
 /**
  * The bar on one screen, which hangs on a Sheet in the middle of the frame's bottom edge, one row:
  * the asking app's icon, which names it in its Tooltip, then Share this screen, Region and Cancel,
- * each saying its key in its Tooltip. Region's Tooltip carries, in its body under the name, the
- * right-button drag that also draws a region.
+ * each named in its own. It takes no keys: while a request waits the keyboard is the apps'.
  */
 export function pickBar(
   asker: Asker,
@@ -653,7 +666,7 @@ export function pickBar(
   share.classList.add("share-pick-screen");
   const region = button({ label: WORDS.region, kind: "Text", size: "Sm", icon: SHARE_ICONS.region, ...(options.lit === "region" ? { pinned: "pressed" as const } : {}) });
   region.classList.add("share-pick-region");
-  // Its key Tooltip names it, as the other buttons' do, so its own Hint would say it twice.
+  // Its Tooltip names it, as the other buttons' do, so its own Hint would say it twice.
   const cancel = iconButton({ icon: "close", label: WORDS.cancel, size: "Sm", kind: "Text", hint: false });
   if (options.onScreen) share.addEventListener("click", options.onScreen);
   if (options.onPoint) {
@@ -667,9 +680,9 @@ export function pickBar(
     "s8",
     "centre",
     floatingTooltip(app, appTip, { side: "above", ...(options.hint === "app" ? { shown: true } : {}) }),
-    floatingTooltip(share, keyTooltip(WORDS.screen, PICK_KEYS.screen), { side: "above" }),
-    floatingTooltip(region, keyTooltip(WORDS.region, PICK_KEYS.region, WORDS.regionHint), { side: "above", ...(options.hint === "region" ? { shown: true } : {}) }),
-    floatingTooltip(cancel, keyTooltip(WORDS.cancel, "Esc"), { side: "above" }),
+    floatingTooltip(share, tooltip(WORDS.screen, ""), { side: "above" }),
+    floatingTooltip(region, tooltip(WORDS.region, ""), { side: "above", ...(options.hint === "region" ? { shown: true } : {}) }),
+    floatingTooltip(cancel, tooltip(WORDS.cancel, ""), { side: "above" }),
   );
   // What hangs on the bottom edge's Sheet: `space.s16` inside on every side, as the OSD's strip.
   const bar = inset(line, "s16", "s16");
@@ -678,29 +691,43 @@ export function pickBar(
 }
 
 /**
- * The label on a window while picking, built with the window and shown while it is lit: what a
- * click does, and the window's name; Enter, while the keyboard is on it (`data-keyboard`).
+ * Draft part, proposed: the Share tab a window offers while a request waits, part of the window's
+ * top left corner: flush with its top and left edges, its outer corner the window's own, its inner
+ * corner the control radius, `size.control_sm` tall. It wears the on-air colour offering itself,
+ * `sharing_container` with `on_sharing_container` for the window's share symbol and "Share" in
+ * `button_small`; lit, the state layer's hover over its fill and `sharing_line` along its inner
+ * edges, which meet the window's own line as one shape; pressed, the state layer's press. It shows
+ * only on the window under the pointer (`:hover`, or `data-pointed` for a sample), and pointing at
+ * it previews the window's on-air line, both by the stylesheet alone: the pointer moving builds
+ * nothing. It takes no Tab: while a request waits the keyboard is the apps'. The library's Button
+ * has no sharing kind and no attached shape, so it is drawn here.
  */
-export function pickLabel(title: string): HTMLElement {
-  const label = keyTooltip(WORDS.click, "Enter", title);
-  label.classList.add("share-pick-label");
-  return label;
+export function shareTab(pinned?: "lit" | "pressed"): HTMLElement {
+  const tab = document.createElement("button");
+  tab.type = "button";
+  tab.className = "share-tab";
+  tab.tabIndex = -1;
+  if (pinned) tab.dataset.pinned = pinned;
+  tab.append(icon(SHARE_ICONS.window, "var(--type-button_small-icon)", "var(--color-on_sharing_container)"), text(WORDS.shareWindow, "button_small", "on_sharing_container"));
+  return tab;
 }
 
 /** Workspaces 1 to 3, each with a window: what the bar shows once the person has gone to the third. */
 const THREE: readonly Group[] = [{ block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: true }] }];
 
-/** Picking's screens, built once, and what lights one of their parts. */
+/** Picking's screens, built once, and what changes on them. */
 export interface Picking {
   readonly element: HTMLElement;
   /**
-   * Shows `lit`: sets the attributes of the windows, the bars' buttons and the screens that
-   * change, and draws a region's surface only while one is being drawn. It builds nothing else.
+   * Shows `lit`: sets the attributes of the bars' buttons and the screens that change, and draws
+   * a region's surface only while one is being drawn. It builds nothing else.
    */
   readonly light: (lit: Lit) => void;
-  /** Brings the dim in and opens each bar's Sheet, by the Sheet's own move. */
+  /** Gives `window` the keyboard: its tube lit, every other window's out, by their attributes. */
+  readonly focus: (window: WindowAt) => void;
+  /** Opens each bar's Sheet, by the Sheet's own move. */
   readonly open: () => void;
-  /** Lifts the dim and shuts each bar's Sheet, the same move played back. */
+  /** Shuts each bar's Sheet, the same move played back. */
   readonly close: () => void;
 }
 
@@ -711,15 +738,19 @@ function mark(element: HTMLElement, name: string, on: boolean, value = ""): void
   else element.removeAttribute(name);
 }
 
+/** The window with the keyboard unless one is named: the first screen's first. */
+const FIRST: WindowAt = { screen: 0, index: 0 };
+
 /**
- * One screen while picking or once shared: its windows, its bar and its mark, built once. Picked,
- * or shared, it is built with what was picked wearing its mark, as the move to sharing plays on.
+ * One screen while a request waits, or once shared: its windows, its bar and its mark, built once.
+ * Picked, or shared, it is built with what was picked wearing its mark, as the move to sharing
+ * plays on.
  */
 function pickingScreen(monitor: Monitor, index: number, options: PickingOptions): Picking {
   const asker = options.asker ?? MEET;
   const built = options.lit ?? NOTHING;
-  const phase = options.phase ?? "picking";
-  // Shared, or picked and giving way to the share: what was picked shows its mark, and nothing lights.
+  const phase = options.phase ?? "waiting";
+  // Shared, or picked and giving way to the share: what was picked shows its mark, and nothing else.
   const picked = phase === "shared" || options.pill === true;
   const share = shareOf(built, options.monitors ?? MONITORS, asker);
   const pill = picked && share ? { sharing: share } : {};
@@ -732,14 +763,22 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
   const grid = tracks(monitor.windows);
   const desk = tiling(document.createElement("span"), grid.columns, grid.rows);
   const handlers = options.handlers ?? {};
+  const focused = options.focused ?? FIRST;
+  const pointed = options.pointed;
   const windows = monitor.windows.map((placed, at) => {
-    const drawn = deskWindow({ ...placed, focused: false });
+    const drawn = deskWindow({ ...placed, focused: focused.screen === index && focused.index === at });
+    const here: WindowAt = { screen: index, index: at };
     if (!picked) {
-      drawn.append(pickLabel(placed.title));
-      const window: Lit = { kind: "window", screen: index, index: at };
-      // Nothing under the pointer is drawn again as it lights, so entering is enough.
-      drawn.addEventListener("pointerenter", () => handlers.onLight?.(window));
-      drawn.addEventListener("click", () => handlers.onShare?.(window));
+      const under = pointed?.screen === index && pointed.index === at;
+      const offer = shareTab(under && pointed?.tab === true ? "lit" : undefined);
+      drawn.append(offer);
+      drawn.toggleAttribute("data-pointed", under);
+      offer.addEventListener("click", (event) => {
+        // The tab shares; the click goes no further, so the window under it isn't focused too.
+        event.stopPropagation();
+        handlers.onShare?.({ kind: "window", ...here });
+      });
+      drawn.addEventListener("click", () => handlers.onFocus?.(here));
     }
     desk.append(drawn);
     return drawn;
@@ -748,26 +787,24 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
   element.append(screenMark());
   if (picked) {
     const here = built.kind !== "none" && built.screen === index;
-    const at = here && built.kind === "window" ? built.index : -1;
-    const window = windows[at];
-    if (window) {
-      window.toggleAttribute("data-shared", true);
-      window.toggleAttribute("data-lifted", true);
-      // Still picking as it gives way, the window keeps its label, which the move to sharing fades.
-      if (phase === "picking") window.append(pickLabel(monitor.windows[at]!.title));
+    const window = windows[here && built.kind === "window" ? built.index : -1];
+    window?.toggleAttribute("data-shared", true);
+    // Shared by its tab, the window keeps the tab as the request gives way, for the move to sharing to fade.
+    if (window && phase === "waiting") {
+      window.append(shareTab("lit"));
+      window.toggleAttribute("data-pointed", true);
     }
     mark(element, "data-lit-screen", here && built.kind === "screen");
     if (here && built.kind === "region" && built.rect) element.append(regionMark(built.rect, monitor));
   }
-  if (phase === "shared") return { element, light: () => undefined, open: () => undefined, close: () => undefined };
+  const focus = (window: WindowAt) => windows.forEach((drawn, at) => mark(drawn, "data-pinned", window.screen === index && window.index === at, "lit"));
+  if (phase === "shared") return { element, light: () => undefined, focus, open: () => undefined, close: () => undefined };
 
-  element.dataset.picking = "";
-  if (!options.arrive) element.dataset.open = "";
   let shown: Lit = NOTHING;
   const bar = pickBar(asker, {
     ...(options.hint ? { hint: options.hint } : {}),
     onScreen: () => handlers.onShare?.({ kind: "screen", screen: index }),
-    // Leaving the button undoes only its own light, this screen lit whole, never a pick made since.
+    // Leaving the button undoes only its own preview, this screen's line, never a region since.
     onPoint: (on) => {
       if (on) handlers.onLight?.({ kind: "screen", screen: index });
       else if (shown.kind === "screen" && shown.screen === index) handlers.onLight?.(NOTHING);
@@ -781,19 +818,6 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
   const shut = options.arrive ? liven(barSheet, false) : undefined;
   const screenButton = bar.querySelector<HTMLElement>(".share-pick-screen")!;
   const regionButton = bar.querySelector<HTMLElement>(".share-pick-region")!;
-  if (!picked) {
-    // A right-button drag anywhere draws a region at once, from where it was pressed.
-    element.addEventListener("contextmenu", (event) => event.preventDefault());
-    element.addEventListener("pointerdown", (event) => {
-      if (event.button !== 2) return;
-      // The press draws the drawing surface, which takes the keyboard; left to its default, the
-      // press would then move the keyboard to the page, and Enter would not share the region.
-      event.preventDefault();
-      const bounds = element.getBoundingClientRect();
-      const from = { x: ((event.clientX - bounds.left) / bounds.width) * monitor.width, y: ((event.clientY - bounds.top) / bounds.height) * monitor.height };
-      handlers.onLight?.({ kind: "region", screen: index, from });
-    });
-  }
 
   let surface: HTMLElement | null = null;
   let drawing = "";
@@ -801,17 +825,11 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     if (picked) return;
     shown = lit;
     const here = lit.kind !== "none" && lit.screen === index;
-    windows.forEach((drawn, at) => {
-      const on = here && lit.kind === "window" && lit.index === at;
-      mark(drawn, "data-lifted", on);
-      mark(drawn, "data-shared", on);
-      mark(drawn, "data-keyboard", on && lit.kind === "window" && lit.keyboard === true);
-    });
     mark(element, "data-lit-screen", here && lit.kind === "screen");
     mark(screenButton, "data-pinned", here && lit.kind === "screen", "lit");
     mark(regionButton, "data-pinned", here && lit.kind === "region", "pressed");
-    // A region being drawn is the one part drawn anew: when drawing starts, or a new drag starts it again.
-    const wanted = here && lit.kind === "region" ? JSON.stringify({ rect: lit.rect, from: lit.from }) : "";
+    // A region being drawn is the one part drawn anew: when drawing starts, and gone when it ends.
+    const wanted = here && lit.kind === "region" ? JSON.stringify({ rect: lit.rect }) : "";
     if (wanted === drawing) return;
     drawing = wanted;
     surface?.remove();
@@ -820,7 +838,6 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     if (lit.kind !== "region" || !here) return;
     surface = regionDraw({
       ...(lit.rect ? { rect: lit.rect } : {}),
-      ...(lit.from ? { from: lit.from } : {}),
       width: monitor.width,
       height: monitor.height,
       density: monitor.density,
@@ -829,21 +846,10 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     });
     element.append(surface);
   };
-  return {
-    element,
-    light,
-    open: () => {
-      mark(element, "data-open", true);
-      shut?.(true);
-    },
-    close: () => {
-      mark(element, "data-open", false);
-      shut?.(false);
-    },
-  };
+  return { element, light, focus, open: () => shut?.(true), close: () => shut?.(false) };
 }
 
-/** Every screen side by side, top-aligned as Hyprland lays them out, built once for picking, or shared. */
+/** Every screen side by side, top-aligned as Hyprland lays them out, built once while a request waits, or shared. */
 export function buildPicking(options: PickingOptions = {}): Picking {
   const monitors = options.monitors ?? MONITORS;
   const laid = document.createElement("span");
@@ -853,12 +859,13 @@ export function buildPicking(options: PickingOptions = {}): Picking {
   return {
     element: laid,
     light: (lit) => screens.forEach((each) => each.light(lit)),
+    focus: (window) => screens.forEach((each) => each.focus(window)),
     open: () => screens.forEach((each) => each.open()),
     close: () => screens.forEach((each) => each.close()),
   };
 }
 
-/** Picking, or shared, drawn still with `options.lit` lit: a sample. */
+/** Picking, or shared, drawn still with `options.lit` shown: a sample. */
 export function picking(options: PickingOptions = {}): HTMLElement {
   const made = buildPicking(options);
   made.light(options.lit ?? NOTHING);
