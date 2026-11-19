@@ -9,14 +9,15 @@
 
 import "./about.css";
 import markUrl from "../../../../../../../crates/kubaos-kobo/assets/logo/kubaos-mark.svg?url";
-import { banner } from "../../../../lib/banner.ts";
+import { banner, tipLine } from "../../../../lib/banner.ts";
 import { button } from "../../../../lib/button.ts";
 import { buttonBar, hangs } from "../../../../lib/button-bar.ts";
-import { card } from "../../../../lib/card.ts";
+import { card, cardHeader } from "../../../../lib/card.ts";
 import { descriptionList, type Fact } from "../../../../lib/description.ts";
 import { type DialogOptions, dialogOver } from "../../../../lib/dialog.ts";
 import { errorBlock } from "../../../../lib/error-block.ts";
 import { field, labelled, note, setInvalid } from "../../../../lib/field.ts";
+import { iconButton } from "../../../../lib/icon-button.ts";
 import { iconTile } from "../../../../lib/icon-tile.ts";
 import { filling, grid, row, stack } from "../../../../lib/layout.ts";
 import { level, meter, tint } from "../../../../lib/meter.ts";
@@ -146,24 +147,37 @@ export interface GlanceActions {
   readonly open: () => void;
 }
 
-/** The update's card on About: where it stands, when it last looked and ran, the quick action and the page. */
+/** How to update from anywhere, under the card's line as a row's tip is (config/kotodama/kubaos.toml: "Update KubaOS"). */
+export const UPDATE_TIP = "Press [Super] [Space] and type “update KubaOS” to update now.";
+
+/**
+ * The update's card on About, one shape in every state: its first line the state with its symbol
+ * and the release's line, the page's button and the quick action at that line's end; under it the
+ * progress or the reason where there is one, then the tip, as a Settings row carries its tip.
+ */
 export function glanceCard(values: UpdateValues, act: GlanceActions): HTMLElement {
-  const page = { label: "Updates", kind: "Text" as const };
   const last = "Last updated 16 November";
   const shape = {
     current: { glyph: "check_circle", title: "Up to date", subtitle: `Checked today at 09:12 · ${last}`, quick: { label: "Check now", kind: "Tonal" as const, icon: "manage_search" } },
     checking: { glyph: "progress_activity", title: "Checking", subtitle: `Asking for the newest release · ${last}`, quick: { label: "Check now", kind: "Tonal" as const, icon: "manage_search", disabled: true } },
-    waiting: { glyph: "system_update_alt", title: "An update is ready", subtitle: `${releaseName(NEXT)}, found today at 09:12 · 302 MB`, quick: { label: "Update", icon: "system_update_alt" } },
+    waiting: { glyph: "system_update_alt", title: "An update is ready", subtitle: `${releaseName(NEXT)}, found today at 09:12 · 302 MB`, quick: { label: "Update", kind: "Filled" as const, icon: "system_update_alt" } },
     updating: { glyph: "progress_activity", title: `Updating to ${releaseName(NEXT)}`, subtitle: `Step ${values.at + 1} of ${STEPS.length}: ${STEPS[values.at]!.title}`, quick: null },
-    failed: { glyph: "error", title: "Couldn't update", subtitle: `Tried today at 09:40 · ${last}`, quick: { label: "Try again", icon: "restart_alt" } },
+    failed: { glyph: "error", title: "Couldn't update", subtitle: `Tried today at 09:40 · ${last}`, quick: { label: "Try again", kind: "Filled" as const, icon: "restart_alt" } },
   }[values.update];
-  const body: HTMLElement[] = [];
+  const page = button({ label: "Updates", kind: "Text", size: "Sm" });
+  page.addEventListener("click", act.open);
+  const buttons: HTMLElement[] = [page];
+  if (shape.quick) {
+    const quick = button({ ...shape.quick, size: "Sm" });
+    quick.addEventListener("click", values.update === "current" ? act.check : act.update);
+    buttons.push(quick);
+  }
+  const line = row("s16", "centre", filling(cardHeader({ glyph: shape.glyph, title: shape.title, subtitle: shape.subtitle })), row("s8", "centre", ...buttons));
+  const body: HTMLElement[] = [line];
   if (values.update === "updating") body.push(progressBar({ fraction: values.at / STEPS.length }));
   if (values.update === "failed") body.push(errorBlock({ message: "A system migration failed, so the update stopped.", hint: `Nothing after step ${values.at + 1} ran; ${releaseName(values.version)} is still here.` }));
-  const bar = buttonBar({ actions: [page, ...(shape.quick ? [shape.quick] : [])], size: "Sm" });
-  bar.actions[0]!.addEventListener("click", act.open);
-  bar.actions[1]?.addEventListener("click", values.update === "current" ? act.check : act.update);
-  const made = card({ header: { glyph: shape.glyph, title: shape.title, subtitle: shape.subtitle }, ...(body.length ? { body } : {}), actions: bar.element });
+  // The line, what it brings, and the tip `space.s12` apart, as a Settings row keeps its tip close.
+  const made = card({ body: [stack("s12", "start", ...[...body, tipLine(UPDATE_TIP)].map((each) => filling(each)))] });
   // The Updates page's playback finds the card by these and moves its bar and its line in place.
   made.classList.add("up-card");
   made.dataset.update = values.update;
@@ -201,26 +215,51 @@ export interface Shown {
   readonly add: (label: string) => void;
 }
 
-/** A group of facts as a card; `hidden` names the labels whose values wait for a click. */
-export function factsCard(facts: readonly Fact[], hidden: readonly string[] = [], shown: Shown = { has: () => false, add: () => undefined }): HTMLElement {
+/**
+ * The copy button at the end of a fact's line: an IconButton (Text, sm) whose hint names what it
+ * copies. It shows while the pointer is on the line or the keyboard is on it, fading over `short`,
+ * and floats over the line's end, so it takes no room and no value moves as it comes and goes.
+ */
+function copyButton(fact: Fact, copy: (fact: Fact) => void, pinned: boolean): HTMLElement {
+  const made = iconButton({ icon: "content_paste", label: `Copy ${fact.label.toLowerCase()}`, kind: "Text", size: "Sm", ...(pinned ? { pinned: "lit" as const } : {}) });
+  made.classList.add("ab-copy");
+  made.toggleAttribute("data-shown", pinned);
+  made.addEventListener("click", () => copy(fact));
+  return made;
+}
+
+/**
+ * A group of facts as a card, each line with its copy button; `hidden` names the labels whose
+ * values wait for a click, and whose copy button comes only once they are shown.
+ */
+export function factsCard(facts: readonly Fact[], copy: (fact: Fact) => void, hidden: readonly string[] = [], shown: Shown = { has: () => false, add: () => undefined }, pinned?: string): HTMLElement {
   const list = descriptionList(facts);
+  list.classList.add("ab-facts");
   const values = [...list.querySelectorAll<HTMLElement>(".k-fact-value")];
   facts.forEach((each, index) => {
-    if (!hidden.includes(each.label)) return;
     const slot = values[index];
-    if (slot) slot.replaceChildren(hiddenFact(each.value, shown.has(each.label), () => shown.add(each.label)));
+    if (!slot) return;
+    const withCopy = () => slot.append(copyButton(each, copy, each.label === pinned));
+    if (!hidden.includes(each.label)) withCopy();
+    else slot.replaceChildren(hiddenFact(each.value, shown.has(each.label), () => shown.add(each.label), withCopy));
   });
   return card({ body: [list] });
 }
 
 /**
  * Draft part, proposed for the library: a fact hidden until it is clicked. Hidden, it is a Text sm
- * button, "Show", with the eye; pressed, the value takes its place in `mono`, and stays for the window.
+ * button, "Show", with the eye; pressed, the value takes its place in `mono`, and stays for the
+ * window. `revealed` hears each time the value shows, so its line can take its copy button then.
  */
-export function hiddenFact(value: string, open: boolean, opened: () => void): HTMLElement {
+export function hiddenFact(value: string, open: boolean, opened: () => void, revealed: () => void = () => undefined): HTMLElement {
   const room = document.createElement("span");
   room.className = "ab-hidden";
-  const reveal = () => room.replaceChildren(text(value, "mono"));
+  const reveal = () => {
+    room.replaceChildren(text(value, "mono"));
+    delete room.dataset.hidden;
+    // The line is drawn first, then the button joins it beside the value.
+    requestAnimationFrame(revealed);
+  };
   if (open) {
     reveal();
     return room;
@@ -298,11 +337,21 @@ export function copiedWords(count: number, left: number): ToastOptions {
   return { icon: "content_paste", words: left === 0 ? `Copied ${count} facts` : `Copied ${count} facts; ${left} hidden left out` };
 }
 
-/** Copy all, with its line: every fact as text, for a bug report. */
+/** One fact's toast once its copy button copied it. */
+export function copiedFact(fact: Fact): ToastOptions {
+  return { icon: "content_paste", words: `Copied ${fact.label.toLowerCase()}` };
+}
+
+/** A fact as one line of text: "Label: value". */
+export function factLine(fact: Fact): string {
+  return `${fact.label}: ${fact.value}`;
+}
+
+/** Copy all as an Info banner: what it is for, what it gives, and the button inside it. */
 export function copyAll(copy: () => void): HTMLElement {
-  const act = button({ label: "Copy all", kind: "Tonal", size: "Sm", icon: "content_paste" });
-  act.addEventListener("click", copy);
-  return row("s16", "centre", filling(wrapped("Every fact on this page as text, for a bug report.", "small", "on_surface_variant")), act);
+  const bar = buttonBar({ actions: [{ label: "Copy all", kind: "Tonal", icon: "content_paste" }], size: "Sm" });
+  bar.actions[0]!.addEventListener("click", copy);
+  return banner({ tone: "Info", icon: "info", title: "Reporting a problem?", body: "Copy every fact on this page as text. Hidden ones go in once shown.", actions: bar.element });
 }
 
 /** The toast room of `frame`, the window, made the first time it is asked for. */

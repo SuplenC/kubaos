@@ -14,13 +14,8 @@ export interface SectionTips {
 
 /** Every section's tips, by its place in the sidebar. */
 export const TIPS: readonly SectionTips[] = [
-  // About
-  {
-    subs: {
-      // config/kotodama/kubaos.toml: "Update KubaOS".
-      Updates: "Press [Super] [Space] and type “update KubaOS” to update now.",
-    },
-  },
+  // About: its update tip sits inside the update's card (`UPDATE_TIP` in about-parts.ts).
+  {},
   // Appearance
   {
     rows: {

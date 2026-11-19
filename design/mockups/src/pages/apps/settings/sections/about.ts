@@ -3,13 +3,14 @@
 // page, Updates, holds everything about updating: the card in its states, what an update holds, how
 // it checks and installs on its own, the channel and what may sit out, its steps and its history.
 
+import type { Fact } from "../../../../lib/description.ts";
 import type { Setting, SettingsSection } from "../settings-parts.ts";
 import { own, type Values } from "../settings-values.ts";
 import { dialogOver } from "../../../../lib/dialog.ts";
 import { section, stack } from "../../../../lib/layout.ts";
 import { durationMs } from "../../../../lib/tokens.ts";
 import { settings } from "../../../../site/settings.ts";
-import { copiedWords, copyAll, factsCard, factsText, glance, glanceCard, HIDDEN, hardwareFacts, identityFacts, MACHINES, nameCard, renameDialog, restartBanner, sayIn, systemFacts } from "./about-parts.ts";
+import { copiedFact, copiedWords, copyAll, factLine, factsCard, factsText, glance, glanceCard, HIDDEN, hardwareFacts, identityFacts, MACHINES, nameCard, renameDialog, restartBanner, sayIn, systemFacts } from "./about-parts.ts";
 import { CHANNELS, changesCard, channelQuestion, historyWell, holdsCard, play, rollBackQuestion, stepsWell, type UpdateValues, updateCard } from "./updates-parts.ts";
 import { choice, fact, pick, toggle } from "./kit.ts";
 
@@ -28,6 +29,8 @@ export interface AboutValues extends UpdateValues {
   notice: number;
   /** The hidden facts shown so far, by label: they stay shown for the window. */
   shown: string[];
+  /** The fact whose copy button a sample draws shown and lit, by label. */
+  pinCopy?: string;
 }
 
 /** KubaOS's defaults: what every reset puts back. */
@@ -134,6 +137,12 @@ export function about(values: Values): SettingsSection {
     const window = frame();
     if (window) sayIn(window, copiedWords(said.count, said.left));
   };
+  /** One fact copied as "Label: value", the toast saying which. */
+  const copyOne = (each: Fact) => {
+    navigator.clipboard?.writeText(factLine(each)).catch(() => undefined);
+    const window = frame();
+    if (window) sayIn(window, copiedFact(each));
+  };
   const remember = (label: string) => {
     shown.add(label);
     a.shown = [...shown];
@@ -194,19 +203,19 @@ export function about(values: Values): SettingsSection {
       {
         title: "Hardware",
         body: "What this machine is made of.",
-        before: () => stack("s16", "start", glance(machine), factsCard(hardwareFacts(machine))),
+        before: () => stack("s16", "start", glance(machine), factsCard(hardwareFacts(machine), copyOne, [], undefined, a.pinCopy)),
         wells: [],
       },
       {
         title: "System",
         body: "What it runs, and since when.",
-        before: () => factsCard(systemFacts(a.version)),
+        before: () => factsCard(systemFacts(a.version), copyOne, [], undefined, a.pinCopy),
         wells: [],
       },
       {
         title: "Network identity",
         body: "What tells this machine apart; each hidden until you show it.",
-        before: () => stack("s16", "start", factsCard(identityFacts(machine), HIDDEN, { has: (label: string) => shown.has(label), add: remember }), copyAll(copy)),
+        before: () => stack("s16", "start", factsCard(identityFacts(machine), copyOne, HIDDEN, { has: (label: string) => shown.has(label), add: remember }, a.pinCopy), copyAll(copy)),
         wells: [],
       },
     ],

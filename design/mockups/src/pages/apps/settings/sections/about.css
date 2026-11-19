@@ -10,3 +10,28 @@
 .ab-rule:empty {
   display: none;
 }
+
+/* A fact's line holds its copy button at its end, over the value, centred down the line. */
+.ab-facts > .k-fact-value {
+  position: relative;
+}
+
+.ab-copy {
+  position: absolute;
+  inset-inline-end: 0;
+  top: 50%;
+  translate: 0 -50%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Shown while the pointer is on the line, its label or its value, or the keyboard is on it; a
+   sample pins one shown. */
+.ab-facts > :hover + .k-fact-value > .ab-copy,
+.ab-facts > .k-fact-value:hover > .ab-copy,
+.ab-facts > .k-fact-value:focus-within > .ab-copy,
+.ab-copy[data-shown] {
+  opacity: 1;
+  pointer-events: auto;
+}
