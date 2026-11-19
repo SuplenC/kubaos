@@ -87,6 +87,7 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::PeakHold => "A live meter's peak tick holding at the highest level.",
         Duration::PeakFall => "A live meter's peak tick falling the whole bar back.",
         Duration::Hold => "A held button held until it acts.",
+        Duration::Undo => "A thing in the Overview's delete slot, waiting until it goes for good.",
         Duration::Hum => "Half a skeleton's breath.",
         Duration::MarqueeHold => "Words past their room holding at their start.",
         Duration::MarqueePace => "Scrolling words travelling `space.s32`.",
