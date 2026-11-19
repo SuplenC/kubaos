@@ -113,6 +113,8 @@ export interface SubPage {
   readonly wells: readonly (readonly Setting[])[];
   /** What comes before its wells: a choice that picks what they set. */
   readonly before?: () => HTMLElement;
+  /** What comes after its wells: a record the settings don't change, such as a history. */
+  readonly after?: () => HTMLElement;
 }
 
 /** A section of Settings: its sidebar row, its header and its sub-sections. */
@@ -654,6 +656,7 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
       const parts: HTMLElement[] = [];
       if (sub.before) parts.push(sub.before());
       parts.push(...wellsOf(sub.wells));
+      if (sub.after) parts.push(sub.after());
       return [back, filling(section(headed(sub.title, sub.wells.flat(), "page"), sub.body, ...parts))];
     };
 
@@ -848,6 +851,9 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
 
     // A choice drawn before a sub-page's wells changes what they set: they are drawn again.
     root.addEventListener("st-redraw", () => draw());
+
+    // A button in a part before the wells opens a sub-page as a row's chevron does.
+    root.addEventListener("st-open", (event) => openPage((event as CustomEvent<string>).detail));
 
     draw();
     return root;

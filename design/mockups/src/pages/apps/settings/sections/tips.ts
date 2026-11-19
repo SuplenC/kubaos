@@ -14,6 +14,13 @@ export interface SectionTips {
 
 /** Every section's tips, by its place in the sidebar. */
 export const TIPS: readonly SectionTips[] = [
+  // About
+  {
+    subs: {
+      // config/kotodama/kubaos.toml: "Update KubaOS".
+      Updates: "Press [Super] [Space] and type “update KubaOS” to update now.",
+    },
+  },
   // Appearance
   {
     rows: {
@@ -137,15 +144,11 @@ export const TIPS: readonly SectionTips[] = [
       Calendar: "Press [Super] [Space] and type “calendar” to open the month at once.",
     },
   },
-  // Apps & updates
+  // Apps
   {
     rows: {
       // docs/USING.md, Startup apps: an app's Actions (Ctrl+K) in the Command menu, Start on login.
       startup: "Press [Ctrl] [K] on an app in the Command menu to find Start on login among its actions.",
-    },
-    subs: {
-      // config/kotodama/kubaos.toml: "Update KubaOS".
-      Updates: "Press [Super] [Space] and type “update KubaOS” to update now.",
     },
   },
 ];

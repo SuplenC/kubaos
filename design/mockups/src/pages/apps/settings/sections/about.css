@@ -1,0 +1,12 @@
+/* About's organisms (`about-parts.ts`). */
+
+/* A machine's name has no spaces to break at: it breaks anywhere rather than run past its card. */
+.ab-name {
+  overflow-wrap: anywhere;
+}
+
+/* The installer's message under the rename field sits as a labelled field's note does; with
+   nothing to say it takes no room, nor the column's gap. */
+.ab-rule:empty {
+  display: none;
+}

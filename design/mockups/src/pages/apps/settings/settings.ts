@@ -1,11 +1,11 @@
-// Settings: the window. Every KubaOS setting has a control here, in twelve sections on SidebarPage:
+// Settings: the window. Every KubaOS setting has a control here, in thirteen sections on SidebarPage:
 // it opens on Home, which is search; a section's sub-sections open under it in the sidebar, which
 // follows the scroll; search lands on the exact row and lights it; the Command menu opens the window
 // on one row. Every section has a page of its own beside this one, the window's.
 
 import { doesntApply, nonEmpty, page, screen } from "../../../site/page.ts";
 import { turnMoves } from "../../templates/sidebar-turns.ts";
-import { APPEARANCE, POWER } from "./settings-data.ts";
+import { APPEARANCE, APPS, POWER } from "./settings-data.ts";
 import { bareWindow, FULL_HD, landedOn, LAPTOP, liveWindow, MINIMUM, settingsWindow } from "./settings-window.ts";
 
 type Shown = "rest" | "selected" | "empty";
@@ -20,7 +20,7 @@ export default page<Shown>({
   level: "apps",
   slug: "settings",
   title: "Settings",
-  lede: "The system's settings, never an app's own, in twelve sections; search and the Command menu land on the row.",
+  lede: "The system's settings, never an app's own, in thirteen sections; search and the Command menu land on the row.",
   code: { unbuilt: "kubaos-settings: not built yet" },
   from: ["sidebar-page", "list", "tabs", "slider", "select", "field", "switch", "banner", "keycap"],
   stage: {
@@ -56,7 +56,7 @@ export default page<Shown>({
     },
     rows: [{ name: "The window", cell: screen((state: Shown) => CELLS[state]()) }],
     looks: {
-      rest: "Home: the field, then the twelve sections",
+      rest: "Home: the field, then the thirteen sections",
       selected: "Power current, Sleep & lock under the bar",
       empty: "nothing found: a line under the field",
     },
@@ -68,7 +68,7 @@ export default page<Shown>({
     counts: [
       { name: "Nothing found", for: "“teleport”: a line says so", sample: screen(CELLS.empty) },
       { name: "One found", for: "“charge”: Charge limit alone", sample: screen(() => settingsWindow({ query: "charge", keyboard: "home" })) },
-      { name: "Twelve sections", for: "at the minimum the sidebar scrolls", sample: screen(() => settingsWindow({ section: 11 }, MINIMUM)) },
+      { name: "Thirteen sections", for: "at the minimum the sidebar scrolls", sample: screen(() => settingsWindow({ section: APPS }, MINIMUM)) },
     ],
   },
   motion: {
