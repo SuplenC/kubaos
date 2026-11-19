@@ -12,7 +12,7 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 | `just mockup-shot PAGE [STATE…]` | Captures a page's states, each drawn alone, as PNGs ("Solo mode", below). |
 | `just mockup-preview [CHECKOUT] [PORT]` | Points the review address, 5174, at a checkout's site with hot reload, so it follows an agent's edits and commits live; `just mockup-preview-stop` stops it ("Live preview", below). |
 | `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
-| `just mockups-check [PAGE…]` | Draws the pages named, or every page, at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). `just design-check` runs it on the pages listed in `checked-pages`, which CI holds a pull request that changes one of the mockups' inputs (`docs/TESTING.md`, "CI") and every push to `main` to; a page joins that list once it passes with no finding and no difference. |
+| `just mockups-check [PAGE…]` | Draws the pages named, or every page, at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). `just design-check` runs it on the pages listed in `checked-pages`, which CI holds a pull request that changes one of the mockups' inputs to (`docs/TESTING.md`, "CI"); a page joins that list once it passes with no finding and no difference. |
 | `just shots mockups` | Renders the pages' shots, before and after (`docs/agents/design-pr-loop.md`). |
 | `npm run perf -- PAGE…` | Measures the pages named for speed and holds them to their budgets ("Speed", below). |
 
@@ -108,7 +108,7 @@ The Anatomy section's samples draw nothing over them at rest. Pointing at a part
 | `src/site/solo.ts`, `scripts/shot.ts` | Solo mode, one state of a page alone, and the captures drawn with it. |
 | `scripts/clock.ts` | The page's own clock, which the captures of motion (`shot.ts --frames`, `tour.ts`) step a frame at a time. |
 | `scripts/player-test.ts` | Seeks every motion player on the built site and holds its plot and its parts to what plays. |
-| `checked-pages` | The pages CI holds a pull request that changes one of the mockups' inputs (`docs/TESTING.md`, "CI") and every push to `main` to, one slug a line (`just mockups-checked`). |
+| `checked-pages` | The pages CI holds a pull request that changes one of the mockups' inputs to (`docs/TESTING.md`, "CI"), one slug a line (`just mockups-checked`). |
 | `scripts/frame-test.ts` | Walks small pages of probed boxes into geometry frames and holds the walk (`src/site/frame.ts`) to what is drawn. |
 | `scripts/perf.ts`, `scripts/perf-trace.ts`, `scripts/perf-budgets.ts` | The speed check: it drives the pages named, reads their traces, and holds them to the budgets. |
 

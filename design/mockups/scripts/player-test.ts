@@ -10,16 +10,17 @@
 // It names every player that disagrees and fails. The browser is nixpkgs' Playwright Chromium
 // (`PLAYWRIGHT_BROWSERS_PATH`, set by `nix develop`).
 //
-// The time goes to round trips, not to work: every other player on the page keeps playing, so
-// each call into the page waits 30 to 70 ms for the renderer while the CPU idles. A seek is one
-// call to find where to click, the click, and one call to read what it held, and the five
-// settings run side by side, each in a page of its own, so their waits overlap.
+// Each call into the page waits 30 to 70 ms for the renderer, which every other player on the
+// page keeps busy playing. A seek is one call to find where to click, the click, and one call to
+// read what it held. Each page in each setting runs in a page of its own, `MOCKUPS_JOBS` of them
+// at once, one per CPU unless set: the players' playing keeps a CPU busy each, so more than that
+// only takes turns. What it says reads by page, then setting, whatever finishes first.
 
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright-core";
-import { chromiumPath, serve } from "./browser.ts";
+import { type Browser, chromium, type Page } from "playwright-core";
+import { chromiumPath, inOrder, jobs, serve } from "./browser.ts";
 
 const FRAME = 1000 / 60;
 
@@ -29,13 +30,14 @@ const PIXEL = 0.01;
 /** How far apart the ball's progress and the browser's may be. */
 const PROGRESS = 1e-3;
 
-let failures = 0;
-let balls = 0;
+/** What one page in one setting found: each disagreement, said, and how many balls it checked. */
+class Findings {
+  readonly failed: string[] = [];
+  balls = 0;
 
-function check(ok: boolean, what: string): void {
-  if (ok) return;
-  failures++;
-  process.stderr.write(`player-test: ${what}\n`);
+  check(ok: boolean, what: string): void {
+    if (!ok) this.failed.push(what);
+  }
 }
 
 /** What one player shows held at a time: per ball, its progress, where it sits, and what plays. */
@@ -153,13 +155,13 @@ async function ranges(page: Page): Promise<Map<string, { from: number; to: numbe
   return found;
 }
 
-async function testPage(page: Page, origin: string, level: string, slug: string, query: string, set: string): Promise<void> {
+async function testPage(page: Page, origin: string, level: string, slug: string, query: string, set: string, found: Findings): Promise<void> {
   await page.goto(`${origin}/index.html?${query}#/${level}/${slug}`);
   await page.evaluate(() => window.kubaos.ready);
   await page.waitForFunction((want) => document.getElementById("page")?.dataset.page === want, slug);
   // Every glow on the page, the players' parts alone among them, is drawn: masked, never a block.
   const bare = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".k-glow")].filter((glow) => !glow.style.maskImage).length);
-  check(bare === 0, `${slug} (${query}): ${bare} glows drawn without their mask`);
+  found.check(bare === 0, `${slug} (${query}): ${bare} glows drawn without their mask`);
   const values = await ranges(page);
   const names = await page.locator(".page-player-words > :first-child").allTextContents();
   for (const [index, name] of names.entries()) {
@@ -169,7 +171,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     for (const t of await moments(page, index)) {
       await seek(page, index, t);
       const shown = await held(page, index);
-      check(shown.control === "Play", `${where}: seeking didn't pause`);
+      found.check(shown.control === "Play", `${where}: seeking didn't pause`);
       shown.balls.forEach((ball, i) => {
         const range = tracks[i]!;
         // A track that holds still (reduced motion's 0 to 0) has no way to go: it plays on its
@@ -177,28 +179,28 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
         const progressOf = (v: number) =>
           range.to === range.from ? (Math.abs(v - range.from) <= 1e-6 ? ball.progress : Number.NaN) : (v - range.from) / (range.to - range.from);
         const playing = ball.played.map(progressOf);
-        check(Math.abs(ball.cy - ball.want) <= PIXEL, `${where} at ${shown.time} ms: ${ball.part}'s ball at y ${ball.cy}, its progress ${ball.progress} is drawn at ${ball.want}`);
-        check(ball.onCurve, `${where} at ${shown.time} ms: ${ball.part}'s ball is off its curve`);
-        check(Math.abs(shown.cx[i]! - shown.head) <= 1, `${where} at ${shown.time} ms: ${ball.part}'s ball isn't on the playhead`);
+        found.check(Math.abs(ball.cy - ball.want) <= PIXEL, `${where} at ${shown.time} ms: ${ball.part}'s ball at y ${ball.cy}, its progress ${ball.progress} is drawn at ${ball.want}`);
+        found.check(ball.onCurve, `${where} at ${shown.time} ms: ${ball.part}'s ball is off its curve`);
+        found.check(Math.abs(shown.cx[i]! - shown.head) <= 1, `${where} at ${shown.time} ms: ${ball.part}'s ball isn't on the playhead`);
         if (ball.followed) {
           // Its part alone plays it alone: held to its own ball, as the whole is to the last's.
           for (const v of ball.alone) {
             const p = progressOf(v);
-            check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} alone plays at ${p}, its ball says ${ball.progress}`);
+            found.check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} alone plays at ${p}, its ball says ${ball.progress}`);
           }
         } else {
           for (const p of playing) {
-            check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} plays at ${p}, its ball says ${ball.progress}`);
+            found.check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} plays at ${p}, its ball says ${ball.progress}`);
           }
           for (const v of ball.alone) {
-            check(Math.abs(v - (ball.played[0] ?? v)) <= 1e-6, `${where} at ${shown.time} ms: ${ball.part} alone plays ${v}, the whole ${ball.played[0]}`);
+            found.check(Math.abs(v - (ball.played[0] ?? v)) <= 1e-6, `${where} at ${shown.time} ms: ${ball.part} alone plays ${v}, the whole ${ball.played[0]}`);
           }
         }
         checked++;
-        balls++;
+        found.balls++;
       });
     }
-    check(checked > 0, `${where}: nothing checked`);
+    found.check(checked > 0, `${where}: nothing checked`);
 
     // A mark goes to its exact moment, and → steps one frame from there.
     const ticks = page.locator(".page-player").nth(index).locator(".page-plot-mark");
@@ -211,15 +213,15 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     const want = Math.min(at, total - 1e-3);
     await mark.locator("rect").dispatchEvent("pointerdown", { pointerId: 1, button: 0, isPrimary: true });
     const marked = await held(page, index);
-    check(Math.abs(marked.time - want) < 1e-6, `${where}: the mark at ${at} ms held ${marked.time} ms`);
+    found.check(Math.abs(marked.time - want) < 1e-6, `${where}: the mark at ${at} ms held ${marked.time} ms`);
     await page.locator(".page-plot-box").nth(index).focus();
     await page.keyboard.press("ArrowRight");
     const stepped = await held(page, index);
     const frame = Math.min(Math.floor(want / FRAME + 1e-6) + 1, last);
-    check(Math.abs(stepped.time - frame * FRAME) < 1e-6, `${where}: → from ${at} ms held ${stepped.time} ms, not frame ${frame}'s ${frame * FRAME}`);
+    found.check(Math.abs(stepped.time - frame * FRAME) < 1e-6, `${where}: → from ${at} ms held ${stepped.time} ms, not frame ${frame}'s ${frame * FRAME}`);
     await page.keyboard.press("Shift+ArrowLeft");
     const back = await held(page, index);
-    check(Math.abs(back.time - Math.max(0, frame - 10) * FRAME) < 1e-6, `${where}: Shift+← held ${back.time} ms`);
+    found.check(Math.abs(back.time - Math.max(0, frame - 10) * FRAME) < 1e-6, `${where}: Shift+← held ${back.time} ms`);
 
     // Pointing at a part, by its stage, its curve, its legend key or its row, picks it everywhere:
     // its row, its curve, its ball, its stage, and an outline of its layers on the whole.
@@ -240,7 +242,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
         return (!above || box.top >= above.bottom) && Math.abs(box.width - width) < 0.5 && words(row.querySelector(".page-plot-key")) === keys[i];
       });
     });
-    check(stacked, `${where}: the parts alone don't stack one under another in the legend's order`);
+    found.check(stacked, `${where}: the parts alone don't stack one under another in the legend's order`);
     const pointers = (i: number) => [
       alone.nth(i),
       player.locator(".page-plot-legend .page-plot-key").nth(i),
@@ -262,7 +264,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
           };
         }, i);
         const one = (list: (string | null)[]) => list.length === 1 && list[0] === picked.want;
-        check(one(picked.curves) && one(picked.balls) && one(picked.stages) && one(picked.rows) && picked.outlines > 0, `${where}: part ${i} picked ${JSON.stringify(picked)}`);
+        found.check(one(picked.curves) && one(picked.balls) && one(picked.stages) && one(picked.rows) && picked.outlines > 0, `${where}: part ${i} picked ${JSON.stringify(picked)}`);
         await page.mouse.move(0, 0);
       }
     }
@@ -288,7 +290,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
       });
       await page.mouse.move(spot.x, spot.y);
       const curve = await player.evaluate((element) => element.querySelector(".page-plot-curve[data-picked]")?.getAttribute("data-pick") ?? null);
-      check(curve === spot.want, `${where}: hovering curve ${spot.want} picked ${curve}`);
+      found.check(curve === spot.want, `${where}: hovering curve ${spot.want} picked ${curve}`);
       await page.mouse.move(0, 0);
     }
   }
@@ -300,40 +302,17 @@ async function main(): Promise<void> {
   if (!existsSync(path.join(dist, "index.html"))) throw new Error(`no built site in ${dist}: run \`just mockups-build\``);
   const origin = await serve(dist);
   const browser = await chromium.launch({ executablePath: chromiumPath() });
+  const tabs: Tab[] = [];
+  let failures = 0;
+  let balls = 0;
   const errors: string[] = [];
-  const collectors: NodeJS.Timeout[] = [];
+  const report = (what: string) => {
+    failures++;
+    process.stderr.write(`player-test: ${what}\n`);
+  };
   try {
-    const open = async () => {
-      // A context each, so a page's pointer, focus and hover are its own.
-      const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, reducedMotion: "no-preference" });
-      const page = await context.newPage();
-      page.on("pageerror", (error) => errors.push(error.message));
-      page.on("crash", () => errors.push(`the page crashed at ${page.url()}`));
-      // The players restyle their samples every frame, and what that leaves behind is the
-      // renderer's garbage, which Chromium collects along with the script heap's: that heap stays
-      // so small that it hardly ever does. Left alone, a page of many players grows by a gigabyte
-      // every quarter of a minute, and five of them run a 16 GB runner out of memory; collected
-      // every second, each stays near 300 MB.
-      const session = await context.newCDPSession(page);
-      let collecting = false;
-      collectors.push(
-        setInterval(() => {
-          if (collecting) return;
-          collecting = true;
-          session
-            .send("HeapProfiler.collectGarbage")
-            .catch(() => undefined)
-            .finally(() => (collecting = false));
-        }, 1000),
-      );
-      return page;
-    };
     // `all` draws every move in a player of its own, at its sample's own size.
     const base = "all&text=short&window=Default";
-    const first = await open();
-    await first.goto(`${origin}/index.html?${base}&mode=dark&scale=1&speed=1&reduced=off&flicker=on`);
-    await first.evaluate(() => window.kubaos.ready);
-    const pages = (await first.evaluate(() => window.kubaos.pages)).filter((p) => named.length === 0 || named.includes(p.slug));
     const settings = [
       ["mode=dark&scale=1&speed=1&reduced=off&flicker=on", "tracks"],
       ["mode=light&scale=1.5&speed=1&reduced=off&flicker=on", "daylight"],
@@ -341,20 +320,36 @@ async function main(): Promise<void> {
       ["mode=dark&scale=1&speed=1&reduced=on&flicker=on", "reduced"],
       ["mode=dark&scale=1&speed=1&reduced=off&flicker=off", "unflickered"],
     ] as const;
-    const tabs = [first, ...(await Promise.all(settings.slice(1).map(open)))];
-    await Promise.all(
-      settings.map(async ([query, set], i) => {
-        for (const { level, slug } of pages) {
-          // Five run at once: a throw names its page and settings.
-          await testPage(tabs[i]!, origin, level, slug, `${base}&${query}`, set).catch((error: unknown) => {
-            throw new Error(`${slug} (${query}): ${error instanceof Error ? error.message : String(error)}`);
-          });
-        }
-      }),
+    const count = jobs();
+    tabs.push(await open(browser));
+    const first = tabs[0]!.page;
+    await first.goto(`${origin}/index.html?${base}&${settings[0][0]}`);
+    await first.evaluate(() => window.kubaos.ready);
+    const pages = (await first.evaluate(() => window.kubaos.pages)).filter((p) => named.length === 0 || named.includes(p.slug));
+    tabs.push(...(await Promise.all(Array.from({ length: Math.min(count, pages.length * settings.length) - 1 }, () => open(browser)))));
+    const items = pages.flatMap(({ level, slug }) => settings.map(([query, set]) => ({ level, slug, query: `${base}&${query}`, set })));
+    await inOrder(
+      items,
+      count,
+      async ({ level, slug, query, set }, worker) => {
+        const tab = tabs[worker]!;
+        const found = new Findings();
+        // A throw names its page and settings, as the pages run side by side.
+        await testPage(tab.page, origin, level, slug, query, set, found).catch((error: unknown) => {
+          throw new Error(`${slug} (${query}): ${error instanceof Error ? error.message : String(error)}`);
+        });
+        return { found, errors: tab.errors.splice(0) };
+      },
+      ({ found, errors: thrown }) => {
+        for (const what of found.failed) report(what);
+        balls += found.balls;
+        errors.push(...thrown);
+      },
     );
   } finally {
-    for (const collector of collectors) clearInterval(collector);
-    check(errors.length === 0, `the page failed: ${errors.join("; ")}`);
+    for (const tab of tabs) clearInterval(tab.collector);
+    for (const tab of tabs) errors.push(...tab.errors.splice(0));
+    if (errors.length > 0) report(`the page failed: ${errors.join("; ")}`);
     await browser.close();
   }
   if (failures > 0) {
@@ -362,6 +357,38 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   process.stdout.write(`player-test: every player holds its recipe, ${balls} balls checked\n`);
+}
+
+/** A worker's page, with the errors it has thrown since its last page, and its collector. */
+interface Tab {
+  readonly page: Page;
+  readonly errors: string[];
+  readonly collector: NodeJS.Timeout;
+}
+
+/** Opens a page in a context of its own, so its pointer, focus and hover are its own. */
+async function open(browser: Browser): Promise<Tab> {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, reducedMotion: "no-preference" });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("crash", () => errors.push(`the page crashed at ${page.url()}`));
+  // The players restyle their samples every frame, and what that leaves behind is the renderer's
+  // garbage, which Chromium collects along with the script heap's: that heap stays so small that
+  // it hardly ever does. Left alone, a page of many players grows by a gigabyte every quarter of a
+  // minute, and five of them run a 16 GB runner out of memory; collected every second, each stays
+  // near 300 MB.
+  const session = await context.newCDPSession(page);
+  let collecting = false;
+  const collector = setInterval(() => {
+    if (collecting) return;
+    collecting = true;
+    session
+      .send("HeapProfiler.collectGarbage")
+      .catch(() => undefined)
+      .finally(() => (collecting = false));
+  }, 1000);
+  return { page, errors, collector };
 }
 
 main().catch((error: unknown) => {
