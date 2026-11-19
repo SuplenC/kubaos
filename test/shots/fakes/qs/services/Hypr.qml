@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick
+import Quickshell.Hyprland
 
 // Stand-in for Hypr. The drivers set `focusedScreen` to the screen they shoot.
 QtObject {
@@ -11,6 +12,17 @@ QtObject {
             "1": "Desk"
         })
     property var staleIds: ({})
+    // As the service works it out (`occupied.js`): each window's own workspace, pinned windows
+    // left out.
+    readonly property string occupiedIds: {
+        const ids = [];
+        for (const toplevel of Hyprland.toplevels.values) {
+            const id = toplevel.workspace?.id;
+            if (id !== undefined && toplevel.lastIpcObject?.pinned !== true && !ids.includes(id))
+                ids.push(id);
+        }
+        return `,${ids.sort((a, b) => a - b).join(",")},`;
+    }
 
     function blockOf(id: int): int {
         return Math.floor((id - 1) / 10);
@@ -20,8 +32,17 @@ QtObject {
         return (id - 1) % 10 + 1;
     }
 
-    function blockOfMonitor(monitor: var): int {
+    // The stand-in's one monitor, whichever the screen.
+    function monitorOf(screen: var): var {
+        return Hyprland.monitor;
+    }
+
+    function blockOfScreen(name: string, monitor: var): int {
         return 0;
+    }
+
+    function occupied(id: int): bool {
+        return occupiedIds.includes(`,${id},`);
     }
 
     function focusWorkspace(id: int): void {

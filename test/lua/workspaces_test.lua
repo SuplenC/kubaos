@@ -60,6 +60,10 @@ local function bare()
       return dir
     elseif key == "XDG_CONFIG_HOME" then
       return dir .. "/config"
+    elseif key == "XDG_RUNTIME_DIR" then
+      return dir .. "/run"
+    elseif key == "HYPRLAND_INSTANCE_SIGNATURE" then
+      return "instance"
     end
     return real_getenv(key)
   end
@@ -78,11 +82,14 @@ local function session()
   return world, require("workspaces")
 end
 
--- The module again on the same world and state, as a config reload makes it.
+-- The module loaded in a new Lua state, with a new `dot`, as Hyprland's
+-- config reload does, and `config.reloaded` fired.
 local function reload(world)
-  package.loaded.workspaces = nil
-  world.handlers = {}
-  return require("workspaces")
+  return world:reload(function()
+    _G.dot = {}
+    package.loaded.workspaces = nil
+    return require("workspaces")
+  end)
 end
 
 local function read(path)
@@ -952,10 +959,7 @@ local function before_migrating()
 end
 
 local function load_after_update(world)
-  package.loaded.workspaces = nil
-  local module = require("workspaces")
-  world:fire("config.reloaded")
-  return module
+  return reload(world)
 end
 
 test("migrating a screens file moves no window and renumbers no workspace", function()
@@ -1051,7 +1055,7 @@ test("the BenQ, then the LG arriving at 0,0 before it is arranged, end with each
 
   io.open, os.rename = real_open, real_rename
   kuba_docked(world)
-  same(written_with, { 31, 32, 33, 34, 35 }, "the file is written once the workspaces have moved")
+  same(written_with, { 31, 32, 33, 34 }, "the file is written once the workspaces with windows have moved")
   same(opened, { file .. ".tmp" }, "written to a temp file beside it")
   same(renamed, { { file .. ".tmp", file } }, "then renamed over it")
 end)
@@ -1193,7 +1197,6 @@ test("after a config reload, unplugging the focused screen still leaves the back
   run(module.focus(2))
   world:open_window()
   reload(world)
-  world:fire("config.reloaded")
 
   world:detach("DP-1")
 
@@ -1233,14 +1236,13 @@ test("Hyprland's fallback output holds no position and writes no row", function(
   world:unplug("eDP-1")
   local before = read(world.state .. "/workspace-screens")
 
-  world:attach("FALLBACK", "")
-  world:detach("DP-1")
-  world:settle()
+  world:unplug("DP-1")
+  same(world:ids_on("FALLBACK"), { 3 }, "the fallback comes once the last screen has gone, on a new workspace")
   same(read(world.state .. "/workspace-screens"), before, "the file is untouched")
-  same(module.workspace_id(hl.get_monitor("FALLBACK"), 2), 12, "unmapped, the fallback addresses the group it shows")
+  same(module.workspace_id(hl.get_monitor("FALLBACK"), 2), 2, "unmapped, the fallback addresses the group it shows")
 
   world:plug("eDP-1", PANEL, 0, 0)
-  world:unplug("FALLBACK")
+  same(hl.get_monitor("FALLBACK"), nil, "the fallback goes once a screen is back")
   same(world:ids_on("eDP-1"), { 1, 2 }, "the panel takes its group back")
   same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. PANEL .. "\n1\t\t1\t" .. LG_A .. "\n", "and the file names no fallback")
 end)
@@ -1372,16 +1374,49 @@ test("moving a workspace to another screen renumbers it into that block before i
   same(world:kept(), { "1@eDP-1", "11@DP-1", "13@DP-1" }, "kept")
 end)
 
-test("moving a workspace to a screen whose block is full keeps its number", function()
+-- What moving a workspace could change: the screens' workspaces and views,
+-- focus, the rules, and what the bar would hear.
+local function snapshot(world)
+  return {
+    world:ids_on("eDP-1"), world:ids_on("DP-1"), world:ids_on("DP-2"),
+    world:shown_on("eDP-1"), world:shown_on("DP-1"), world:shown_on("DP-2") or 0,
+    world.focused.name, world:all_rules(), world.renumbered, world.moves, { table.unpack(world.events) },
+  }
+end
+
+test("moving a workspace to a screen whose group has all ten does nothing", function()
   local world, module = two_screens()
   fill(world, module, "DP-1", 10)
   world:focus_monitor("eDP-1")
   run(module.focus(2))
   local window = world:open_window()
+  world.events = {}
+  local before = snapshot(world)
 
   run(module.move_to_monitor("r"))
 
-  same({ window.workspace.id, window.workspace.monitor.name, world.renumbered }, { 2, "DP-1", 0 }, "a guest")
+  same(snapshot(world), before, "unchanged")
+  same({ window.workspace.id, window.workspace.monitor.name }, { 2, "eDP-1" }, "the window stays")
+end)
+
+test("moving a workspace to a screen that has no group yet, the layout still changing, does nothing", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(2))
+  local window = world:open_window()
+  world:attach("DP-2", LG_B)
+  world:arrange("DP-2", 3840, 0)
+  world.hidden["eDP-1"] = true
+  world.events = {}
+  local before = snapshot(world)
+
+  run(module.move_to_monitor("r"))
+
+  same(snapshot(world), before, "unchanged")
+  same({ window.workspace.id, window.workspace.monitor.name }, { 12, "DP-1" }, "the window stays")
+  world.hidden["eDP-1"] = nil
+  world:settle()
+  same({ window.workspace.id, window.workspace.monitor.name, world:shown_on("DP-2") }, { 12, "DP-1", 21 }, "and after the wait")
 end)
 
 -- Regression: an empty workspace 1, once left, was out of reach of every
@@ -1526,6 +1561,190 @@ test("unplugging an empty screen releases its kept workspace", function()
   world:unplug("DP-1")
 
   same(world:kept(), { "1@eDP-1" }, "kept")
+end)
+
+test("a window an X11 app closes to the tray gives up the empty workspace kept after it", function()
+  local world, module = two_screens()
+  world:open_window()
+  run(module.next())
+  local window = world:open_window()
+  same(world:ids_on("eDP-1"), { 1, 2, 3 }, "one empty after the window")
+
+  world:unmap_window(window)
+
+  same(world:ids_on("eDP-1"), { 1, 2 }, "the one no longer needed goes")
+end)
+
+test("windows opening together bring the kept workspaces in line once", function()
+  local world = two_screens()
+  local before = #world.timers
+
+  world:step(function()
+    world:open_window()
+    world:open_window()
+  end)
+
+  same(#world.timers - before, 1, "one wait")
+  same(world:kept(), { "1@eDP-1", "2@eDP-1", "11@DP-1" }, "kept")
+end)
+
+test("going to empty workspaces with a pinned window leaves the kept workspaces where they were", function()
+  local world, module = two_screens()
+  world:open_window()
+  world:pin(world:open_window())
+  same(world:kept(), { "1@eDP-1", "2@eDP-1", "11@DP-1" }, "kept")
+
+  run(module.focus(2))
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2 } }, "on the kept empty one")
+  run(module.focus(5))
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2, 5 } }, "on another")
+  run(module.focus(1))
+
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2 } }, "back")
+end)
+
+test("pinning the only window on a group's last workspace moves the empty one kept after it back", function()
+  local world, module = two_screens()
+  world:open_window()
+  run(module.focus(2))
+  local window = world:open_window()
+  same(world:kept(), { "1@eDP-1", "3@eDP-1", "11@DP-1" }, "kept")
+
+  world:pin(window)
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "2@eDP-1", "11@DP-1" }, { 1, 2 } }, "pinned")
+
+  world:pin(window, false)
+  same({ world:kept(), world:ids_on("eDP-1") }, { { "1@eDP-1", "3@eDP-1", "11@DP-1" }, { 1, 2, 3 } }, "unpinned")
+end)
+
+test("SUPER + SHIFT + CTRL + Right leaves a window alone after the others where it is", function()
+  local world, module = two_screens()
+  world:open_window()
+  run(module.focus(2))
+  local window = world:open_window()
+
+  run(module.move_window_to_new())
+  run(module.move_window_to_new())
+
+  same({ window.workspace.id, world:shown_on("eDP-1") }, { 2, 2 }, "stays")
+  same(world:ids_on("eDP-1"), { 1, 2, 3 }, "and one empty after it")
+end)
+
+test("a screen plugged back in keeps the workspaces Hyprland brings back to it while the layout settles", function()
+  local world = busy()
+  world:unplug("DP-1")
+
+  world:attach("DP-1", LG_A)
+
+  same(world:ids_on("DP-1"), { 11, 12, 13, 14 }, "the group's own and the empty one kept after it")
+  same(world:kept(), { "1@eDP-1", "3@eDP-1", "11@DP-1", "14@DP-1" }, "kept where they are")
+  world:arrange("DP-1", 1920, 0)
+  world:settle()
+  same({ world:ids_on("eDP-1"), world:ids_on("DP-1") }, { { 1, 2, 3 }, { 11, 12, 13, 14 } }, "and after the wait")
+end)
+
+-- Counts the reconciles the module runs from now on.
+local function reconciles(module)
+  local count = { n = 0 }
+  local reconcile = module.reconcile
+  module.reconcile = function(...)
+    count.n = count.n + 1
+    return reconcile(...)
+  end
+  return count
+end
+
+test("a layout change that moves no screen reconciles nothing", function()
+  local world, module = two_screens()
+  local count = reconciles(module)
+
+  world:arrange("DP-1", 1920, 0)
+  world:settle()
+  same(count.n, 0, "the same place")
+
+  world:arrange("DP-1", 2560, 0)
+  world:settle()
+  same(count.n, 1, "a new place")
+end)
+
+test("a screen arriving after every screen went is reconciled without waiting for those that went", function()
+  local world, module = two_screens()
+  world:detach("eDP-1")
+  world:detach("DP-1")
+  world:settle()
+  local count = reconciles(module)
+
+  world:attach("DP-1", LG_B)
+  world:arrange("DP-1", 0, 0)
+  world:tick()
+
+  same(count.n, 1, "reconciled after one wait")
+end)
+
+test("a window closing while no screen is plugged in keeps every workspace kept", function()
+  local world = two_screens()
+  local window = world:open_window()
+  world:unplug("DP-1")
+  world:unplug("eDP-1")
+
+  world:close_window(window)
+
+  same(world:kept(), { "1@eDP-1", "2@eDP-1" }, "kept")
+end)
+
+test("a groups file saved leaves the view on an empty workspace of a waiting group the user went to", function()
+  local world, module = busy()
+  world:unplug("DP-1")
+  run(module.go_to(14, "eDP-1"))
+
+  write(world.groups, "# No pins.\n")
+  run(module.reload_groups())
+
+  same(world:shown_on("eDP-1"), 14, "still there")
+end)
+
+test("a groups file saved leaves the view on the empty first workspace of a waiting group gone to by position", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(2))
+  world:open_window()
+  world:unplug("DP-1")
+  run(module.go_to_position("1"))
+  same(world:shown_on("eDP-1"), 11, "the group's lowest")
+
+  write(world.groups, "# No pins.\n")
+  run(module.reload_groups())
+
+  same(world:shown_on("eDP-1"), 11, "still there")
+end)
+
+test("an empty workspace of its own group the user went to gives way when the screen changes group", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(3))
+  same(world:shown_on("DP-1"), 13, "the empty third of its own group")
+
+  write(world.groups, '[group.2]\nscreens = ["' .. LG_A .. '"]\n')
+  run(module.reload_groups())
+
+  same(world:shown_on("DP-1"), 21, "the first of the group it stands at")
+end)
+
+test("a config reload leaves the screens file as it is", function()
+  local world = two_screens()
+  local real_open = io.open
+  local opened = {}
+  io.open = function(path, mode)
+    if mode == "w" and path:find(world.state, 1, true) then
+      opened[#opened + 1] = path
+    end
+    return real_open(path, mode)
+  end
+
+  reload(world)
+
+  io.open = real_open
+  same(opened, {}, "written")
 end)
 
 -- Workspace groups on the fake Hyprland. Kuba's work desk: two Dells, the
@@ -1761,7 +1980,6 @@ test("a groups file that doesn't read is one toast and pins nothing, until it is
 
   run(module.problem_shown(1))
   module = reload(world)
-  world:fire("config.reloaded")
   same(#world.commands, 1, "once shown, a config reload doesn't say it again")
 
   write(world.groups, '[group.1]\nscreens = ["' .. LG_A .. '"]\n')
@@ -1774,6 +1992,21 @@ test("a groups file that doesn't read is one toast and pins nothing, until it is
   same(#world.commands, 2, "and a toast again")
 end)
 
+-- What `fn` returns, run with the clock `seconds` ahead.
+local function later(seconds, fn)
+  local real_time = os.time
+  os.time = function(...)
+    if select("#", ...) > 0 then
+      return real_time(...)
+    end
+    return real_time() + seconds
+  end
+  local ok, result = pcall(fn)
+  os.time = real_time
+  assert(ok, result)
+  return result
+end
+
 -- Regression: at login the toast was sent before the shell, the notification
 -- server, was up, and then counted as shown for good.
 test("a broken groups file at login is toasted until the shell shows it, and only then counts as shown", function()
@@ -1784,21 +2017,18 @@ test("a broken groups file at login is toasted until the shell shows it, and onl
   assert(world.commands[1]:find("&& exec hyprctl dispatch 'dot.workspaces.problem_shown(1)'; sleep 1; done", 1, true),
     world.commands[1])
   module = reload(world)
-  world:fire("config.reloaded")
   same(#world.commands, 1, "a reload while it is still being tried doesn't try twice")
 
-  dot.workspace_groups_toasting.expires = 0
-  module = reload(world)
-  world:fire("config.reloaded")
+  module = later(61, function() return reload(world) end)
   same(#world.commands, 2, "once the tries ran out unshown, the next load tries again")
   assert(world.commands[2]:find("problem_shown(2)", 1, true), world.commands[2])
 
   run(module.problem_shown(1))
-  same(dot.workspace_groups_problem, nil, "a stale token counts for nothing")
-  run(module.problem_shown(2))
-  module = reload(world)
-  world:fire("config.reloaded")
-  same(#world.commands, 2, "shown, it isn't said again")
+  module = later(200, function() return reload(world) end)
+  same(#world.commands, 3, "a stale token counts for nothing, so once those tries ran out it is tried again")
+  run(module.problem_shown(3))
+  later(400, function() return reload(world) end)
+  same(#world.commands, 3, "shown, it isn't said again")
 end)
 
 -- Regression: nvim saves by moving the file away and writing a new one, and
@@ -1825,6 +2055,26 @@ test("a groups file missing for a moment, as an editor saves it, moves nothing",
   run(module.reload_groups())
   world:settle()
   same(world:ids_on("DP-2"), { 41, 42, 43 }, "still missing after the wait, nothing is pinned")
+end)
+
+test("a workspace whose rule rests while its group moves to another screen and back leaves no rule behind", function()
+  local world, module = two_screens()
+  world:plug("DP-2", LG_B, 3840)
+  fill(world, module, "DP-1", 1)
+
+  for round = 1, 2 do
+    world:focus_monitor("DP-1")
+    run(module.focus(2))
+    local window = world:open_window()
+    write(world.groups, '[group.1]\nscreens = ["' .. LG_B .. '"]\n')
+    run(module.reload_groups())
+    world:close_window(window)
+    write(world.groups, "# Round " .. round .. ".\n")
+    run(module.reload_groups())
+  end
+
+  same(world:kept(), { "1@eDP-1", "11@DP-1", "12@DP-1", "21@DP-2" }, "kept")
+  same(world:rules_for("12"), 2, "one rule per screen it was kept on")
 end)
 
 test("going to a pinned group's position focuses the screen pinned there", function()

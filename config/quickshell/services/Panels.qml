@@ -10,6 +10,14 @@ Singleton {
     property string current: ""
     property ShellScreen screen: Hypr.focusedScreen
 
+    // A screen unplugged takes its open panel with it: Quickshell deletes the screen's object,
+    // which leaves `screen` null and the panel drawn nowhere, and the next toggle would close it
+    // rather than open it.
+    onScreenChanged: {
+        if (!root.screen)
+            root.close();
+    }
+
     function open(name: string): void {
         if (Session.locked)
             return;

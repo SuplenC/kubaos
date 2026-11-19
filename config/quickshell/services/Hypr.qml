@@ -7,6 +7,7 @@ import Quickshell.Hyprland
 import qs.settings
 import KubaOS.Components as K
 import "dnd.js" as Dnd
+import "occupied.js" as Occupied
 
 // Small helpers on top of the Hyprland IPC, and each screen's workspaces.
 //
@@ -21,6 +22,14 @@ Singleton {
 
     // The ShellScreen of the monitor Hyprland considers focused.
     readonly property ShellScreen focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
+
+    // The Hyprland monitor of `screen`, null while Hyprland lists none under its name. Found in
+    // the list by name, so a binding on it follows the list. `Hyprland.monitorFor` answers once:
+    // null for a screen Wayland announces before Hyprland's event for it is read, and an object
+    // Quickshell deletes when the monitor goes, though the screen may stay or come back.
+    function monitorOf(screen: ShellScreen): HyprlandMonitor {
+        return Hyprland.monitors.values.find(monitor => monitor.name === screen?.name) ?? null;
+    }
 
     // The lines "block<TAB>connector<TAB>position<TAB>screen" of the state
     // file, and "<TAB>name" for a group the user named, as fields; a
@@ -70,14 +79,30 @@ Singleton {
         return (id - 1) % slots + 1;
     }
 
-    // A monitor's block. Until Hyprland has written the file, the block of the
-    // workspace it shows.
-    function blockOfMonitor(monitor: HyprlandMonitor): int {
-        const block = blocks[monitor?.name ?? ""];
+    // The block of the screen named `name`, whose Hyprland monitor is `monitor`, looked up by name
+    // so a screen Hyprland doesn't list yet still finds its own. A screen the file doesn't name
+    // takes the block of the workspace its monitor shows: Hyprland writes the file only once a
+    // new screen's workspaces have moved. With no monitor either it holds no block, -1, so it
+    // never draws the laptop's group as its own; with no file at all, the laptop's.
+    function blockOfScreen(name: string, monitor: HyprlandMonitor): int {
+        const block = blocks[name];
         if (block !== undefined)
             return block;
-        const active = monitor?.activeWorkspace?.id ?? 1;
+        if (!monitor)
+            return screenLines.length > 0 ? -1 : 0;
+        const active = monitor.activeWorkspace?.id ?? 1;
         return active > 0 ? blockOf(active) : 0;
+    }
+
+    // The ids of the workspaces that hold windows other than pinned ones, sorted, each between
+    // commas (`occupied.js`). Worked out once here and kept as a string, which signals only when
+    // its text changes, so a window event reaches the bar's cells only when the set changes: each
+    // cell scanning the windows itself took about 1.2 ms of script per window event across three
+    // screens, the set about 30 µs.
+    readonly property string occupiedIds: Occupied.ids(Hyprland.toplevels.values)
+
+    function occupied(id: int): bool {
+        return root.occupiedIds.includes(`,${id},`);
     }
 
     // Works for empty (not yet created) workspaces too, unlike HyprlandWorkspace.activate().
@@ -138,15 +163,47 @@ Singleton {
         }
     }
 
-    // The client list read once more after a burst of `fullscreen` events has settled. Quickshell
-    // drops a read asked for while another is in flight, so the last change of a burst (a window
-    // leaving fullscreen right after entering it) could otherwise be missed until the next one.
+    // The client list read once more after a burst of `fullscreen` or `pin` events has settled.
+    // Quickshell drops a read asked for while another is in flight, so the last change of a burst
+    // (a window leaving fullscreen right after entering it) could otherwise be missed until the
+    // next one.
     Timer {
-        id: fullscreenRead
+        id: clientsRead
 
         interval: K.Tokens.duration.short
         onTriggered: Hyprland.refreshToplevels()
     }
+
+    // Hyprland's workspaces, screens and windows read again once its workspace and screen events
+    // have held still for a moment, as one burst. Quickshell (v0.3.2) puts a workspace switch on
+    // the focused screen whichever screen it happened on, and moves the workspace there with it:
+    // the reconcile in `config/hypr/workspaces.lua` switching a screen that just arrived would
+    // leave the workspace on the focused screen's bar. A list asked for before an event and read
+    // after it can drop a screen just added or leave windows on a renumbered workspace's old
+    // object, and a read asked for while one is in flight is dropped. The read after the burst
+    // puts all of it right, and an ordinary switch costs one burst of three reads, a window event
+    // none.
+    //
+    // Each move and switch the reconcile makes starts the wait again, so the read follows its last
+    // one whatever the interval; an interval shorter than the reconcile's own wait for the screens
+    // to settle (`SETTLE_MS` there) only costs a second read.
+    //
+    // HAZARD: the workspaces before the screens. The workspace list makes again a screen that
+    // Quickshell dropped, from the one each workspace names, and only then can the screen list,
+    // which makes none, fill in what it shows. Hyprland answers in the order asked.
+    Timer {
+        id: settledRead
+
+        interval: K.Tokens.duration.medium
+        onTriggered: {
+            Hyprland.refreshWorkspaces();
+            Hyprland.refreshMonitors();
+            Hyprland.refreshToplevels();
+        }
+    }
+
+    // The events after which `settledRead` reads again.
+    readonly property var unsettling: ["workspacev2", "focusedmon", "moveworkspacev2", "monitoraddedv2", "monitorremoved", "changeworkspaceid"]
 
     // The ids Hyprland has renumbered away from (`changeworkspaceid`, which
     // `dot.workspaces.move_to_monitor` causes), as a set. Quickshell (v0.3.2)
@@ -192,11 +249,15 @@ Singleton {
         target: Hyprland
 
         function onRawEvent(event: HyprlandEvent): void {
+            if (root.unsettling.includes(event.name))
+                settledRead.restart();
             if (event.name === "screencast") {
                 root.shares = Dnd.screencast(root.shares, event.data);
-            } else if (event.name === "fullscreen") {
+            } else if (event.name === "fullscreen" || event.name === "pin") {
+                // A window's fullscreen mode and whether it is pinned are only in the client list,
+                // which Quickshell reads on neither event.
                 Hyprland.refreshToplevels();
-                fullscreenRead.restart();
+                clientsRead.restart();
             } else if (event.name === "moveworkspacev2") {
                 const fields = event.parse(3);
                 const next = Object.assign({}, root.movedTo);

@@ -761,19 +761,27 @@ c_workspaces() {
   workspaces_hotplug_bar
 }
 
-# The primary's bar after screens are plugged in: test/lib/hyprland-hotplug.py
-# stands in for Hyprland and sends the groups waiting on the primary, and the
-# focused window's workspace among them, to the new screens, with Quickshell
-# reading the workspace list it asked for before the moves only after their
-# events. The primary's bar shows its own group alone, and no title.
+# The bars after screens are plugged in and unplugged: test/lib/hyprland-hotplug.py
+# stands in for Hyprland, in Hyprland's order of events, and adds and takes
+# away sway's second screen. The groups waiting on the primary, and the focused
+# window's workspace among them, go to two new screens, with Quickshell reading
+# the workspace list it asked for before the moves only after their events:
+# the primary's bar shows its own group alone, and no title. Hyprland drops the
+# primary and lists it again, the session's screen staying, and the bar shows
+# the primary's workspace again. A second screen sway adds before Hyprland
+# lists it shows its workspace once Hyprland does, and again after it is taken
+# away and brought back. That screen, without the focus, switches workspace,
+# and only its bar follows. Each bar's indicator sits on its workspace's cell.
 workspaces_hotplug_bar() {
-  local signature=kubaos-e2e-hotplug state="$USER_HOME/.local/state" fake groups title bad=0
+  local signature=kubaos-e2e-hotplug state="$USER_HOME/.local/state" fake swaysock cell kind screen value what last bad=0
   local screens="$state/kubaos/hypr/workspace-screens"
   session_start sway 1920x1080 1
+  swaysock="$(sed -n 's/^SWAYSOCK=//p' "$SESSION_ENV")"
+  cell="$(sed -n 's/^chip = //p' "$REPO/design/tokens.toml")"
   # The stand-in reads the log from before Quickshell starts.
   : >"$QS_LOG"
   chown "$USER_NAME:" "$QS_LOG"
-  as_user python3 -I "$REPO/test/lib/hyprland-hotplug.py" "$RUNTIME_DIR" "$signature" "$state" "$QS_LOG" \
+  as_user python3 -I "$REPO/test/lib/hyprland-hotplug.py" "$RUNTIME_DIR" "$signature" "$state" "$QS_LOG" "$swaysock" \
     >"$LOGS/hyprland-hotplug.log" 2>&1 &
   fake=$!
   for _ in $(seq 50); do
@@ -793,20 +801,31 @@ workspaces_hotplug_bar() {
     tail -5 "$LOGS/hyprland-hotplug.log" | sed 's/^/     /'
     bad=1
   else
-    groups="$(grep -o 'workspaces probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
-    groups="${groups#workspaces probe: HEADLESS-1 }"
-    title="$(grep -o 'active window probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
-    title="${title#active window probe: HEADLESS-1 }"
-    if [[ $groups == '[[1,2,4,5]]' ]]; then
-      echo "ok   after a hotplug the primary's bar shows its own group alone, the workspace list read after the moves' events"
-    else
-      echo "FAIL after a hotplug the primary's bar shows $groups, not [[1,2,4,5]]"
-      bad=1
-    fi
-    if [[ $title == '""' ]]; then
-      echo "ok   the focused window's title leaves the primary's bar with its workspace"
-    else
-      echo "FAIL after a hotplug the primary's bar shows the title $title of a window on another screen"
+    # Each line: the probe, the screen, what its last line reads, what that shows.
+    while IFS='|' read -r kind screen value what; do
+      last="$(grep -o "$kind probe: $screen .*" "$QS_LOG" | tail -1)"
+      last="${last#"$kind probe: $screen "}"
+      if [[ $last == "$value" ]]; then
+        echo "ok   $what"
+      else
+        echo "FAIL $what: $screen's last $kind probe reads $last, not $value"
+        bad=1
+      fi
+    done <<EOF
+workspaces|HEADLESS-1|[[1,2,4,5]]|after a hotplug the primary's bar shows its own group alone, the workspace list read after the moves' events
+active window|HEADLESS-1|""|the focused window's title leaves the primary's bar with its workspace
+active workspace|HEADLESS-1|1|the primary's bar shows its workspace after Hyprland dropped the screen and listed it again, and after another screen switched
+indicator|HEADLESS-1|1 0|the primary's indicator sits on its workspace's cell
+active workspace|HEADLESS-2|12|a screen Wayland announced before Hyprland shows the workspace it switched to without the focus
+workspaces|HEADLESS-2|[[11,12]]|that screen's bar shows its own group
+indicator|HEADLESS-2|12 $cell|that screen's indicator sits on its workspace's cell
+EOF
+    [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
+    # Quickshell's warning for a screen's object read after the screen went, which no QML
+    # file is named in.
+    if grep -q 'dangling screen' "$QS_LOG"; then
+      echo "FAIL a bar read a screen that was gone:"
+      grep -m 3 'dangling screen' "$QS_LOG" | sed 's/^/     /'
       bad=1
     fi
   fi
