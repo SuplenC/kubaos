@@ -1,5 +1,5 @@
 // The on-air marks: what is shared, marked on the desktop for the person alone, never in the stream.
-// A shared window keeps a violet border, and its tube burns violet while it has the keyboard; a
+// A shared window keeps a violet border, and its tube burns violet while it is focused; a
 // shared region has a violet line just outside it; a shared screen has the same line round its
 // whole edge, inside it. One mark for all three. Nothing else changes. The windows and the marks
 // are draft parts, proposed for the library (`sharing-parts.ts`).
@@ -7,23 +7,25 @@
 import { stack } from "../../lib/layout.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { label } from "../../site/dom.ts";
+import { stageControls } from "../../site/parts/stage.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
 import { DESK, desktop, type DesktopOptions, deskWindow, GHOSTTY, REGION, regionMark, screenMark } from "./sharing-parts.ts";
 
-/** A shared window's desktop, the keyboard on window `focused`. */
+/** A shared window's desktop, window `focused` focused. */
 const windowShared = (focused = 0, index = 1) => desktop({ shared: { kind: "window", index }, focused });
 
 /** The marks the stage switches between, each a desktop with that share on air. */
 const MARKS: readonly { readonly label: string; readonly draw: (focused: number) => HTMLElement }[] = [
   { label: "Screen", draw: (focused) => desktop({ shared: { kind: "screen" }, focused }) },
   { label: "Window", draw: (focused) => windowShared(focused) },
-  { label: "Window, with the keyboard", draw: () => windowShared(1) },
+  { label: "Focused window", draw: () => windowShared(1) },
   { label: "Region", draw: (focused) => desktop({ shared: { kind: "region" }, focused }) },
 ];
 
 /**
  * The stage: what is shared picked over the desktop, as the site's other stages offer their states,
- * the screen first; a click on a window gives it the keyboard, the shared one's tube burning violet.
+ * the screen first, the choice lifted above the sample by the stage (`stageControls`); a click on a
+ * window focuses it, the shared one's tube burning violet.
  */
 function live(): HTMLElement {
   const holder = document.createElement("span");
@@ -46,7 +48,7 @@ function live(): HTMLElement {
       draw(index === 2 ? 1 : 0);
     },
   });
-  holder.append(stack("s12", "start", stack("s8", "start", label("What is shared", "label"), choice), room));
+  holder.append(stack("s12", "start", stageControls(stack("s8", "start", label("What is shared", "label"), choice)), room));
   draw(0);
   return holder;
 }
@@ -95,7 +97,7 @@ export default page<State>({
   title: "On-air marks",
   lede: "What is shared, marked in violet for the person alone, never in the stream.",
   code: { unbuilt: "Not built: Hyprland, the shell" },
-  stage: { live, hint: "pick what is shared; click a window to give it the keyboard", daylight: true },
+  stage: { live, hint: "pick what is shared; click a window to focus it", daylight: true },
   variants: [
     { name: "A window, not focused", for: "its border violet; nothing else", sample: shown({ shared: { kind: "window", index: 1 }, focused: 0 }) },
     { name: "A window, focused", for: "its tube violet, glow at night", sample: shown({ shared: { kind: "window", index: 1 }, focused: 1 }) },
@@ -128,7 +130,7 @@ export default page<State>({
       error: "a failed share ends; its marks go",
     },
     rows: [{ name: "A shared window", cell: (state: State) => windowAlone(true, state === "lit") }],
-    looks: { rest: "a violet border, the window border's width", lit: "the keyboard on it: the violet tube and glow" },
+    looks: { rest: "not focused: a violet border, the window border's width", lit: "focused: the violet tube and glow" },
   },
   focus: {
     tubes: [
