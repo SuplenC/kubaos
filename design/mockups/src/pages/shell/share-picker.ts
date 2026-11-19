@@ -53,11 +53,11 @@ function playShared(root: HTMLElement): void {
 
 /**
  * A request waiting live on `monitors`: the window under the pointer takes the focus and shows its
- * Share pill, which shares it; Share this screen shares the screen; Region
- * draws, Enter sharing the region and Esc going back to waiting; × cancels. The screens are built
- * once as the request arrives and only change attributes after that; shared, the move to sharing
- * plays as its recipe says; cancelled, the desktop is left as it was. A double-click on the
- * desktop asks again.
+ * Share pill, which shares it; Share this screen shares the screen; Region draws, letting go of the
+ * box sharing the region and Esc going back to waiting; × cancels. The screens are built once as
+ * the request arrives and only change attributes after that; shared, the move to sharing plays as
+ * its recipe says; cancelled, the desktop is left as it was. A double-click on the desktop asks
+ * again.
  */
 function livePicking(monitors: readonly Monitor[]): HTMLElement {
   const holder = document.createElement("span");
@@ -211,7 +211,7 @@ export default page<Shown>({
     { name: "A window pointed at", for: "it takes the focus; its Share pill on its border", sample: screen(() => both({ pointed: FIREFOX_WINDOW })) },
     { name: "Its Share pill pointed at", for: "lit violet; the line runs on behind it", sample: screen(() => both({ pointed: { ...FIREFOX_WINDOW, pill: true } })) },
     { name: "This screen pointed at", for: "the button lit violet; the screen's edge previewed", sample: screen(() => both({ lit: { kind: "screen", screen: 0 } })) },
-    { name: "A region being drawn", for: "the one dim; Region held; clear inside its line", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
+    { name: "A region being drawn", for: "mid-drag, the one dim; letting go shares it", sample: screen(() => both({ lit: { kind: "region", screen: 0, rect: REGION } })) },
     { name: "Pointed on the other screen", for: "the pill on the window under the pointer", sample: screen(() => both({ pointed: { screen: 1, index: 0 } })) },
     { name: "An app asks", for: "the app's icon in each bar", sample: screen(() => both({ asker: DISCORD })) },
     { name: "Who asked, its hint up", for: "the app's icon names it on hover", sample: screen(() => one({ hint: "app" })) },
@@ -226,7 +226,7 @@ export default page<Shown>({
       rows: [
         { name: "Near its line", for: "its corners light; inside, the desktop as usual", sample: screen(() => regionShared("near")) },
         { name: "Moved by its line", for: "needs the portal to take a new box; it can't yet", sample: screen(() => regionShared("moving")) },
-        { name: "Resized by a corner", for: "that corner white-hot; the opposite one stays", sample: screen(() => regionShared("resizing")) },
+        { name: "Resized by a corner", for: "that corner glows pressed; the opposite one stays", sample: screen(() => regionShared("resizing")) },
       ],
     },
   ],
@@ -294,7 +294,7 @@ export default page<Shown>({
       { name: "Asked", what: "An app asks: each bar rises out of its screen's bottom edge; nothing dims.", tracks: bars(true, false), reduced: bars(true, true), back: "cuts", sample: screen(() => both()) },
       {
         name: "Drawing a region",
-        what: "Region: the screen's dim fades in over `short`, the one modal moment.",
+        what: "Region: the screen's dim fades in over `short`, the one modal moment; letting go of the box shares it.",
         tracks: [{ part: "the dim", on: "the screen", target: ".share-draw", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "cuts",
@@ -347,7 +347,6 @@ export default page<Shown>({
   },
   keyboard: {
     keys: [
-      { keys: ["Enter"], does: "while drawing: shares the region" },
       { keys: ["Esc"], does: "while drawing: back to waiting" },
     ],
     order: "None while waiting: the keyboard stays with the apps.",

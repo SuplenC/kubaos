@@ -465,8 +465,9 @@ function resized(began: Rect, grab: Grab, dx: number, dy: number, room: Room): R
  * Each corner's stretch, the curve and `space.s32` of the line either side of it, resizes from that
  * corner, the opposite corner staying put; the rest of the band moves it. While the pointer is near
  * the line, each corner's stretch lights as a lit control's tube does, in the sharing tone (the
- * library's ring, `focusRing`): the corner under the pointer fully, the others at
- * `focus.near_opacity`; a corner being dragged holds the pressed, white-hot look. While it moves the
+ * library's ring, `focusRing`, filled, so the lit line burns at `sharing_core`): every corner's
+ * line at the core, the one under the pointer glowing fully and the others at
+ * `focus.near_opacity`; a corner being dragged holds the pressed look, its glow swollen. While it moves the
  * drawing's size chip follows under it. It stays inside its own screen and never gets smaller than
  * `size.control_lg` each way. Only the band takes the pointer: inside, the desktop is as usual. The
  * band and the lit corners are the mark's own, which only the person sees, never the stream. Only a
@@ -528,8 +529,11 @@ export function regionMark(start: Rect, room: Room, options: RegionOptions = {})
     corner.dataset.corner = name;
     const light = document.createElement("span");
     light.className = "share-region-light k-control";
-    light.toggleAttribute("data-hot", true);
-    const ring = focusRing(light, "surface", "sharing", false);
+    // Lit, its line burns at the tone's core, as a filled control's edge does, so the line itself
+    // brightens; pressed, its glow swells as any control's does.
+    light.style.setProperty("--edge", "var(--color-sharing_core)");
+    light.style.setProperty("--edge-off", "var(--color-sharing_glass)");
+    const ring = focusRing(light, "surface", "sharing", true);
     ring.style.setProperty("--corner", "calc(var(--region-corner) + var(--region-line))");
     corner.append(light);
     lights.set(name, light);
@@ -666,7 +670,10 @@ export interface DrawOptions {
  * Draft part, proposed: drawing a region on the screen, the one modal moment of picking. The
  * screen dims outside the box; the box is clear, with the mark it keeps on air just outside it,
  * `sharing` the thin stroke wide, and its size in the screen's pixels in a Neutral chip under its
- * start. A drag with the main button draws it; Enter shares it and Esc goes back to waiting.
+ * start. A drag with the main button draws it, held inside the screen, and letting go shares it at
+ * once: it can be moved and resized once shared, so nothing asks to confirm it. A box smaller than
+ * `size.control_lg` either way shares nothing and drawing waits for another drag; Esc goes back to
+ * waiting.
  */
 export function regionDraw(options: DrawOptions = {}): HTMLElement {
   const density = options.density ?? DP10.density;
@@ -692,10 +699,14 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
     size.replaceChildren(chip({ label: regionSize(Math.round(rect.width * density), Math.round(rect.height * density)), icon: SHARE_ICONS.region }));
   };
   show();
+  /** Where the pointer is on the screen, in its logical pixels, held inside it. */
   const logical = (event: PointerEvent) => {
     const bounds = surface.getBoundingClientRect();
-    return { x: ((event.clientX - bounds.left) / bounds.width) * width, y: ((event.clientY - bounds.top) / bounds.height) * height };
+    const x = ((event.clientX - bounds.left) / bounds.width) * width;
+    const y = ((event.clientY - bounds.top) / bounds.height) * height;
+    return { x: Math.min(Math.max(x, 0), width), y: Math.min(Math.max(y, 0), height) };
   };
+  let left = false;
   // The window takes the drag's moves, so a drag carried past the screen's edge still lands on it.
   const follow = (from: { x: number; y: number }) => {
     const drag = (moved: PointerEvent) => {
@@ -703,17 +714,30 @@ export function regionDraw(options: DrawOptions = {}): HTMLElement {
       rect = { x: Math.round(Math.min(from.x, to.x)), y: Math.round(Math.min(from.y, to.y)), width: Math.round(Math.abs(to.x - from.x)), height: Math.round(Math.abs(to.y - from.y)) };
       show();
     };
+    const release = () => {
+      window.removeEventListener("pointermove", drag);
+      if (left) return;
+      const least = leastRegion();
+      if (rect && rect.width >= least && rect.height >= least) {
+        options.onDone?.(rect);
+        return;
+      }
+      // Too small to share: the box goes and drawing waits for another drag.
+      rect = undefined;
+      show();
+    };
     window.addEventListener("pointermove", drag);
-    window.addEventListener("pointerup", () => window.removeEventListener("pointermove", drag), { once: true });
+    window.addEventListener("pointerup", release, { once: true });
   };
   surface.addEventListener("pointerdown", (event) => {
     event.stopPropagation();
     if (event.button === 0) follow(logical(event));
   });
   surface.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && rect && rect.width > 0 && rect.height > 0) options.onDone?.(rect);
-    else if (event.key === "Escape") options.onBack?.();
-    else return;
+    if (event.key !== "Escape") return;
+    // Gone back before letting go: the drag's release shares nothing.
+    left = true;
+    options.onBack?.();
     event.preventDefault();
     event.stopPropagation();
   });

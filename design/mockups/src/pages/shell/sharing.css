@@ -187,12 +187,12 @@
    corner holds it with room for its glow and shows only the corner's stretch of it, fading out
    along the line. It takes no pointer. */
 .share-region-corner {
-  --reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
+  --corner-glow-room: round(up, calc(var(--focus-far) - 0.001px), 1px);
   position: absolute;
-  inset: calc(-1 * (var(--region-line) + var(--reach)));
+  inset: calc(-1 * (var(--region-line) + var(--corner-glow-room)));
   display: block;
   pointer-events: none;
-  --stretch-end: calc(var(--reach) + var(--region-line) + var(--region-stretch));
+  --stretch-end: calc(var(--corner-glow-room) + var(--region-line) + var(--region-stretch));
   mask-image: radial-gradient(circle at var(--at), var(--color-scrim) var(--stretch-end), transparent calc(var(--stretch-end) + var(--region-band)));
 }
 
@@ -214,7 +214,7 @@
 
 .share-region-light {
   position: absolute;
-  inset: var(--reach);
+  inset: var(--corner-glow-room);
   display: block;
 }
 
@@ -223,9 +223,11 @@
 }
 
 /* Near the line (on its band or a grip, a drag under way, or `data-near` for a sample): every
-   corner lit at `focus.near_opacity`, the one under the pointer (`data-near`'s corner) fully. */
+   corner's line lit at the core, its glow at `focus.near_opacity`; the one under the pointer
+   (`data-near`'s corner) glows fully. */
 .share-region:is([data-near], [data-dragging], :has(> .share-region-band:hover, > .share-region-grip:hover)) .share-region-light:not([data-pinned]) {
   --lit: var(--focus-near_opacity);
+  --line-shown: 1;
 }
 
 .share-region:is([data-near="nw"], :has(> .share-region-grip[data-corner="nw"]:hover)) > [data-corner="nw"] > .share-region-light,
