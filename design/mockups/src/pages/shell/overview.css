@@ -28,6 +28,8 @@
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-red { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-solid { syntax: "<number>"; inherits: true; initial-value: 0; }
 
 /* The sample: a whole screen, the size the stage or the full screen gives it. */
 .ov {
@@ -534,11 +536,17 @@
 }
 
 /* The delete slot: on the frame's glass at the miniatures' radius, as wide as what it holds with
-   `space.s16` round it (`slotBox`), a workspace's shape while empty, in the corner while something is carried
-   or waits in it. It rises `space.s24` into place and fades in over `medium`, and leaves the same
-   way, faster. Its line is the Danger tone's glass at rest, `focus.tube` wide; lit while something
-   is pulled in, the line burns and glows as a lit Danger control's does. It never grows, so the line
-   keeps its width. */
+   `space.s16` round it (`slotBox`), a workspace's shape while empty, in the corner while something
+   is carried or waits in it. It rises `space.s24` into place and fades in over `medium`, and leaves
+   the same way, faster. It never grows, so its line, `focus.tube` wide, keeps its width.
+
+   Its red says how near a delete is, each state easing into the next over `short` on `standard`:
+   - nothing carried: the glass, its line the Danger tone's unlit glass, the symbol in Danger;
+   - something carried: the line full Danger, the glass warmed by Danger at `opacity.tint`;
+   - something pulled in and still held: solid Danger (`burn_error`, the Danger fill) with its glow,
+     what is drawn on it in `on_burn_error`;
+   - let go, waiting out its time: red glass, Danger at `opacity.error_fill` over the glass, the line
+     full Danger and no glow, so what waits and the timer read clearly. */
 .ov-bin {
   position: absolute;
   left: 0;
@@ -548,7 +556,13 @@
   width: var(--ov-w);
   height: var(--ov-h);
   border-radius: var(--radius-control);
-  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
+  /* `--ov-red` is how much Danger warms the glass, `--ov-solid` how far it is solid Danger. */
+  background: color-mix(
+    in srgb,
+    var(--color-burn_error) calc(var(--ov-solid) * 100%),
+    color-mix(in srgb, rgb(from var(--color-burn_error) r g b / var(--ov-red)), rgb(from var(--color-surface_container) r g b / var(--opacity-frame)))
+  );
+  --ov-slot-ink: color-mix(in srgb, var(--color-on_burn_error) calc(var(--ov-solid) * 100%), var(--color-burn_error));
   translate: var(--ov-x) calc(var(--ov-y) + var(--space-s24));
   opacity: 0;
   pointer-events: none;
@@ -564,7 +578,21 @@
     translate var(--motion-medium) var(--easing-emphasized_decel),
     opacity var(--motion-medium) var(--easing-emphasized_decel),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear),
-    --ov-w var(--motion-medium) var(--easing-emphasized_decel);
+    --ov-w var(--motion-medium) var(--easing-emphasized_decel),
+    --ov-red var(--motion-short) var(--easing-standard),
+    --ov-solid var(--motion-short) var(--easing-standard);
+}
+
+.ov[data-carrying] .ov-bin {
+  --ov-red: var(--opacity-tint);
+}
+
+.ov-bin[data-pending] {
+  --ov-red: var(--opacity-error_fill);
+}
+
+.ov-bin[data-pinned] {
+  --ov-solid: 1;
 }
 
 /* The line at rest: the tube shown as unlit glass, with no glow. */
@@ -574,6 +602,13 @@
 
 .ov-bin:not([data-pinned]) > .k-ring > .k-tube {
   border-color: var(--tube-unlit);
+  transition: border-color var(--motion-short) var(--easing-standard);
+}
+
+/* Something carried, or waiting: the line full Danger, with no glow. */
+.ov[data-carrying] .ov-bin:not([data-pinned]) > .k-ring > .k-tube,
+.ov-bin[data-pending]:not([data-pinned]) > .k-ring > .k-tube {
+  border-color: var(--tube-lit);
 }
 
 /* Something waits in it: anywhere on the slot takes it back out, with the open hand. */
@@ -611,7 +646,7 @@
   display: block;
   height: var(--size-progress);
   border-radius: var(--radius-full);
-  background: rgb(from var(--color-burn_error) r g b / var(--opacity-tint));
+  background: rgb(from var(--ov-slot-ink) r g b / var(--opacity-tint));
   opacity: 0;
   transition: opacity var(--motion-short) var(--easing-standard);
 }
@@ -625,7 +660,7 @@
   width: calc(var(--hold, 0) * 100%);
   height: 100%;
   border-radius: inherit;
-  background: var(--color-burn_error);
+  background: var(--ov-slot-ink);
 }
 
 /* A thing waiting in the slot takes the pointer too, with the open hand. */

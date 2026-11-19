@@ -1516,6 +1516,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (target?.kind !== "bin") delete was.element.dataset.held;
     delete was.element.dataset.refused;
     caught = false;
+    // Let go, it is no longer held: the slot calms from its solid red.
+    lightBin(false);
     // Dropped mid-pull, a window's landing and a workspace's glide take its shrink from where it is.
     if (was.kind === "space" && target?.kind !== "bin") {
       glide(was.element, "land");
@@ -1672,7 +1674,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   // The slot: a workspace's shape on the frame's glass, its line in the Danger tone's glass at
   // rest, lit with its glow while something is pulled in; the delete symbol in its middle, and the
   // timer's bar along its foot while something waits.
-  const bin = span("ov-bin", span("ov-slot-symbol", icon("delete", "var(--icon-s32)", "var(--color-burn_error)")), span("ov-slot-timer", span("ov-slot-fill")));
+  const bin = span("ov-bin", span("ov-slot-symbol", icon("delete", "var(--icon-s32)", "var(--ov-slot-ink)")), span("ov-slot-timer", span("ov-slot-fill")));
   focusRing(bin, "control", "burn_error", false);
   // A sample's annotation: the slot's reach, the screen clipping it to its corner.
   const reach = options.reach ? span("ov-reach") : null;
@@ -1685,7 +1687,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (left !== undefined) bin.style.setProperty("--hold", String(left));
   }
 
-  /** The slot lit as a lit Danger control, while a carried thing is pulled in. */
+  /** The slot solid Danger and glowing, while a carried thing is pulled in and still held. */
   function lightBin(over: boolean): void {
     if (over) bin.dataset.pinned = "lit";
     else delete bin.dataset.pinned;

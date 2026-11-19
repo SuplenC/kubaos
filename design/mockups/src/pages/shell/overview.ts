@@ -205,6 +205,15 @@ const TIP_LEAVES: Move = {
   sample: () => still({ learned: ["window"] }),
 };
 
+const SLOT_REDDENS: Move = {
+  name: "The slot reddening",
+  what: "Pulled in and held: the glass turns solid Danger over `short`; let go, it calms to red glass.",
+  tracks: [{ part: "the solid red", on: "the slot", target: ".ov-bin", property: "--ov-solid", from: 0, to: 1, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "plays",
+  sample: () => still({ pin: { kind: "binning", what: TERMINAL, over: false } }),
+};
+
 const SLOT_ARRIVES: Move = {
   name: "The delete slot arriving",
   what: "Lifted: it rises `space.s24` into the corner and fades in over `medium`; it leaves over `short`.",
@@ -291,11 +300,11 @@ export default page<Shown>({
     { name: "1, 2, empty 3, 4", for: "a gap: 3 holds its place, empty", sample: at({ fill: "gap" }) },
     { name: "The empty 3, deleted", for: "right-dragged into the slot", sample: at({ fill: "gap", pin: { kind: "binning", what: { space: "s8" }, over: true } }) },
     { name: "After it: 1, 2, 3", for: "4 rolled to 3; dragged back out, the gap returns", sample: at({ fill: "gap", pin: { kind: "pending", what: { space: "s8" }, left: 0.9 } }) },
-    { name: "The delete slot, carrying", for: "a window on its way to it", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
-    { name: "Over the delete slot", for: "pulled into the lit slot: let go, and it waits", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
+    { name: "The delete slot, carrying", for: "on its way: the line full red, the glass warmed", sample: at({ pin: { kind: "binning", what: TERMINAL, over: false } }) },
+    { name: "Over the delete slot", for: "pulled in and held: solid red; let go, it waits", sample: at({ pin: { kind: "binning", what: TERMINAL, over: true } }) },
     { name: "A workspace over the slot", for: "right-dragged: its miniature held in the slot", sample: at({ pin: { kind: "binning", what: GAME, over: true } }) },
-    { name: "Waiting to close", for: "in the slot, three fifths of its time left", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }) },
-    { name: "A second one over it", for: "both in the slot, the first still timed", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
+    { name: "Waiting to close", for: "red glass, three fifths of its time left", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.6 } }) },
+    { name: "A second one over it", for: "held while one waits: solid red, both in the slot", sample: at({ pin: { kind: "pending", what: TERMINAL, left: 0.4, next: GAME } }) },
     { name: "The second dropped", for: "the first deleted, the second waiting afresh", sample: at({ pin: { kind: "pending", what: GAME, left: 1, confirmed: TERMINAL } }) },
     { name: "Taken back out", for: "dragged out of the slot: carried again, its timer gone", sample: at({ pin: { kind: "picked", what: TERMINAL } }) },
     { name: "The tip, shown", for: "nothing learned yet: the bottom left corner, 1:1", sample: corner({}, "left", 720, 160) },
@@ -329,7 +338,7 @@ export default page<Shown>({
     tubes: [
       { name: "A workspace, by the keyboard", tone: "accent", filled: false, content: false },
       { name: "A carry's target", tone: "accent", filled: false, content: false },
-      { name: "The delete slot, lit", tone: "burn_error", filled: false, content: false },
+      { name: "The delete slot, held in", tone: "burn_error", filled: true, content: false },
     ],
     looks: { lit: "the tube round the miniature, its glow outside", signsOff: "the tube as glass, no glow" },
     signsOff: () => still({ pin: { kind: "lit", space: "s7" } }),
@@ -346,7 +355,7 @@ export default page<Shown>({
   motion: {
     arrives: [OPENING, SWIPE_OPENS],
     leaves: [CLOSING, SWIPE_CLOSES],
-    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, TIMER, TIMES_OUT],
+    between: [LIFT, PLACE_FOLLOWS, DROP_SETTLES, ARRIVES, GAP_CLOSES, TIP_LEAVES, SLOT_ARRIVES, PULLED, SLOT_REDDENS, TIMER, TIMES_OUT],
   },
   keyboard: {
     keys: [
@@ -390,6 +399,8 @@ export default page<Shown>({
       { part: "Gap round a held thing", token: "space-s16" },
       { part: "Slot in from the corner", token: "space-s48" },
       { part: "Slot's timer", token: "size-progress" },
+      { part: "Slot warmed, carrying", token: "opacity-tint" },
+      { part: "Slot's red glass, waiting", token: "opacity-error_fill" },
       { part: "Drop reach, of the shorter side", token: "scale-drop_reach" },
     ],
     reflow: { note: "Its own group up to a 3 × 3 grid's size; waiting groups at half; rows centred.", sample: at({ desk: "laptop" }) },
