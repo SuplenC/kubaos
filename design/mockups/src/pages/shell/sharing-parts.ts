@@ -33,7 +33,7 @@ import { panelPage } from "../../lib/panel-page.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
-import { clamped, text } from "../../lib/text.ts";
+import { centreOnInk, clamped, text } from "../../lib/text.ts";
 import { floatingTooltip, keyTooltip, popover, tooltip } from "../../lib/tooltip.ts";
 import { mutePill } from "./bar-audio-parts.ts";
 import { barScreen, bellPill, type CameraUse, cameraPill, EVERYDAY, type Share, SHARE_ICONS, type ShareKind, sharingPill, statusPill, wallpaper } from "./bar-parts.ts";
@@ -845,6 +845,9 @@ function shareCard(view: ShareView, index: number, options: SharingPanelOptions)
   const words = shareWords(view);
   const title = clamped(words.title, "body_strong", "on_surface");
   title.classList.add("share-card-line");
+  // Beside a tile the eye sets the title's capitals against the tile's symbol, so every title is
+  // centred on a capital's height, whatever its words weigh: the cards' titles sit alike.
+  centreOnInk(title, "body_strong", "H");
   // Every card leads with an Sm tile, so the three kinds' titles line up: a window's app icon, or
   // the kind's own symbol, the one its Change what's shared button carries.
   const app = view.kind === "window" && view.app ? view.app : undefined;
