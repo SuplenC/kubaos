@@ -130,12 +130,15 @@ fn the_files_settings_are_their_flag_files() {
     let before = machine.read();
     machine.write("config/kubaos/desktop/files/tidy-downloads", "");
     machine.write("config/kubaos/desktop/files/no-automount", "");
+    machine.write("config/kubaos/desktop/files/no-folder-sizes", "");
     let after = machine.read();
 
     assert_eq!(before.get(TIDY_DAILY), Some(&on(false)));
     assert_eq!(before.get(AUTOMOUNT), Some(&on(true)));
     assert_eq!(after.get(TIDY_DAILY), Some(&on(true)));
     assert_eq!(after.get(AUTOMOUNT), Some(&on(false)));
+    assert_eq!(before.get(FOLDER_SIZES), Some(&on(true)));
+    assert_eq!(after.get(FOLDER_SIZES), Some(&on(false)));
 }
 
 #[test]
@@ -487,6 +490,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
     for name in [
         TIDY_DAILY,
         AUTOMOUNT,
+        FOLDER_SIZES,
         GREETING,
         MAC_ACCENTS,
         PHONE_LINK,
@@ -528,6 +532,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "usr/share/kubaos/system/packages.toml",
         "config/kubaos/desktop/files/tidy-downloads",
         "config/kubaos/desktop/files/no-automount",
+        "config/kubaos/desktop/files/no-folder-sizes",
         "config/kubaos/desktop/workspaces/no-open-where-launched",
         "config/kubaos/terminal/zsh/no-greeting",
         "config/kubaos/desktop/keyboard/keyboard.toml",
