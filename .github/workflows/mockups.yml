@@ -1,0 +1,85 @@
+# The mockup site (design/mockups), published on GitHub Pages: on each push to
+# main that changes it, `just mockups-build` builds it static and Pages serves
+# that build. Its checks run in check.yml; this workflow only builds and
+# publishes.
+#
+# Two jobs, so the one whose token can publish runs none of the repo's code:
+# `build` only reads, and `deploy` hands Pages the site `build` uploaded.
+# The caches are check.yml's design job's: the same devshell, and the tokens'
+# generator is among the crates it compiles.
+#
+# Actions are pinned to a commit, with the release in the comment beside it.
+name: Mockups
+
+# Only a push that changes what the site is built from: the site and the
+# tokens (design/), the tokens' generator, the fonts and symbols it reads from
+# `kubaos-ui`, the pictures its pages show (branding/, Kōbō's assets, the boot
+# splash and GRUB theme), and this workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - design/**
+      - crates/kubaos-tokens/**
+      - crates/kubaos-ui/**
+      - crates/kubaos-kobo/assets/**
+      - branding/**
+      - system/files/plymouth/**
+      - system/files/grub/**
+      - .github/workflows/mockups.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push's site replaces an older one's; a deploy under way finishes.
+concurrency:
+  group: mockups-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build (x86_64-linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      # This job runs the repo's code: it keeps no token to push with.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          name: design
+          cargo: true
+
+      - name: Build the site
+        run: nix develop --command just mockups-build
+
+      - name: Upload
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: design/mockups/dist
+
+  deploy:
+    name: deploy
+    needs: build
+    # Only main's site is published: a manual run from another branch builds, never deploys.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
