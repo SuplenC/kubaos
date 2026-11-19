@@ -451,7 +451,7 @@ export default page<Shown>({
       { part: "Zone, of a place's sides", token: "scale-snap" },
       { part: "Zone at least, of the screen", token: "scale-snap_least" },
       { part: "Slot's room, its height", token: "size-drop_slot" },
-      { part: "Slot's room, in from its line", token: "space-s16" },
+      { part: "Slot's margin, all four sides", token: "space-s16" },
       { part: "Slot in from the corner", token: "space-s48" },
       { part: "Slot's timer", token: "size-progress" },
       { part: "Slot warmed, carrying", token: "opacity-tint" },

@@ -1647,18 +1647,24 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /**
-   * In the slot: the room inside its line, a workspace's shape `size.drop_slot` tall, `space.s16`
-   * from the line on the left, the right and the top and above the timer's bar. One thing at a
-   * time, fitted to that room keeping its shape, and centred in it; a second covers the first.
+   * In the slot: the room inside its line, `size.drop_slot` tall, `space.s16` from the line on all
+   * four sides, in the shape of the thing it holds. One thing at a time, fitted to that room
+   * keeping its shape, and centred in it; a second covers the first, the slot taking its shape.
    */
   function slotPose(thing: Posed): Pose {
     const slot = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!);
     const gap = L("space-s16");
-    const room = { x: slot.x + gap, y: slot.y + gap, w: slot.w - 2 * gap, h: L("size-drop_slot") };
+    const room = { x: slot.x + gap, y: slot.y + gap, w: slot.w - 2 * gap, h: slot.h - 2 * gap };
     const s = thing.kind === "window" ? number("scale-carried") * thing.scale : thing.scale;
     const box = drawn(thing.kind, { x: 0, y: 0, ...thing.own, s, k: 1 });
     const k = Math.min(room.w / box.w, room.h / box.h);
-    return { x: room.x + (room.w - box.w * k) / 2, y: room.y + (room.h - box.h * k) / 2, ...thing.own, s, k };
+    // In the room shaped for it, it fills it exactly: the room is whole device pixels wide, and the
+    // part of a pixel that leaves goes into its own width, not into one margin.
+    const fills = Math.abs(room.w - box.w * k) < 1 && Math.abs(room.h - box.h * k) < 1;
+    const w = fills ? (thing.own.w * room.w) / (box.w * k) : thing.own.w;
+    const h = fills ? (thing.own.h * room.h) / (box.h * k) : thing.own.h;
+    const size = fills ? { w: room.w, h: room.h } : { w: box.w * k, h: box.h * k };
+    return { x: room.x + (room.w - size.w) / 2, y: room.y + (room.h - size.h) / 2, w, h, s, k };
   }
 
   function pose(thing: Posed, at: Pose): void {
@@ -1974,17 +1980,32 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /**
    * The slot's place on screen `on`: `space.s48` in from its bottom right corner, as far in as the
-   * miniatures' margin. It holds one thing in a room of a workspace's shape `size.drop_slot` tall,
-   * `space.s16` from its line on every side and above the timer's bar, which keeps `space.s8` from
-   * its foot. It is the one size whatever it holds.
+   * miniatures' margin. It holds one thing `size.drop_slot` tall in its own shape, `space.s16` from
+   * its line on all four sides, so it is as wide as `holding` makes it; empty, as a workspace of
+   * the screen's shape would. The timer's bar takes no room of its own: it runs in the bottom
+   * margin (`overview.css`).
    */
-  function slotBox(on: ScreenView): model.Rect {
+  function slotBox(on: ScreenView, holding: Posed | null = slotHolds()): model.Rect {
     const gap = L("space-s16");
     const inner = L("size-drop_slot");
-    const h = gap + inner + gap + L("size-progress") + L("space-s8");
-    const w = 2 * gap + (inner * on.size.w) / on.size.h;
+    const shape = holding ? slotShape(holding) : on.size.w / on.size.h;
+    const h = gap + inner + gap;
+    // Whole device pixels wide, so its right edge and what it holds land on them (`slotPose`).
+    const w = 2 * gap + device(inner * shape);
     const inset = L("space-s48");
     return { x: on.at.x + on.size.w - inset - w, y: on.at.y + on.size.h - inset - h, w, h };
+  }
+
+  /** What the slot is drawn round: the thing pulled into it, over one that waits there, or that one. */
+  function slotHolds(): Posed | null {
+    return carry && caught ? carry : (pending?.posed ?? null);
+  }
+
+  /** A thing's shape in the slot, its width over its height, as it is drawn away from any place. */
+  function slotShape(thing: Posed): number {
+    const s = thing.kind === "window" ? number("scale-carried") * thing.scale : thing.scale;
+    const box = drawn(thing.kind, { x: 0, y: 0, ...thing.own, s, k: 1 });
+    return box.w / box.h;
   }
 
   /** Shows the slot on the screen under `point` while something is carried, or where one waits. */
@@ -2051,7 +2072,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /** The slot's middle, in world points. */
   function binCentre(): Point {
-    const box = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!);
+    // The empty slot's middle: the reach stays put whatever the slot holds.
+    const box = slotBox(viewOf(binOn ?? desk.focused) ?? views[0]!, null);
     return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
   }
 
