@@ -97,9 +97,6 @@ export default page({
     { name: "A morphing symbol", for: "two states in one symbol: play's halves part into pause", sample: morphing },
     { name: "Held", for: "acts once held for `duration.hold`: a reset", sample: () => heldSample() },
     { name: "Held, halfway", for: "the ring's arc half round, from the top", sample: () => heldSample(0.5) },
-    { name: "Outlined, Danger", for: "on a picture: the Overview's delete zone", sample: () => roomy(iconButton({ icon: "delete", label: "Close", kind: "Danger", size: "Lg", outlined: true }), "Lg") },
-    { name: "Outlined, Danger, lit", for: "a carried window over it", sample: () => roomy(iconButton({ icon: "delete", label: "Close", kind: "Danger", size: "Lg", outlined: true, pinned: "lit" }), "Lg") },
-    { name: "Outlined, Text, its ring draining", for: "the zone's Undo, its time running out", sample: () => roomy(iconButton({ icon: "undo", label: "Undo", kind: "Text", size: "Lg", outlined: true, held: 0.6 }), "Lg") },
   ]),
   sizes: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => roomy(sample("Filled", size), size) }))),
   states: {
