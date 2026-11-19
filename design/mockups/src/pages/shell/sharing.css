@@ -1,0 +1,418 @@
+/* Picking what to share, the on-air panels and the marks on what is shared (`sharing-parts.ts`). */
+
+/* Every screen side by side, top-aligned as Hyprland lays them out. */
+.share-screens {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-s24);
+}
+
+/* A desktop's dim never shows over its windows here, and it is no target: the pointer reaches the
+   windows under it, while a request waits and on the on-air desktop alike. */
+.k-screen:has(> .share-desk) > .k-screen-dim {
+  pointer-events: none;
+}
+
+/* The picking bar, on its Sheet in the middle of the frame's bottom edge: one row, as wide as its
+   content, never wider than the screen less the frame and the Sheet's fillets on both sides. */
+.share-pick-bar {
+  box-sizing: border-box;
+  max-width: calc(var(--screen-width) - 2 * (var(--frame-side) + var(--radius-surface)));
+}
+
+/* Drawing a region, the frame and the bar's Sheet stay over the drawing's dim, Region held pressed. */
+.k-screen.share-screen[data-drawing] > :is(.k-screen-glass, .k-screen-over) {
+  z-index: 4;
+}
+
+.share-pick-bar .k-row {
+  min-width: 0;
+}
+
+/* A window's Share pill while a request waits: draft part, proposed (`sharePill`), a sharing
+   Tonal Button in a holder of its own. The holder centres it on the window's top border line,
+   half above it, `space.s8` past the end of the window's corner, over the window's line, so pill
+   and line are one piece, and over the neighbouring windows, the gap and the bar where it reaches
+   past its window. Only the window under the pointer shows it, fading in and out over `short`;
+   hidden, it takes no pointer. Being the window's own, its half past the window keeps the window
+   under the pointer. */
+.share-pill {
+  --border: max(1px, round(nearest, var(--stroke-thin), 1px));
+  position: absolute;
+  z-index: 3;
+  top: round(nearest, calc((var(--border) - var(--size-control_sm)) / 2), 1px);
+  left: calc(var(--corner) + var(--space-s8));
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-window:is(:hover, [data-pointed]) > .share-pill {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* A window on the desktop: draft part, proposed. */
+/* The screen's tiling: the room inside the frame, `space.s8` in from it and between the windows,
+   as Hyprland's gaps, split into equal tracks; it fills whatever size the screen is drawn at. */
+.share-desk {
+  position: absolute;
+  inset: calc(var(--frame-top) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8));
+  display: grid;
+  grid-template-columns: repeat(var(--desk-columns, 1), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--desk-rows, 1), minmax(0, 1fr));
+  gap: var(--space-s8);
+}
+
+.share-window {
+  position: relative;
+  box-sizing: border-box;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-s16);
+  border-radius: var(--corner);
+  background: var(--color-surface);
+}
+
+/* A shared window's border: `sharing_line`, the window border's width, over the neutral border,
+   shown while the window is shared or its Share pill is pointed at, whether or not it has the
+   keyboard. The tube, while it has it, burns over it. */
+.share-border {
+  position: absolute;
+  inset: 0;
+  border: var(--line) solid var(--color-sharing_line);
+  border-radius: var(--corner);
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-window:not([data-shared], :has(> .share-pill .k-control:is(:hover, [data-pinned]))) .share-border {
+  opacity: 0;
+}
+
+/* A shared region's mark: the thin stroke just outside the region, at a window's corner
+   (`--region-corner`). It takes no pointer: only its band does, so inside it the desktop is as
+   usual. */
+.share-region {
+  --region-line: max(1px, round(nearest, var(--stroke-thin), 1px));
+  --region-band: var(--space-s8);
+  /* How far from the region's corner each corner's grip runs along the line. */
+  --region-stretch: var(--space-s32);
+  position: absolute;
+  display: block;
+  border-radius: var(--region-corner);
+  box-shadow: 0 0 0 var(--region-line) var(--color-sharing_line);
+  pointer-events: none;
+}
+
+/* Its grab band: the line and `space.s8` either side of it, one strip a side, which moves it. */
+.share-region-band {
+  position: absolute;
+  pointer-events: auto;
+  cursor: move;
+}
+
+.share-region-band:is([data-side="top"], [data-side="bottom"]) {
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
+  height: calc(var(--region-line) + 2 * var(--region-band));
+}
+
+.share-region-band:is([data-side="left"], [data-side="right"]) {
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
+  width: calc(var(--region-line) + 2 * var(--region-band));
+}
+
+.share-region-band[data-side="top"] {
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
+}
+
+.share-region-band[data-side="bottom"] {
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
+}
+
+.share-region-band[data-side="left"] {
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
+}
+
+.share-region-band[data-side="right"] {
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
+}
+
+/* A corner's grip: the band along the corner's stretch, an L the band thick, over the band there,
+   which resizes from that corner. Drawn for the top left corner and turned for the others. */
+.share-region-grip {
+  --grip: calc(var(--region-line) + var(--region-band) + var(--region-stretch));
+  --thick: calc(var(--region-line) + 2 * var(--region-band));
+  position: absolute;
+  z-index: 1;
+  width: var(--grip);
+  height: var(--grip);
+  clip-path: polygon(0 0, 100% 0, 100% var(--thick), var(--thick) var(--thick), var(--thick) 100%, 0 100%);
+  pointer-events: auto;
+}
+
+.share-region-grip[data-corner="nw"] {
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
+  cursor: nwse-resize;
+}
+
+.share-region-grip[data-corner="ne"] {
+  top: calc(-1 * (var(--region-line) + var(--region-band)));
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
+  transform: scaleX(-1);
+  cursor: nesw-resize;
+}
+
+.share-region-grip[data-corner="se"] {
+  right: calc(-1 * (var(--region-line) + var(--region-band)));
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
+  transform: scale(-1);
+  cursor: nwse-resize;
+}
+
+.share-region-grip[data-corner="sw"] {
+  bottom: calc(-1 * (var(--region-line) + var(--region-band)));
+  left: calc(-1 * (var(--region-line) + var(--region-band)));
+  transform: scaleY(-1);
+  cursor: nesw-resize;
+}
+
+/* A corner's twin: a second arc outside the corner, the region's own line (`sharing_line`, the
+   thin stroke), of the corner's own radius, its centre moved out along the corner's diagonal so its
+   middle stands `space.s4` clear of the line's; three quarters of the quarter turn, centred on the
+   diagonal, with round ends. Drawn as a ring as large as the corner's circle, masked to the arc and
+   its two end caps; set for the top left corner and turned for the others. The trigonometry is
+   the arc's own: its centre moved by the gap over the diagonal (cos 45°), its ends 33.75° either
+   side of it. It takes no pointer. */
+.share-region-twin {
+  --twin-radius: calc(var(--region-corner) + var(--region-line) / 2);
+  --twin-size: calc(2 * (var(--region-corner) + var(--region-line)));
+  --twin-shift: calc((var(--space-s4) + var(--region-line)) * 0.7071);
+  --twin-mid: calc(var(--twin-size) / 2);
+  --twin-cap: calc(var(--region-line) / 2);
+  position: absolute;
+  box-sizing: border-box;
+  display: block;
+  width: var(--twin-size);
+  height: var(--twin-size);
+  border: var(--region-line) solid var(--color-sharing_line);
+  border-radius: var(--radius-full);
+  mask-image:
+    conic-gradient(from 281.25deg, var(--color-scrim) 0 67.5deg, transparent 0),
+    radial-gradient(circle at calc(var(--twin-mid) - 0.9808 * var(--twin-radius)) calc(var(--twin-mid) - 0.1951 * var(--twin-radius)), var(--color-scrim) var(--twin-cap), transparent calc(var(--twin-cap) + 1px)),
+    radial-gradient(circle at calc(var(--twin-mid) - 0.1951 * var(--twin-radius)) calc(var(--twin-mid) - 0.9808 * var(--twin-radius)), var(--color-scrim) var(--twin-cap), transparent calc(var(--twin-cap) + 1px));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-region-twin[data-corner="nw"] {
+  top: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  left: calc(-1 * (var(--region-line) + var(--twin-shift)));
+}
+
+.share-region-twin[data-corner="ne"] {
+  top: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  right: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  transform: scaleX(-1);
+}
+
+.share-region-twin[data-corner="se"] {
+  right: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  bottom: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  transform: scale(-1);
+}
+
+.share-region-twin[data-corner="sw"] {
+  bottom: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  left: calc(-1 * (var(--region-line) + var(--twin-shift)));
+  transform: scaleY(-1);
+}
+
+/* Near the line (on its band or a grip, a drag under way, or `data-near` for a sample): every
+   corner's twin faint, at `opacity.held`; the one under the pointer (`data-near`'s corner), and
+   one being dragged, whole. */
+.share-region:is([data-near], [data-dragging], :has(> .share-region-band:hover, > .share-region-grip:hover)) > .share-region-twin {
+  opacity: var(--opacity-held);
+}
+
+.share-region:is([data-near="nw"], :has(> .share-region-grip[data-corner="nw"]:hover)) > .share-region-twin[data-corner="nw"],
+.share-region:is([data-near="ne"], :has(> .share-region-grip[data-corner="ne"]:hover)) > .share-region-twin[data-corner="ne"],
+.share-region:is([data-near="se"], :has(> .share-region-grip[data-corner="se"]:hover)) > .share-region-twin[data-corner="se"],
+.share-region:is([data-near="sw"], :has(> .share-region-grip[data-corner="sw"]:hover)) > .share-region-twin[data-corner="sw"],
+.share-region > .share-region-twin[data-held] {
+  opacity: 1;
+}
+
+/* Its size while it moves or resizes: the drawing's chip, `space.s8` under its line from its start,
+   following it, shown only while a drag is under way. */
+.share-region-size {
+  position: absolute;
+  left: 0;
+  top: calc(100% + var(--region-line) + var(--space-s8));
+  display: flex;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-region[data-dragging] > .share-region-size {
+  opacity: 1;
+}
+
+/* A shared screen's mark: the thin stroke inside the screen's whole edge, at its own corners, in
+   `sharing_line`, as a window's and a region's. It lies within the bar's room above and below
+   its pills and takes no pointer. While a request waits it shows while Share this screen is
+   pointed at. */
+.share-edge {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: block;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line);
+  pointer-events: none;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-screen:not([data-lit-screen]) > .share-edge {
+  opacity: 0;
+}
+
+/* Drawing a region: draft part, proposed. The dim, the one picking shows, is the box's own spread,
+   so the box stays clear, and its line is the region's on-air mark. */
+.share-draw {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  cursor: crosshair;
+  outline: none;
+  background: rgb(from var(--color-scrim) r g b / var(--opacity-panel_scrim));
+}
+
+/* Drawing's dim fades in as drawing starts, the one modal moment. */
+@starting-style {
+  .share-draw {
+    opacity: 0;
+  }
+}
+
+.share-draw {
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.share-draw[data-drawn] {
+  background: none;
+}
+
+.share-draw-box {
+  position: absolute;
+  display: none;
+  border-radius: var(--corner);
+  box-shadow:
+    0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line),
+    0 0 0 calc(var(--screen-width) + var(--screen-height)) rgb(from var(--color-scrim) r g b / var(--opacity-panel_scrim));
+}
+
+.share-draw[data-drawn] > .share-draw-box {
+  display: block;
+}
+
+.share-draw-size {
+  position: absolute;
+  display: none;
+}
+
+.share-draw[data-drawn] > .share-draw-size {
+  display: flex;
+}
+
+/* A draft part's sample: a desktop's corner the size of a panel and a thumbnail, with room round it. */
+.share-sample {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  padding: var(--space-s16);
+  width: calc(var(--size-panel) + 2 * var(--space-s16));
+  height: calc(var(--size-thumbnail_height) + 2 * var(--space-s16));
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_lowest);
+}
+
+/* A share's card: each line cut with an ellipsis where it runs past the card, never growing it. */
+.share-card .share-card-line {
+  min-width: 0;
+}
+
+/* A map of the desk, a draft part: as wide as the card, never taller than a three-line row, its
+   screens in their real places on whole pixels, each parted from the next by the thin stroke. It
+   stands in a room as wide as the card, centred in it, its width, height and place rounded to
+   whole pixels so the card's lines under it stay on them. It is its boxes' container, so their
+   corners scale with its width: each corner's share of the desk's width (`--screen-corner`,
+   `--window-corner`) times the map's. */
+.share-map-room {
+  container-type: inline-size;
+  display: block;
+  align-self: stretch;
+}
+
+.share-map {
+  --map-gap: max(1px, round(nearest, calc(var(--stroke-thin) / 2), 1px));
+  --map-width: round(down, min(100cqw, calc(var(--size-row_three_line) * var(--map-ratio))), 1px);
+  container-type: inline-size;
+  position: relative;
+  display: block;
+  width: var(--map-width);
+  height: round(nearest, calc(var(--map-width) / var(--map-ratio)), 1px);
+  margin-left: round(down, calc((100cqw - var(--map-width)) / 2), 1px);
+}
+
+.share-map-screen {
+  position: absolute;
+  box-sizing: border-box;
+  display: block;
+  left: round(nearest, calc(var(--x) * 1% + var(--map-gap)), 1px);
+  top: round(nearest, calc(var(--y) * 1% + var(--map-gap)), 1px);
+  width: round(nearest, calc(var(--w) * 1% - 2 * var(--map-gap)), 1px);
+  height: round(nearest, calc(var(--h) * 1% - 2 * var(--map-gap)), 1px);
+  border-radius: max(var(--radius-small), calc(var(--screen-corner) * 100cqw));
+  background: var(--color-surface_container_highest);
+}
+
+/* The screen shared whole: the on-air line and a faint violet fill. */
+.share-map-screen[data-shared="whole"] {
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-sharing_line);
+  background: rgb(from var(--color-sharing) r g b / var(--opacity-tint));
+}
+
+/* The screen a window or a region is on: a quiet outline. */
+.share-map-screen[data-shared="part"] {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline);
+}
+
+/* The window or the region, solid violet at its real place and size on its screen, at a window's
+   corner scaled with the map. */
+.share-map-taken {
+  position: absolute;
+  display: block;
+  left: round(nearest, calc(var(--x) * 1%), 1px);
+  top: round(nearest, calc(var(--y) * 1%), 1px);
+  width: round(nearest, calc(var(--w) * 1%), 1px);
+  height: round(nearest, calc(var(--h) * 1%), 1px);
+  border-radius: max(var(--radius-small), calc(var(--window-corner) * 100cqw));
+  background: var(--color-sharing);
+}
+
+/* A window's workspace, in its screen's top left corner, where the bar shows it. */
+.share-map-workspace {
+  position: absolute;
+  left: var(--space-s4);
+  top: var(--space-s4);
+}
+

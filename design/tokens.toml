@@ -210,6 +210,9 @@ row_compact = 28
 lock_date_least = 12
 # A menu's width: an item's symbol, its words and a shortcut's keycaps side by side.
 menu = 240
+# A tooltip at its widest: a short sentence of `small` text stays on one line, and a longer
+# one breaks in a measure still quick to read beside the control it explains.
+tooltip = 320
 chip = 24
 # A badge over an icon's corner: a count's pill, a line of label text tall, and
 # a dot, the size of a picked radio button's.
@@ -1177,6 +1180,22 @@ warning = ""
 # shared, with `sharing_core` along its middle as `primary_core` runs along the accent's.
 burn_sharing = ""
 sharing = ""
+# The line of every on-air mark (a shared window's border, a region's line, a screen's edge) and
+# of a lit sharing control by day: violet that reads beside the window it marks and beside the dark
+# or light wallpaper past it, which text's fit, pinned dark by the day surfaces, would lose.
+sharing_line = ""
+# The sharing pill's fill and its ink: violet as strong as a recording's red on `error_container`,
+# so the pill is found at a glance the moment the screen is on air.
+sharing_container = ""
+on_sharing_container = ""
+# The label on `sharing` itself: a sharing Button held, over its hold's fill.
+on_sharing = ""
+# A sharing Button's roles (`button.md`, its `sharing` colour), by the accent's recipes: a Tonal
+# one's label at rest and its fill pressed, and a Text one's label at rest and lit.
+on_sharing_container_rest = ""
+sharing_container_pressed = ""
+sharing_rest = ""
+sharing_lit = ""
 # The privacy dots: a microphone that is listening, in an orange clear of the warning's amber and
 # the error's red, and anything recording, the camera watching or the screen being recorded, in
 # the recording red: pure red at night, the REC light, a step deeper and purer than the error's red.
@@ -1277,7 +1296,7 @@ logo_core_cold = "#dcf1ff"
 burn_error = "oklch(0.56 0.21 27)"
 burn_success = "oklch(0.62 0.16 150)"
 burn_warning = "oklch(0.84 0.16 85)"
-burn_sharing = "oklch(0.52 0.22 300)"
+burn_sharing = "oklch(0.57 0.28 300)"
 burn_microphone = "oklch(0.70 0.18 55)"
 burn_recording = "oklch(0.55 0.22 29)"
 
@@ -1330,6 +1349,16 @@ recording = { from = "burn_recording", text_on = ["surface", "surface_container_
 on_error = { dark = { from = "burn_error", lightness = 0.25, text_on = ["error"] }, light = { mix = "burn_error", white = 1.0 } }
 error_container = { dark = { from = "burn_error", lightness = 0.5, chroma = 1.2 }, light = { from = "burn_error", at_lightness = 0.93 } }
 on_error_container = { dark = { mix = "burn_error", white = 0.85, text_on = ["error_container"] }, light = { from = "burn_error", lightness = 0.4, text_on = ["error_container"] } }
+# Sharing's container and its label, by the error container's recipe, so the sharing pill and the
+# camera's, on `error_container`, read as equals.
+# The on-air line: by night the neon tone; by day the burning tone itself, a graphic held to 3:1 on
+# the window and on a wallpaper dark or light, where the text role's fit would take it darker.
+sharing_line = { dark = { from = "sharing" }, light = { from = "burn_sharing" } }
+sharing_container = { dark = { from = "burn_sharing", lightness = 0.5, chroma = 1.2 }, light = { from = "burn_sharing", at_lightness = 0.93 } }
+on_sharing_container = { dark = { mix = "burn_sharing", white = 0.85, text_on = ["sharing_container"] }, light = { from = "burn_sharing", lightness = 0.4, text_on = ["sharing_container"] } }
+# The label on `sharing`, by `on_error`'s recipe: the tone deep at night, white by day: a held
+# sharing Button's label over its hold's fill.
+on_sharing = { dark = { from = "burn_sharing", lightness = 0.25, text_on = ["sharing"] }, light = { mix = "burn_sharing", white = 1.0 } }
 
 # A tone's core, the white-hot line along the middle of a lit tube: half way
 # to white.
@@ -1393,10 +1422,16 @@ cold_glass = { dark = { from = "cold_unlit" }, light = { from = "cold" } }
 error_glass = { dark = { from = "error_unlit" }, light = { from = "error" } }
 success_glass = { dark = { from = "success_unlit" }, light = { from = "success" } }
 warning_glass = { dark = { from = "warning_unlit" }, light = { from = "warning" } }
-sharing_glass = { dark = { from = "sharing_unlit" }, light = { from = "sharing" } }
+sharing_glass = { dark = { from = "sharing_unlit" }, light = { from = "sharing_line" } }
 microphone_glass = { dark = { from = "microphone_unlit" }, light = { from = "microphone" } }
 recording_glass = { dark = { from = "recording_unlit" }, light = { from = "recording" } }
 primary_lit = { dark = { from = "primary_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
+# A sharing Button's roles, by the accent's: Tonal's label at rest a little dimmer at night and
+# its fill pressed a step brighter; Text's label unlit at rest and the core lit, fitted to read.
+on_sharing_container_rest = { dark = { from = "on_sharing_container", lightness = 0.8, text_on = ["sharing_container"] }, light = { from = "on_sharing_container" } }
+sharing_container_pressed = { dark = { from = "sharing_container", lighter = 0.035 }, light = { from = "sharing_container", darker = 0.04 } }
+sharing_rest = { dark = { from = "sharing_unlit", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "sharing", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
+sharing_lit = { dark = { from = "sharing_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "sharing", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
 
 # The burning kinds, Danger, Success and Warning: always lit, the bright fixed
 # tone with a dark label, the tone at a quarter of its lightness, made darker
@@ -1539,6 +1574,16 @@ pairs = [
   { fg = "sharing", bg = "surface_container", need = "graphic", use = "Sharing's tube and dot, on a panel, window card or bar pill" },
   { fg = "sharing", bg = "surface_container_high", need = "graphic", use = "The sharing tube and dot, on a dialog or panel card" },
   { fg = "sharing", bg = "surface_container_highest", need = "graphic", use = "The sharing tube and dot, on the highest container" },
+  { fg = "on_sharing_container", bg = "sharing_container", need = "text", use = "The sharing pill's symbol and its count" },
+  { fg = "on_sharing", bg = "sharing", need = "text", use = "A held sharing Button's label over its hold's fill" },
+  { fg = "on_sharing_container_rest", bg = "sharing_container", need = "text", use = "A sharing Tonal Button's label at rest" },
+  { fg = "on_sharing_container", bg = "sharing_container_pressed", need = "text", use = "A sharing Tonal Button's label, pressed" },
+  { fg = "sharing_rest", bg = "surface_container", need = "text", use = "A sharing Text Button's label at rest, on a panel or the bar's Sheet" },
+  { fg = "sharing_lit", bg = "surface_container", need = "text", use = "A sharing Text Button's label lit, on a panel or the bar's Sheet" },
+  { fg = "sharing_rest", bg = "surface", need = "text", use = "A sharing Text Button's label at rest, on a page" },
+  { fg = "sharing_line", bg = "surface", need = "graphic", use = "An on-air mark: a shared window's border on its surface" },
+  { fg = "sharing_line", bg = "surface_container_lowest", need = "graphic", use = "An on-air mark beside the lowest container" },
+  { fg = "sharing_line", bg = "surface_container_highest", need = "graphic", use = "An on-air mark beside the highest container" },
   { fg = "microphone", bg = "surface", need = "text", use = "A listening microphone's words, on a page" },
   { fg = "microphone", bg = "surface_container_lowest", need = "text", use = "A listening microphone's words, on the lock screen" },
   { fg = "microphone", bg = "surface_container_low", need = "text", use = "A listening microphone's words, on a well" },

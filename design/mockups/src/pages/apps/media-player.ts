@@ -4,6 +4,7 @@
 // state the player has. Its draft parts are in `media-player-parts.ts`.
 
 import { label } from "../../site/dom.ts";
+import { stageControls } from "../../site/parts/stage.ts";
 import { doesntApply, type Move, nonEmpty, page, screen } from "../../site/page.ts";
 import { CHROME, settings } from "../../site/settings.ts";
 import { tabs } from "../../lib/tabs.ts";
@@ -635,7 +636,8 @@ function live(): HTMLElement {
   );
   const box = document.createElement("span");
   box.className = "mp-live";
-  box.append(options, songs, room, label("Drag the corner to resize it; point at it, click, scroll, or use mpv's keys; drop a song of your own on it to try it", "mono"));
+  // What plays and the visualiser are the stage's own switches, drawn above the sample at the site's size.
+  box.append(stageControls(options), stageControls(songs), room, label("Drag the corner to resize it; point at it, click, scroll, or use mpv's keys; drop a song of your own on it to try it", "mono"));
   return box;
 }
 

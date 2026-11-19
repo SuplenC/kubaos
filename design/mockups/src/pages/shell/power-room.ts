@@ -32,8 +32,7 @@ import { progressBar, setProgress } from "../../lib/progress.ts";
 import { nested, role } from "../../lib/radius.ts";
 import { hang, sheet } from "../../lib/sheet.ts";
 import { text } from "../../lib/text.ts";
-import { keycap, keys } from "../../lib/keycap.ts";
-import { floatingTooltip, keyTooltip, tooltip } from "../../lib/tooltip.ts";
+import { floatingTooltip, keyTooltip } from "../../lib/tooltip.ts";
 import type { Duration, Easing, NonEmpty, Track } from "../../site/page.ts";
 import { between, bezier, css, cueOf, milliseconds, stepsOf, struck } from "../../site/recipe.ts";
 import { paint, paletteOf } from "../../site/recolour.ts";
@@ -103,12 +102,12 @@ export function tipTitle(index: number): string {
 export const NO_UNDO = "No undo once the sign shows.";
 
 /**
- * The tile's tooltip: its name and letter on one line, or for Restart and Shut down the name, the
- * words on what can't be undone, and the letter under them.
+ * The tile's tooltip: its name and letter on one line, and for Restart and Shut down the words on
+ * what can't be undone under them.
  */
 function tipOf(index: number): HTMLElement {
   const action = ACTIONS[index]!;
-  return index >= RESTART ? tooltip(tipTitle(index), NO_UNDO, row("s4", "centre", ...keys(action.key).map(keycap))) : keyTooltip(tipTitle(index), action.key);
+  return keyTooltip(tipTitle(index), action.key, index >= RESTART ? NO_UNDO : "");
 }
 
 /** The line over the tiles: what the action does, in a sentence. */

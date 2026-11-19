@@ -188,6 +188,112 @@ export function previewPill(branch = BRANCH, state: Shown = "rest"): HTMLElement
   return control([icon("code", "var(--icon-s16)", "var(--color-cold)")], `Live preview of feature/${branch}. Click to go back to the release`, state, { tone: "preview", lone: true });
 }
 
+// On air: the screen shared and the camera in use, each a pill of its own.
+
+/** What a share takes: a whole screen, one window, or a region drawn on a screen. */
+export type ShareKind = "screen" | "window" | "region";
+
+/** Each kind's symbol, the same in the picker's tabs and on the pill. */
+export const SHARE_ICONS: Record<ShareKind, string> = { screen: "desktop_windows", window: "app_window", region: "screenshot_region" };
+
+/** A share running: what it takes, named as the picker names it, the app it goes to, and since when. */
+export interface Share {
+  readonly kind: ShareKind;
+  readonly what: string;
+  readonly who: string;
+  /** The site in the app, where the app names one. */
+  readonly site?: string;
+  readonly since?: string;
+}
+
+/** A camera in use: the app that has it, the camera, and since when. */
+export interface CameraUse {
+  readonly who: string;
+  readonly device?: string;
+  readonly since?: string;
+}
+
+/** What the on-air pills' hints say, one message each, the names as placeholders. */
+export const ON_AIR_WORDS = {
+  sharing: (what: string, who: string) => `Sharing ${what} · ${who}`,
+  camera: (who: string) => `Camera · ${who}`,
+} as const;
+
+// The locale's list joins the hint's messages: "Sharing the left screen · Chromium, Sharing … · Discord".
+const LISTED = new Intl.ListFormat("en-GB", { style: "narrow", type: "unit" });
+// The locale's number says the count.
+const COUNT = new Intl.NumberFormat("en-GB");
+
+/** A list of one or more: one share or camera, or several. */
+type OneOrMore<T> = T | readonly T[];
+const all = <T>(each: OneOrMore<T>): readonly T[] => (Array.isArray(each) ? (each as readonly T[]) : [each as T]);
+
+/** Which on-air pill: the screen shared, or the camera in use. */
+export type OnAirTone = "sharing" | "camera";
+
+const ON_AIR_INK: Record<OnAirTone, string> = { sharing: "on_sharing_container", camera: "on_error_container" };
+
+/**
+ * An on-air pill's content: its symbol, then past one the count, `space.s4` after it as a value
+ * after its symbol. The symbol is the same element either way, so as the count comes and goes the
+ * Pill keeps the symbol solid and only the count fades, in its own room.
+ */
+export function onAirContent(tone: OnAirTone, symbol: string, count: number): Element[] {
+  const ink = ON_AIR_INK[tone];
+  const glyph = icon(symbol, "var(--icon-s16)", `var(--color-${ink})`);
+  return count > 1 ? [glyph, text(COUNT.format(count), "label_number", ink)] : [glyph];
+}
+
+/**
+ * An on-air pill's options: on its meaning's container, `space.s8` at each end whether or not a
+ * count is in it, so the count arriving never moves the pill's ends; the gap `space.s4`.
+ */
+export function onAirOptions(tone: OnAirTone): Omit<PillOptions, "content"> {
+  return { tone, lone: false, end: "s8", gap: "s4" };
+}
+
+function onAirPill(tone: OnAirTone, content: Element[], tip: string, state: Shown): HTMLElement {
+  const made = pill({ ...onAirOptions(tone), content, interactive: true, tooltip: tip, ...stateOptions(state) });
+  made.classList.add("shell-on-air");
+  made.dataset.onAir = tone;
+  made.setAttribute("aria-haspopup", "dialog");
+  return made;
+}
+
+/** The sharing pill's content: the kind's symbol, the screen's where shares of several kinds run, and the count past one. */
+export function sharingContent(shares: OneOrMore<Share>): Element[] {
+  const list = all(shares);
+  const kinds = new Set(list.map((each) => each.kind));
+  return onAirContent("sharing", SHARE_ICONS[kinds.size === 1 ? list[0]!.kind : "screen"], list.length);
+}
+
+/** The camera pill's content: the camera's symbol, and the count past one. */
+export function cameraContent(cameras: OneOrMore<CameraUse>): Element[] {
+  return onAirContent("camera", "video", all(cameras).length);
+}
+
+/**
+ * The sharing pill: on `sharing_container`, the kind's symbol in `on_sharing_container`, and the
+ * count past one. Its hint says what and with whom, for each; a press opens its panel.
+ */
+export function sharingPill(shares: OneOrMore<Share>, state: Shown = "rest"): HTMLElement {
+  const tip = LISTED.format(all(shares).map((each) => ON_AIR_WORDS.sharing(each.what, each.who)));
+  return onAirPill("sharing", sharingContent(shares), tip, state);
+}
+
+/**
+ * The camera pill: the camera's symbol on `error_container` in `on_error_container`, red as the
+ * screen recording's pill is, and the count past one. Its hint names the app, for each camera.
+ */
+export function cameraPill(cameras: OneOrMore<CameraUse>, state: Shown = "rest"): HTMLElement {
+  return onAirPill("camera", cameraContent(cameras), LISTED.format(all(cameras).map((each) => ON_AIR_WORDS.camera(each.who))), state);
+}
+
+/** The on-air pills in their order: the shares, then the cameras. */
+export function onAirPills(on: { readonly sharing?: OneOrMore<Share>; readonly camera?: OneOrMore<CameraUse> }, state: Shown = "rest"): HTMLElement[] {
+  return [...(on.sharing ? [sharingPill(on.sharing, state)] : []), ...(on.camera ? [cameraPill(on.camera, state)] : [])];
+}
+
 // Recording.
 
 export interface RecordingOptions {
@@ -456,6 +562,10 @@ export interface BarContent {
   readonly playing: boolean;
   /** What plays, while something does. */
   readonly song?: Song;
+  /** Shares run: the sharing pill shows, first on the right, never given way. */
+  readonly sharing?: Share | readonly Share[];
+  /** Apps have a camera: the camera pill shows after the sharing pill, never given way. */
+  readonly camera?: CameraUse | readonly CameraUse[];
 }
 
 /** Every pill at once, as the shots' stand-ins hold them. */
@@ -576,6 +686,9 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   const right = document.createElement("span");
   right.className = "shell-bar-right";
   const folded = state.tray === "folded" || (content.update && !state.update) || (content.preview && !state.preview);
+  // First on the right, nearest the clock: the side is laid from its end, so a pill arriving here
+  // moves no other pill, and it lands in the room the eye already crosses to read the time.
+  right.append(...onAirPills(content, shown));
   right.append(content.tray && !folded ? trayPill() : morePill(shown));
   right.append(state.sysmon === "rings" ? rimPill(LOADS.slice(0, 3), shown) : sysmonPill({ readings: READINGS.slice(0, content.readings), state: shown }));
   right.append(mutePill({ ...(state.mute === "mic" ? { micOnly: true } : {}), ...(circle ? { pinned: { side: state.mute === "mic" ? "input" : "output", state: circle } } : {}) }), bellPill(false, shown), shedStatus({ shed: state.shed, state: shown }));

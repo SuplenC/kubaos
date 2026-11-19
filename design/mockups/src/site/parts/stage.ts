@@ -4,7 +4,9 @@
 // sample, or what the pinned state looks like. The panes stand side by side where the sample fits a
 // half-width pane at its own size, and one under the other, each across the stage, where side by
 // side would shrink it (`standPanes`). A sample wider than its pane is scaled down to fit it, and
-// its pane says by how much; with `?all`, the panes stack and nothing is scaled.
+// its pane says by how much; with `?all`, the panes stack and nothing is scaled. A live sample's own
+// controls (its state switches, `stageControls`) are no part of what it mocks: each pane lifts them
+// out of the sample into a row of their own above it, drawn at the site's size whatever the scale.
 
 import { el, holdScaled, label, relayout, sampleBox } from "../dom.ts";
 import { fullScreenControl, isScreen } from "../full-screen.ts";
@@ -14,6 +16,17 @@ import { picker } from "./picker.ts";
 import { painted } from "./swatches.ts";
 
 const MODE_NAMES: Record<Mode, string> = { dark: "Night", light: "Day" };
+
+/**
+ * Marks `element`, part of a live sample, as the sample's own control (a switch between the states
+ * it shows): the stage lifts it out of the sample into its pane's controls row, so it is drawn at
+ * the site's size and never scaled with the sample or read as part of what it mocks. It is moved,
+ * not copied, so it keeps its listeners.
+ */
+export function stageControls<E extends HTMLElement>(element: E): E {
+  element.dataset.stageControls = "";
+  return element;
+}
 
 /** One chip of the bar: what each pane draws for it, and the hint it shows. */
 export interface Pick {
@@ -28,6 +41,8 @@ export interface Pick {
  */
 interface Pane {
   readonly box: HTMLElement;
+  /** The row the sample's own controls are lifted into, above the scaled sample. */
+  readonly controls: HTMLElement;
   readonly outer: HTMLElement;
   readonly inner: HTMLElement;
   readonly scale: HTMLElement;
@@ -161,10 +176,11 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     const scale = el("span", "page-pane-scale");
     const full = fullScreenControl(() => ({ make: () => picks[shown]!.draw(mode)[0]!, mode }));
     const head = el("div", "page-pane-head", label(day ? MODE_NAMES[mode] : `${MODE_NAMES[mode]}, in either mode`, "label", "on_surface_variant"), scale, ...(full ? [full] : []));
-    const box = sampleBox(painted(now.theme, mode, head, outer));
+    const controls = el("div", "page-pane-controls");
+    const box = sampleBox(painted(now.theme, mode, head, controls, outer));
     box.classList.add("page-pane");
     box.dataset.paneMode = mode;
-    return { box, outer, inner, scale, full };
+    return { box, controls, outer, inner, scale, full };
   });
   const hint = el("div", "page-stage-hint");
 
@@ -174,7 +190,10 @@ export function stage(spec: Stage, states?: { readonly states: States<State>; re
     resized.disconnect();
     panes.forEach((pane, i) => {
       const drawn = pick.draw(modes[i]!);
-      pane.inner.replaceChildren(...drawn);
+      // The sample's own controls leave it for the pane's row above it, where nothing scales them.
+      const lifted = drawn.flatMap((sample) => [...(sample.matches("[data-stage-controls]") ? [sample] : []), ...sample.querySelectorAll<HTMLElement>("[data-stage-controls]")]);
+      pane.controls.replaceChildren(...lifted);
+      pane.inner.replaceChildren(...drawn.filter((sample) => !lifted.includes(sample as HTMLElement)));
       for (const sample of drawn) resized.observe(sample);
       if (pane.full) pane.full.hidden = !isScreen(drawn);
     });

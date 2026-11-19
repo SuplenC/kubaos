@@ -387,6 +387,20 @@ body {
   align-self: stretch;
 }
 
+/* A live sample's own controls, lifted out of it (`stageControls` in `site/parts/stage.ts`): a row
+   above the sample at the site's size, wrapping where the pane is narrow; gone while there are none. */
+.page-pane-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  align-self: stretch;
+  gap: var(--space-s16);
+}
+
+.page-pane-controls:empty {
+  display: none;
+}
+
 /* `?all` draws the panes one under another at their samples' own size (`site/parts/stage.ts`). */
 [data-all] .page-panes {
   grid-template-columns: minmax(0, 1fr);

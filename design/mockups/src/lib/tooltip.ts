@@ -1,9 +1,12 @@
 // What a control does, on a card over it while the pointer is over it or the keyboard is on it:
 // `kubaos-ui`'s `tooltip::tooltip` and `tooltip::with_tooltip`, `KubaOS.Components`' `Tooltip`
-// (`docs/design/components/tooltip.md`). A title in `body_strong`, the body in `small` and
-// `on_surface_variant` `space.s4` under it, and what it holds `space.s8` below (its keys, as
-// `KeyHints`), on a popover `size.menu` wide: `surface_container`, the control radius, `space.s12`
-// inside, raised to the ladder's top step, a tooltip's (`lib/elevation.ts`).
+// (`docs/design/components/tooltip.md`). A small card, sized for the small controls it explains:
+// its name in `label`, a hint's type and no larger than a small button's label, the body in `small`
+// and `on_surface_variant` `space.s4` under it, and what it holds `space.s8` below (its keys, as
+// `KeyHints`). The name's own key stands on the name's line. The card is a popover as wide as its
+// words, `size.tooltip` at most: `surface_container`, the control radius, `space.s8` inside above
+// and below and `space.s12` at the sides, raised to the ladder's top step, a tooltip's
+// (`lib/elevation.ts`).
 //
 // It isn't neon: no line, no glow and no states of its own. It floats `space.s8` above its control,
 // starting where the control starts, or below where there is no room above, and fades in and out
@@ -75,27 +78,34 @@ export function anchorPopover(card: HTMLElement, anchor: HTMLElement, room: HTML
   }
 }
 
+/** The body's line: quieter than the name, and a short sentence of it on one line. */
+const quiet = (body: string): HTMLElement[] => (body === "" ? [] : [wrapped(body, "small", "on_surface_variant")]);
+
+/** The card round `words`, raised and floating as every tooltip's. */
+function card(words: Element, variant: string): HTMLElement {
+  const made = document.createElement("span");
+  made.className = "k-tooltip";
+  made.append(popover(4, words));
+  return probe(made, { role: "component", name: "Tooltip", variant, fixed: { width: false, height: false } }, { floats: true });
+}
+
 /** The card: `title`, `body` under it when there is one, and `extra` below. */
 export function tooltip(title: string, body: string, extra?: Element): HTMLElement {
-  const words = stack("s4", "start", wrapped(title, "body_strong"), ...(body === "" ? [] : [wrapped(body, "small", "on_surface_variant")]));
-  const card = document.createElement("span");
-  card.className = "k-tooltip";
-  card.append(popover(4, stack("s8", "start", words, ...(extra ? [extra] : []))));
-  return probe(card, { role: "component", name: "Tooltip", variant: "", fixed: { width: true, height: false } }, { floats: true });
+  const words = stack("s4", "start", wrapped(title, "label"), ...quiet(body));
+  return card(stack("s8", "start", words, ...(extra ? [extra] : [])), "");
 }
 
 /**
- * The card for a control its name says enough about, with its key: the name in `body_strong` and
- * the key's keycaps `space.s12` after it, on one line, `space.s4` apart, as wide as they are. Every
- * control that has a key and no words to add takes it, so a surface can drop its key hints.
+ * The card for a control with a key of its own: the name in `label` and the key's keycaps
+ * `space.s12` after it, on one line, `space.s4` apart, and the body, when there is one, a quiet
+ * line `space.s4` under them. Every control that has a key takes it, so a surface can drop its key
+ * hints; the keys stay on the name's line, never on a line of their own under the body.
  */
-export function keyTooltip(title: string, combination: string): HTMLElement {
+export function keyTooltip(title: string, combination: string, body = ""): HTMLElement {
   const caps = row("s4", "centre", ...keys(combination).map(keycap));
-  const card = document.createElement("span");
-  card.className = "k-tooltip";
-  card.dataset.line = "";
-  card.append(popover(4, row("s12", "centre", text(title, "body_strong"), caps)));
-  return probe(card, { role: "component", name: "Tooltip", variant: "key", fixed: { width: false, height: true } }, { floats: true });
+  caps.classList.add("k-tooltip-keys");
+  const name = row("s12", "centre", text(title, "label"), caps);
+  return card(body === "" ? name : stack("s4", "start", name, ...quiet(body)), "key");
 }
 
 /** Where a card floats from its control: above it, or below where there is no room above. */

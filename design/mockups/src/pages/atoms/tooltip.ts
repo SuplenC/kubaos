@@ -14,6 +14,13 @@ import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const TITLE: Words = { short: "Mac accents", long: "Mac accents on Left Alt, for every layout" };
+/** A control with a key and a line to add: the power menu's Restart, held. */
+const RESTART = { name: "Restart, held", key: "R" } as const;
+const RESTART_LINE: Words = {
+  short: "No undo once the sign shows.",
+  long: "No undo once the sign shows: every app closes, and what isn't saved is lost.",
+};
+
 const BODY: Words = {
   short: "Type accents as a Mac does.",
   long: "Type accents as a Mac does: hold Left Alt with the accent's key, then type the letter. Right Alt keeps typing the layout's own third level.",
@@ -39,12 +46,15 @@ function explained(options: TipOptions = {}, state: Shown = "rest"): HTMLElement
   return withTooltip(control(state), card(), options);
 }
 
-/** A sentence with a term in it, the term's card shown over it or not: room above for the card. */
+/** A sentence with a term in it, the term's card shown over it or not: room above it and beside it for the card. */
 function inSentence(shownNow = true): HTMLElement {
   const word = term("Flatpak");
   const sentence = wrapped("Each app is a Flatpak, kept apart from the rest.", "body");
   sentence.replaceChildren("Each app is a ", word, ", kept apart from the rest.");
-  return inset(stack(0, "start", termed(sentence, word, tooltip("Flatpak", "An app with all it needs, sandboxed from the system."), { shown: shownNow })), "s64");
+  const room = inset(stack(0, "start", termed(sentence, word, tooltip("Flatpak", "An app with all it needs, sandboxed from the system."), { shown: shownNow })), "s64");
+  // The card runs on from the word's start past the sentence's end: room for it at its widest.
+  room.style.minWidth = "calc(var(--size-tooltip) + 3 * var(--space-s64))";
+  return room;
 }
 
 /** A button whose card answers its press, shown as just after one: room above for the card. */
@@ -73,10 +83,11 @@ export default page({
     { name: "A title alone", for: "when the title says it all", sample: () => tooltip(shown(TITLE), "") },
     { name: "A name and its key", for: "a button whose key isn't shown: one line", sample: () => keyTooltip("Desktop", "2") },
     { name: "A name and a combination", for: "each key a cap, `space.s4` apart", sample: () => keyTooltip("Full screen", "F") },
+    { name: "Name, key and a line", for: "the key on the name's line, a quiet line under", sample: () => keyTooltip(RESTART.name, RESTART.key, shown(RESTART_LINE)) },
     { name: "A term in a sentence", for: "a word dotted under, its card over it", sample: () => inSentence() },
     { name: "Answering a press", for: "shown for two holds after a press", sample: () => answering() },
   ],
-  sizes: doesntApply("one width, `size.menu`; as tall as what it holds."),
+  sizes: doesntApply("one size: as wide as its words, `size.tooltip` at most, as tall as they are."),
   states: {
     shown: ["rest"],
     absent: {
@@ -93,6 +104,7 @@ export default page({
       { name: "Without keys", cell: () => card(false) },
       { name: "A title alone", cell: () => tooltip(shown(TITLE), "") },
       { name: "A name and its key", cell: () => keyTooltip("Desktop", "2") },
+      { name: "Name, key and a line", cell: () => keyTooltip(RESTART.name, RESTART.key, shown(RESTART_LINE)) },
     ],
     looks: {
       rest: "step 4 on `surface_container`, `radius.control`; no line, no glow",
@@ -104,6 +116,7 @@ export default page({
       { name: "Its title", words: TITLE, sample: (words: string) => tooltip(words, shown(BODY)) },
       { name: "Its body", words: BODY, sample: (words: string) => tooltip(shown(TITLE), words) },
       { name: "A name beside its key", words: { short: "Apply", long: "Apply and keep this wallpaper" }, sample: (words: string) => keyTooltip(words, "↵") },
+      { name: "The line under name and key", words: RESTART_LINE, sample: (words: string) => keyTooltip(RESTART.name, RESTART.key, words) },
     ],
     missingPicture: doesntApply("words and keys only."),
     counts: [
@@ -148,15 +161,17 @@ export default page({
     samples: nonEmpty([
       { name: "The card", for: "width, padding, corners, gaps", sample: () => card() },
       { name: "Over its control", for: "the gap, from its start", sample: () => explained({ shown: true }) },
+      { name: "Name, key and a line", for: "the key on the name's line", sample: () => keyTooltip(RESTART.name, RESTART.key, shown(RESTART_LINE)) },
     ]),
     measures: [
-      { part: "Width", token: "size-menu" },
-      { part: "Padding", token: "space-s12" },
+      { part: "Widest", token: "size-tooltip" },
+      { part: "Padding, above and below", token: "space-s8" },
+      { part: "Padding, at the sides", token: "space-s12" },
       { part: "Corner", token: "radius-control" },
       { part: "Rim", token: "stroke-hairline_device_px" },
-      { part: "Title line", token: "type-body_strong-line" },
+      { part: "Name line", token: "type-label-line" },
       { part: "Body line", token: "type-small-line" },
-      { part: "Title → body", token: "space-s4" },
+      { part: "Name → body", token: "space-s4" },
       { part: "Words → keys, card → control", token: "space-s8" },
       { part: "Name → its key", token: "space-s12" },
       { part: "Between keycaps", token: "space-s4" },
@@ -164,6 +179,6 @@ export default page({
       { part: "Ambient drop", token: "elevation-4-ambient-y" },
       { part: "Ambient blur", token: "elevation-4-ambient-blur" },
     ],
-    reflow: doesntApply("`size.menu` wide at every window size; at the edge it moves back to stay inside."),
+    reflow: doesntApply("its words' width at every window size; at the edge it moves back to stay inside."),
   },
 });
