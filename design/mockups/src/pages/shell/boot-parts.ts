@@ -23,7 +23,7 @@ import { settings } from "../../site/settings.ts";
 import { still } from "../templates/locks.ts";
 import { ON, touching, touchingReduced } from "../templates/lock-moves.ts";
 import { halt, play, settle, unsettle } from "./live-tracks.ts";
-import { GROUPS, groupOf, light, neonRoom } from "./neon-sign.ts";
+import { GROUPS, groupOf, hum, light, neonRoom } from "./neon-sign.ts";
 
 type Eased = Track<Easing>;
 
@@ -46,6 +46,37 @@ export const MANY: readonly string[] = [
   "KubaOS Shinjuku, with Linux 6.8.0-90-generic",
   "KubaOS Shinjuku, with Linux 6.8.0-90-generic (recovery mode)",
 ];
+
+/**
+ * Advanced options' submenu: Ubuntu's `10_linux` lists each kernel installed, newest first, with
+ * its recovery mode after it, named after os-release's PRETTY_NAME by our wrapper.
+ */
+export const ADVANCED: readonly string[] = MANY.slice(0, 4);
+
+/**
+ * KubaOS snapshots' submenu, as grub-btrfs titles it with `GRUB_BTRFS_TITLE_FORMAT=("date"
+ * "description")`: a header row, then each snapshot newest first, its date as btrfs gives it and
+ * its snapper description: the hourly timeline, apt's pre and post pair, and the install's own.
+ */
+export const SNAPSHOTS: readonly string[] = [
+  "|        Date         | Description       |",
+  "| 2026-11-19 14:00:01 | timeline          |",
+  "| 2026-11-19 13:00:01 | timeline          |",
+  "| 2026-11-18 21:42:17 | apt               |",
+  "| 2026-11-18 21:41:55 | apt               |",
+  "| 2026-11-02 18:20:44 | home-manager base |",
+  "| 2026-11-02 18:05:12 | hyprland base     |",
+  "| 2026-11-02 17:48:30 | clean base        |",
+];
+
+/** The main menu's entries that open a submenu, and what they list. */
+export const SUBMENUS: ReadonlyMap<number, readonly string[]> = new Map([
+  [1, ADVANCED],
+  [2, SNAPSHOTS],
+]);
+
+/** The main menu's entry that leaves for the firmware's own setup. */
+export const FIRMWARE = 3;
 
 /** The rows GRUB's menu has room for (`theme.txt.in`'s `boot_menu` height); more scroll in place. */
 export const MENU_ROWS = 4;
@@ -110,6 +141,8 @@ export interface Drawn {
   readonly hint?: string;
   /** The lock at rest under the splash, for the splash to fade into. */
   readonly lock?: boolean;
+  /** The primary screen, which alone has GRUB's menu and the splash's field; true unless said. */
+  readonly primary?: boolean;
 }
 
 export interface Screen {
@@ -244,7 +277,10 @@ export function screen(drawn: Drawn = {}): Screen {
   foot.append(countdown, keyHints(GRUB_HINTS));
   const lit = scene === "menu" || scene === "chosen" ? 0 : (drawn.lit ?? GROUPS.length);
   const room = neonRoom(lit, menu, prompt);
-  splash.append(room, foot);
+  // GRUB's menu, its countdown and its hints are the primary screen's alone, as the field is.
+  const primary = drawn.primary ?? true;
+  if (!primary) menu.replaceChildren();
+  splash.append(room, ...(primary ? [foot] : []));
   if (scene === "shell" || scene === "edit") {
     room.style.opacity = "0";
     menu.style.opacity = "0";
@@ -406,24 +442,30 @@ const wait = (name: Duration) => new Promise<void>((done) => window.setTimeout(d
 
 /**
  * The sequence live, from the boot menu: ↑ ↓ pick, Enter boots, E and C open GRUB's text screens
- * and Esc leaves them. The splash takes the passphrase (`kuba` opens it; anything else is wrong),
- * then the lock; with another password a key stands in for typing it. On the desktop, a key
- * restarts. The clock is stopped, as after a key.
+ * and Esc leaves them. Advanced options and KubaOS snapshots open their submenus, Esc going back to
+ * the entry they opened from; UEFI Firmware Settings leaves for the firmware, black. The splash
+ * takes the passphrase (`kuba` opens it; anything else is wrong), then the lock; with another
+ * password a key stands in for typing it. On the desktop or the firmware's black, a key restarts.
+ * The clock is stopped, as after a key. With two screens, the first is the primary.
  */
 export function liveBoot(world: World): HTMLElement {
   const root = document.createElement("span");
   root.className = "boot-live";
   root.tabIndex = 0;
-  type Phase = "menu" | "shell" | "edit" | "starting" | "prompt" | "busy" | "lock" | "desktop" | "moving";
+  type Phase = "menu" | "shell" | "edit" | "starting" | "prompt" | "busy" | "lock" | "desktop" | "firmware" | "moving";
   let phase: Phase = "menu";
   let at = 0;
+  // In a submenu: its entries, and the main menu's row it opened from, lit again on the way back.
+  let sub: readonly string[] | null = null;
+  let opened = 0;
+  const entries = () => sub ?? ENTRIES;
   let typed = "";
   let shown: Screen[] = [];
   const primary = () => shown[0]!;
 
   function draw(scene: Scene): void {
     halt(root);
-    shown = world.displays.map((display) => screen({ scene, display, countdown: null, at, lock: true }));
+    shown = world.displays.map((display, i) => screen({ scene, display, countdown: null, at, entries: entries(), lock: true, primary: i === 0 }));
     const drawn = shown.map((each) => each.element);
     root.replaceChildren(drawn.length === 1 ? drawn[0]! : screens(...drawn.map((each, i) => named(world.displays[i]!, each))));
   }
@@ -445,6 +487,8 @@ export function liveBoot(world: World): HTMLElement {
     typed = "";
     const reduced = reducedAt(root);
     await play(root, reduced ? startingReduced(world.encrypted) : flickerOff(root) ? startingUnflickered(world.encrypted) : starting(world.encrypted));
+    // The hum starts once every group is on, never during the switch-on.
+    if (!reducedAt(root)) hum(root, settings().speed);
     if (!world.encrypted) await intoLock();
   }
 
@@ -483,9 +527,10 @@ export function liveBoot(world: World): HTMLElement {
 
   async function restart(): Promise<void> {
     phase = "moving";
+    at = 0;
+    sub = null;
     draw("black");
     await play(root, restarting());
-    at = 0;
     phase = "menu";
   }
 
@@ -499,12 +544,27 @@ export function liveBoot(world: World): HTMLElement {
     switch (phase) {
       case "menu": {
         event.preventDefault();
-        const entries = ENTRIES.length;
+        const count = entries().length;
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          at = Math.max(0, Math.min(entries - 1, at + (event.key === "ArrowDown" ? 1 : -1)));
-          for (const each of shown) drawMenu(each.menu, ENTRIES, at);
-        } else if (event.key === "Enter") void boot();
-        else if (event.key.toLowerCase() === "e" || event.key.toLowerCase() === "c") {
+          at = Math.max(0, Math.min(count - 1, at + (event.key === "ArrowDown" ? 1 : -1)));
+          drawMenu(primary().menu, entries(), at);
+        } else if (event.key === "Enter") {
+          const opens = sub === null ? SUBMENUS.get(at) : undefined;
+          if (opens) {
+            opened = at;
+            sub = opens;
+            at = 0;
+            drawMenu(primary().menu, sub, at);
+          } else if (sub === null && at === FIRMWARE) {
+            // The machine leaves for its firmware's setup: GRUB draws nothing more.
+            phase = "firmware";
+            draw("black");
+          } else if (!(sub === SNAPSHOTS && at === 0)) void boot();
+        } else if (event.key === "Escape" && sub !== null) {
+          sub = null;
+          at = opened;
+          drawMenu(primary().menu, ENTRIES, at);
+        } else if (event.key.toLowerCase() === "e" || event.key.toLowerCase() === "c") {
           phase = event.key.toLowerCase() === "e" ? "edit" : "shell";
           draw(phase);
         }
@@ -536,6 +596,7 @@ export function liveBoot(world: World): HTMLElement {
         void unlock();
         return;
       case "desktop":
+      case "firmware":
         event.preventDefault();
         void restart();
         return;
@@ -546,7 +607,7 @@ export function liveBoot(world: World): HTMLElement {
   root.addEventListener("click", () => {
     root.focus({ preventScroll: true });
     if (phase === "lock") void unlock();
-    else if (phase === "desktop") void restart();
+    else if (phase === "desktop" || phase === "firmware") void restart();
   });
   menu();
   return root;

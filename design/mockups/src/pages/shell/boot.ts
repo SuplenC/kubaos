@@ -6,6 +6,7 @@ import { fixed } from "../../lib/content.ts";
 import { doesntApply, type Move, nonEmpty, page, screen as whole } from "../../site/page.ts";
 import { goingDown, goingDownReduced, goingDownUnflickered, room, SHUTDOWN } from "./power-room.ts";
 import {
+  ADVANCED,
   type Drawn,
   ENTRIES,
   choosing,
@@ -22,6 +23,7 @@ import {
   screen,
   screens,
   shaking,
+  SNAPSHOTS,
   starting,
   startingReduced,
   startingUnflickered,
@@ -32,7 +34,16 @@ const at = (drawn: Drawn) => whole(() => screen(drawn).element);
 
 /** The two-screen sample: the laptop and a monitor, the field on the primary alone, or on each. */
 const twoScreens = (fallback: boolean) =>
-  whole(() => screens(named(LAPTOP, screen({ scene: "splash", display: LAPTOP, prompt: "empty" }).element), named(MONITOR, screen({ scene: "splash", display: MONITOR, prompt: fallback ? "empty" : "none" }).element)));
+  whole(() => screens(named(LAPTOP, screen({ scene: "splash", display: LAPTOP, prompt: "empty" }).element), named(MONITOR, screen({ scene: "splash", display: MONITOR, prompt: fallback ? "empty" : "none", primary: fallback }).element)));
+
+/** The boot menu on two screens: the menu on the primary alone, the unlit sign on the other. */
+const twoMenus = whole(() => screens(named(LAPTOP, screen({ scene: "menu", display: LAPTOP }).element), named(MONITOR, screen({ scene: "menu", display: MONITOR, primary: false }).element)));
+
+/** バ's blink as the recipe shows it: down at its cue, back a `micro` later. */
+const BLINKS = [
+  { part: "バ's blink", on: "the boot screen", target: ".neon-sign-ba", property: "opacity", from: 1, to: 0.35, duration: "instant", curve: "standard", cue: ["scene", "slow"] },
+  { part: "バ's blink", on: "the boot screen", target: ".neon-sign-ba", property: "opacity", from: 0.35, to: 1, duration: "instant", curve: "standard", cue: ["scene", "slow", "micro"] },
+] as const;
 
 const POWERED = () => {
   const box = document.createElement("span");
@@ -68,6 +79,15 @@ const STARTS_PLAIN: Move = {
   unflickered: startingUnflickered(false),
   back: "cuts",
   sample: from(starting(false), () => screen({ scene: "splash" }).element),
+};
+
+const HUMS: Move = {
+  name: "Humming, once lit",
+  what: "Once lit: the sign steps 0.97–1 every `micro`; バ blinks 0.35, 1, 0.5, 1 every 4 s. The recipe shows the blink's span.",
+  tracks: [...BLINKS],
+  reduced: [{ part: "no hum", on: "the boot screen", target: ".neon-sign-ba", property: "opacity", from: 1, to: 1, duration: "instant", curve: "standard" }],
+  back: "cuts",
+  sample: at({ scene: "splash" }),
 };
 
 const SHAKES: Move = {
@@ -151,6 +171,9 @@ export default page<Shown>({
   },
   variants: [
     { name: "Boot menu", for: "the sign unlit, the entries under it; nothing animates", sample: at({ scene: "menu" }) },
+    { name: "Advanced options", for: "its submenu: each kernel, then its recovery mode", sample: at({ scene: "menu", entries: ADVANCED, countdown: null }) },
+    { name: "KubaOS snapshots", for: "grub-btrfs' submenu: a header, then snapshots by date", sample: at({ scene: "menu", entries: SNAPSHOTS, countdown: null }) },
+    { name: "UEFI Firmware Settings", for: "the machine leaves for its firmware: black", sample: at({ scene: "black" }) },
     { name: "Clock stopped", for: "after any key: the countdown goes, the hints stay", sample: at({ scene: "menu", countdown: null, at: 2 }) },
     { name: "Entry chosen", for: "the menu gone, the unlit sign where it was", sample: at({ scene: "chosen" }) },
     { name: "Starting, the field there", for: "ク and バ struck, the field already waiting", sample: at({ scene: "splash", lit: 2, prompt: "empty" }) },
@@ -170,6 +193,7 @@ export default page<Shown>({
     {
       title: "Several screens",
       rows: [
+        { name: "Two screens, the menu", for: "the menu on the primary; the unlit sign alone on the other", sample: twoMenus },
         { name: "Two screens", for: "the sign in each centre; the field on the primary", sample: twoScreens(false) },
         { name: "Fallback: primary unknown", for: "if the splash can't tell, the field on each", sample: twoScreens(true) },
       ],
@@ -179,6 +203,7 @@ export default page<Shown>({
       rows: [
         { name: "A quiet kernel", for: "`quiet splash loglevel=3`: no text between menu and splash", sample: at({ scene: "chosen" }) },
         { name: "The menu's picture kept", for: "no mode set after GRUB: its last frame stays until the splash", sample: at({ scene: "chosen" }) },
+        { name: "The menu on the primary", for: "the target: GRUB on the primary alone; firmware often mirrors", sample: twoMenus },
         { name: "One place for the sign", for: "GRUB and the splash centre it alike, to the pixel", sample: at({ scene: "splash", lit: 0 }) },
         { name: "The sign's size per screen", for: "the splash scales it per screen, its @2× on HiDPI", sample: twoScreens(false) },
         { name: "Hand-off to the lock", for: "the splash quits onto the lock's first frame, never black", sample: whole(() => screen({ scene: "splash", lock: true }).element) },
@@ -219,14 +244,14 @@ export default page<Shown>({
   motion: {
     arrives: [CHOOSES, STARTS, STARTS_PLAIN, RESTARTS],
     leaves: [INTO_LOCK, STRAIGHT_IN, INTO_LOCK_PLAIN, GOES_DOWN],
-    between: [SHAKES],
+    between: [HUMS, SHAKES],
   },
   keyboard: {
     keys: [
       { keys: ["↑", "↓"], does: "the menu: the entry above or below, no wrap" },
-      { keys: ["Enter"], does: "the menu: boots the lit entry" },
+      { keys: ["Enter"], does: "the menu: boots, opens a submenu, or leaves for the firmware" },
       { keys: ["E", "C"], does: "the menu: edit the entry, or GRUB's shell" },
-      { keys: ["Esc"], does: "edit or shell: back to the menu" },
+      { keys: ["Esc"], does: "a submenu, edit or shell: back, its entry lit again" },
       { keys: ["Ctrl+X", "F10"], does: "edit: boots the edited entry" },
       { keys: ["Any key"], does: "the menu: stops the countdown" },
       { keys: ["Typing", "Backspace"], does: "the splash: into the passphrase's field" },
