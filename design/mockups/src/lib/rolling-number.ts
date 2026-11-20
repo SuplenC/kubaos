@@ -133,12 +133,37 @@ export function rollingNumber(options: RollingOptions): Rolling {
   const widest = [...options.widest];
   element.style.setProperty("--slots", String(widest.filter((char) => !isMark(char, figures)).length));
   element.style.setProperty("--marks", widest.filter((char) => isMark(char, figures)).map((char) => `round(up, calc(${advance(style, char)} * var(--px) - 0.001px), 1px)`).join(" + ") || "0px");
-  element.style.setProperty("--figure", String(figureWidth(style, figures)));
   element.style.setProperty("--t-line", `var(--type-${style}-line)`);
+  // HAZARD: a slot is held to its figures as the page draws them and the check reads them, never
+  // to a separate measure alone. A figure needs its own advance (`--natural`, measured when it is
+  // made), times how much larger the page draws its words than their style (`grown`), and the
+  // width its glyphs are laid out at in place, which the browser rounds up to its layout unit at
+  // the size it draws them, a hair over the advance on some machines' fonts. Measured apart, they
+  // differ by that hair, and a slot a hair narrower than its figure cuts it. So the room is the
+  // widest of the glyphs measured, of every figure's advance and of every figure as laid out,
+  // grown as drawn, and the CSS rounds it up to whole device pixels.
+  let room = figureWidth(style, figures);
+  let grown = 1;
+  /** Raises the room to every figure's own advance, and once on the page to its width as laid out. */
+  const hold = (): void => {
+    const shown = element.isConnected;
+    const scale = (shown && Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale"))) || settings().scale;
+    // The box's CSS pixels per viewport pixel: the page may be zoomed.
+    const unzoom = shown ? element.offsetWidth / Math.max(1e-6, element.getBoundingClientRect().width) : 1;
+    const range = document.createRange();
+    for (const each of element.querySelectorAll<HTMLElement>(":scope > .k-roll-slot:not([data-mark]) > .k-roll-figure")) {
+      room = Math.max(room, Number(each.style.getPropertyValue("--natural")) || 0);
+      if (!shown) continue;
+      range.selectNodeContents(each);
+      room = Math.max(room, (range.getBoundingClientRect().width * unzoom) / scale / grown);
+    }
+    element.style.setProperty("--figure", String(room));
+  };
   let value = options.value;
   let shown = format(value);
   element.append(...[...shown].map((char) => slot(char, style, color, centre, figures)));
   element.setAttribute("aria-label", shown);
+  hold();
   let resizing: Animation | null = null;
   // Its widest value's width, the least it is ever drawn at, as `.k-rolling`'s `min-width` has it.
   const least = widest.reduce((sum, char) => sum + roomOf(char), 0);
@@ -146,7 +171,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
   /** A slot's width, as the CSS rounds it: a figure's or a mark's advance at the box's scale, up to a whole pixel. */
   function roomOf(char: string): number {
     const scale = (element.isConnected && Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale"))) || settings().scale;
-    return Math.ceil((isMark(char, figures) ? advance(style, char) : figureWidth(style, figures)) * scale - 0.001);
+    return Math.ceil((isMark(char, figures) ? advance(style, char) : room * grown) * scale - 0.001);
   }
 
   /** What `boxes` take side by side, the box never under its widest value. */
@@ -205,6 +230,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
         else if (!box.querySelector(".k-roll-figure:not([data-out])")) box.remove();
       }, () => {});
     });
+    hold();
     // A shed slot stands just before the figures that stay, out of the box's flow, so the box's own
     // width is already the new figures' and nothing moves when the slot goes.
     const staying = slotsOf(element).filter((box) => !box.hasAttribute("data-shed"));
@@ -244,8 +270,29 @@ export function rollingNumber(options: RollingOptions): Rolling {
   // laid out after the page put its boxes on pixels (the Overview places its workspaces a frame
   // later): each time it is laid out at a size, in that same frame, it is put on pixels too.
   new ResizeObserver(() => {
-    if (element.isConnected && element.parentElement) centreOnPixels(element.parentElement);
+    if (!element.isConnected) return;
+    const drawn = drawnLarger();
+    if (drawn !== grown) {
+      grown = drawn;
+      element.style.setProperty("--grown", String(grown));
+    }
+    hold();
+    if (element.parentElement) centreOnPixels(element.parentElement);
   }).observe(element);
+
+  /**
+   * How much larger than its style the page draws a figure's words, as the geometry check reads
+   * it (`site/frame.ts`'s `grownByCss`): 1 unless its font size is apart from its style's by more
+   * than a thousandth.
+   */
+  function drawnLarger(): number {
+    const each = element.querySelector<HTMLElement>(":scope > .k-roll-slot:not([data-mark]) > .k-roll-figure");
+    const own = Number(each?.dataset.size);
+    if (!each || !own) return 1;
+    const scale = Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale")) || settings().scale;
+    const drawnAt = Number.parseFloat(getComputedStyle(each).fontSize) / scale;
+    return Math.abs(drawnAt - own) > own * 1e-3 ? Math.max(1, drawnAt / own) : 1;
+  }
   return { element, set, value: () => value };
 }
 
