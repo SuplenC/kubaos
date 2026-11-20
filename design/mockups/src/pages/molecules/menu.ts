@@ -158,7 +158,7 @@ export default page({
     between: [
       {
         name: "The keyboard moves to an item",
-        what: "↓ or the pointer: it lights onto `secondary_container` over `short` on `standard` as the last goes back.",
+        what: "↓: it lights onto `secondary_container` over `short` on `standard` as the last goes back.",
         tracks: [
           { part: "the item left", on: "two items", target: ".k-menu-item:first-child", property: "--lit", from: 1, to: 0, duration: "short", curve: "standard" },
           { part: "the item reached", on: "two items", target: ".k-menu-item:last-child", property: "--lit", from: 0, to: 1, duration: "short", curve: "standard" },

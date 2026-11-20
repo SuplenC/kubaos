@@ -1,6 +1,6 @@
 // The Pill page: `docs/design/components/pill.md`. A group in the bar: a pill a small control tall
 // holding symbols and short words side by side, the shell's alone. An interactive one takes the
-// pointer and lights under it, but is never a stop for Tab.
+// pointer, its fill a step on under it, but is never a stop for Tab, so it never lights.
 
 import { badgedIcon } from "../../lib/badge.ts";
 import type { Words } from "../../lib/content.ts";
@@ -9,7 +9,7 @@ import { icon } from "../../lib/icon.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { makePill, pillChanging, type PillOptions, type PillTone, paired, pill } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
-import { lights, powerMoves, press, pillSwap } from "../../site/moves.ts";
+import { hovers, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 const LAYOUT: Words = { short: "PL", long: "Polish (programmer's)" };
@@ -58,7 +58,7 @@ function live(): HTMLElement {
   return stack("s24", "start", bar(), growing());
 }
 
-type MatrixState = "rest" | "lit" | "pressed";
+type MatrixState = "rest" | "hovered" | "pressed";
 
 const ROWS: readonly { name: string; options: Omit<PillOptions, "content">; content: () => Element[] }[] = [
   { name: "Symbols and words", options: { lone: false, interactive: true }, content: STATUS },
@@ -90,8 +90,9 @@ export default page({
     { name: "A lone symbol", for: "`space.s8` round it: a circle", sample: () => pill({ content: [glyph("notifications")], lone: true }) },
   ],
   states: {
-    shown: ["rest", "lit", "pressed"],
+    shown: ["rest", "hovered", "pressed"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       disabled: "a group with nothing to do just rests",
       selected: "the bar's picks are in its panels",
       loading: "a count it waits for shows on arrival",
@@ -101,21 +102,11 @@ export default page({
     rows: nonEmpty(ROWS.map(({ name }, index) => ({ name, cell: (state: MatrixState) => cell(index, state) }))),
     looks: {
       rest: "its fill, its content in its ink",
-      lit: "pointer only: tube in its tone, glow at night, name hint",
-      pressed: "tube white-hot, glow × `focus.pressed_glow`; by day an ink tint",
+      hovered: "a step on: `surface_container_high`, or its tone's state layer",
+      pressed: "`surface_container_highest`, a step past hover; no line, no glow",
     },
   },
-  focus: {
-    tubes: [
-      { name: "The bar's", tone: "accent", filled: false, content: false },
-      { name: "Recording", tone: "error", filled: false, content: false },
-    ],
-    looks: {
-      lit: "the tube inside the pill's edge, the glow outside",
-      signsOff: "the tube as its tone's glass, no glow",
-    },
-    signsOff: (index: number) => cell(index, "signs-off"),
-  },
+  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
   content: {
     text: [{ name: "Its words", words: LAYOUT, sample: (said: string) => pill({ content: [words(said)], lone: false }) }],
     missingPicture: doesntApply("its symbols are KubaOS Symbols, always there."),
@@ -136,10 +127,9 @@ export default page({
         back: "plays",
         sample: () => pillChanging({ lone: false }, [words("PL")], [words("Polish (programmer's)")]),
       },
-      { name: "Lit", what: "The pointer onto it: it lights up over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => bar() },
-      { name: "Back to rest", what: "The pointer off: back to rest over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => bar("lit") },
-      { name: "Pressed", what: "Over `micro` the tube runs white-hot and the glow brightens; by day its ink tints it.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => bar("lit") },
-      ...powerMoves(() => bar("lit")),
+      { name: "Hovered", what: "The pointer onto it: its fill a step on over `short` on `standard`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => bar() },
+      { name: "Back to rest", what: "The pointer off: back to rest over `short` on `standard`.", tracks: hovers(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => bar("hovered") },
+      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered, with no line and no glow.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => bar("hovered") },
     ],
   },
   keyboard: doesntApply("never a stop for Tab: the bar's actions are Items in the Command menu."),

@@ -61,7 +61,8 @@ thin = 2
 # symbol is never drawn with a fractional stroke.
 symbol = 2
 
-# The neon of a lit control (hovered or focused, one state), one rule for every
+# The neon of a lit control (focused from the keyboard; the pointer's hover and
+# press are quiet fills with no neon, `[opacity]`), one rule for every
 # component: one line inside the control's edge, at its corner, and the glow
 # outside it in the control's tone. On a control not filled with its tone the
 # line is the tube, `tube` wide, over the control's outline; on a filled one
@@ -89,7 +90,8 @@ content_glow = 0.4
 # letters, fading from its opacity to nothing at its reach, in logical pixels.
 label_near = 2
 label_glow = 0.3
-# A pressed control's glow, at night: the lit glow this many times brighter.
+# A focused control pressed by a key, at night: the lit glow this many times
+# brighter. A pointer's press draws no glow.
 pressed_glow = 1.25
 # The band a picture keeps round itself inside its own box where its
 # neighbours leave no more room: a wallpaper thumbnail inside its grid cell,
@@ -603,11 +605,11 @@ use = "What must not lag: the caret, typed text, reduced moves."
 
 [duration.micro]
 ms = 100
-use = "A control pressed, a state layer, a colour change under the pointer."
+use = "A control pressed, a state layer's press."
 
 [duration.short]
 ms = 200
-use = "A control lighting or resting, a knob, a mark, a toast arriving."
+use = "A control lighting, hovered or resting, a knob, a mark, a toast arriving."
 
 [duration.medium]
 ms = 300
@@ -776,6 +778,11 @@ use = "A colour change speeding up: a theme change, dark ⇄ light."
 # Opacities laid over a colour role.
 [opacity]
 # The state layer: the content colour over a surface, on hover and on press.
+# Hover is quiet, one rule for every control: a control with no surface of its
+# own (a Text button, a row, a menu item) takes `on_surface` at `hover` as a
+# faint shape, and at `press` pressed. A control with a fill goes the share
+# `hover` / `press` of the way to its pressed fill hovered, and all the way
+# pressed, so hover is the smaller step in the direction a press goes.
 hover = 0.08
 focus = 0.12
 press = 0.14
@@ -784,7 +791,9 @@ press = 0.14
 # state layer's press is too faint on a fill already the accent; under the
 # pointer the fill takes `press`.
 held = 0.40
-# A Text button pressed in daylight: its tone as a faint fill under it.
+# A Text button pressed in daylight, as the libraries draw it: its tone as a
+# faint fill under it. The state model's press is the state layer instead
+# (`press`), the same by night and by day.
 press_tint = 0.10
 # A disabled control's content, and its container.
 disabled_content = 0.38
@@ -1366,8 +1375,10 @@ burn_recording = "oklch(0.55 0.22 29)"
 # model's: the mockups' CSS computes them; the iced and QML outputs don't build
 # them yet.
 #
-# The states (`docs/DESIGN.md`, "States"): rest, lit (hovered or focused, one
-# state), pressed and disabled. At night a control rests unlit and lights up;
+# The states (`docs/DESIGN.md`, "States"): rest, hovered, pressed, lit (focused
+# from the keyboard) and disabled. Hovered and pressed are quiet: the fill a
+# step, then a step further, toward its `_pressed` role (`[opacity]` `hover`),
+# with no line and no glow. At night a control rests unlit and lights up;
 # by day nothing glows. Lit has two looks: with the signs on, the neon burns;
 # with them off (by day always, at night while a power change has the lights
 # out), the line stays inside the edge as unlit glass, a `_glass` role, with no
@@ -1447,8 +1458,10 @@ primary_fill_glass = { dark = { from = "primary_fill", lighter = 0.12 }, light =
 
 # Tonal: the accent's quieter sibling, on its container. At night its label
 # rests dimmed and lights to `on_secondary_container`; pressed lifts the
-# container a little at night and darkens it a little by day.
-on_secondary_container_rest = { dark = { from = "on_secondary_container", lightness = 0.8, text_on = ["secondary_container"] }, light = { from = "on_secondary_container" } }
+# container a little at night and darkens it a little by day. The dimmed label
+# is fitted on the pressed container too, since a pointer's press leaves the
+# label at rest.
+on_secondary_container_rest = { dark = { from = "on_secondary_container", lightness = 0.8, text_on = ["secondary_container", "secondary_container_pressed"] }, light = { from = "on_secondary_container" } }
 secondary_container_pressed = { dark = { from = "secondary_container", lighter = 0.035 }, light = { from = "secondary_container", darker = 0.04 } }
 # A danger menu item lit fills with the error itself; pressed, it lifts at
 # night and darkens by day as the Tonal container does.
@@ -1470,9 +1483,10 @@ sharing_glass = { dark = { from = "sharing_unlit" }, light = { from = "sharing_l
 microphone_glass = { dark = { from = "microphone_unlit" }, light = { from = "microphone" } }
 recording_glass = { dark = { from = "recording_unlit" }, light = { from = "recording" } }
 primary_lit = { dark = { from = "primary_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
-# A sharing Button's roles, by the accent's: Tonal's label at rest a little dimmer at night and
-# its fill pressed a step brighter; Text's label unlit at rest and the core lit, fitted to read.
-on_sharing_container_rest = { dark = { from = "on_sharing_container", lightness = 0.8, text_on = ["sharing_container"] }, light = { from = "on_sharing_container" } }
+# A sharing Button's roles, by the accent's: Tonal's label at rest a little dimmer at night, fitted
+# on its fill at rest and pressed, and its fill pressed a step brighter; Text's label unlit at rest
+# and the core lit, fitted to read.
+on_sharing_container_rest = { dark = { from = "on_sharing_container", lightness = 0.8, text_on = ["sharing_container", "sharing_container_pressed"] }, light = { from = "on_sharing_container" } }
 sharing_container_pressed = { dark = { from = "sharing_container", lighter = 0.035 }, light = { from = "sharing_container", darker = 0.04 } }
 sharing_rest = { dark = { from = "sharing_unlit", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "sharing", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
 sharing_lit = { dark = { from = "sharing_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "sharing", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
@@ -1536,8 +1550,10 @@ pairs = [
   { fg = "on_primary_fill", bg = "primary_fill", need = "text", use = "A Filled button's label at rest" },
   { fg = "on_primary_fill_lit", bg = "primary_fill", need = "text", use = "A Filled button's label, lit" },
   { fg = "on_primary_fill_lit", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed" },
+  { fg = "on_primary_fill", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed by the pointer: its rest label, unlit" },
   { fg = "on_secondary_container_rest", bg = "secondary_container", need = "text", use = "A Tonal button's label at rest" },
   { fg = "on_secondary_container", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed" },
+  { fg = "on_secondary_container_rest", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed by the pointer: its rest label, unlit" },
   { fg = "primary_rest", bg = "surface", need = "text", use = "A Text button's label at rest, on a page" },
   { fg = "primary_rest", bg = "surface_container_low", need = "text", use = "A Text button's label at rest, in a well" },
   { fg = "primary_rest", bg = "surface_container", need = "text", use = "A Text button's label at rest, on a panel or window card" },
@@ -1622,6 +1638,7 @@ pairs = [
   { fg = "on_sharing", bg = "sharing", need = "text", use = "A held sharing Button's label over its hold's fill" },
   { fg = "on_sharing_container_rest", bg = "sharing_container", need = "text", use = "A sharing Tonal Button's label at rest" },
   { fg = "on_sharing_container", bg = "sharing_container_pressed", need = "text", use = "A sharing Tonal Button's label, pressed" },
+  { fg = "on_sharing_container_rest", bg = "sharing_container_pressed", need = "text", use = "A sharing Tonal Button's label, pressed by the pointer: its rest label, unlit" },
   { fg = "sharing_rest", bg = "surface_container", need = "text", use = "A sharing Text Button's label at rest, on a panel or the bar's Sheet" },
   { fg = "sharing_lit", bg = "surface_container", need = "text", use = "A sharing Text Button's label lit, on a panel or the bar's Sheet" },
   { fg = "sharing_rest", bg = "surface", need = "text", use = "A sharing Text Button's label at rest, on a page" },

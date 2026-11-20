@@ -113,8 +113,8 @@ export default page({
     rows: nonEmpty(ROWS.map(({ name, picked }) => ({ name, cell: (state: MatrixState) => inState({ picked }, state) }))),
     looks: {
       rest: "the pick ringed in `primary`; Hue and Tone live with Custom",
-      lit: "the choice's focus tube; a hovered pick or track, its own",
-      pressed: "next pick's tube white-hot; track held, hues up `opacity.held`",
+      lit: "the focused choice's tube and glow; the pointer adds none",
+      pressed: "state layer at `opacity.press`; track held, hues up `opacity.held`",
       disabled: "everything at `opacity.disabled_content`, the hues' chroma lowered too",
     },
   },

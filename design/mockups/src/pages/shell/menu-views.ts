@@ -171,7 +171,7 @@ export default page<Shown>({
   motion: {
     arrives: [PUSHED],
     leaves: [POPPED],
-    between: [{ name: "Back lights", what: "The pointer onto Back: its tube fades in.", tracks: lights(".k-button", "Back", 0, 1), reduced: "same", back: "plays", sample: () => stack(0, "start", listView(few())) }, ...powerMoves(() => listView({ ...few(), back: "lit" }))],
+    between: [{ name: "Back lights", what: "The keyboard onto Back: its tube fades in.", tracks: lights(".k-button", "Back", 0, 1), reduced: "same", back: "plays", sample: () => stack(0, "start", listView(few())) }, ...powerMoves(() => listView({ ...few(), back: "lit" }))],
   },
   keyboard: {
     keys: [

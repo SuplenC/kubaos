@@ -391,9 +391,10 @@ function opacities(): HTMLElement {
 /** A button state's column and how it is pinned: none for rest and disabled. */
 const BUTTON_STATES: readonly { name: string; pinned?: Pinned; disabled?: boolean }[] = [
   { name: "Rest" },
-  { name: "Lit · signs on", pinned: "lit" },
-  { name: "Lit · signs off", pinned: "signs-off" },
+  { name: "Hovered", pinned: "hover" },
   { name: "Pressed", pinned: "pressed" },
+  { name: "Focused · signs on", pinned: "lit" },
+  { name: "Focused · signs off", pinned: "signs-off" },
   { name: "Disabled", disabled: true },
 ];
 

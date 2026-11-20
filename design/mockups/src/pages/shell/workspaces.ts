@@ -13,6 +13,11 @@
 // indicator: its leading edge over `medium`, its trailing edge over `long`, both on
 // `emphasized_decel`. A number's colour and the ghost's fade over `short` on `standard`.
 //
+// The cell under the pointer takes a neutral circle a step up the container ladder,
+// `surface_container_high`, and pressed `surface_container_highest`, fading over `short`, as any
+// control's quiet hover does; the pill itself draws no line and no glow for the pointer. The shown
+// workspace's cell takes none: it is already where you are.
+//
 // It isn't the library's `Pill`: its cells glide every frame. It has no part in `src/lib/` yet.
 
 import "./workspaces.css";
@@ -48,6 +53,8 @@ export interface WorkspacesOptions {
   /** Clicks and the wheel move the shown workspace, a ghost turning into a workspace. */
   readonly live?: boolean;
   readonly pinned?: Pinned;
+  /** The workspace whose cell the pointer is on while pinned hovered or pressed: the one after the shown one, unless named. */
+  readonly pointer?: number;
 }
 
 /** The shots' stand-ins: 1 with a window, 2 shown with one, 3 the ghost; Desk's 11 with a window, 12 its ghost. */
@@ -131,7 +138,7 @@ function easing(name: string): string {
 }
 
 /** One entry's slot: its piece of the tint behind, and its content. */
-function slot(entry: Entry, kanji: boolean, active: number, choose: (id: number) => void): HTMLElement {
+function slot(entry: Entry, kanji: boolean, active: number, pointer: number, choose: (id: number) => void): HTMLElement {
   const box = document.createElement("span");
   box.className = "shell-ws-slot";
   box.dataset.key = entry.key;
@@ -161,6 +168,8 @@ function slot(entry: Entry, kanji: boolean, active: number, choose: (id: number)
   const shown = entry.workspace === active;
   const cell = document.createElement("span");
   cell.className = "shell-ws-cell";
+  cell.toggleAttribute("data-shown", shown);
+  cell.toggleAttribute("data-pointer", entry.workspace === pointer);
   cell.toggleAttribute("data-ghost", entry.kind === "ghost");
   const number = text(numberText(entry.workspace, kanji), numberStyle(shown || entry.occupied, kanji), shown ? "on_primary" : entry.occupied ? "on_surface" : "on_surface_variant");
   number.classList.add("shell-ws-number");
@@ -186,6 +195,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   const kanji = options.kanji ?? false;
   let groups: Group[] = (options.groups ?? SHOTS_GROUPS).map((group) => ({ ...group, spaces: [...group.spaces] }));
   let active = options.active ?? 2;
+  const pointer = options.pointer ?? active + 1;
   const element = document.createElement("span");
   element.className = "shell-ws k-control";
   element.dataset.hot = "";
@@ -209,7 +219,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   };
 
   function draw(): void {
-    content.replaceChildren(...entries.map((entry) => slot(entry, kanji, active, choose)));
+    content.replaceChildren(...entries.map((entry) => slot(entry, kanji, active, pointer, choose)));
     const at = cellsTo(entries, active, kanji);
     indicator.style.setProperty("--ws-start", String(at));
     indicator.style.setProperty("--ws-end", String(at + 1));
@@ -234,7 +244,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     // Slots that stay keep their element, grown or recoloured; new ones grow from nothing; gone ones shrink out.
     const next: HTMLElement[] = [];
     for (const entry of entries) {
-      const fresh = slot(entry, kanji, active, choose);
+      const fresh = slot(entry, kanji, active, pointer, choose);
       const kept = old.get(entry.key);
       if (kept) {
         kept.replaceWith(fresh);

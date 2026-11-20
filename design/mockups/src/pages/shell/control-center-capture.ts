@@ -77,7 +77,7 @@ export default page<Shown>({
     arrives: doesntApply("they come with the panel."),
     leaves: doesntApply("they go with the panel; a capture closes it first."),
     between: [
-      { name: "A capture button lights", what: "Pointer or keyboard: tube and glow fade in.", tracks: lights(".k-card .k-button:nth-child(2)", "the region button", 0, 1), reduced: "same", back: "plays", sample: () => inRoom(capture()) },
+      { name: "A capture button lights", what: "The keyboard onto it: tube and glow fade in.", tracks: lights(".k-card .k-button:nth-child(2)", "the region button", 0, 1), reduced: "same", back: "plays", sample: () => inRoom(capture()) },
       { name: "A capture button pressed", what: "Its tube runs hot, then the panel closes.", tracks: press(".k-card .k-button:nth-child(2)", "the region button"), reduced: "same", back: "plays", sample: () => inRoom(capture("idle", "0:42", "lit")) },
       ...powerMoves(() => both()),
     ],

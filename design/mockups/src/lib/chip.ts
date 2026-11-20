@@ -5,8 +5,11 @@
 // its right `space.s12`, or nothing when the close button ends it.
 //
 // A plain chip is a fact and has no states. A pressable one is a control in the state model
-// (`.k-control` in `lib.css`): it lights in its kind's tone, and a Filled one rests on the unlit
-// fill with the core inside its edge. Its close button is a control of its own, a circle that
+// (`.k-control` in `lib.css`): focused from the keyboard it lights in its kind's tone, and a Filled
+// one rests on the unlit fill with the core inside its edge. Under the pointer it is quiet: a
+// Neutral chip's surface a step up the container ladder, a Selected or Filled one's fill toward its
+// pressed fill, and a tinted one (Accent, Cold, Warning), whose fill is a tint and not a surface,
+// the state layer over its tint. Its close button is a control of its own, a circle that
 // lights as a Text icon button does. A chip that toggles (a setting a toolbar turns on and off)
 // fades between Neutral and its kind on `--checked`.
 
@@ -42,7 +45,7 @@ interface Colours {
 }
 
 export const CHIP_COLOURS: Record<ChipKind, Colours> = {
-  Neutral: { fill: role("surface_container_high"), fillPressed: role("surface_container_high"), label: role("on_surface"), labelLit: role("on_surface") },
+  Neutral: { fill: role("surface_container_high"), fillPressed: role("surface_container_highest"), label: role("on_surface"), labelLit: role("on_surface") },
   Selected: {
     fill: role("secondary_container"),
     fillPressed: role("secondary_container_pressed"),
@@ -64,6 +67,9 @@ export const CHIP_COLOURS: Record<ChipKind, Colours> = {
 
 /** The tone each kind lights in: the cold accent on a Cold chip, `warning` on a Warning one, the accent on every other. */
 export const CHIP_TONES: Record<ChipKind, Tone> = { Neutral: "accent", Selected: "accent", Accent: "accent", Cold: "cold", Warning: "warning", Filled: "accent" };
+
+/** The kinds whose fill is a tint of their tone: hovered and pressed, the state layer goes over it. */
+const TINTED: readonly ChipKind[] = ["Accent", "Cold", "Warning"];
 
 /** Whether a kind is filled with its tone, so its line is the core inside the fill's edge. */
 export function chipFilled(kind: ChipKind): boolean {
@@ -156,6 +162,7 @@ export function chip(options: ChipOptions): HTMLElement {
     element.setAttribute("role", "button");
     if (!disabled) element.tabIndex = (options.tabStop ?? true) ? 0 : -1;
     element.toggleAttribute("data-hot", !chipFilled(kind) && kind !== "Selected");
+    element.toggleAttribute("data-tinted", TINTED.includes(kind));
     pin(element, options.pinned);
     const ring = focusRing(element, "control", CHIP_TONES[kind], chipFilled(kind));
     ring.dataset.pressable = "";

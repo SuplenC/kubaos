@@ -60,7 +60,7 @@ export default page({
     looks: {
       rest: "not picked on `surface_container_highest`; picked on `primary_fill`, unlit",
       lit: "the tube, or the core in a fill, with the glow outside",
-      pressed: "glow × `focus.pressed_glow`; tube white-hot, or the fill lifts",
+      pressed: "the state layer at `opacity.press`, or the fill lifts; no glow",
       disabled: "grey: no tone, line or glow, and no Tab stop",
     },
   },

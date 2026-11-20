@@ -8,7 +8,7 @@ import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { TRAY, type TrayApp, trayPill } from "./bar-parts.ts";
 
-type State = "rest" | "lit" | "pressed" | "open";
+type State = "rest" | "hovered" | "pressed" | "open";
 
 /** nm-applet's menu, as the shots' stand-in reads it. */
 const NETWORK: readonly MenuEntry[] = [
@@ -28,7 +28,7 @@ const VPNS: readonly MenuEntry[] = [{ label: "Back", icon: "arrow_back" }, "sepa
 function opened(entries: readonly MenuEntry[], index = 1, current?: number): HTMLElement {
   const room = document.createElement("span");
   room.className = "shell-tray-room";
-  const tray = trayPill(TRAY, { index, state: "lit" });
+  const tray = trayPill(TRAY, { index, state: "hover" });
   const card = popover(2, menu(entries, current === undefined ? {} : { current }));
   card.classList.add("shell-tray-menu");
   room.append(tray, card);
@@ -90,8 +90,9 @@ export default page<State>({
   ],
   sizes: doesntApply("one size: circles `size.chip`, pictures `icon.s16`."),
   states: {
-    shown: ["rest", "lit", "pressed", "open"],
+    shown: ["rest", "hovered", "pressed", "open"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       disabled: "an app's tray item is there or gone",
       selected: "no item holds a pick",
       loading: "the menu shows once its first entries arrive",
@@ -101,23 +102,23 @@ export default page<State>({
     rows: nonEmpty([
       {
         name: "Network",
-        cell: (state: State) => (state === "open" ? opened(NETWORK) : trayPill(TRAY, state === "rest" ? undefined : { index: 1, state })),
+        cell: (state: State) => (state === "open" ? opened(NETWORK) : trayPill(TRAY, state === "rest" ? undefined : { index: 1, state: state === "hovered" ? "hover" : state })),
       },
       {
         name: "Its submenu",
-        cell: (state: State) => (state === "open" ? opened(VPNS, 1, 3) : trayPill(TRAY, state === "rest" ? undefined : { index: 2, state })),
+        cell: (state: State) => (state === "open" ? opened(VPNS, 1, 3) : trayPill(TRAY, state === "rest" ? undefined : { index: 2, state: state === "hovered" ? "hover" : state })),
       },
     ]),
     looks: {
       rest: "pictures on the pill, no fill",
-      lit: "pointer: `on_surface` at `opacity.hover` in its circle, its hint",
+      hovered: "`on_surface` at `opacity.hover` in its circle, its hint",
       pressed: "the circle at `opacity.press`",
       open: "our Menu on a popover `space.s12` under it",
     },
   },
   focus: doesntApply("it takes no Tab; its open menu holds the keyboard, its items lit as a Menu's."),
   content: {
-    text: [{ name: "Its hint, the app's title", words: TITLE, sample: () => trayPill([TRAY[2]!], { index: 0, state: "lit" }) }],
+    text: [{ name: "Its hint, the app's title", words: TITLE, sample: () => trayPill([TRAY[2]!], { index: 0, state: "hover" }) }],
     missingPicture: [{ name: "No picture", for: "the circle keeps its room", sample: () => trayPill([TRAY[2]!, { title: "Blank", picture: "", missing: true }, TRAY[0]!]) }],
     counts: [
       { name: "None", for: "the pill is gone", sample: () => document.createElement("span") },

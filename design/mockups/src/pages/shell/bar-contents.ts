@@ -7,7 +7,7 @@ import type { Shown } from "../../lib/control.ts";
 import { row } from "../../lib/layout.ts";
 import { makePill, pillChanging } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
-import { lights, powerMoves, press, pillSwap } from "../../site/moves.ts";
+import { hovers, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import {
   bellPill,
@@ -32,7 +32,7 @@ import {
   updatePill,
 } from "./bar-parts.ts";
 
-type State = "rest" | "lit" | "pressed";
+type State = "rest" | "hovered" | "pressed";
 
 const ROWS: readonly { name: string; make: (state: Shown) => HTMLElement }[] = [
   { name: "Clock", make: (state) => clockPill({ countdown: CLOCK.countdown, state }) },
@@ -111,7 +111,7 @@ export default page<State>({
     { name: "Bell", for: "while there is a notification, all read", sample: () => bellPill() },
     { name: "Bell, unread", for: "the accent's dot while anything is unread", sample: () => bellPill(false, "rest", true) },
     { name: "Bell, Do not disturb", for: "crossed out; the dot still says unread", sample: () => bellPill(true, "rest", true) },
-    { name: "Bell, nothing unread", for: "its hint says so; no peek", sample: () => quietBell("lit") },
+    { name: "Bell, nothing unread", for: "its hint says so; no peek", sample: () => quietBell("hovered") },
     { name: "Keyboard layout", for: "two layouts or more", sample: () => keyboardPill() },
     { name: "Proxy", for: "on: a locked shield, `tertiary`", sample: () => proxyPill() },
     { name: "Proxy failing", for: "a key with the error dot", sample: () => proxyPill(true) },
@@ -124,7 +124,7 @@ export default page<State>({
     { name: "System monitor, sparklines", for: "the last minute each", sample: () => sysmonPill({ style: "sparklines" }) },
     { name: "Close to a limit", for: "symbol and words in `warning`", sample: () => sysmonPill({ readings: [READINGS[0]!, { ...READINGS[2]!, text: "82°", level: 1 }] }) },
     { name: "Past a limit, a full disk", for: "`error`, and a red drive", sample: () => sysmonPill({ readings: [{ ...READINGS[0]!, text: "97%", level: 2 }, READINGS[1]!], fullDisk: true }) },
-    { name: "Offering Hide", for: "a right click, until the pointer leaves", sample: () => sysmonPill({ offering: true, state: "lit" }) },
+    { name: "Offering Hide", for: "a right click, until the pointer leaves", sample: () => sysmonPill({ offering: true, state: "hovered" }) },
     { name: "System monitor, compact", for: "CPU rim, RAM, temperature: all `primary` at ease", sample: () => rimPill() },
     { name: "Compact, RAM near its limit", for: "its ring in `warning`", sample: () => rimPill([LOADS[0]!, { share: 0.88, level: 1 }, LOADS[2]!]) },
     { name: "Compact, CPU past its limit", for: "the rim in `error`", sample: () => rimPill([{ share: 0.97, level: 2 }, LOADS[1]!, LOADS[2]!]) },
@@ -139,8 +139,9 @@ export default page<State>({
     { name: "System monitor", for: "`space.s8` between readings", sample: SYSMON_SAMPLE },
   ],
   states: {
-    shown: ["rest", "lit", "pressed"],
+    shown: ["rest", "hovered", "pressed"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       disabled: "a pill with nothing to do is gone",
       selected: "no pill holds a pick",
       loading: "it shows once its service answers",
@@ -150,23 +151,15 @@ export default page<State>({
     rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => make(state) }))),
     looks: {
       rest: "`surface_container`, content in its roles; rings `primary`",
-      lit: "pointer only: tube in its tone, glow at night, hint",
-      pressed: "tube white-hot; by day an ink tint",
+      hovered: "a step on: `surface_container_high`, or its tone's state layer",
+      pressed: "fill a step past hover; no line, no glow",
     },
   },
-  focus: {
-    tubes: [
-      { name: "Every pill", tone: "accent", filled: false, content: false },
-      { name: "Live preview", tone: "cold", filled: false, content: false },
-      { name: "Clock while recording", tone: "error", filled: false, content: false },
-    ],
-    looks: { lit: "the tube inside the edge, the glow outside", signsOff: "the tube as glass, no glow" },
-    signsOff: (index: number) => ROWS[index]!.make("signs-off"),
-  },
+  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
   content: {
     text: [
       { name: "The layout's code", words: LAYOUT, sample: (words: string) => keyboardPill(words) },
-      { name: "The branch, in the hint", words: { short: "fix", long: BRANCH }, sample: (words: string) => previewPill(words, "lit") },
+      { name: "The branch, in the hint", words: { short: "fix", long: BRANCH }, sample: (words: string) => previewPill(words, "hovered") },
       { name: "The countdown", words: COUNTDOWN, sample: (words: string) => clockPill({ countdown: words }) },
     ],
     missingPicture: doesntApply("its symbols are KubaOS Symbols, always there."),
@@ -187,10 +180,9 @@ export default page<State>({
         back: "plays",
         sample: () => pillChanging({ lone: false, gap: "s8" }, sysmonContent(), sysmonContent({ offering: true })),
       },
-      { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => all() },
-      { name: "Back to rest", what: "The pointer off: back to rest over `short`.", tracks: lights(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => all("lit") },
-      { name: "Pressed", what: "Over `micro` the tube runs white-hot; by day its ink tints it.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => all("lit") },
-      ...powerMoves(() => all("lit")),
+      { name: "Hovered", what: "The pointer onto it: its fill a step on over `short`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => all() },
+      { name: "Back to rest", what: "The pointer off: back to rest over `short`.", tracks: hovers(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => all("hovered") },
+      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered, with no line and no glow.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => all("hovered") },
     ],
   },
   keyboard: doesntApply("never a stop for Tab; SUPER+SHIFT+Space switches the layout, the rest are Command menu Items."),

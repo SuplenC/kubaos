@@ -7,7 +7,7 @@ import type { Shown as ControlShown } from "../../lib/control.ts";
 import { hint } from "../../lib/hint.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { pillChanging } from "../../lib/pill.ts";
-import { lights, pillSwap, powerMoves, press } from "../../site/moves.ts";
+import { hovers, pillSwap, press } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
 import { mutePill } from "./bar-audio-parts.ts";
 import { barStrip, bellPill, type CameraUse, cameraPill, EVERYDAY, ON_AIR_WORDS, onAirOptions, type Share, sharingContent, sharingPill, statusPill } from "./bar-parts.ts";
@@ -144,7 +144,7 @@ const COUNTED: Move = {
   sample: () => pillChanging({ ...onAirOptions("sharing"), interactive: true }, sharingContent(SHARES.screen), sharingContent(TWO_SHARES)),
 };
 
-type State = "rest" | "lit" | "pressed" | "open";
+type State = "rest" | "hovered" | "pressed" | "open";
 
 const LONG_WINDOW: Share = { kind: "window", what: "Visual Studio Code - Insiders's window", who: "Chromium" };
 
@@ -164,8 +164,8 @@ export default page<State>({
     { name: "Two shares", for: "the symbol and the count", sample: () => sharingPill(TWO_SHARES) },
     { name: "Two cameras", for: "the camera and the count", sample: () => cameraPill(TWO_CAMERAS) },
     { name: "Both, in order", for: "sharing first, then the camera", sample: () => end() },
-    { name: "The sharing pill's hint", for: "what and with whom", sample: () => hinted(sharingPill(SHARES.screen, "lit"), ON_AIR_WORDS.sharing(SHARES.screen.what, SHARES.screen.who)) },
-    { name: "The camera pill's hint", for: "the app that has it", sample: () => hinted(cameraPill(CAMERA, "lit"), ON_AIR_WORDS.camera(CAMERA.who)) },
+    { name: "The sharing pill's hint", for: "what and with whom", sample: () => hinted(sharingPill(SHARES.screen, "hovered"), ON_AIR_WORDS.sharing(SHARES.screen.what, SHARES.screen.who)) },
+    { name: "The camera pill's hint", for: "the app that has it", sample: () => hinted(cameraPill(CAMERA, "hovered"), ON_AIR_WORDS.camera(CAMERA.who)) },
     { name: "On the bar", for: "first on the right, nearest the clock", sample: screen(() => onTheBar()) },
     { name: "On the bar, counted", for: "two shares and two cameras", sample: screen(() => onTheBar(TWO_SHARES, TWO_CAMERAS)) },
   ],
@@ -197,8 +197,9 @@ export default page<State>({
     },
   ],
   states: {
-    shown: ["rest", "lit", "pressed", "open"],
+    shown: ["rest", "hovered", "pressed", "open"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       disabled: "shown only while on air",
       selected: "nothing to pick in the pill",
       loading: "the preview holds Media's placeholder as the camera starts",
@@ -211,25 +212,18 @@ export default page<State>({
     ],
     looks: {
       rest: "its symbol in its ink on its container",
-      lit: "pointer: its tube in its colour, glow at night, hint",
-      pressed: "the tube white-hot",
+      hovered: "the state layer over its container, its hint",
+      pressed: "the fill a step past hover; no glow",
       open: "its panel under it; the pill rests, its hint off the title",
     },
   },
-  focus: {
-    tubes: [
-      { name: "Sharing pill", tone: "sharing", filled: false, content: false },
-      { name: "Camera pill", tone: "recording", filled: false, content: false },
-    ],
-    looks: { lit: "the tube inside the edge, the glow outside", signsOff: "the tube as glass, no glow" },
-    signsOff: (index: number) => (index === 0 ? sharingPill(SHARES.screen, "signs-off") : cameraPill(CAMERA, "signs-off")),
-  },
+  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
   content: {
     text: [
       {
         name: "What is shared, in the hint",
         words: { short: SHARES.screen.what, long: LONG_WINDOW.what },
-        sample: (words: string) => hinted(sharingPill({ ...SHARES.screen, what: words }, "lit"), ON_AIR_WORDS.sharing(words, SHARES.screen.who)),
+        sample: (words: string) => hinted(sharingPill({ ...SHARES.screen, what: words }, "hovered"), ON_AIR_WORDS.sharing(words, SHARES.screen.who)),
       },
     ],
     missingPicture: [
@@ -251,9 +245,8 @@ export default page<State>({
     leaves: [leaves("The sharing pill leaves", () => sharingPill(SHARES.screen)), leaves("The camera pill leaves", () => cameraPill(CAMERA))],
     between: [
       COUNTED,
-      { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(PILL, "both pills", 0, 1), reduced: "same", back: "cuts", sample: () => end() },
-      { name: "Pressed", what: "Over `micro` the tube runs white-hot; its panel opens.", tracks: press(PILL, "both pills"), reduced: "same", back: "plays", sample: () => end(SHARES.screen, CAMERA, "lit") },
-      ...powerMoves(() => end(SHARES.screen, CAMERA, "lit")),
+      { name: "Hovered", what: "The pointer onto it: its fill a step on over `short`.", tracks: hovers(PILL, "both pills", 0, 1), reduced: "same", back: "cuts", sample: () => end() },
+      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered; its panel opens.", tracks: press(PILL, "both pills"), reduced: "same", back: "plays", sample: () => end(SHARES.screen, CAMERA, "hovered") },
     ],
   },
   keyboard: {

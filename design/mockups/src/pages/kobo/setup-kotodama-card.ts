@@ -329,7 +329,7 @@ interface OtherParts {
  * group, and the line at its foot that never ends while it searches.
  */
 function otherMenu(q: string, groups: readonly Group[], foot: string, more: OtherParts = {}): { box: HTMLElement; groups: HTMLElement[]; answers: HTMLElement; settle: () => void } {
-  const words = field({ value: q, icon: "search", pointer: false });
+  const words = field({ value: q, icon: "search" });
   const bar = document.createElement("span");
   bar.className = "setup-kotodama-crawl";
   const parts = groups.map((group) => {

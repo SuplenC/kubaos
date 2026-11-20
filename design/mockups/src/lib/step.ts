@@ -11,8 +11,8 @@
 // the current step is the selected row, on `secondary_container`. In a rail the symbol is lit in
 // `primary` once its step is reached, glowing at night, the current one humming while it runs, and
 // the current row is a quiet fill. A pressable step is a
-// control: lit, the accent's tube inside its edge with the glow outside at night; pressed, the
-// tube runs white-hot by night and the tone tints its fill by day.
+// control: focused from the keyboard, the accent's tube inside its edge with the glow outside at
+// night; hovered and pressed, the state layer over its fill, quiet, with no line and no glow.
 //
 // Where the row is too narrow for the chip beside the title's first word, the chip goes under the
 // words, at their start, on a line of its own; in a list, every step's chip goes with it.

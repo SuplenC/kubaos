@@ -83,7 +83,7 @@ export default page<Shown>({
     rows: [{ name: "Keyboard tab", cell }],
     looks: {
       rest: "no row lit; the one typed with ticked",
-      lit: "the row under the pointer or keys, as any list's",
+      lit: "the keys' row, as any list's; the pointer's is quiet",
       pressed: "the lit row's fill presses",
       selected: "typing with the second: the tick moves, the order stays",
       disabled: "four layouts, the most: + off",
@@ -118,7 +118,7 @@ export default page<Shown>({
     arrives: doesntApply("the add view swaps in at once, made anew each time."),
     leaves: doesntApply("Back or Esc swaps the layouts in at once."),
     between: [
-      { name: "The chip lights up", what: "Pointer or keyboard on Mac accents: tube and glow fade in.", tracks: lights(".k-chip", "Mac accents", 0, 1), reduced: "same", back: "plays", sample: () => keys() },
+      { name: "The chip lights up", what: "The keyboard on Mac accents: tube and glow fade in.", tracks: lights(".k-chip", "Mac accents", 0, 1), reduced: "same", back: "plays", sample: () => keys() },
       { name: "A row pressed", what: "The focused row pressed: its fill presses.", tracks: press(".k-list-row[data-current]", "a layout"), reduced: "same", back: "plays", sample: () => keys({ selected: 1 }) },
       ...powerMoves(() => keys({ selected: 1 })),
     ],

@@ -41,7 +41,6 @@ const ROWS: readonly Row[] = [
   { name: "Empty", options: {} },
   { name: "Placeholder", options: { placeholder: "Your name" } },
   { name: "Typed", options: { value: "tuxedo" } },
-  { name: "Typed, under the pointer", options: { value: "tuxedo", pointer: true } },
   { name: "With an icon", options: { value: "Shinj", icon: "search", placeholder: "Search" } },
   { name: "A word selected", options: { value: "Shinji Ikari", caret: { pos: 12, anchor: 7 } } },
   { name: "Password", options: { value: "hunter2", secret: true } },
@@ -51,7 +50,7 @@ const ROWS: readonly Row[] = [
   { name: "Read-only", options: { value: "kuba", icon: "lock" }, locked: true },
 ];
 
-/** `row`'s field in `state`; lit is pinned with the keyboard in it unless the row is the pointer's. */
+/** `row`'s field in `state`; lit is pinned with the keyboard in it. */
 function cell(row: Row, state: Shown | "signs-off"): HTMLElement {
   if (row.locked) {
     switch (state) {

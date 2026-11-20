@@ -6,6 +6,12 @@
 // gets its own page, and its own mock, at its level.
 
 import { button, filled, labelGlow, type Kind, type Size, SIZES, TONES } from "../../lib/button.ts";
+import { chip } from "../../lib/chip.ts";
+import type { Pinned } from "../../lib/control.ts";
+import { listRow, well } from "../../lib/list.ts";
+import { menuItem } from "../../lib/menu.ts";
+import { pill } from "../../lib/pill.ts";
+import { popover } from "../../lib/tooltip.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { focusRing, glow, type Tone, toneColour, windowRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
@@ -237,7 +243,7 @@ const FOCUS_FOR: Record<string, string> = {
   "focus-offset": "The band a picture keeps round itself; its glow is cut past it",
   "focus-label_near": "The reach of a lit label's glow on a fill",
   "focus-label_glow": "That glow's opacity at the letters",
-  "focus-pressed_glow": "A pressed control's glow: lit, this many times brighter",
+  "focus-pressed_glow": "A key pressed on a focused control: its glow this many times brighter",
 };
 
 /** A focus token's value as the tokens write it: a length in logical pixels, or a number. */
@@ -604,6 +610,37 @@ function deviceTable(): HTMLElement {
   return across(table(["Length", "What", ...SCALES.map((scale) => `${scale}×`)], rows));
 }
 
+/** The four states of a control, as the pointer and the keyboard leave it: rest has no pin. */
+const FOUR: readonly { readonly name: string; readonly pinned?: Pinned }[] = [
+  { name: "Rest" },
+  { name: "Hovered", pinned: "hover" },
+  { name: "Pressed", pinned: "pressed" },
+  { name: "Focused", pinned: "lit" },
+];
+
+/** One of each kind of control, as `pinned` leaves it. */
+const QUIET: readonly { readonly name: string; readonly draw: (pinned?: Pinned) => HTMLElement }[] = [
+  { name: "Bar pill", draw: (pinned) => pill({ content: [text("Tue 27 Oct", "label")], lone: false, interactive: true, ...(pinned ? { pinned } : {}) }) },
+  { name: "Tonal button", draw: (pinned) => button({ label: "Cancel", kind: "Tonal", size: "Md", ...(pinned ? { pinned } : {}) }) },
+  { name: "Filled button", draw: (pinned) => button({ label: "Save", kind: "Filled", size: "Md", ...(pinned ? { pinned } : {}) }) },
+  { name: "Text button", draw: (pinned) => button({ label: "Learn more", kind: "Text", size: "Md", ...(pinned ? { pinned } : {}) }) },
+  { name: "Danger button", draw: (pinned) => button({ label: "Erase disk", kind: "Danger", size: "Md", ...(pinned ? { pinned } : {}) }) },
+  { name: "Chip", draw: (pinned) => chip({ label: "Wi-Fi", press: "press", ...(pinned ? { pinned } : {}) }) },
+  {
+    name: "List row",
+    draw: (pinned) => well("List", listRow({ title: "Bluetooth" }, pinned === "lit", pinned === "hover" || pinned === "pressed" || pinned === "lit" ? pinned : undefined)),
+  },
+  {
+    name: "Menu item",
+    draw: (pinned) => popover(2, menuItem({ label: "Rename" }, pinned === "lit", pinned === "hover" || pinned === "pressed" || pinned === "lit" ? pinned : undefined)),
+  },
+];
+
+/** Every kind of control in each of its four states, in `mode`. */
+function quietHover(mode: Mode): HTMLElement {
+  return room(settings().theme, mode, table(["Control", ...FOUR.map((state) => state.name)], QUIET.map((control) => [control.name, ...FOUR.map((state) => control.draw(state.pinned))])));
+}
+
 /** The text a long-content sample shows, from the toolbar's length. */
 const LONG: Words = { short: "Back", long: "Back to the keyboard layout" };
 
@@ -611,8 +648,8 @@ export default foundation({
   level: "foundations",
   slug: "focus",
   title: "Focus",
-  lede: "Hovered or focused, a control is lit: a neon line inside its edge in its tone, a glow outside while the signs are on.",
-  stage: { live, hint: "Tab through them, or hover", daylight: true },
+  lede: "Keyboard focus lights a control, a neon line inside its edge and a glow outside; the pointer only fills it a step on.",
+  stage: { live, hint: "Tab through them; the pointer stays quiet", daylight: true },
   tokens: [
     { name: "The focus tokens", note: "Every token of the family, by its value.", sample: focusTokens },
     { name: "The tones and their cores", note: "The core is the tone 50% to white; unlit is lightness × 0.6, chroma × 1.2; formulas, never values.", sample: toneTable },
@@ -620,6 +657,8 @@ export default foundation({
     { name: "The flicker: neon.strike", note: "Ten even steps over `medium`, for power changes alone; hover, focus and press only fade.", sample: strikeBars },
   ],
   rules: [
+    { name: "Hover is quiet, focus is neon", note: "Hovered, the fill a step on; pressed, a step further; focused, the line and glow.", sample: () => quietHover("dark") },
+    { name: "Hover is quiet, by day", note: "By day each step goes darker, as a press always has.", sample: () => quietHover("light") },
     { name: "One line, inside the edge", note: "A tube inside an unfilled control's edge, a core inside a fill's; only glow passes the dashed box.", sample: () => everyControl("dark") },
     { name: "The neon takes the tone", note: "Signs on, tube and glow in the tone; signs off, solid glass (`_glass`, `_unlit`) with no glow.", sample: toneLooks },
     { name: "Content lights as a tube", note: "A Text button's label burns as `primary_core` under a faint glow; Filled's takes a tiny one, Tonal's none.", sample: litContent },

@@ -66,7 +66,7 @@ export interface TabsOptions {
    * and the move's player takes them to the picked one.
    */
   readonly from?: number;
-  /** Drawn lit as the pointer over the well lights it, with no focus tube: a sample of it. */
+  /** Drawn lit as the list row it ends lights it, with no focus tube: a sample of it. */
   readonly pointed?: boolean;
   /** The choice whose tip is drawn shown, as under the pointer: a sample of it. */
   readonly tipShown?: number;

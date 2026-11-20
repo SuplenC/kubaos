@@ -94,7 +94,7 @@ export default page({
     looks: {
       rest: "its kind's colours; a plain chip is always this",
       lit: "the tube, or Filled's core, with the glow outside",
-      pressed: "glow × `focus.pressed_glow`; tube white-hot, or the fill lifts",
+      pressed: "a step past hover: ladder, pressed fill or state layer; no glow",
       disabled: "grey: no tone, line or glow, and no press",
     },
   },

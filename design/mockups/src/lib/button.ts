@@ -2,12 +2,14 @@
 // by what it is for, three sizes; an optional icon leads the label, or trails it on a button that
 // goes forward. Its measures are the specimens' (`docs/design/components/button.md`).
 //
-// Its states are the neon's (`docs/DESIGN.md`, "States"): rest, lit (hovered or focused, one
-// state), pressed and disabled. Lit has two looks: with the signs on, the neon burns; with them
+// Its states are the neon's (`docs/DESIGN.md`, "States"): rest, hovered, pressed, lit (focused
+// from the keyboard) and disabled. Hovered and pressed are quiet: the fill a step and then a step
+// further toward the kind's pressed fill, no line and no glow; a kind with no fill takes a faint
+// shape, the state layer. Lit has two looks: with the signs on, the neon burns; with them
 // off, by day always and at night while a power change has the lights out, the line stays inside
 // the edge as unlit glass, with no glow. Each kind names the colour roles of its fill, label and
 // line in each state and look, every one a derived role computed from the live tone, and the CSS
-// crossfades them as the control lights, as the signs go off and on, and as it is pressed.
+// crossfades them as the control lights, as the signs go off and on, and as it is hovered and pressed.
 //
 // A quiet kind can wear the sharing colour instead of the accent (`colour: "sharing"`): the same
 // kind, the same weight and states, in the sharing roles and lighting in violet, for the controls
@@ -52,8 +54,9 @@ export const METRICS: Record<Size, Metrics> = {
 /**
  * A kind's colours in each state, by colour role: its fill and its label at rest, lit and pressed,
  * and the line inside its edge, lit and pressed; and lit with the signs off, its fill, label and
- * glass line. A null fill is none. Pressed, a label is its lit one, and a kind whose pressed fill or
- * line changes only by day or by night says so in CSS. By day the signs-off roles are the lit ones,
+ * glass line. A null fill is none, and presses to the state layer. A label keeps its colour hovered
+ * and pressed, lighting only with the neon, and a kind whose pressed fill or line changes only by
+ * day or by night says so in CSS. By day the signs-off roles are the lit ones,
  * so daylight lit and signs off are one look.
  */
 export interface Colours {
@@ -250,19 +253,23 @@ export function iconInLine(name: string, style: TypeStyle, color: string): HTMLE
 const role = (name: string | null) => (name ? `var(--color-${name})` : "transparent");
 
 /**
+ * The fill a control with no fill of its own rises to as it is pressed: the state layer,
+ * `on_surface` at `opacity.press`, so hovered, part way there, it is `opacity.hover`.
+ */
+export const STATE_LAYER = "rgb(from var(--color-on_surface) r g b / var(--opacity-press))";
+
+/**
  * Sets `element`'s colours as `kind`'s in `colour`, its fill, label and line in every state and
- * look, as the custom properties `.k-kind` crossfades, and the tone a Text kind's day press tints
- * with.
+ * look, as the custom properties `.k-kind` crossfades.
  */
 export function paintKind(element: HTMLElement, kind: Kind, colour: ButtonColour = "accent"): void {
   const colours = coloursOf(kind, colour);
   element.dataset.kind = kind;
-  element.style.setProperty("--kind-tone", `var(--color-${toneColour(toneOf(kind, colour))})`);
   element.toggleAttribute("data-hot", kind === "Text");
   element.style.setProperty("--fill", role(colours.fill));
   element.style.setProperty("--fill-lit", role(colours.fillLit));
   element.style.setProperty("--fill-off", role(colours.fillOff));
-  element.style.setProperty("--fill-pressed", role(colours.fillPressed));
+  element.style.setProperty("--fill-pressed", colours.fillPressed ? role(colours.fillPressed) : STATE_LAYER);
   element.style.setProperty("--label", role(colours.label));
   element.style.setProperty("--label-lit", role(colours.labelLit));
   element.style.setProperty("--label-off", role(colours.labelOff));

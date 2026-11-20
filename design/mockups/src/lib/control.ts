@@ -3,17 +3,20 @@
 // each state is `.k-control`'s in `lib.css`.
 
 /**
- * A state shown whatever the pointer and the keyboard do, as the specimens pin them: lit in the
- * look the scene gives it, lit with the signs off whatever the scene, or pressed.
+ * A state shown whatever the pointer and the keyboard do, as the specimens pin them: lit (focused
+ * from the keyboard) in the look the scene gives it, lit with the signs off whatever the scene,
+ * hovered (the pointer over it, quiet), pressed by the pointer (quiet, a step further), or hovered
+ * and focused at once (the neon over the hovered fill).
  */
-export type Pinned = "lit" | "signs-off" | "pressed";
+export type Pinned = "lit" | "signs-off" | "hover" | "pressed" | "focus-hover";
 
-/** Every state a sample is drawn in: at rest, disabled, or pinned. */
-export type Shown = "rest" | "disabled" | Pinned;
+/** Every state a sample is drawn in: at rest, disabled, hovered (as the site's states name it), or pinned. */
+export type Shown = "rest" | "disabled" | "hovered" | Pinned;
 
 /** The options a control takes for a state: disabled, or pinned. */
 export function stateOptions(state: Shown): { disabled?: boolean; pinned?: Pinned } {
   if (state === "rest") return {};
+  if (state === "hovered") return { pinned: "hover" };
   return state === "disabled" ? { disabled: true } : { pinned: state };
 }
 

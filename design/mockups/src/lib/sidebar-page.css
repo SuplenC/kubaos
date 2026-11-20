@@ -90,9 +90,9 @@
 }
 
 /* The highlight: the current section's fill, `surface_container_high` at the control radius, a
-   section row tall, `space.s12` in; it carries the row's tube while the row is lit (hovered, or the
-   keyboard on it), so the tube travels with it rather than going out on one row and lighting on
-   the next. Its place is `--highlight-y`, the current row's top. */
+   section row tall, `space.s12` in; it carries the row's tube while the keyboard is on the row,
+   and its fill rises toward the highest container while the pointer is, so neither goes out on one
+   row and lights on the next. Its place is `--highlight-y`, the current row's top. */
 .k-sp-highlight {
   position: absolute;
   top: 0;
@@ -100,25 +100,31 @@
   right: var(--space-s12);
   height: var(--size-row);
   border-radius: var(--radius-control);
-  background: var(--color-surface_container_high);
+  background: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--rise, 0) * 100%));
   /* Gliding, it goes from `--highlight-from` to `--highlight-y` as `--highlight-at` goes 0 to 1. */
   translate: 0 calc(var(--highlight-from, var(--highlight-y, 0px)) + (var(--highlight-y, 0px) - var(--highlight-from, var(--highlight-y, 0px))) * var(--highlight-at));
   pointer-events: none;
 }
 
-.k-sp-rows:has(> .k-sp-row[data-kind="section"][data-current]:not(:disabled):is(:focus-visible, [data-pinned])) > .k-sp-highlight.k-control,
-.k-sp-side:not([data-still]) .k-sp-rows:has(> .k-sp-row[data-kind="section"][data-current]:hover) > .k-sp-highlight.k-control {
+.k-sp-rows:has(> .k-sp-row[data-kind="section"][data-current]:not(:disabled):is(:focus-visible, [data-pinned="lit"], [data-pinned="signs-off"])) > .k-sp-highlight.k-control {
   --lit: 1;
 }
 
-/* The current row's own tube gives way to the highlight's; it fades out as the row becomes current. */
-.k-sp-rows[data-glides] > .k-sp-row[data-kind="section"][data-current].k-control {
-  --lit: 0;
+.k-sp-rows:has(> .k-sp-row[data-kind="section"][data-current]:not(:disabled)[data-pinned="hover"]) > .k-sp-highlight.k-control,
+.k-sp-side:not([data-still]) .k-sp-rows:has(> .k-sp-row[data-kind="section"][data-current]:hover) > .k-sp-highlight.k-control {
+  --hover: 1;
 }
 
-/* The rows moved under a pointer that stayed: what it is over now isn't lit until it moves. */
-.k-sp-side[data-still] .k-sp-row.k-control:not(:focus-visible, [data-pinned]) {
+/* The current row's own tube and fill give way to the highlight's; they fade out as the row
+   becomes current. */
+.k-sp-rows[data-glides] > .k-sp-row[data-kind="section"][data-current].k-control {
   --lit: 0;
+  --hover: 0;
+}
+
+/* The rows moved under a pointer that stayed: what it is over now takes no fill until it moves. */
+.k-sp-side[data-still] .k-sp-row.k-control:not([data-pinned]) {
+  --hover: 0;
 }
 
 /* The hairline under Home: `space.s8` clear of the rows on either side, with the rows' own
@@ -138,9 +144,11 @@
    with the window's corner `space.s12` out (`radius.surface` less `space.s12`); a sub-section's
    `size.control_sm` tall in `small`, its words where a section's start. At rest its words are
    `on_surface_variant`; current, `on_surface`, and a current section is filled in
-   `surface_container_high`, its symbol `primary`. Lit, hovered or with the keyboard on it, it
-   lights as a Text button does: the tube inside its edge, the glow outside at night, its words
-   `on_surface`; pressed, the tube runs white-hot. */
+   `surface_container_high`, its symbol `primary`. With the keyboard on it, it lights as a Text
+   button does: the tube inside its edge, the glow outside at night, its words `on_surface`, and a
+   key's press runs the tube white-hot. Under the pointer it is quiet, as a Text button is: the
+   state layer (`--layer`), a faint shape at the control radius, and a current section's highlight
+   rises a step toward the highest container instead. */
 .k-sp-row {
   all: unset;
   position: relative;
@@ -158,7 +166,7 @@
   --current: 0;
   --words: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(max(var(--lit), var(--current)) * 100%));
   --glyph: var(--words);
-  background: transparent;
+  background: var(--layer, transparent);
 }
 
 /* A section's symbol goes to `primary` as it becomes current. */
@@ -169,6 +177,7 @@
 .k-sp-row.k-control {
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     --current var(--motion-medium) var(--easing-standard);
 }
@@ -194,7 +203,7 @@
 }
 
 .k-sp-row[data-kind="section"][data-current] {
-  background: var(--color-surface_container_high);
+  background: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--rise, 0) * 100%));
 }
 
 /* The current sub-section's bar: a short stretch of neon, `type.small`'s line tall, centred in the
@@ -341,9 +350,10 @@
    highlight, the accent at `opacity.tint` laid over the row; landed, it fades over `slow`. */
 .k-sp-pane .k-list-row {
   --landed-tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-tint) * var(--landed)));
-  background-image: linear-gradient(var(--landed-tint), var(--landed-tint));
+  background-image: linear-gradient(var(--landed-tint), var(--landed-tint)), linear-gradient(var(--layer), var(--layer));
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     opacity var(--motion-short) var(--easing-standard);
 }

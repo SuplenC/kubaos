@@ -4,8 +4,12 @@
 // content (`space.s8` round a lone symbol). A pill of its own tone takes a fill and an ink together.
 //
 // An interactive pill takes the pointer and is a control in the state model (`.k-control` in
-// `lib.css`), lit only by the pointer: it is never a stop for Tab, so a panel's keyboard focus never
-// wanders into the bar. Its name shows in a hint under it while it is lit. When its content changes,
+// `lib.css`): it is never a stop for Tab, so a panel's keyboard focus never wanders into the bar,
+// and the pointer only ever gives it the quiet hover, no line and no glow. Hovered, its fill is a
+// step lighter, pressed a step further: a neutral pill climbs the container ladder
+// (`surface_container_high`, then `_highest`), and one of its own tone takes the state layer over
+// its fill (`opacity.hover`, then `opacity.press` of `on_surface`). Its name shows in a hint under
+// it while the pointer is on it. When its content changes,
 // what stays (the same element, or an equal one) keeps its place, solid, and moves with the change;
 // what leaves fades out as its room closes and what arrives fades in as its room opens, over
 // `medium` on `standard_decel`, so the pill's width eases with them. Inside a symbol and its value,
@@ -30,12 +34,33 @@ import { settings } from "../site/settings.ts";
  */
 export type PillTone = "neutral" | "recording" | "preview" | "sharing" | "camera";
 
-const FILLS: Record<PillTone, { readonly fill: string; readonly ink: string; readonly tone: Tone }> = {
-  neutral: { fill: "var(--color-surface_container)", ink: "var(--color-on_surface)", tone: "accent" },
-  recording: { fill: "var(--color-error_container)", ink: "var(--color-on_error_container)", tone: "error" },
-  preview: { fill: "rgb(from var(--color-cold) r g b / var(--opacity-tint))", ink: "var(--color-cold)", tone: "cold" },
-  sharing: { fill: "var(--color-sharing_container)", ink: "var(--color-on_sharing_container)", tone: "sharing" },
-  camera: { fill: "var(--color-error_container)", ink: "var(--color-on_error_container)", tone: "recording" },
+/** A pill's colours: its fill at rest, hovered and pressed, its ink, and the tone its tube lights in. */
+interface Fill {
+  readonly fill: string;
+  readonly hover: string;
+  readonly pressed: string;
+  readonly ink: string;
+  readonly tone: Tone;
+}
+
+/** `fill` under the state layer, `on_surface` at the opacity token `opacity`: a tone's fill a step on. */
+const layered = (fill: string, opacity: "hover" | "press") => `color-mix(in srgb, ${fill}, var(--color-on_surface) calc(var(--opacity-${opacity}) * 100%))`;
+
+/** A tone's fill and ink, its steps the state layer over the fill. */
+const toned = (fill: string, ink: string, tone: Tone): Fill => ({ fill, hover: layered(fill, "hover"), pressed: layered(fill, "press"), ink, tone });
+
+const FILLS: Record<PillTone, Fill> = {
+  neutral: {
+    fill: "var(--color-surface_container)",
+    hover: "var(--color-surface_container_high)",
+    pressed: "var(--color-surface_container_highest)",
+    ink: "var(--color-on_surface)",
+    tone: "accent",
+  },
+  recording: toned("var(--color-error_container)", "var(--color-on_error_container)", "error"),
+  preview: toned("rgb(from var(--color-cold) r g b / var(--opacity-tint))", "var(--color-cold)", "cold"),
+  sharing: toned("var(--color-sharing_container)", "var(--color-on_sharing_container)", "sharing"),
+  camera: toned("var(--color-error_container)", "var(--color-on_error_container)", "recording"),
 };
 
 export interface PillOptions {
@@ -47,9 +72,9 @@ export interface PillOptions {
   /** The gap between its content, as QML's `spacing`, where a pill sets its own: `space.s4`, `space.s12`. */
   readonly gap?: string | 0;
   readonly tone?: PillTone;
-  /** Takes the pointer: lit under it, pressed, and its name in a hint. */
+  /** Takes the pointer: a quiet fill under it, a step more pressed, and its name in a hint. */
   readonly interactive?: boolean;
-  /** Its name, in a hint under it while it is lit. */
+  /** Its name, in a hint under it while the pointer is on it. */
   readonly tooltip?: string;
   readonly pinned?: Pinned;
 }
@@ -78,6 +103,8 @@ export function makePill(options: PillOptions): Pill {
   element.className = "k-pill";
   element.toggleAttribute("data-lone", options.lone);
   element.style.setProperty("--fill", tone.fill);
+  element.style.setProperty("--fill-hover", tone.hover);
+  element.style.setProperty("--fill-pressed", tone.pressed);
   element.style.setProperty("--ink", tone.ink);
   if (options.end !== undefined) element.style.setProperty("--end", `var(--space-${options.end})`);
   const clip = document.createElement("span");

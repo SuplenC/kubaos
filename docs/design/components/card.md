@@ -10,7 +10,7 @@ A region of the page holding a group that belongs together but isn't a list. It 
 
 What it holds runs top to bottom `space.s16` apart: a header (a symbol at `subheading`'s 24, its title in `subheading` `space.s8` after it, a `small` line in `on_surface_variant` `space.s4` below), the body, and a `ButtonBar` at its foot, its action `Tonal`. A card or a well is never inside another; a control in a card keeps its own corner, and a picture filling the card less its padding takes the row radius (8, `radius.row`), since the card's 16 less its 16 would leave no corner.
 
-**States:** a plain card takes no input and has none. A pressable card is one press target as a whole and holds no controls: rest, lit (the accent's tube inside its edge, the glow outside at night), pressed (the tube white-hot, the glow brighter, by day `opacity.press_tint` of the accent over its fill) and disabled (its resting fill and edge kept, what it holds at `opacity.disabled_content`, no line, no stop for Tab).
+**States:** a plain card takes no input and has none. A pressable card is one press target as a whole and holds no controls: rest, hovered (the state layer over its fill, `on_surface` at `opacity.hover`, no line and no glow), pressed (the state layer at `opacity.press`), lit, focused from the keyboard (the accent's tube inside its edge, the glow outside at night) and disabled (its resting fill and edge kept, what it holds at `opacity.disabled_content`, no line, no stop for Tab).
 
 *Not built yet: both libraries draw a card at the surface radius (24) on the well's fill (`surface_container_low` at `opacity.well`) rather than the container above its surface, and neither has a pressable card.*
 

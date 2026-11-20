@@ -105,7 +105,7 @@ export default page({
     looks: {
       rest: "flat, `surface_container`, soft hairline, no shadow",
       lit: "the `primary` tube inside its edge, glow at night",
-      pressed: "white-hot, glow × `focus.pressed_glow`; by day a tint",
+      pressed: "the state layer at `opacity.press`; no line, no glow",
       disabled: "its fill kept, content at `opacity.disabled_content`, no Tab stop",
     },
   },

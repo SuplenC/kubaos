@@ -213,7 +213,7 @@ export default page<Shown>({
     looks: {
       rest: "another tile current; its symbol muted",
       lit: "its tube and glow; the desktop plays it",
-      pressed: "white-hot; held ones fill with the tint",
+      pressed: "the state layer; held ones fill with the tint",
     },
   },
   focus: {
@@ -237,7 +237,7 @@ export default page<Shown>({
     arrives: [OPENING],
     leaves: [CLOSING, LOCKS, SLEEPS, LOGS_OUT, GOES_DOWN],
     between: [
-      { name: "Lit", what: "The keyboard or pointer onto a tile: it lights over `short`, and its action plays.", tracks: lights(".power-tile[data-action=\"suspend\"]", "a tile", 0, 1), reduced: "same", back: "cuts", sample: held(open(LOCK, { played: false })) },
+      { name: "Lit", what: "The keyboard onto a tile: it lights over `short`, and its action plays.", tracks: lights(".power-tile[data-action=\"suspend\"]", "a tile", 0, 1), reduced: "same", back: "cuts", sample: held(open(LOCK, { played: false })) },
       ...LOOKS,
       CYCLE,
       HOLDS,

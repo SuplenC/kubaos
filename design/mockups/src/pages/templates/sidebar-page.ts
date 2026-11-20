@@ -2,7 +2,7 @@
 // in a sidebar beside a page that scrolls, with Home, a page that is only search, at the top:
 // Settings' layout. Live in a window that resizes, from the app's minimum to a 1080p screen.
 
-import type { Shown } from "../../lib/control.ts";
+import { type Shown, stateOptions } from "../../lib/control.ts";
 import { fixed, shown, type Words } from "../../lib/content.ts";
 import { stack } from "../../lib/layout.ts";
 import { type SidebarPageOptions, sidebarPage, sidebarRow } from "../../lib/sidebar-page.ts";
@@ -26,7 +26,7 @@ function small(options: Omit<SidebarPageOptions, "outline"> = {}, sections = out
 function rowIn(kind: "section" | "sub", words: string, glyph: string | null, current: boolean, state: Shown): HTMLElement {
   const band = document.createElement("span");
   band.className = "k-sp-side t-band";
-  const button = sidebarRow(kind, words, glyph, current, state === "rest" || state === "disabled" ? undefined : state);
+  const button = sidebarRow(kind, words, glyph, current, stateOptions(state).pinned);
   band.append(button);
   return band;
 }
@@ -178,7 +178,7 @@ export default page({
     looks: {
       rest: "`on_surface_variant`, no fill, no line",
       lit: "the tube inside its edge, glow at night, words `on_surface`",
-      pressed: "the tube runs hot over `micro`; by day the glass darkens",
+      pressed: "the state layer at `opacity.press` over `micro`; no glow",
       selected: "filled `surface_container_high`, symbol `primary`; a sub-section, the bar",
     },
   },

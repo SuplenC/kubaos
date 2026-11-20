@@ -26,11 +26,11 @@
 // or the label, `space.s4` clear of each. A slider of more than eight stops draws neither dots nor
 // the resting mark: it still settles on its stops, and reads as a plain slider.
 //
-// It is a control in the state model (`.k-control` in `lib.css`): lit under the pointer or with the
-// keyboard on it, its fill brightening by `opacity.press` toward the palette's bright end, the tube
-// inside its edge with the glow outside; held (pressed or dragged), the fill brightens by
-// `opacity.held`. Its icon's button lights as an icon button does on the fill, and while it is lit
-// the slider isn't; Space presses it, as a click does. It owns its value here, as the app does in both libraries: the pointer, the
+// It is a control in the state model (`.k-control` in `lib.css`): under the pointer its fill
+// brightens by `opacity.hover` toward the palette's bright end, with no line and no glow; with the
+// keyboard on it, the tube burns inside its edge with the glow outside; held (pressed or dragged),
+// the fill brightens by `opacity.held`. Its icon's button takes the pointer and the keys as an icon
+// button does on the fill, and while it does the slider rests; Space presses it, as a click does. It owns its value here, as the app does in both libraries: the pointer, the
 // keys and the horizontal wheel move it, and it draws itself again.
 
 import { settings } from "../site/settings.ts";

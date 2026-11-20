@@ -281,7 +281,7 @@ export default page<"rest" | "lit" | "pressed" | "disabled" | "selected" | "load
     looks: {
       rest: "a step to do, no fill; Back and Continue",
       lit: "a done step's tube, glow at night; Continue's core",
-      pressed: "the tube white-hot, by day the tone's tint; Continue brighter",
+      pressed: "the state layer at `opacity.press`; Continue a step brighter",
       disabled: "behind a locked step, no press; Continue with its reason",
       selected: "current: `on_surface` at `opacity.hover`, symbol `primary`; the band's note",
       loading: "the symbol hums to `opacity.hum`; no press, no band",

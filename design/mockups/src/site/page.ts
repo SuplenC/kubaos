@@ -98,9 +98,14 @@ export interface VariantGroup {
   readonly rows: NonEmpty<Variant>;
 }
 
-/** Every state the mockup skill names, and open, which only a part that opens has. */
+/**
+ * Every state the mockup skill names, open, which only a part that opens has, and hovered, which
+ * the site draws beside Lit for every part that has it and a part that never takes the keyboard
+ * (a bar pill) shows on its own.
+ */
 export const STATES = [
   "rest",
+  "hovered",
   "lit",
   "pressed",
   "open",
@@ -112,11 +117,12 @@ export const STATES = [
 ] as const;
 export type State = (typeof STATES)[number];
 /** The states only some parts have: a page without one leaves it out with no word on why. */
-type Optional = "open";
+type Optional = "open" | "hovered";
 
 export const STATE_NAMES: Record<State, string> = {
   rest: "Rest",
-  lit: "Lit",
+  hovered: "Hovered",
+  lit: "Focused",
   pressed: "Pressed",
   open: "Open",
   disabled: "Disabled",
@@ -125,6 +131,67 @@ export const STATE_NAMES: Record<State, string> = {
   empty: "Empty",
   error: "Error",
 };
+
+/**
+ * A column of the states: a state the page shows, or Hovered, which every part with a lit state
+ * has and the site draws for it from its rest sample (`HOVERED`), unless the page shows Hovered
+ * itself.
+ */
+export type StateColumn<S extends State> = S | "hovered";
+
+/**
+ * Hovered: the pointer over a part, quiet, as every control is (`docs/DESIGN.md`, "States"). A page
+ * that shows Lit, which is focus from the keyboard, shows Hovered beside it, drawn from its rest
+ * sample with its controls pinned under the pointer.
+ */
+export const HOVERED = { name: "Hovered", look: "pointer: the fill a step on, no line, no glow" } as const;
+
+/** Hovered's sample and its look: the page's own where it shows Hovered, else drawn from rest. */
+export function hoveredOf<S extends State>(states: States<S>): { readonly look: Cell; readonly draw: (row: States<S>["rows"][number]) => Element } {
+  const own = (states.shown as readonly State[]).includes("hovered");
+  const looks = states.looks as Partial<Record<State, Cell>>;
+  return {
+    look: own ? (looks.hovered ?? HOVERED.look) : HOVERED.look,
+    draw: (row) => (own ? row.cell("hovered" as S) : hovered(row.cell("rest" as S))),
+  };
+}
+
+/**
+ * The parts a sample pins under the pointer: the library's controls, and a page's own press target
+ * that takes the pointer's state layer (`data-hoverable`).
+ */
+const CONTROLS = ".k-control, .k-menu-item, .k-list-row, [data-hoverable]";
+
+/**
+ * `sample` with the pointer over it: each outermost control in it that can be taken pinned
+ * hovered. A part whose pointer lands on a piece of it (a workspace cell) shows that from its own
+ * pin.
+ */
+export function hovered(sample: Element): Element {
+  const all = [...(sample.matches(CONTROLS) ? [sample] : []), ...sample.querySelectorAll(CONTROLS)].filter((each): each is HTMLElement => each instanceof HTMLElement);
+  for (const control of all) {
+    if (control.parentElement?.closest(CONTROLS) && all.includes(control.parentElement.closest(CONTROLS) as HTMLElement)) continue;
+    if (control.matches("[aria-disabled='true'], :disabled")) continue;
+    control.dataset.pinned = "hover";
+  }
+  return sample;
+}
+
+/**
+ * The columns `shown` draws, in the order the states go: Rest, Hovered, Pressed, then Focused
+ * (Lit), then the rest; Hovered added only where Lit is shown and the page doesn't show Hovered
+ * itself, which keeps its own order.
+ */
+export function stateColumns<S extends State>(shown: readonly S[]): StateColumn<S>[] {
+  if ((shown as readonly State[]).includes("hovered") || !(shown as readonly State[]).includes("lit")) return [...shown];
+  const others = shown.filter((state) => state !== "lit");
+  const after = others.indexOf("pressed" as S) >= 0 ? others.indexOf("pressed" as S) : others.indexOf("rest" as S);
+  const columns: StateColumn<S>[] = [...others];
+  columns.splice(after + 1, 0, "lit" as S);
+  const rest = columns.indexOf("rest" as S);
+  columns.splice(rest + 1, 0, "hovered");
+  return columns;
+}
 
 /**
  * The states: a row per variant and a column per state it has, which the stage's chips pin and the
@@ -154,7 +221,7 @@ export interface Tube {
 }
 
 /**
- * The looks of the lit state. Nothing the user does picks one; the scene does: `lit` is the signs
+ * The looks of the lit state, focus from the keyboard. Nothing the user does picks one; the scene does: `lit` is the signs
  * on, the neon burning, at night at rest; `signsOff` is the same control still lit with the neon
  * unpowered, its line unlit glass with no glow, by day always and at night while a power change has
  * the lights out (`docs/DESIGN.md`, "States").
@@ -163,13 +230,13 @@ export const LOOKS = ["lit", "signsOff"] as const;
 export type Look = (typeof LOOKS)[number];
 
 export const LOOK_NAMES: Record<Look, string> = {
-  lit: "Lit · signs on",
-  signsOff: "Lit · signs off",
+  lit: "Focused · signs on",
+  signsOff: "Focused · signs off",
 };
 
 /**
  * The line a part lights when it is lit: every line in its tone, what each look makes of it, and
- * the state matrix's "Lit · signs off" column at night, pinned as "Lit" is.
+ * the state matrix's "Focused · signs off" column at night, pinned as "Focused" is.
  */
 export interface Focus {
   readonly tubes: NonEmpty<Tube>;

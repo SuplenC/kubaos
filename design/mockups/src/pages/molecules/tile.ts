@@ -98,7 +98,7 @@ export default page({
     looks: {
       rest: "off: `surface_container_high`; on: `primary_fill`, `on_primary_fill`",
       lit: "tube, or on the core, inside its edge; glow at night",
-      pressed: "glow × `focus.pressed_glow`; on lifts to `primary_fill_pressed`",
+      pressed: "off rises to the highest container; on to `primary_fill_pressed`",
       disabled: "grey, on or off: no press, no Tab stop",
     },
   },

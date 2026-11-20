@@ -116,7 +116,7 @@ export default page({
     looks: {
       rest: "unlit at night; the burning kinds burn",
       lit: "the line burns inside its edge, the glow outside; its hint shows",
-      pressed: "overdriven: fill brighter, glow × `focus.pressed_glow`",
+      pressed: "pointer: the fill a step past hover, no line, no glow",
       disabled: "grey: no tone, line or glow; the hint still shows",
     },
   },

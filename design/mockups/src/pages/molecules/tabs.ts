@@ -57,7 +57,7 @@ function tipped(shown: number): HTMLElement {
   return within(PANEL, stack("s8", "start", room, tabs({ choices: TIPPED, tipShown: shown })));
 }
 
-/** Motion's three choices at rest, then lit as the pointer over the well lights them. */
+/** Motion's three choices at rest, then lit as the list row they end lights them. */
 function litLooks(): HTMLElement {
   return flow("s32", ...[false, true].map((pointed) => within(PANEL, tabs({ choices: MOTION, picked: 1, ...(pointed ? { pointed } : {}) }))));
 }

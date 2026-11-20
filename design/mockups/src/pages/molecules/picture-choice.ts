@@ -105,7 +105,7 @@ export default page({
     looks: {
       rest: "picked: the accent's line, glow at night, its mark",
       lit: "the cold tube in the picked line's place, glow at night",
-      pressed: "tube `cold_core`, glow × `focus.pressed_glow`; by day a cold tint",
+      pressed: "the state layer at `opacity.press` over the picture; no glow",
       disabled: "picture at `opacity.disabled_content`, name dimmed; skipped by the keys",
       loading: "its placeholder breathing in the box",
     },
