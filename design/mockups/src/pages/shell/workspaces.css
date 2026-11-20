@@ -166,6 +166,23 @@
   grid-area: 1 / 1;
 }
 
+/* A workspace whose menu is open: a circle the cell's size in `primary` at `opacity.tint` behind
+   its number, as an accent is drawn faintly under itself, fading in and out with the menu. */
+.shell-ws-cell::before {
+  content: "";
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+.shell-ws-slot[data-menu] > .shell-ws-cell::before {
+  opacity: 1;
+}
+
 /* A cell's number: a rolling number (`lib/rolling-number.ts`), as the Overview's are, or a kanji,
    centred in its cell by the cell. */
 .shell-ws-number {

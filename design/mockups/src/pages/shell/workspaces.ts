@@ -35,7 +35,9 @@
 // and widens into its new one as it lands, never crossing a rule, a gap or a name.
 // Nothing in the pill is selected by a press or a drag.
 //
-// A right click opens its menu (`lib/menu.ts`) on a popover under it: on a workspace, its own
+// A right click opens its menu (`lib/menu.ts`) on a popover under it, the workspace it is for marked
+// by a circle of `primary` at `opacity.tint` behind its number, fading over `short` on `standard`
+// (none on the shown one, already on the indicator): on a workspace, its own
 // actions under "Workspace N", then its group's under "This group"; on a group's name or its ghost,
 // the group's alone, under its name. The deletes are
 // held. Move to group and Move to screen open their lists in place, Back first, as every submenu.
@@ -877,9 +879,14 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   const room = options.live || options.menu ? document.createElement("span") : null;
   let card: HTMLElement | null = null;
 
+  /** The workspace a menu is open for, marked so it reads as the menu's. */
+  let marked: HTMLElement | null = null;
+
   function closeMenu(): void {
     card?.remove();
     card = null;
+    if (marked) delete marked.dataset.menu;
+    marked = null;
     document.removeEventListener("pointerdown", outside, true);
   }
 
@@ -950,6 +957,12 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       room.append(card);
       if (!still) list_.focus({ preventScroll: true });
     };
+    // The workspace it is for takes a light tint of primary, unless it is the shown one, already on
+    // the indicator; a group's menu marks nothing.
+    if ("workspace" in on && on.workspace !== active) {
+      marked = anchor;
+      anchor.dataset.menu = "";
+    }
     const main = () => showRows(rows, null);
     const sub = (list: readonly Row[]) => showRows([{ spec: { label: "Back", icon: "arrow_back" }, act: main }, "separator", ...list], main);
     main();

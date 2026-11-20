@@ -88,7 +88,7 @@ export default page<State>({
     {
       title: "Its menu",
       rows: [
-        { name: "On a workspace", for: "its actions, then its group's", sample: () => workspaces({ groups: LIVE, menu: { workspace: 3 } }) },
+        { name: "On a workspace", for: "its actions, then its group's; it takes a light primary circle", sample: () => workspaces({ groups: LIVE, menu: { workspace: 3 } }) },
         { name: "On a group", for: "its name or ghost: the group's alone", sample: () => workspaces({ groups: LIVE, menu: { group: 1 } }) },
         { name: "Delete held", for: "`error` sweeps across; acts when full", sample: () => workspaces({ groups: LIVE, menu: { workspace: 3, holding: 0.6 } }) },
       ],
