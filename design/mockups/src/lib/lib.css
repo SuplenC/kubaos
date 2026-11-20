@@ -2964,8 +2964,24 @@
   bottom: 0;
 }
 
-.k-select-room:is([data-open], [data-folding]) > .k-select {
-  z-index: 10;
+/* Open or folding, a live select's surface is in the top layer, fixed over its room where
+   `lib/select.ts` measures the room drawn (`--select-at-*`), as wide as the room and at its scale,
+   growing down from its top or up from its bottom. A sample drawn open stays in its room's flow. */
+.k-select:popover-open {
+  position: fixed;
+  left: var(--select-at-left);
+  right: auto;
+  top: var(--select-at-top);
+  bottom: auto;
+  width: var(--select-at-width);
+  transform: scale(var(--select-at-scale));
+  transform-origin: 0 0;
+}
+
+.k-select-room[data-up] > .k-select:popover-open {
+  top: auto;
+  bottom: var(--select-at-bottom);
+  transform-origin: 0 100%;
 }
 
 /* Open or folding, nothing lights it: the keyboard is in its list. */
@@ -3159,10 +3175,40 @@
    where the pick's do. */
 .k-select-popover {
   position: absolute;
-  z-index: 10;
   top: calc(100% + var(--space-s4));
   left: calc(-1 * var(--select-back));
   opacity: var(--select-open);
+}
+
+/* Live, its Menu is in the top layer, standing by the room as drawn (`--select-at-*`) where it
+   stood in it, at the room's scale. */
+.k-select-popover:popover-open {
+  position: fixed;
+  top: calc(var(--select-at-below) + var(--space-s4) * var(--select-at-scale));
+  bottom: auto;
+  left: calc(var(--select-at-left) - var(--select-back) * var(--select-at-scale));
+  transform: scale(var(--select-at-scale));
+  transform-origin: 0 0;
+}
+
+.k-select-room[data-look="inline"][data-up] > .k-select-popover:popover-open {
+  top: auto;
+  bottom: calc(var(--select-at-above) + var(--space-s4) * var(--select-at-scale));
+  transform-origin: 0 100%;
+}
+
+/* A popover's own box from the browser (a margin, a border, padding, a canvas fill and its
+   colour, a size of its content's) gives way to what the select's styles say, at no weight. */
+:where(.k-select:popover-open, .k-select-popover:popover-open) {
+  inset: auto;
+  width: auto;
+  height: auto;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  overflow: visible;
+  color: inherit;
+  background: none;
 }
 
 .k-select-room[data-look="inline"] {

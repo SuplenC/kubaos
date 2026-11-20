@@ -26,6 +26,12 @@
 // in, on a popover raised to step 2 `space.s4` under the words (over them where the room below is
 // too short), its options' words in line with the pick's; it fades in over `short` and out over
 // `micro`, as a popover does.
+//
+// A live select, open or folding, stands in the browser's top layer, over its room: a raised
+// stacking order counts only among its neighbours, so a later row that stacks on its own (a
+// slider's) would paint over the list, and a scrolling pane or a stage would cut it. It is placed
+// from its room's drawn box every frame it is up, at the room's scale, not by a CSS anchor, which
+// leaves out a scaled stage's transform and a moving page's.
 
 import { pin, type Pinned } from "./control.ts";
 import { raise } from "./elevation.ts";
@@ -231,6 +237,8 @@ export function select(options: SelectOptions): HTMLElement {
   }
 
   room.toggleAttribute("data-up", options.up ?? false);
+  // What rises out of the page as it opens: the field's whole surface, or the inline look's Menu.
+  const floating = inline ? room.querySelector<HTMLElement>(".k-select-popover")! : surface;
   probe(surface, {
     role: "component",
     name: "Select",
@@ -283,6 +291,8 @@ export function select(options: SelectOptions): HTMLElement {
     delete room.dataset.folding;
     delete room.dataset.taken;
     for (const item of items) item.removeAttribute("data-taken");
+    // Raised before it is measured: shut, a popover takes no box.
+    rise();
     // An inline select's Menu is laid out only while open, so it opens before it is measured.
     if (inline) room.dataset.open = "";
     room.toggleAttribute("data-up", growsUp());
@@ -310,6 +320,44 @@ export function select(options: SelectOptions): HTMLElement {
   function folded(): void {
     delete room.dataset.folding;
     delete room.dataset.taken;
+    cancelAnimationFrame(following);
+    if (floating.matches(":popover-open")) floating.hidePopover();
+    floating.removeAttribute("popover");
+  }
+
+  let following = 0;
+
+  /**
+   * Lifts the surface into the top layer, over everything after it and past every clip. It is a
+   * popover only while it is up: shut, a popover is hidden, and a shut field shows its box.
+   */
+  function rise(): void {
+    floating.popover = "manual";
+    if (!floating.matches(":popover-open")) floating.showPopover();
+    cancelAnimationFrame(following);
+    follow();
+  }
+
+  /**
+   * Stands the risen surface over its room as drawn now, and again next frame, so it keeps to the
+   * room as the page scrolls or moves. Its lengths are in its own CSS pixels, which the page's zoom
+   * scales as it does the room's; what scales the room besides (a stage fitting its sample) scales
+   * it too.
+   */
+  function follow(): void {
+    if (!room.isConnected) return;
+    const at = room.getBoundingClientRect();
+    const zoom = room.currentCSSZoom;
+    const view = document.documentElement.clientHeight;
+    const style = floating.style;
+    style.setProperty("--select-at-left", `${at.left / zoom}px`);
+    style.setProperty("--select-at-top", `${at.top / zoom}px`);
+    style.setProperty("--select-at-below", `${at.bottom / zoom}px`);
+    style.setProperty("--select-at-above", `${(view - at.top) / zoom}px`);
+    style.setProperty("--select-at-bottom", `${(view - at.bottom) / zoom}px`);
+    style.setProperty("--select-at-width", `${room.offsetWidth}px`);
+    style.setProperty("--select-at-scale", String(at.width / Math.max(1, room.offsetWidth * zoom)));
+    following = requestAnimationFrame(follow);
   }
 
   /** Picks the option at `index`: it shows pressed for `micro`, then the surface folds. */
