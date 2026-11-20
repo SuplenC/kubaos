@@ -240,6 +240,12 @@ export function rollingNumber(options: RollingOptions): Rolling {
   }
 
   probe(element, { role: "component", name: "RollingNumber", variant: style, fixed: FIXED_HEIGHT });
+  // An owner centres it by layout, which can leave it half a device pixel off when its owner is
+  // laid out after the page put its boxes on pixels (the Overview places its workspaces a frame
+  // later): each time it is laid out at a size, in that same frame, it is put on pixels too.
+  new ResizeObserver(() => {
+    if (element.isConnected && element.parentElement) centreOnPixels(element.parentElement);
+  }).observe(element);
   return { element, set, value: () => value };
 }
 
