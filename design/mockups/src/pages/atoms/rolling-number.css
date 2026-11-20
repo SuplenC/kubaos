@@ -1,0 +1,11 @@
+/* The RollingNumber page's own sample: a number in a cell a chip across that centres it by layout,
+   as a workspace's cell in the bar does. */
+.rn-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_high);
+}

@@ -2,6 +2,7 @@
 // odometer does, only the figures that change, in a box as wide as its widest value. Counters'
 // values are its first use.
 
+import "./rolling-number.css";
 import { iconButton } from "../../lib/icon-button.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { rollingMidway, rollingNumber } from "../../lib/rolling-number.ts";
@@ -60,6 +61,17 @@ function clockSample(): HTMLElement {
   return made.element;
 }
 
+/** One figure to two and back, a second apart while it is shown live, centred in a cell as a workspace's number is. */
+function growingSample(): HTMLElement {
+  const made = rollingNumber({ value: 9, widest: "0", style: "button_small" });
+  const cell = document.createElement("span");
+  cell.className = "rn-cell";
+  cell.append(made.element);
+  const tick = () => made.element.isConnected && (made.set(made.value() === 9 ? 10 : 9), setTimeout(tick, 1000));
+  if (CHROME) setTimeout(tick, 1000);
+  return cell;
+}
+
 export default page<"rest">({
   level: "atoms",
   slug: "rolling-number",
@@ -75,6 +87,7 @@ export default page<"rest">({
     { name: "Going up", for: "the new figure in from below", sample: () => rollingMidway(99, 100, WIDEST) },
     { name: "Going down", for: "the new figure in from above", sample: () => rollingMidway(100, 99, WIDEST) },
     { name: "A clock", for: "figures roll, colons keep their place: a player's time", sample: clockSample },
+    { name: "One figure to two", for: "9 ↔ 10 centred: its box eases its width with the roll", sample: growingSample },
   ],
   sizes: doesntApply("one size: `mono_large`, a counter's value beside its buttons."),
   states: {

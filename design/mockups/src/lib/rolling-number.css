@@ -1,6 +1,13 @@
 /* A rolling number (`lib/rolling-number.ts`): its figures at its end in a box as wide as its widest
    value, each in a slot one figure wide and a line tall that cuts what rolls out of it. */
 
+/* The width a rolling number eases through while a roll changes how many figures it has. */
+@property --roll-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 /* How far a figure has rolled, 0 to 1, and which way: 1 up, -1 down. */
 @property --roll {
   syntax: "<number>";
@@ -9,6 +16,7 @@
 }
 
 .k-rolling {
+  position: relative;
   display: flex;
   flex: none;
   justify-content: flex-end;
@@ -20,6 +28,12 @@
   height: var(--t-line);
 }
 
+/* Easing its width, it takes whole device pixels, as its figures' width at rest is one: a box a
+   fraction wide is centred a half pixel off where the same box at rest is, a step as it lands. */
+.k-rolling[data-resizing] {
+  width: round(nearest, var(--roll-width), 1px);
+}
+
 /* A slot is a figure's advance rounded up to a whole device pixel, so every figure starts on one. */
 .k-roll-slot {
   position: relative;
@@ -28,6 +42,13 @@
   width: var(--slot);
   height: var(--t-line);
   overflow: clip;
+}
+
+/* A slot whose figure the count shed, rolling out just before the figures that stay, out of the
+   box's flow and drawn past its edge until its roll ends (`lib/rolling-number.ts` places it). */
+.k-roll-slot[data-shed] {
+  position: absolute;
+  top: 0;
 }
 
 /* A mark between figures (a clock's colon): as wide as its own advance, rounded up to a whole

@@ -6,7 +6,11 @@
 // Only the figures that change roll. Going up, the new one comes in from below as the old one leaves
 // upward; going down, from above as the old leaves downward: `--roll` 0 to 1 over `short` on
 // `standard`, the pair moving together. A figure the count grows comes in from nothing, and one it
-// sheds leaves into nothing. With reduce motion the figures change in place.
+// sheds leaves into nothing. The box is as wide as its figures: when a roll changes how many there
+// are, it eases from the old figures' width to the new over the roll's own `short` on `standard`,
+// starting with it, so an owner that centres it moves it smoothly and it stands centred as the roll
+// ends. A shed figure rolls out beside the figures that stay, outside the box's width but drawn,
+// and goes as its roll ends. With reduce motion the figures and the width change in place.
 //
 // A number can be written with marks between its figures (`format`): a clock's colons, a minus.
 // A mark sits in a slot as wide as its own advance, rounded up to a whole device pixel, and never
@@ -18,6 +22,7 @@
 // style, whatever style a number is drawn in, so the pill's numbers share one baseline.
 
 import "./rolling-number.css";
+import { centreOnPixels } from "./centre.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
 import { advance, centreFor, tabularFigure, text, type TypeStyle } from "./text.ts";
 import { durationMs, raw } from "./tokens.ts";
@@ -120,9 +125,31 @@ export function rollingNumber(options: RollingOptions): Rolling {
   let shown = format(value);
   element.append(...[...shown].map((char) => slot(char, style, color, centre)));
   element.setAttribute("aria-label", shown);
+  let resizing: Animation | null = null;
+  // Its widest value's width, the least it is ever drawn at, as `.k-rolling`'s `min-width` has it.
+  const least = widest.reduce((sum, char) => sum + roomOf(char), 0);
+
+  /** A slot's width, as the CSS rounds it: a figure's or a mark's advance at the box's scale, up to a whole pixel. */
+  function roomOf(char: string): number {
+    const scale = (element.isConnected && Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale"))) || settings().scale;
+    return Math.ceil((isMark(char) ? advance(style, char) : tabularFigure(style)) * scale - 0.001);
+  }
+
+  /** What `boxes` take side by side, the box never under its widest value. */
+  function across(boxes: readonly HTMLElement[]): number {
+    return Math.max(least, boxes.reduce((sum, box) => sum + roomOf(box.hasAttribute("data-mark") ? box.textContent ?? "" : "0"), 0));
+  }
 
   function set(next: number): void {
     if (next === value) return;
+    // The width it is drawn at now, mid-ease or at rest, before anything about it changes; a box
+    // not yet on the page, which an owner may roll as it builds it, has its slots' width.
+    const drawn = element.isConnected ? Number.parseFloat(getComputedStyle(element).width) : Number.NaN;
+    delete element.dataset.resizing;
+    const before = Number.isFinite(drawn) ? drawn : across(slotsOf(element).filter((box) => !box.hasAttribute("data-shed")));
+    resizing?.cancel();
+    // A figure still rolling out from the last change goes now: the slots line up with the value again.
+    for (const shed of element.querySelectorAll(":scope > .k-roll-slot[data-shed]")) shed.remove();
     const way = next > value ? 1 : -1;
     const words = format(next);
     const width = Math.max(words.length, shown.length);
@@ -155,6 +182,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
         fresh.dataset.in = "";
         box.append(fresh);
       }
+      if (!fresh) box.dataset.shed = "";
       const roll = box.animate([{ "--roll": 0 }, { "--roll": 1 }], { duration: ms("short"), easing: raw("easing-standard") });
       // A slot the count shed goes once its figure has rolled away, on the roll's own end.
       roll.finished.then(() => {
@@ -163,6 +191,35 @@ export function rollingNumber(options: RollingOptions): Rolling {
         else if (!box.querySelector(".k-roll-figure:not([data-out])")) box.remove();
       }, () => {});
     });
+    // A shed slot stands just before the figures that stay, out of the box's flow, so the box's own
+    // width is already the new figures' and nothing moves when the slot goes.
+    const staying = slotsOf(element).filter((box) => !box.hasAttribute("data-shed"));
+    const after = across(staying);
+    let right = staying.reduce((sum, box) => sum + roomOf(box.hasAttribute("data-mark") ? box.textContent ?? "" : "0"), 0);
+    for (const box of slotsOf(element).filter((each) => each.hasAttribute("data-shed")).reverse()) {
+      box.style.right = `${right}px`;
+      right += roomOf("0");
+    }
+    if (!reduced && Math.abs(after - before) >= 0.5) {
+      element.dataset.resizing = "";
+      const going = element.animate([{ "--roll-width": `${before}px` }, { "--roll-width": `${after}px` }], { duration: ms("short"), easing: raw("easing-standard") });
+      resizing = going;
+      // A box its owner centres lands on whole device pixels at rest, the odd one after it
+      // (`lib/centre.ts`); while it eases its width it is put there every frame too, so the ease
+      // ends where the box rests and nothing steps by half a pixel as it lands.
+      const centre = () => element.isConnected && element.parentElement && centreOnPixels(element.parentElement);
+      const follow = () => {
+        if (resizing !== going) return;
+        centre();
+        if (going.playState !== "finished") requestAnimationFrame(follow);
+      };
+      requestAnimationFrame(follow);
+      going.finished.then(() => {
+        if (resizing !== going) return;
+        delete element.dataset.resizing;
+        centre();
+      }, () => {});
+    }
     value = next;
     shown = words;
     element.setAttribute("aria-label", shown);
