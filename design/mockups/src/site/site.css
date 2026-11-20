@@ -410,9 +410,12 @@ body {
   overflow-x: auto;
 }
 
-/* A sample drawn in one pane (a template with no daylight) stands in the stage's middle. */
+/* A sample drawn in one pane (a template with no daylight) stands in the stage's middle. Safe: a
+   sample wider than the pane overflows past the end only, as the stage measures it from the start
+   (`samplesWidth`); centred both ways, it would read about half its overflow short and be scaled
+   too little. */
 .page-hero[data-panes="1"] .page-stage-flow {
-  justify-content: center;
+  justify-content: safe center;
 }
 
 .page-stage-flow {
