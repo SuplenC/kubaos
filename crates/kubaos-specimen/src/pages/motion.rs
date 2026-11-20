@@ -89,6 +89,7 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::Hold => "A held button held until it acts.",
         Duration::Undo => "A thing in the Overview's delete slot, waiting until it goes for good.",
         Duration::Hum => "Half a skeleton's breath.",
+        Duration::NeonBlink => "One step of the lit boot sign's バ blinking.",
         Duration::MarqueeHold => "Words past their room holding at their start.",
         Duration::MarqueePace => "Scrolling words travelling `space.s32`.",
         Duration::Toast => "A toast staying once it has arrived.",

@@ -159,17 +159,13 @@
   position: relative;
 }
 
-/* After: the black, and the boot splash's sign on it where the splash draws it, centred with the
-   room its passphrase field keeps under it, at its device size (`--power-splash-scale`). The sign's
-   layers have no background: the room shows through them as it darkens. */
+/* After: the black, and the boot splash's sign on it in the exact centre, at its device size
+   (`--splash-scale`, `neon-sign.ts`). The sign's layers have no background: the room shows through
+   them as it darkens. */
 .power-splash {
   position: absolute;
   inset: 0;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
 }
 
@@ -177,24 +173,4 @@
   position: absolute;
   inset: 0;
   background: var(--color-scrim);
-}
-
-.power-sign {
-  position: relative;
-  flex: none;
-  width: calc(var(--sign-device, 0) * var(--px) / var(--power-splash-scale));
-  aspect-ratio: var(--sign-ratio, auto);
-}
-
-.power-sign > img {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.power-sign-room {
-  flex: none;
-  height: calc((var(--size-control_md) + var(--space-s8) + var(--size-keycap)) / var(--power-splash-scale));
 }

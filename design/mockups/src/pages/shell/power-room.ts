@@ -11,12 +11,6 @@
 // stands, so what the recipe says and what you try never disagree.
 
 import "./power-room.css";
-import signBa from "../../../../../system/files/plymouth/kubaos/sign-ba@2x.png?url";
-import signBase from "../../../../../system/files/plymouth/kubaos/sign-base@2x.png?url";
-import signDakuten from "../../../../../system/files/plymouth/kubaos/sign-dakuten@2x.png?url";
-import signKu from "../../../../../system/files/plymouth/kubaos/sign-ku@2x.png?url";
-import signKuba from "../../../../../system/files/plymouth/kubaos/sign-kuba@2x.png?url";
-import signOs from "../../../../../system/files/plymouth/kubaos/sign-os@2x.png?url";
 import { banner } from "../../lib/banner.ts";
 import { buttonBar } from "../../lib/button-bar.ts";
 import { button } from "../../lib/button.ts";
@@ -34,13 +28,15 @@ import { hang, sheet } from "../../lib/sheet.ts";
 import { text } from "../../lib/text.ts";
 import { floatingTooltip, keyTooltip } from "../../lib/tooltip.ts";
 import type { Duration, Easing, NonEmpty, Track } from "../../site/page.ts";
-import { between, bezier, css, cueOf, milliseconds, stepsOf, struck } from "../../site/recipe.ts";
+import { css, milliseconds, struck } from "../../site/recipe.ts";
 import { paint, paletteOf } from "../../site/recolour.ts";
 import { settings } from "../../site/settings.ts";
 import { barButtons } from "../templates/panels.ts";
 import { PURPLE_HOUR, SCREEN } from "../templates/locks.ts";
 import { BLURRED, DIMMED, ON, reducedRest, resting, touching, touchingReduced } from "../templates/lock-moves.ts";
 import { PURPLE_DAY } from "./wallpaper-schemes.ts";
+import { GLASS, GROUPS, groupOf, neonRoom, SIGN } from "./neon-sign.ts";
+import { play, settle, targets } from "./live-tracks.ts";
 
 type Eased = Track<Easing>;
 
@@ -159,13 +155,9 @@ const BAR = ".k-bar";
 const FRAME = ".k-frame";
 const SPLASH = ".power-splash";
 const BLACK = ".power-black";
-const ART = ".power-sign";
-const GLASS = ".power-sign-base";
+const ART = SIGN;
 const windowAt = (i: number) => `.power-window[data-at="${i}"]`;
 const tileOf = (i: number) => `.power-tile[data-action="${ACTIONS[i]!.id}"]`;
-
-/** The tubes' groups in the order they switch on (`kubaos.script`'s GROUP); they go out the other way. */
-export const GROUPS = ["ku", "ba", "dakuten", "kuba", "os"] as const;
 
 /** `count` of `step`, a cue of whole phases. */
 function times(count: number, step: Duration): Duration[] {
@@ -344,7 +336,7 @@ export function goingDown(index: number): NonEmpty<Track> {
     ...darkening("long", "standard", from),
     track("the splash", SPLASH, "opacity", 0, 1, "long", "standard"),
     track("the splash's black", BLACK, "opacity", 0, 1, "instant", "standard", "long"),
-    ...[...GROUPS].reverse().map((group, i) => ({ part: `${group}'s tubes`, on: ROOM, target: `.power-sign-${group}`, property: "opacity", from: 1, to: 0, duration: "medium" as const, curve: "neon.strike.reversed" as const, cue: ["long", "slow", ...times(i + 1, "short")] as unknown as NonEmpty<Duration> })),
+    ...[...GROUPS].reverse().map((group, i) => ({ part: `${group}'s tubes`, on: ROOM, target: groupOf(group), property: "opacity", from: 1, to: 0, duration: "medium" as const, curve: "neon.strike.reversed" as const, cue: ["long", "slow", ...times(i + 1, "short")] as unknown as NonEmpty<Duration> })),
     track("the dead glass", GLASS, "opacity", 1, 0, "medium", "emphasized_accel", "long", "slow", ...times(GROUPS.length, "short"), "medium"),
   ] as unknown as NonEmpty<Track>;
 }
@@ -406,8 +398,8 @@ export function blocking(reduced = false): NonEmpty<Eased> {
 
 /**
  * The scale of the screen the sample's room stands for: `SCREEN` is a 1920 by 1200 laptop at 1.25.
- * The boot splash draws in device pixels, at 1 on a screen that short, so its sign and the field's
- * room under it are drawn at their device size, this much smaller in logical pixels.
+ * The boot splash draws in device pixels, at 1 on a screen that short, so its sign is drawn at its
+ * device size, this much smaller in logical pixels, in the exact centre as every boot screen has it.
  */
 const SPLASH_SCALE = 1.25;
 
@@ -491,38 +483,13 @@ function tileOfAction(action: Action, name: string): HTMLButtonElement {
   return made;
 }
 
-function signOf(): HTMLElement {
-  const box = document.createElement("span");
-  box.className = "power-sign";
-  const layer = (src: string, cls: string) => {
-    const img = document.createElement("img");
-    img.src = src;
-    img.alt = "";
-    img.draggable = false;
-    img.className = cls;
-    return img;
-  };
-  const glass = layer(signBase, "power-sign-base");
-  // The splash's picture is drawn at its 1× size, its @2× giving the pixels: its natural size, halved.
-  const size = () => {
-    if (glass.naturalWidth === 0) return;
-    box.style.setProperty("--sign-device", String(glass.naturalWidth / 2));
-    box.style.setProperty("--sign-ratio", `${glass.naturalWidth} / ${glass.naturalHeight}`);
-  };
-  glass.addEventListener("load", size);
-  size();
-  const src: Record<(typeof GROUPS)[number], string> = { ku: signKu, ba: signBa, dakuten: signDakuten, kuba: signKuba, os: signOs };
-  box.append(glass, ...GROUPS.map((group) => layer(src[group], `power-sign-g power-sign-${group}`)));
-  return box;
-}
-
 function build(options: RoomOptions): Built {
   const situation = options.situation ?? CALM;
   const names = options.names ?? ACTIONS.map((each) => each.name);
   const made = lock({ ...SCREEN, wallpaper: PURPLE_HOUR, phase: "desktop", bar: barButtons(false), windows: WINDOWS.map(windowOf), sheet: false });
   const element = made.element;
   element.classList.add("power-room");
-  element.style.setProperty("--power-splash-scale", String(SPLASH_SCALE));
+  element.style.setProperty("--splash-scale", String(SPLASH_SCALE));
 
   const tiles = ACTIONS.map((action, i) => tileOfAction(action, names[i]!));
   const anchors = tiles.map((tile, i) => floatingTooltip(tile, tipOf(i), { side: "above", held: i >= RESTART ? "end" : "start", shown: options.tip === true && options.at === i }));
@@ -565,9 +532,7 @@ function build(options: RoomOptions): Built {
   splash.className = "power-splash";
   const black = document.createElement("span");
   black.className = "power-black";
-  const room = document.createElement("span");
-  room.className = "power-sign-room";
-  splash.append(black, signOf(), room);
+  splash.append(black, neonRoom());
   element.append(splash);
 
   return { element, tiles, say, slot, blocker, blockerButtons: [...shows, quit], quit, timed, sheetParts: rising.parts };
@@ -602,95 +567,19 @@ const REST: readonly (readonly [string, string, number | string])[] = [
   [BLACK, "opacity", 0],
   [ART, "opacity", 1],
   [GLASS, "opacity", 1],
-  [".power-sign-g", "opacity", 1],
+  [".neon-sign-g", "opacity", 1],
   [".power-blocker", "opacity", 1],
   [".power-blocker", "--power-rise", 0],
 ];
-
-function targets(root: HTMLElement, selector: string): HTMLElement[] {
-  return [...(root.matches(selector) ? [root] : []), ...root.querySelectorAll<HTMLElement>(selector)];
-}
 
 function rest(root: HTMLElement): void {
   for (const animation of root.getAnimations({ subtree: true })) if (!(animation instanceof CSSTransition)) animation.cancel();
   for (const [selector, property, value] of REST) for (const each of targets(root, selector)) each.style.setProperty(property, String(value));
 }
 
-/** `tracks` at their ends, at once: a still of where a move leaves the room. */
-function settle(root: HTMLElement, tracks: readonly Track[]): void {
-  const ordered = [...tracks].sort((a, b) => cueOf(a) + milliseconds(a.duration) - (cueOf(b) + milliseconds(b.duration)));
-  for (const each of ordered) for (const element of targets(root, each.target)) element.style.setProperty(each.property, String(css(each.to)));
-}
-
 const reducedAt = (element: Element) => settings().reduced || element.closest("[data-reduced]") !== null;
 const flickerOff = (element: Element) => !settings().flicker || element.closest("[data-flicker]") === null;
 const ms = (duration: Duration) => milliseconds(duration) / settings().speed;
-const curveOf = (easing: Easing) => `cubic-bezier(${bezier(easing).join(", ")})`;
-
-/** Each element's running animations, by property: a new one takes over from where the old one stands. */
-const running = new WeakMap<Element, Map<string, Animation>>();
-
-/** The value `property` stands at on `element` now, mid-animation or not. */
-function now(element: HTMLElement, property: string): string {
-  const style = getComputedStyle(element);
-  const value = property === "opacity" ? style.opacity : style.getPropertyValue(property).trim();
-  return value === "" || value === "none" ? (property === "scale" ? "1" : "0") : value;
-}
-
-/** Eases `property` on `element` from where it stands to `to`: set at once, the animation the way there. */
-function tween(element: HTMLElement, each: Track, delay: number): Promise<void> {
-  const map = running.get(element) ?? new Map<string, Animation>();
-  running.set(element, map);
-  const key = each.property;
-  const from = now(element, key);
-  const to = String(css(each.to));
-  map.get(key)?.cancel();
-  element.style.setProperty(key, to);
-  const frames: Keyframe[] = struck(each.curve)
-    ? [...stepsOf(each.curve).map((step, i, all) => ({ offset: i / all.length, easing: "step-end", [key]: String(between(each, step)) })), { offset: 1, [key]: to }]
-    : [{ [key]: from }, { [key]: to }];
-  const animation = element.animate(frames, { duration: Math.max(1, ms(each.duration)), delay, easing: struck(each.curve) ? "linear" : curveOf(each.curve as Easing), fill: "backwards" });
-  map.set(key, animation);
-  return animation.finished.then(
-    () => undefined,
-    () => undefined,
-  );
-}
-
-/**
- * Plays `tracks` on `root` from wherever each part stands, each to its `to` on its curve after its
- * cue: the live room's way of playing the page's moves. Tracks on one part and property play in cue
- * order, each from where the one before left it. A stepped track flickers through `neon.strike`'s
- * steps. A pressed tile is the state model's to draw, so its press isn't played. Resolves once every
- * track is done.
- */
-function play(root: HTMLElement, tracks: readonly Track[]): Promise<void> {
-  const chains = new Map<HTMLElement, Map<string, Track[]>>();
-  for (const each of [...tracks].sort((a, b) => cueOf(a) - cueOf(b))) {
-    if (each.property === "--press") continue;
-    for (const element of targets(root, each.target)) {
-      const byProperty = chains.get(element) ?? new Map<string, Track[]>();
-      chains.set(element, byProperty);
-      byProperty.set(each.property, [...(byProperty.get(each.property) ?? []), each]);
-    }
-  }
-  const started = performance.now();
-  const runs: Promise<void>[] = [];
-  for (const [element, byProperty] of chains) {
-    for (const list of byProperty.values()) {
-      runs.push(
-        (async () => {
-          for (const each of list) {
-            const at = cueOf(each) / settings().speed - (performance.now() - started);
-            await tween(element, each, Math.max(0, at));
-          }
-        })(),
-      );
-    }
-  }
-  return Promise.all(runs).then(() => undefined);
-}
-
 const wait = (time: number) => new Promise<void>((done) => window.setTimeout(done, time));
 
 /**
@@ -750,7 +639,7 @@ export function room(options: RoomOptions = {}): HTMLElement {
     if (options.dark === "black") element.querySelector<HTMLElement>(ART)!.style.opacity = "0";
     else {
       const out = options.dark.sign;
-      [...GROUPS].reverse().forEach((group, i) => (element.querySelector<HTMLElement>(`.power-sign-${group}`)!.style.opacity = i < out ? "0" : "1"));
+      [...GROUPS].reverse().forEach((group, i) => (element.querySelector<HTMLElement>(groupOf(group))!.style.opacity = i < out ? "0" : "1"));
       if (out > GROUPS.length) element.querySelector<HTMLElement>(GLASS)!.style.opacity = "0";
     }
   }

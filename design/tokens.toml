@@ -682,6 +682,13 @@ use = "A live meter's peak tick falling the whole bar back."
 ms = 1200
 use = "Half a skeleton's breath: its glass warming or cooling."
 
+# The boot splash's lit sign blinks バ once in each loop of its hum: the tubes step through
+# `opacity.neon_blink_low`, full, `opacity.neon_blink_half` and full, each held this long, a
+# stutter too quick to read as a fade.
+[duration.neon_blink]
+ms = 33
+use = "One step of the lit sign's バ blinking in its hum."
+
 # Words that run past their fixed room (`Marquee`): they hold at their start for `marquee_hold`,
 # so the start is read first, then scroll at an even pace, `space.s32` per `marquee_pace` (32 a
 # second, slow enough to read in the corner of the eye), until the copy that follows them stands
@@ -865,6 +872,13 @@ power_held = 0.80
 power_cycle = 0.45
 power_cycle_glass = 0.15
 power_restart_held = 0.65
+# The boot splash's lit sign hums: every `micro` the whole sign steps to a level between
+# `neon_hum_floor` and full, a faint flicker that says the tubes are alive without reading as a
+# change. Once a loop バ blinks, down to `neon_blink_low`, back, down to `neon_blink_half` and back,
+# each step a `neon_blink`.
+neon_hum_floor = 0.97
+neon_blink_low = 0.35
+neon_blink_half = 0.50
 # Where Hyprland starts blurring behind the frame's layer (its `ignore_alpha`): only the glass.
 # The layer also draws a scrim and, over it, the panels' shadow, which cover up to 0.81 together
 # (`scrim` under `shadow.panel` at `frame`); a cut-off under that blurs a ragged band of the
