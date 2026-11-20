@@ -544,8 +544,8 @@ pub struct Derived {
     /// Its OKLCH chroma times this, as far as sRGB holds it.
     #[serde(default)]
     pub chroma: Option<f32>,
-    /// The role it is drawn over: the colour so far, at `opacity`, laid on this role in sRGB, as the
-    /// toolkits blend a tint on a surface. Given with `opacity`.
+    /// The role it is drawn over: the colour so far, at `opacity`, laid on this role in sRGB, as
+    /// the toolkits blend a tint on a surface. Given with `opacity`.
     #[serde(default)]
     pub over: Option<String>,
     /// The opacity it is drawn at `over` another role, by its name in `[opacity]`.
@@ -606,7 +606,12 @@ impl Derived {
     /// Whether it is only `mix` toward white or black, in one recipe for both modes.
     #[must_use]
     pub fn is_mix(&self) -> bool {
-        self.mix.is_some() && !self.moves_oklch() && self.from.is_none() && self.over.is_none() && self.text_on.is_none() && !self.by_mode()
+        self.mix.is_some()
+            && !self.moves_oklch()
+            && self.from.is_none()
+            && self.over.is_none()
+            && self.text_on.is_none()
+            && !self.by_mode()
     }
 
     /// The role its `mix` names, or nothing.
@@ -653,8 +658,15 @@ impl Derived {
     }
 
     /// Its colour in `mode` from the roles it reads, as `role` gives them, its opacity from
-    /// `opacities`, its text fitted to hold `minimum`, or `None` when a role or an opacity is missing.
-    fn compute(&self, mode: Mode, minimum: f32, opacities: &BTreeMap<String, f32>, role: &mut dyn FnMut(&str) -> Option<Rgb>) -> Option<Rgb> {
+    /// `opacities`, its text fitted to hold `minimum`, or `None` when a role or an opacity is
+    /// missing.
+    fn compute(
+        &self,
+        mode: Mode,
+        minimum: f32,
+        opacities: &BTreeMap<String, f32>,
+        role: &mut dyn FnMut(&str) -> Option<Rgb>,
+    ) -> Option<Rgb> {
         let recipe = self.in_mode(mode);
         let mut colour = match (&recipe.mix, &recipe.from, recipe.way()) {
             (Some(mix), None, Some((Toward::White, t))) => role(mix)?.toward_white(t),
@@ -773,7 +785,9 @@ impl Colors {
         }
         reading.push(name.to_owned());
         let minimum = self.fit_minimum(name, mode);
-        let colour = derived.compute(mode, minimum, &self.opacities, &mut |role| self.resolve(role, mode, out, reading));
+        let colour = derived.compute(mode, minimum, &self.opacities, &mut |role| {
+            self.resolve(role, mode, out, reading)
+        });
         reading.pop();
         if let Some(colour) = colour {
             out.insert(name.to_owned(), colour);

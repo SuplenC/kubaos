@@ -374,7 +374,10 @@ fn recipes(tokens: &Tokens, mode: Mode) -> String {
                 fields.push(format!("\"{name}\":{}", number(value)));
             }
         }
-        if let (Some(under), Some(alpha)) = (&recipe.over, recipe.opacity.as_ref().and_then(|name| tokens.opacity.get(name))) {
+        if let (Some(under), Some(alpha)) = (
+            &recipe.over,
+            recipe.opacity.as_ref().and_then(|name| tokens.opacity.get(name)),
+        ) {
             fields.push(format!("\"over\":{under:?}"));
             fields.push(format!("\"alpha\":{}", number(*alpha)));
         }
