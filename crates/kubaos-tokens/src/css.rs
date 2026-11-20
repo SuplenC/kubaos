@@ -374,6 +374,13 @@ fn recipes(tokens: &Tokens, mode: Mode) -> String {
                 fields.push(format!("\"{name}\":{}", number(value)));
             }
         }
+        if let (Some(under), Some(alpha)) = (
+            &recipe.over,
+            recipe.opacity.as_ref().and_then(|name| tokens.opacity.get(name)),
+        ) {
+            fields.push(format!("\"over\":{under:?}"));
+            fields.push(format!("\"alpha\":{}", number(*alpha)));
+        }
         if let Some(on) = &recipe.text_on {
             fields.push(format!("\"text_on\":[{}]", list(on)));
             fields.push(format!("\"holds\":{}", number(tokens.color.fit_minimum(role, mode))));

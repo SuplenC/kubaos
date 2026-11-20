@@ -76,6 +76,7 @@ pub fn parse(text: &str) -> Result<Tokens, Error> {
     let mut tokens: Tokens = toml::from_str(text).map_err(Error::Parse)?;
     let violations = rules::check(&tokens);
     if violations.is_empty() {
+        tokens.color.opacities.clone_from(&tokens.opacity);
         tokens.color.fill_recipes();
         Ok(tokens)
     } else {

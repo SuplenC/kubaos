@@ -521,13 +521,6 @@
   animation: mp-fade-in var(--motion-short) var(--easing-emphasized_decel);
 }
 
-/* A group's heading stands clear of its first item's words as a list's section label stands clear of
-   its first row's: `space.s12` under it, before the item's own room round its words. A second group
-   sits further off than any two items, `space.s16` above its heading. */
-.mp-menu-heading {
-  padding: var(--space-s8) var(--space-s8) var(--space-s12);
-}
-
 .mp-popover .k-stack > .k-stack,
 .mp-popover .k-stack > .k-stack > .k-menu {
   align-self: stretch;

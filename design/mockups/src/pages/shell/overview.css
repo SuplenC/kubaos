@@ -237,16 +237,11 @@
 .ov-ws-number {
   display: flex;
   align-items: center;
+  justify-content: center;
   width: var(--size-chip);
   height: var(--size-chip);
   border-radius: var(--radius-full);
   background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
-}
-
-/* Its figures centred on whole device pixels: centring alone puts them half a pixel out when the
-   badge and the figures differ by an odd number of them. */
-.ov-ws-number > .k-rolling {
-  margin-left: round(down, calc((var(--size-chip) - var(--slots) * var(--slot) - var(--marks, 0px)) / 2), 1px);
 }
 
 .ov-ws-number[data-shown] {
@@ -267,11 +262,6 @@
 
 .ov-ws:is([data-lifted], [data-landing]) > .ov-ws-desk {
   box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
-}
-
-/* Refused by a full group: it dims, and goes back where it came from when let go. */
-.ov-ws[data-refused] {
-  opacity: var(--opacity-locked);
 }
 
 /* ── A window ────────────────────────────────────────────────────────────────────────────────── */
@@ -336,10 +326,6 @@
     calc(var(--radius-surface) - var(--space-s8)),
     calc((var(--radius-control) - var(--space-s8) * var(--ov-sx)) / var(--ov-sx))
   );
-}
-
-.ov-win[data-refused] {
-  opacity: var(--opacity-locked);
 }
 
 .ov-win[data-landing] {

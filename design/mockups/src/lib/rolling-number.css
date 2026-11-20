@@ -1,6 +1,13 @@
 /* A rolling number (`lib/rolling-number.ts`): its figures at its end in a box as wide as its widest
    value, each in a slot one figure wide and a line tall that cuts what rolls out of it. */
 
+/* The width a rolling number eases through while a roll changes how many figures it has. */
+@property --roll-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 /* How far a figure has rolled, 0 to 1, and which way: 1 up, -1 down. */
 @property --roll {
   syntax: "<number>";
@@ -9,22 +16,40 @@
 }
 
 .k-rolling {
+  position: relative;
   display: flex;
   flex: none;
   justify-content: flex-end;
-  --slot: round(up, calc(var(--figure) * var(--px) - 0.001px), 1px);
-  width: calc(var(--slots) * var(--slot) + var(--marks, 0px));
+  /* A figure's room, as large as the page draws it (`--grown`), rounded up to whole device pixels. */
+  --slot: round(up, calc(var(--figure) * var(--grown, 1) * var(--px) - 0.001px), 1px);
+  /* As wide as its slots, never under its widest value's: a value wider than that widens it, so its
+     figures are always inside it and an owner centres it by layout. */
+  width: max-content;
+  min-width: calc(var(--slots) * var(--slot) + var(--marks, 0px));
   height: var(--t-line);
+}
+
+/* Easing its width, it takes whole device pixels, as its figures' width at rest is one: a box a
+   fraction wide is centred a half pixel off where the same box at rest is, a step as it lands. */
+.k-rolling[data-resizing] {
+  width: round(nearest, var(--roll-width), 1px);
 }
 
 /* A slot is a figure's advance rounded up to a whole device pixel, so every figure starts on one. */
 .k-roll-slot {
   position: relative;
-  display: block;
+  display: grid;
   flex: none;
   width: var(--slot);
   height: var(--t-line);
   overflow: clip;
+}
+
+/* A slot whose figure the count shed, rolling out just before the figures that stay, out of the
+   box's flow and drawn past its edge until its roll ends (`lib/rolling-number.ts` places it). */
+.k-roll-slot[data-shed] {
+  position: absolute;
+  top: 0;
 }
 
 /* A mark between figures (a clock's colon): as wide as its own advance, rounded up to a whole
@@ -34,19 +59,21 @@
 }
 
 /* Tabular whatever its style, as its slot is: a narrow figure (a 1) sits in a figure's room, never
-   leaving a hole before what follows the number, a percent sign or a unit. */
-.k-roll-figure {
-  position: absolute;
-  top: 0;
-  left: 0;
+   leaving a hole before what follows the number, a percent sign or a unit. A figure fills its slot
+   and is set in its middle, the leaving and the arriving one in the same place, so the number's box
+   is its figures' and an owner centres it by layout alone. */
+.k-roll-slot > .k-roll-figure {
+  grid-area: 1 / 1;
+  width: 100%;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
 /* Going up, the old figure leaves upward and the new one comes in from below; down, the reverse. */
-.k-roll-figure[data-out] {
+.k-roll-slot > .k-roll-figure[data-out] {
   translate: 0 calc(var(--roll) * var(--way, 1) * -100%);
 }
 
-.k-roll-figure[data-in] {
+.k-roll-slot > .k-roll-figure[data-in] {
   translate: 0 calc((1 - var(--roll)) * var(--way, 1) * 100%);
 }

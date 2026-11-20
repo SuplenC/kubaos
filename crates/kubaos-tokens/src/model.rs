@@ -497,6 +497,10 @@ pub struct Colors {
     /// each palette.
     #[serde(default)]
     pub derived: BTreeMap<String, Derived>,
+    /// Every opacity in `[opacity]`, by name: what a recipe drawn `over` another role reads its
+    /// opacity from. Copied in as the tokens are read ([`crate::parse`]), not written in `[color]`.
+    #[serde(skip)]
+    pub opacities: BTreeMap<String, f32>,
     /// How far over the text minimum, as a ratio, a fixed role fits its lightness on backgrounds
     /// that follow the wallpaper. The fit is computed once, on the fallback palettes' surfaces,
     /// and drawn on every wallpaper's, which sit slightly apart from them; fitted to the minimum
@@ -506,8 +510,9 @@ pub struct Colors {
 
 /// A role computed from others, whichever palette is drawn, so it follows the wallpaper. A recipe
 /// starts from a role (`mix` moved toward white or black in sRGB, or `from` as it is), may move its
-/// OKLCH lightness and chroma (fitted back into sRGB at the same hue and lightness), and may then
-/// fit its lightness until it holds text contrast on every role in `text_on`. A role with a recipe
+/// OKLCH lightness and chroma (fitted back into sRGB at the same hue and lightness), may be drawn
+/// at an opacity `over` another role (a tint laid on a surface, as it is seen), and may then fit
+/// its lightness until it holds text contrast on every role in `text_on`. A role with a recipe
 /// for each mode gives it in `dark` and `light` and nothing else. `rules` refuses anything else.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -539,6 +544,13 @@ pub struct Derived {
     /// Its OKLCH chroma times this, as far as sRGB holds it.
     #[serde(default)]
     pub chroma: Option<f32>,
+    /// The role it is drawn over: the colour so far, at `opacity`, laid on this role in sRGB, as
+    /// the toolkits blend a tint on a surface. Given with `opacity`.
+    #[serde(default)]
+    pub over: Option<String>,
+    /// The opacity it is drawn at `over` another role, by its name in `[opacity]`.
+    #[serde(default)]
+    pub opacity: Option<String>,
     /// The backgrounds it is text on: its lightness moves until it holds [`Colors::fit_minimum`] on
     /// each.
     #[serde(default)]
@@ -594,7 +606,12 @@ impl Derived {
     /// Whether it is only `mix` toward white or black, in one recipe for both modes.
     #[must_use]
     pub fn is_mix(&self) -> bool {
-        self.mix.is_some() && !self.moves_oklch() && self.from.is_none() && self.text_on.is_none() && !self.by_mode()
+        self.mix.is_some()
+            && !self.moves_oklch()
+            && self.from.is_none()
+            && self.over.is_none()
+            && self.text_on.is_none()
+            && !self.by_mode()
     }
 
     /// The role its `mix` names, or nothing.
@@ -636,12 +653,20 @@ impl Derived {
             .mix
             .iter()
             .chain(recipe.from.iter())
+            .chain(recipe.over.iter())
             .chain(recipe.text_on.iter().flatten())
     }
 
-    /// Its colour in `mode` from the roles it reads, as `role` gives them, its text fitted to hold
-    /// `minimum`, or `None` when a role is missing.
-    fn compute(&self, mode: Mode, minimum: f32, role: &mut dyn FnMut(&str) -> Option<Rgb>) -> Option<Rgb> {
+    /// Its colour in `mode` from the roles it reads, as `role` gives them, its opacity from
+    /// `opacities`, its text fitted to hold `minimum`, or `None` when a role or an opacity is
+    /// missing.
+    fn compute(
+        &self,
+        mode: Mode,
+        minimum: f32,
+        opacities: &BTreeMap<String, f32>,
+        role: &mut dyn FnMut(&str) -> Option<Rgb>,
+    ) -> Option<Rgb> {
         let recipe = self.in_mode(mode);
         let mut colour = match (&recipe.mix, &recipe.from, recipe.way()) {
             (Some(mix), None, Some((Toward::White, t))) => role(mix)?.toward_white(t),
@@ -658,6 +683,10 @@ impl Derived {
             lch.l += f64::from(recipe.lighter.unwrap_or(0.0)) - f64::from(recipe.darker.unwrap_or(0.0));
             lch.c *= f64::from(recipe.chroma.unwrap_or(1.0));
             colour = lch.to_rgb();
+        }
+        if let Some(under) = &recipe.over {
+            let alpha = *opacities.get(recipe.opacity.as_deref()?)?;
+            colour = colour.over(role(under)?, alpha);
         }
         if let Some(on) = &recipe.text_on {
             let backgrounds = on.iter().map(|name| role(name)).collect::<Option<Vec<_>>>()?;
@@ -756,7 +785,9 @@ impl Colors {
         }
         reading.push(name.to_owned());
         let minimum = self.fit_minimum(name, mode);
-        let colour = derived.compute(mode, minimum, &mut |role| self.resolve(role, mode, out, reading));
+        let colour = derived.compute(mode, minimum, &self.opacities, &mut |role| {
+            self.resolve(role, mode, out, reading)
+        });
         reading.pop();
         if let Some(colour) = colour {
             out.insert(name.to_owned(), colour);
@@ -837,6 +868,27 @@ impl Rgb {
             r: channel(self.r),
             g: channel(self.g),
             b: channel(self.b),
+        }
+    }
+
+    /// This colour at `alpha` over the opaque `under`, as the toolkits blend in sRGB, each channel
+    /// rounded half up.
+    #[must_use]
+    pub fn over(self, under: Rgb, alpha: f32) -> Rgb {
+        let channel = |top: u8, bottom: u8| {
+            let (top, bottom) = (f32::from(top), f32::from(bottom));
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "Clamped to 0..=255 and rounded first."
+            )]
+            let byte = (bottom + (top - bottom) * alpha + 0.5).floor().clamp(0.0, 255.0) as u8;
+            byte
+        };
+        Rgb {
+            r: channel(self.r, under.r),
+            g: channel(self.g, under.g),
+            b: channel(self.b, under.b),
         }
     }
 

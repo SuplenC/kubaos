@@ -57,6 +57,7 @@ export function forgetWidths(): void {
   masses.clear();
   fonts.clear();
   tabulars.clear();
+  widest.clear();
 }
 
 /** Whether iced shapes `words`: anything but plain ASCII. */
@@ -132,6 +133,37 @@ export function tabularFigure(style: TypeStyle): number {
   meter.remove();
   figures.set(style, width);
   return width;
+}
+
+const widest = new Map<string, number>();
+
+/**
+ * The widest of `glyphs` in `style`, in logical pixels: a slot that holds any of them (a kanji
+ * numeral's, `RollingNumber`). Each is taken at the widest of its advance and its width as the
+ * page lays it out, measured large and at its own size: a glyph from a fallback font comes out a
+ * hair apart between them, the page rounding its width up to its layout unit at its own size.
+ */
+export function widestGlyph(style: TypeStyle, glyphs: string): number {
+  const key = `${style} ${glyphs}`;
+  const known = widest.get(key);
+  if (known !== undefined) return known;
+  const { font: large, times } = font(style);
+  const own = large.replace(/([\d.]+)px/, (_, size: string) => `${Number(size) / times}px`);
+  const meters = [large, own].map((each) => {
+    const meter = document.createElement("span");
+    meter.style.cssText = "position:absolute;visibility:hidden;white-space:pre";
+    meter.style.font = each;
+    document.documentElement.append(meter);
+    return meter;
+  });
+  let most = 0;
+  for (const glyph of glyphs) {
+    for (const meter of meters) meter.textContent = glyph;
+    most = Math.max(most, meters[0]!.getBoundingClientRect().width / times, meters[1]!.getBoundingClientRect().width, advance(style, glyph));
+  }
+  for (const meter of meters) meter.remove();
+  widest.set(key, most);
+  return most;
 }
 
 /** Sets `element`'s font to `style`'s. */

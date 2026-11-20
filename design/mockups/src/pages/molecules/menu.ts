@@ -1,5 +1,6 @@
 // The Menu page, with MenuItem: `docs/design/components/menu.md`. A few actions or choices one
-// under the other on a popover: a tray icon's menu. A select's options are menu items too, on its
+// under the other on a popover, in groups apart by hairlines and headed by their names: a tray
+// icon's menu. A select's options are menu items too, on its
 // own grown surface. The item the keyboard is on is lit on the secondary container; the pointer
 // moving onto an item puts the keyboard on it.
 
@@ -34,6 +35,17 @@ const COUNTER: readonly MenuEntry[] = [
   { label: "History", icon: "history" },
   "separator",
   { label: "Hold to remove", icon: "delete", held: true },
+];
+
+/** A menu in two groups, each headed by its name: the media player's tracks. */
+const HEADED: readonly MenuEntry[] = [
+  { heading: "Audio" },
+  { label: "English", checked: true },
+  { label: "Polish", checked: false },
+  "separator",
+  { heading: "Subtitles" },
+  { label: "Off", checked: false },
+  { label: "English", checked: true },
 ];
 
 const HOLD: MenuItemSpec = { label: "Hold to remove", icon: "delete", held: true };
@@ -116,6 +128,7 @@ export default page({
   variants: [
     { name: "Actions", for: "what can be done to one thing: symbols, keys, groups", sample: () => onPopover(ACTIONS) },
     { name: "Choices", for: "one of a few, checked; each item keeps the check's room", sample: () => onPopover(choices(3), 3) },
+    { name: "Headed groups", for: "a group's name over its items: never lit or taken", sample: () => onPopover(HEADED, 1) },
     { name: "MenuItem, with keys", for: "a shortcut's keys as keycaps at its end", sample: () => alone({ label: "Copy path", icon: "content_paste", keys: "Ctrl+C" }) },
     { name: "MenuItem, danger", for: "destroys something: in `error`", sample: () => alone({ label: "Quit", icon: "logout", danger: true }) },
     { name: "MenuItem, an app's picture", for: "its own icon in the symbol's 16, kept whole", sample: () => alone({ label: "Spotify", picture: DISC!.picture, checked: true }) },
@@ -203,21 +216,24 @@ export default page({
       { keys: ["Enter held"], does: "on a held item: holds it; let go early, it runs back" },
       { keys: ["Esc"], does: "leaves, or steps out of a submenu first" },
     ],
-    order: "One stop: the keys move inside it, past disabled items and hairlines.",
+    order: "One stop: the keys move inside it, past disabled items, headings and hairlines.",
     lands: "On its checked choice, or its first item that can be taken.",
   },
   measures: {
     samples: nonEmpty([
       { name: "A tray menu", for: "item height, padding, gaps, keys, hairlines", sample: () => onPopover(ACTIONS) },
+      { name: "Headed groups", for: "a heading's room over its items", sample: () => onPopover(HEADED, 1) },
       { name: "A choice", for: "the check's room, kept when unchecked", sample: () => alone({ label: "Italy", checked: false }, true) },
       { name: "Held, part-way", for: "the sweep inside the item's box, its corners", sample: () => alone({ ...HOLD, holding: 0.4 }, true, "lit") },
     ]),
     measures: [
       { part: "Item height", token: "size-control_sm" },
-      { part: "Item sides, gaps, hairline inset", token: "space-s8" },
+      { part: "Item sides, gaps, insets, over headings", token: "space-s8" },
       { part: "Popover padding, keycap gap", token: "space-s4" },
       { part: "Symbol, check", token: "icon-s16" },
       { part: "Item words' line", token: "type-body-line" },
+      { part: "Heading's line", token: "type-label-line" },
+      { part: "Under a heading", token: "space-s12" },
       { part: "Keycap", token: "size-keycap" },
       { part: "Hairline", token: "stroke-hairline_device_px" },
       { part: "Popover corners", token: "radius-control" },

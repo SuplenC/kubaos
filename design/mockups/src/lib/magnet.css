@@ -1,0 +1,5 @@
+/* A carried thing that where it is held refuses (`lib/magnet.ts`'s `refuse`): a full group, which
+   has no place for it. It dims, and goes back where it came from when let go. */
+.k-carried[data-refused] {
+  opacity: var(--opacity-locked);
+}
