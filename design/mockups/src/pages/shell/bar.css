@@ -258,3 +258,51 @@
   width: var(--slot-width);
   padding-inline-start: round(down, calc((var(--slot-width) - var(--time-width)) / 2), 1px);
 }
+
+/* The clock pill (`clockPill`): `space.s4` from its curves to the seal and the capsule, which fill
+   its height less `space.s4` above and below; a plain part at either end stands `space.s12` from
+   the curve, as a pill's words do. The capsule is the screen's middle: the side with less beside
+   it takes the difference as a margin, which the bar's grid centres with the pill. */
+.shell-clock-pill {
+  margin-inline: var(--capsule-before, 0) var(--capsule-after, 0);
+}
+
+.shell-clock-pill .shell-clock-plain:first-child {
+  margin-inline-start: var(--space-s8);
+}
+
+.shell-clock-pill .shell-clock-plain:last-child {
+  margin-inline-end: var(--space-s8);
+}
+
+/* The weekday's seal: its kanji on a disc of `cold`. */
+.shell-clock-seal {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--size-control_sm) - 2 * var(--space-s4));
+  height: calc(var(--size-control_sm) - 2 * var(--space-s4));
+  border-radius: var(--radius-full);
+  background: var(--color-cold);
+}
+
+/* The time in a flat capsule of `primary`, `space.s8` inside. */
+.shell-clock-capsule {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: calc(var(--size-control_sm) - 2 * var(--space-s4));
+  padding-inline: var(--space-s8);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+.shell-clock-pill[data-recording] .shell-clock-seal {
+  background: var(--color-on_error_container);
+}
+
+.shell-clock-pill[data-recording] .shell-clock-capsule {
+  background: var(--color-error);
+}

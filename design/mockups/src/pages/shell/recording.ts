@@ -1,15 +1,13 @@
-// The Recording and countdowns page: `RecordingIndicator.qml`, `IdleIndicator.qml` and the clock's
-// countdown in `Clock.qml`. What runs against time in the bar: a recording, Keep awake and a
-// scheduled action, and the countdown the clock settings pin.
+// The Recording and Keep awake page: `RecordingIndicator.qml` and `IdleIndicator.qml`. What runs
+// against time in the bar: a recording, Keep awake and a scheduled action.
 
-import type { Words } from "../../lib/content.ts";
 import type { Shown } from "../../lib/control.ts";
 import { row } from "../../lib/layout.ts";
 import { makePill, pillChanging } from "../../lib/pill.ts";
 import { ALL } from "../../site/settings.ts";
 import { hovers, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
-import { CLOCK, clockContent, clockPill, idleContent, idleOptions, idlePill, recordingContent, recordingPill } from "./bar-parts.ts";
+import { idleContent, idleOptions, idlePill, recordingContent, recordingPill } from "./bar-parts.ts";
 
 type State = "rest" | "hovered" | "pressed";
 
@@ -31,7 +29,6 @@ function live(): HTMLElement {
   let left = 10 * 60 + 4;
   const recording = makePill({ content: recordingContent({ elapsed: face(elapsed) }), lone: false, tone: "recording", interactive: true, tooltip: "Recording. Click to stop" });
   const idle = makePill({ content: idleContent({ keepAwake: false, scheduled: { icon: "bedtime", left: face(left) } }), lone: false, ...idleOptions({ scheduled: SUSPEND }), interactive: true, tooltip: "Suspend at 23:00. Click to cancel it" });
-  const clock = makePill({ content: clockContent({ countdown: CLOCK.countdown }), lone: false, interactive: true, tooltip: "Tuesday, 27 October 2026" });
   if (!ALL) {
     const tick = window.setInterval(() => {
       if (!recording.element.isConnected) {
@@ -49,7 +46,7 @@ function live(): HTMLElement {
       idle.element.querySelector(".k-row")!.replaceChildren(...idleContent({ keepAwake: false, scheduled: { icon: "bedtime", left: face(left) } }));
     }, 1000);
   }
-  return row("s8", "centre", clock.element, recording.element, idle.element);
+  return row("s8", "centre", recording.element, idle.element);
 }
 
 const ROWS: readonly { name: string; make: (state: Shown) => HTMLElement }[] = [
@@ -58,16 +55,13 @@ const ROWS: readonly { name: string; make: (state: Shown) => HTMLElement }[] = [
   { name: "Keep awake", make: (state) => idlePill({ state }) },
   { name: "Scheduled", make: (state) => idlePill({ keepAwake: false, scheduled: SUSPEND, state }) },
   { name: "Both", make: (state) => idlePill({ scheduled: SUSPEND, state }) },
-  { name: "Clock's countdown", make: (state) => clockPill({ countdown: CLOCK.countdown, state }) },
 ];
-
-const NAME: Words = { short: "Exam", long: "Vacation in the mountains" };
 
 export default page<State>({
   level: "shell",
   slug: "recording",
-  title: "Recording and countdowns",
-  lede: "What runs against time in the bar: a recording, Keep awake and a scheduled action, the clock's countdown.",
+  title: "Recording and Keep awake",
+  lede: "What runs against time in the bar: a recording, Keep awake and a scheduled action.",
   code: { qml: "RecordingIndicator, IdleIndicator, Clock" },
   stage: { live, hint: "watch 9:59 turn 10:00: the pill eases", daylight: true },
   variants: [
@@ -76,7 +70,6 @@ export default page<State>({
     { name: "Keep awake", for: "a cup, `tertiary`, `space.s8` ends", sample: () => idlePill() },
     { name: "A scheduled action", for: "its symbol and the time left, `space.s12` ends", sample: () => idlePill({ keepAwake: false, scheduled: SUSPEND }) },
     { name: "Both", for: "the cup, then the action", sample: () => idlePill({ scheduled: SUSPEND }) },
-    { name: "The clock's countdown", for: "after the time, to the minute, `tertiary`", sample: () => clockPill({ countdown: CLOCK.countdown }) },
   ],
   sizes: [
     { name: "Under an hour", for: "m:ss", sample: () => recordingPill({ elapsed: "1:23" }) },
@@ -102,9 +95,9 @@ export default page<State>({
   },
   focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
   content: {
-    text: [{ name: "The countdown's name", words: NAME, sample: (words: string) => clockPill({ countdown: `${words} 52 d 2 h` }) }],
+    text: doesntApply("its words are times and fixed names."),
     missingPicture: doesntApply("its symbols are always there."),
-    counts: doesntApply("one recording, one scheduled action, one pinned countdown at most."),
+    counts: doesntApply("one recording and one scheduled action at most."),
   },
   motion: {
     arrives: doesntApply("it shows at once as the recording or action starts."),

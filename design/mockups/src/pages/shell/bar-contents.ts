@@ -12,10 +12,7 @@ import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import {
   bellPill,
   BRANCH,
-  CLOCK,
   clockPill,
-  countdownWords,
-  compactClock,
   idlePill,
   keyboardPill,
   LOADS,
@@ -35,7 +32,7 @@ import {
 type State = "rest" | "hovered" | "pressed";
 
 const ROWS: readonly { name: string; make: (state: Shown) => HTMLElement }[] = [
-  { name: "Clock", make: (state) => clockPill({ countdown: CLOCK.countdown, state }) },
+  { name: "Clock", make: (state) => clockPill({ state }) },
   { name: "Status", make: (state) => statusPill({ state }) },
   { name: "Bell", make: (state) => bellPill(false, state) },
   { name: "Bell, unread", make: (state) => bellPill(false, state, true) },
@@ -50,7 +47,6 @@ const ROWS: readonly { name: string; make: (state: Shown) => HTMLElement }[] = [
 ];
 
 const LAYOUT: Words = { short: "US", long: "PL-prog" };
-const COUNTDOWN: Words = { short: "Exam 2 d", long: "Vacation in the mountains 52 d 2 h" };
 
 /** Every pill side by side, as the bar's right end lays them out, and the clock. */
 function all(state: Shown = "rest"): HTMLElement {
@@ -87,7 +83,7 @@ function liveLayout(): HTMLElement {
 }
 
 function live(): HTMLElement {
-  return row("s8", "centre", previewPill(), idlePill(), proxyPill(), liveLayout(), updatePill(), clockPill({ countdown: CLOCK.countdown }), morePill(), liveSysmon(), rimPill(), bellPill(), statusPill());
+  return row("s8", "centre", previewPill(), idlePill(), proxyPill(), liveLayout(), updatePill(), clockPill(), morePill(), liveSysmon(), rimPill(), bellPill(), statusPill());
 }
 
 const SYSMON_SAMPLE = () => sysmonPill({ readings: READINGS.slice(0, 2) });
@@ -101,9 +97,8 @@ export default page<State>({
   from: ["pill"],
   stage: { live, hint: "point at one; click US; right-click the monitor", daylight: true },
   variants: [
-    { name: "Clock", for: "kanji `tertiary`, date and time `body`, the time held widest", sample: () => clockPill() },
-    { name: "Clock with a countdown", for: "the pinned countdown after the time, `tertiary`", sample: () => clockPill({ countdown: CLOCK.countdown }) },
-    { name: "A countdown under a minute", for: "m:ss, never its name alone", sample: () => clockPill({ countdown: countdownWords("Vacation", 45) }) },
+    { name: "Clock", for: "seal, date, the time's `primary` capsule, weather", sample: () => clockPill() },
+    { name: "Clock, no home city", for: "no weather", sample: () => clockPill({ weather: false }) },
     { name: "Status", for: "power, network, Bluetooth, battery", sample: () => statusPill() },
     { name: "Status, wired desktop", for: "no Bluetooth, no battery", sample: () => statusPill({ net: "lan", bluetooth: null, battery: null }) },
     { name: "Status, battery low", for: "the battery in `error`", sample: () => statusPill({ battery: { percent: 8, low: true } }) },
@@ -129,8 +124,8 @@ export default page<State>({
     { name: "Compact, RAM near its limit", for: "its ring in `warning`", sample: () => rimPill([LOADS[0]!, { share: 0.88, level: 1 }, LOADS[2]!]) },
     { name: "Compact, CPU past its limit", for: "the rim in `error`", sample: () => rimPill([{ share: 0.97, level: 2 }, LOADS[1]!, LOADS[2]!]) },
     { name: "Status, shedding", for: "the share gone, then symbols from the left", sample: () => shedStatus({ shed: 3 }) },
-    { name: "Clock, compacting", for: "the date gone, the kanji kept", sample: () => compactClock({ date: "none" }) },
-    { name: "Clock while recording", for: "recording merged in: its look, its dot leading", sample: () => compactClock({ kanji: false, date: "none", recording: true }) },
+    { name: "Clock, compacting", for: "weather and date gone, the seal kept", sample: () => clockPill({ date: "none", weather: false }) },
+    { name: "Clock while recording", for: "recording merged in: its colours, its dot leading", sample: () => clockPill({ seal: false, date: "none", weather: false, recording: true }) },
   ],
   sizes: [
     { name: "Symbols and words", for: "`space.s12` ends, `space.s8` gaps", sample: () => statusPill() },
@@ -160,7 +155,6 @@ export default page<State>({
     text: [
       { name: "The layout's code", words: LAYOUT, sample: (words: string) => keyboardPill(words) },
       { name: "The branch, in the hint", words: { short: "fix", long: BRANCH }, sample: (words: string) => previewPill(words, "hovered") },
-      { name: "The countdown", words: COUNTDOWN, sample: (words: string) => clockPill({ countdown: words }) },
     ],
     missingPicture: doesntApply("its symbols are KubaOS Symbols, always there."),
     counts: [
@@ -188,7 +182,7 @@ export default page<State>({
   keyboard: doesntApply("never a stop for Tab; SUPER+SHIFT+Space switches the layout, the rest are Command menu Items."),
   measures: {
     samples: nonEmpty([
-      { name: "Clock", for: "kanji, date, time, countdown", sample: () => clockPill({ countdown: CLOCK.countdown }) },
+      { name: "Clock", for: "seal, date, capsule, weather", sample: () => clockPill() },
       { name: "Status", for: "symbols, battery's gap", sample: () => statusPill() },
       { name: "System monitor", for: "readings, their gaps", sample: SYSMON_SAMPLE },
       { name: "Bars", for: "a compact meter", sample: () => sysmonPill({ style: "bars", readings: READINGS.slice(0, 1) }) },

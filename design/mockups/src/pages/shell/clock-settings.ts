@@ -1,14 +1,14 @@
-// The clock popup's settings (`config/quickshell/modules/clock/ClockSettings.qml`): the gear swaps
-// them in for the search, the month and the tools. Holidays, the first weekday, the time format,
-// the date order, the analog face, the bar's countdown and the extra clocks.
+// The clock's settings as `config/quickshell/modules/clock/ClockSettings.qml` draws them today:
+// holidays, the first weekday, the time format, the date order, the analog face, the bar's
+// countdown and the extra clocks. The clock popup no longer holds them; they move to Settings.
 
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
-import { type ClockOptions, clockOnScreen } from "./clock-parts.ts";
+import { clockSettingsOnScreen, type SettingsOptions } from "./clock-parts.ts";
 
 type Shown = "rest" | "open" | "selected" | "error";
 
-function shot(options: ClockOptions = {}): HTMLElement {
-  return clockOnScreen({ page: "settings", ...options });
+function shot(options: SettingsOptions = {}): HTMLElement {
+  return clockSettingsOnScreen(options);
 }
 
 function cell(state: Shown): HTMLElement {
@@ -28,10 +28,10 @@ export default page<Shown>({
   level: "shell",
   slug: "clock-settings",
   title: "Clock settings",
-  lede: "The clock popup's gear: how the calendar, the time and the bar's countdown read, and the extra clocks.",
+  lede: "How the calendar, the time and the bar's countdown read, and the extra clocks: on their way to Settings.",
   code: { qml: "ClockSettings" },
   from: nonEmpty(["select", "chip", "field", "icon-button"]),
-  stage: { live: () => clockOnScreen({ page: "settings", live: true }), hint: "the × goes back; Esc too", daylight: true },
+  stage: { live: () => shot(), hint: "on their way to Settings", daylight: true },
   variants: [
     { name: "The shots' settings", for: "Poland's holidays, Monday first, Vacation pinned", sample: () => shot() },
     { name: "Nothing pinned", for: "None picked: the bar shows no countdown", sample: () => shot({ pinned: null }) },

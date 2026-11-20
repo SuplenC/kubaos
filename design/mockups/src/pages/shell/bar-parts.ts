@@ -18,6 +18,7 @@ import { length } from "../../lib/tokens.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
 import { settings } from "../../site/settings.ts";
 import { mutePill, nowPlaying, type Song } from "./bar-audio-parts.ts";
+import { degrees, HOME, NOW_HOUR, symbolOf } from "./weather-data.ts";
 import { workspaces, type WorkspacesOptions, SHOTS_GROUPS } from "./workspaces.ts";
 
 export { wallpaper };
@@ -36,28 +37,8 @@ function control(content: Element[], tooltip: string, state: Shown, options: Int
 
 // The clock.
 
-export const CLOCK = { kanji: "火", date: "Tue 27 Oct", time: "21:47", countdown: "Vacation 52 d 2 h" } as const;
-
-/**
- * A pinned countdown as the clock says it, `seconds` left: to the minute as the clock beside it
- * ("52 d 2 h", "3 h 12 min", "12 min"), and under a minute its seconds ("0:45"), never its name alone.
- */
-export function countdownWords(name: string, seconds: number): string {
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (days > 0) return `${name} ${days} d ${hours} h`;
-  if (hours > 0) return `${name} ${hours} h ${minutes} min`;
-  if (minutes > 0) return `${name} ${minutes} min`;
-  return `${name} 0:${String(seconds % 60).padStart(2, "0")}`;
-}
-
-export interface ClockOptions {
-  readonly countdown?: string;
-  readonly date?: string;
-  readonly time?: string;
-  readonly state?: Shown;
-}
+/** The clock pill's words at the shots' moment: Tuesday 27 October, 21:47, 12° in Warsaw. */
+export const CLOCK = { kanji: "火", date: "Tue 27 Oct", day: "Tue 27", time: "21:47", temperature: degrees(HOME.temperature), symbol: symbolOf(HOME.weather, NOW_HOUR) } as const;
 
 /**
  * The time in `body`, Geist's own proportional figures, centred in a slot as wide as the widest
@@ -71,15 +52,87 @@ export function clockTime(time: string = CLOCK.time, color = "on_surface"): HTML
   return shown;
 }
 
-/** The weekday's kanji in `accent`, the date in `body`, the time in its slot, a countdown after. */
-export function clockPill(options: ClockOptions = {}): HTMLElement {
-  return control(clockContent(options), "Tuesday, 27 October 2026", options.state ?? "rest");
+/** What the clock pill shows, as far as a narrow bar has shed it. */
+export interface ClockOptions {
+  /** The weekday's seal. */
+  readonly seal?: boolean;
+  readonly date?: "full" | "day" | "none";
+  /** Home's weather: none with no home city, or once a narrow bar sheds it. */
+  readonly weather?: boolean;
+  /** Recording merged in on a narrow bar: the recording's colours, its dot leading. */
+  readonly recording?: boolean;
+  readonly state?: Shown;
 }
 
-export function clockContent(options: ClockOptions = {}): Element[] {
-  const parts: Element[] = [text(CLOCK.kanji, "accent", "tertiary"), text(options.date ?? CLOCK.date, "body", "on_surface_variant"), clockTime(options.time)];
-  if (options.countdown) parts.push(text(options.countdown, "body", "tertiary"));
-  return parts;
+/**
+ * The clock pill: the weekday's seal (its kanji on a disc of `cold`), the date plain, the time in a
+ * capsule of `primary`, and home's weather plain like the date. The capsule is the screen's exact
+ * middle, the pill laid out round it (`centreCapsule`). Recording merged in, the pill and its
+ * capsule take the recording's colours and its dot leads.
+ */
+export function clockPill(options: ClockOptions = {}): HTMLElement {
+  const recording = options.recording ?? false;
+  const ink = (role: string) => (recording ? "on_error_container" : role);
+  const parts: Element[] = [];
+  if (recording) {
+    const dot = document.createElement("span");
+    dot.className = "shell-dot shell-clock-plain";
+    parts.push(dot);
+  }
+  if (options.seal ?? true) {
+    const seal = document.createElement("span");
+    seal.className = "shell-clock-seal";
+    seal.append(text(CLOCK.kanji, "accent", recording ? "error_container" : "on_cold"));
+    parts.push(seal);
+  }
+  const date = options.date ?? "full";
+  if (date !== "none") parts.push(plainPart(text(date === "full" ? CLOCK.date : CLOCK.day, "body", ink("on_surface_variant"))));
+  const capsule = document.createElement("span");
+  capsule.className = "shell-clock-capsule";
+  capsule.append(clockTime(CLOCK.time, recording ? "on_error" : "on_primary"));
+  parts.push(capsule);
+  if (options.weather ?? true) {
+    const weather = paired(glyph(CLOCK.symbol, ink("on_surface_variant")), text(CLOCK.temperature, "body", ink("on_surface_variant")));
+    weather.classList.add("shell-clock-weather");
+    parts.push(plainPart(weather));
+  }
+  const tip = recording ? "Recording. Tuesday, 27 October 2026" : "Tuesday, 27 October 2026";
+  const made = control(parts, tip, options.state ?? "rest", { end: "s4", ...(recording ? { tone: "recording" as const } : {}) });
+  made.classList.add("shell-clock-pill");
+  made.toggleAttribute("data-recording", recording);
+  centreCapsule(made);
+  return made;
+}
+
+/** A plain part of the clock pill: at an end of the pill it stands `space.s12` from the curve. */
+function plainPart<E extends Element>(element: E): E {
+  element.classList.add("shell-clock-plain");
+  return element;
+}
+
+/** Where the capsule's middle sits in `pill`, from its left, in the pill's own pixels. */
+function capsuleExtents(pill: HTMLElement): { readonly before: number; readonly after: number } {
+  const capsule = pill.querySelector<HTMLElement>(".shell-clock-capsule");
+  const box = pill.getBoundingClientRect();
+  if (!capsule || box.width === 0) return { before: box.width / 2, after: box.width / 2 };
+  const own = capsule.getBoundingClientRect();
+  const middle = own.left + own.width / 2 - box.left;
+  return { before: middle, after: box.width - middle };
+}
+
+/**
+ * Keeps the capsule on the screen's exact middle: the bar centres the pill's box, so the side of
+ * the capsule with less beside it takes a margin of the difference, which the bar's grid then
+ * centres with the pill. A width worked out from the layout, which the CSS can't read.
+ */
+function centreCapsule(pill: HTMLElement): void {
+  new ResizeObserver(() => {
+    const zoom = pill.getBoundingClientRect().width / Math.max(1, pill.offsetWidth) || 1;
+    const { before, after } = capsuleExtents(pill);
+    const spare = Math.round((before - after) / zoom);
+    pill.style.setProperty("--capsule-before", `${Math.max(0, -spare)}px`);
+    pill.style.setProperty("--capsule-after", `${Math.max(0, spare)}px`);
+  }).observe(pill);
 }
 
 // The status pill.
@@ -516,34 +569,6 @@ export function shedStatus(options: ShedOptions = {}): HTMLElement {
   return control(parts, "Home 5G  ·  Battery 64%", options.state ?? "rest", { lone: parts.length === 1 });
 }
 
-// The clock as it compacts.
-
-export interface CompactClock {
-  readonly kanji?: boolean;
-  readonly date?: "full" | "day" | "none";
-  readonly countdown?: boolean;
-  /** Recording merged into it: the recording pill's look, its dot leading. */
-  readonly recording?: boolean;
-  readonly state?: Shown;
-}
-
-export function compactClock(options: CompactClock = {}): HTMLElement {
-  const recording = options.recording ?? false;
-  const ink = (role: string) => (recording ? "on_error_container" : role);
-  const parts: Element[] = [];
-  if (recording) {
-    const dot = document.createElement("span");
-    dot.className = "shell-dot";
-    parts.push(dot);
-  }
-  if (options.kanji ?? true) parts.push(text(CLOCK.kanji, "accent", ink("tertiary")));
-  const date = options.date ?? "full";
-  if (date !== "none") parts.push(text(date === "full" ? CLOCK.date : "Tue 27", "body", ink("on_surface_variant")));
-  parts.push(clockTime(CLOCK.time, ink("on_surface")));
-  if (options.countdown) parts.push(text(CLOCK.countdown, "body", ink("tertiary")));
-  return control(parts, recording ? "Recording. Tuesday, 27 October 2026" : "Tuesday, 27 October 2026", options.state ?? "rest", recording ? { tone: "recording" } : {});
-}
-
 // The whole bar: what it holds, and the order it gives way in as it narrows.
 
 /** What the bar holds at full width. */
@@ -555,7 +580,6 @@ export interface BarContent {
   readonly update: boolean;
   readonly preview: boolean;
   readonly tray: boolean;
-  readonly countdown: boolean;
   readonly title: string;
   readonly readings: 2 | 3;
   readonly borrowed: boolean;
@@ -567,21 +591,24 @@ export interface BarContent {
   readonly sharing?: Share | readonly Share[];
   /** Apps have a camera: the camera pill shows after the sharing pill, never given way. */
   readonly camera?: CameraUse | readonly CameraUse[];
+  /** No home city set: the clock shows no weather. */
+  readonly noHome?: boolean;
 }
 
 /** Every pill at once, as the shots' stand-ins hold them. */
-export const EVERYTHING: BarContent = { recording: true, keepAwake: true, proxy: true, layout: true, update: true, preview: true, tray: true, countdown: true, title: TITLE, readings: 3, borrowed: true, playing: true };
+export const EVERYTHING: BarContent = { recording: true, keepAwake: true, proxy: true, layout: true, update: true, preview: true, tray: true, title: TITLE, readings: 3, borrowed: true, playing: true };
 /** An ordinary day: the tray, the system monitor's two default readings, the bell, status. */
-export const EVERYDAY: BarContent = { recording: false, keepAwake: false, proxy: false, layout: false, update: false, preview: false, tray: true, countdown: false, title: TITLE, readings: 2, borrowed: false, playing: false };
+export const EVERYDAY: BarContent = { recording: false, keepAwake: false, proxy: false, layout: false, update: false, preview: false, tray: true, title: TITLE, readings: 2, borrowed: false, playing: false };
 
 /** How far each part has given way. */
 interface BarState {
   title: boolean;
   layout: boolean;
-  countdown: boolean;
+  weather: boolean;
   idle: boolean;
   date: "full" | "day" | "none";
-  recording: "time" | "dot";
+  seal: boolean;
+  recording: "time" | "clock";
   tray: "open" | "folded";
   update: boolean;
   preview: boolean;
@@ -593,7 +620,7 @@ interface BarState {
   shed: number;
 }
 
-const FULL: BarState = { title: true, layout: true, countdown: true, idle: true, date: "full", recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", playing: "wide", mute: "both", shed: 0 };
+const FULL: BarState = { title: true, layout: true, weather: true, idle: true, date: "full", seal: true, recording: "time", tray: "open", update: true, preview: true, name: true, ghosts: true, sysmon: "numbers", playing: "wide", mute: "both", shed: 0 };
 
 /** Where a rung's part sits: the left, the right, or the clock in the middle. */
 type Side = "left" | "right" | "clock";
@@ -620,11 +647,11 @@ export const RUNGS: readonly Rung[] = [
   { side: "left", says: "Now playing folds to its controls", back: "Now playing wide again", apply: (s) => void (s.playing = "folded") },
   { side: "left", says: "Title gone", apply: (s) => void (s.title = false) },
   { side: "left", says: "Keyboard layout goes", apply: (s) => void (s.layout = false) },
-  { side: "clock", says: "Countdown goes", apply: (s) => void (s.countdown = false) },
+  { side: "clock", says: "Weather goes", apply: (s) => void (s.weather = false) },
   { side: "left", says: "Keep awake and Proxy go", apply: (s) => void (s.idle = false) },
   { side: "clock", says: "Date drops the month", apply: (s) => void (s.date = "day") },
   { side: "clock", says: "Date goes", apply: (s) => void (s.date = "none") },
-  { side: "left", says: "Recording keeps its dot", apply: (s) => void (s.recording = "dot") },
+  { side: "left", says: "Recording joins the clock", apply: (s) => void (s.recording = "clock") },
   { side: "right", says: "Tray apps fold into ⋯", apply: (s) => void (s.tray = "folded") },
   { side: "left", says: "Update joins ⋯", apply: (s) => void (s.update = false) },
   { side: "left", says: "Preview joins ⋯", apply: (s) => void (s.preview = false) },
@@ -637,6 +664,7 @@ export const RUNGS: readonly Rung[] = [
   { side: "right", says: "Network goes", apply: (s) => void (s.shed = 3) },
   { side: "right", says: "Bluetooth goes", apply: (s) => void (s.shed = 4) },
   { side: "right", says: "Mute pill keeps the mic", apply: (s) => void (s.mute = "mic") },
+  { side: "clock", says: "Seal goes", apply: (s) => void (s.seal = false) },
 ];
 
 /** The rungs `fitBar` takes before the rest: now playing's words, then the title. */
@@ -673,7 +701,7 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   left.className = "shell-bar-left";
   left.append(workspacesFor(content, state, options));
   if (content.preview && state.preview) left.append(previewPill(BRANCH, shown));
-  if (content.recording) left.append(state.recording === "dot" ? recordingDot(shown) : recordingPill({ state: shown }));
+  if (content.recording && state.recording === "time") left.append(recordingPill({ state: shown }));
   if (content.keepAwake && state.idle) left.append(idlePill({ state: shown }));
   if (content.proxy && state.idle) left.append(proxyPill(false, shown));
   if (content.layout && state.layout) left.append(keyboardPill("US", shown));
@@ -683,7 +711,7 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   // The audio pills' circles take the state layer in a pill's place: hovered or pressed, the first's.
   const circle = shown === "hovered" ? "hover" : shown === "pressed" ? shown : undefined;
   if (content.playing && state.playing !== "none") left.append(nowPlaying({ folded: state.playing === "folded", ...(content.song ? { song: content.song } : {}), ...(circle ? { pinned: { part: "play", state: circle } } : {}) }));
-  const clock = compactClock({ date: state.date, countdown: content.countdown && state.countdown, state: shown });
+  const clock = clockPill({ seal: state.seal, date: state.date, weather: !content.noHome && state.weather, recording: content.recording && state.recording === "clock", state: shown });
   const right = document.createElement("span");
   right.className = "shell-bar-right";
   const folded = state.tray === "folded" || (content.update && !state.update) || (content.preview && !state.preview);
@@ -697,14 +725,6 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   row.className = "shell-bar-row";
   row.append(left, clock, right);
   return { row, left, clock, right, title: titled };
-}
-
-/** The recording's dot alone, its time in its hint. */
-function recordingDot(shown: Shown): HTMLElement {
-  const dot = document.createElement("span");
-  dot.className = "shell-dot";
-  const made = control([dot], "Recording 1:23. Click to stop", shown, { tone: "recording", end: "s12" });
-  return made;
 }
 
 /** A rung's state's fit at `width` logical pixels, measured where the page draws. */
@@ -736,13 +756,17 @@ function measure(width: number, content: BarContent, state: BarState): Measured 
   };
   const leftNeed = need(drawn.left);
   const rightNeed = need(drawn.right);
-  const clockWidth = of(drawn.clock);
+  // The capsule is the screen's middle: each side has the room from there to its end of the pill.
+  const capsule = capsuleExtents(drawn.clock);
+  const before = capsule.before / scale;
+  const after = capsule.after / scale;
   const playing = drawn.left.querySelector(".shell-playing-pill") !== null;
   host.remove();
   const clear = length("space-s40");
   const leftClear = playing ? gap : clear;
-  const half = (width - 2 * gap - clockWidth) / 2;
-  return { playing, leftFits: leftNeed + leftClear <= half, rightFits: rightNeed + clear <= half, titleRoom: half - leftClear - leftNeed - length("space-s12") };
+  const leftHalf = width / 2 - gap - before;
+  const rightHalf = width / 2 - gap - after;
+  return { playing, leftFits: leftNeed + leftClear <= leftHalf, rightFits: rightNeed + clear <= rightHalf, titleRoom: leftHalf - leftClear - leftNeed - length("space-s12") };
 }
 
 /**
