@@ -1,79 +1,43 @@
-// The WeatherSky page, a DRAFT: the sky behind the clock popup's weather cards, live at the three
-// sizes the popup draws it at, with a control for the hour, the weather and every reading; the
-// nine weathers by day, at dusk and by night; the still card and reduced motion.
+// The WeatherSky page, a DRAFT: the sky behind the clock popup's weather, and the three cards that
+// lie on it (`lib/weather-card.ts`): home's card and the weather view's banner live, a city's card
+// still, live with a control for the hour, the weather and every reading; the nine weathers by
+// day, at dusk and by night; home's card with no city and offline; one to eight cities.
 
 import "./weather-sky.css";
 import { list, listRow } from "../../lib/list.ts";
-import { row, stack, within } from "../../lib/layout.ts";
+import { stack, within } from "../../lib/layout.ts";
 import { select } from "../../lib/select.ts";
 import { slider } from "../../lib/slider.ts";
 import { tabs } from "../../lib/tabs.ts";
-import { text } from "../../lib/text.ts";
-import { type Hail, type Readings, TYPICAL, type Weather, weatherSky, type WeatherSky, WEATHERS } from "../../lib/weather-sky.ts";
+import { type CardSky, cityCard, cityRow, type HomeState, homeWeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
+import { type Hail, type Readings, TYPICAL, type Weather, WEATHERS } from "../../lib/weather-sky.ts";
 import { doesntApply, nonEmpty, page, type Variant } from "../../site/page.ts";
+import { CITIES, CONDITIONS, clockOf, degrees, HOME, hourOf, offsetOf } from "../shell/weather-data.ts";
 
-/** Each weather's name, as a card says it. */
-const NAMES: Record<Weather, string> = {
-  clear: "Clear",
-  fair: "Fair",
-  partly: "Partly cloudy",
-  overcast: "Overcast",
-  fog: "Fog",
-  rain: "Rain",
-  thunderstorm: "Thunderstorm",
-  snow: "Snow",
-  hail: "Hail",
-};
-
-type Size = "home" | "banner" | "city";
-
-interface CardOptions {
-  readonly size: Size;
-  readonly hour: number;
-  readonly weather: Weather;
-  readonly readings?: Partial<Readings>;
-  readonly still?: boolean;
-  readonly reduced?: boolean;
-  readonly seed?: number;
+/** Home's reading at `sky`: Warsaw's numbers, the condition `sky`'s weather's. */
+function homeAt(sky: CardSky, age?: string): HomeState & { readonly state: "reading" } {
+  return { state: "reading", sky, place: HOME.name, temperature: degrees(HOME.temperature), condition: CONDITIONS[sky.weather], high: degrees(HOME.high), low: degrees(HOME.low), ...(age ? { age } : {}) };
 }
 
-/** A sample card: the sky at `size`, and the stand-in text what falls lands on. */
-interface Card {
-  readonly box: HTMLElement;
-  readonly sky: WeatherSky;
-  /** Writes the condition word for `weather`. */
-  readonly say: (weather: Weather) => void;
+function bannerAt(sky: CardSky): WeatherBannerOptions {
+  return { sky, temperature: degrees(HOME.temperature), condition: CONDITIONS[sky.weather], feels: degrees(HOME.feels), high: degrees(HOME.high), low: degrees(HOME.low) };
 }
 
-function card(options: CardOptions): Card {
-  const sky = weatherSky({
-    hour: options.hour,
-    weather: options.weather,
-    ...(options.readings ? { readings: options.readings } : {}),
-    ...(options.still ? { still: true } : {}),
-    ...(options.reduced !== undefined ? { reduced: options.reduced } : {}),
-    seed: options.seed ?? 0,
-  });
-  sky.element.classList.add("ws-card");
-  sky.element.dataset.size = options.size;
-  const city = options.size === "city";
-  const words = document.createElement("div");
-  words.className = "ws-text";
-  const lines = document.createElement("div");
-  lines.className = "ws-lines";
-  const figure = text("12°", city ? "headline" : "hero_number");
-  const line = text("Warsaw · 14° / 7°", city ? "caption" : "small");
-  const say = (weather: Weather) => lines.replaceChildren(text(NAMES[weather], city ? "label" : "subheading"), line);
-  say(options.weather);
-  words.append(figure, lines);
-  sky.content.append(words);
-  sky.landOn([words]);
-  return { box: sky.element, sky, say };
+/** A sample's box, its width the popup's room for it: the banner the column, home's card a panel. */
+function sized<E extends HTMLElement>(element: E, part: "banner" | "home" | "city"): E {
+  element.classList.add("ws-sample");
+  element.dataset.sample = part;
+  return element;
 }
 
-/** The hour as a clock reads it, by the locale. */
-const CLOCK = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
-const clockOf = (hour: number) => CLOCK.format(new Date(Math.round(hour * 60) * 60_000));
+const home = (sky: CardSky, age?: string) => sized(homeWeatherCard({ home: homeAt(sky, age) }).element, "home");
+const banner = (sky: CardSky) => sized(weatherBanner(bannerAt(sky)).element, "banner");
+
+/** A city's card as the popup draws it, by its index in the sample cities. */
+function city(index: number, sky?: Partial<CardSky>): HTMLElement {
+  const place = CITIES[index]!;
+  return cityCard({ sky: { hour: hourOf(place), weather: place.weather, ...(place.readings ? { readings: place.readings } : {}), seed: index * 5, ...sky }, name: place.name, time: clockOf(hourOf(place)), temperature: degrees(place.temperature), offset: offsetOf(place) }).element;
+}
 
 /** A reading's control: its range, its step, and how its value reads. */
 interface Dial {
@@ -110,20 +74,25 @@ function ending(title: string, control: HTMLElement): HTMLElement {
 }
 
 /**
- * Live: the banner and the home card live and the city card still, one control for the hour, the
- * weather and each reading. Picking a weather sets its typical readings; the hour lands at once.
+ * Live: the banner and home's card live, Tokyo's card still, one control for the hour, the weather
+ * and each reading. Picking a weather sets its typical readings; the hour lands at once.
  */
 function live(): HTMLElement {
   let weather: Weather = "rain";
   let readings: Readings = { ...TYPICAL[weather].readings, rain: 7.5 };
   let hour = 14;
-  const cards = [
-    card({ size: "banner", hour, weather, readings, seed: 11 }),
-    card({ size: "home", hour, weather, readings, seed: 23 }),
-    card({ size: "city", hour, weather, readings, still: true, seed: 37 }),
-  ];
+  const skyNow = (): CardSky => ({ hour, weather, readings, seed: 11 });
+  const big = weatherBanner(bannerAt(skyNow()));
+  const small = homeWeatherCard({ home: homeAt(skyNow()) });
+  const tokyo = cityCard({ sky: { hour, weather, readings, seed: 37 }, name: "Tokyo", time: clockOf(hour), temperature: degrees(18), offset: "+8 h" });
+  const tell = () => {
+    big.show(bannerAt(skyNow()));
+    small.show(homeAt(skyNow()));
+    tokyo.sky?.setHour(hour, true);
+    tokyo.sky?.setWeather(weather, readings);
+  };
   const dials = new Map<Dial["key"], HTMLElement>();
-  const rebuildDials: (() => void)[] = [];
+  const rebuild: (() => void)[] = [];
   const hourDial = slider({
     icon: "schedule",
     size: "Compact",
@@ -132,22 +101,20 @@ function live(): HTMLElement {
     widest: "00:00",
     changed: (v) => {
       hour = Math.round(v * 24 * 20) / 20;
-      for (const each of cards) each.sky.setHour(hour, true);
+      for (const each of [big, small, tokyo]) each.sky?.setHour(hour, true);
     },
   });
   const dialOf = (dial: Dial) => {
     const range = dial.max - dial.min;
-    const at = (value: number) => (value - dial.min) / range;
     return slider({
       icon: dial.icon,
       size: "Compact",
-      value: at(readings[dial.key]),
+      value: (readings[dial.key] - dial.min) / range,
       number: (v) => dial.format.format(dial.min + Math.round((v * range) / dial.step) * dial.step),
       widest: dial.format.format(dial.max),
       changed: (v) => {
-        const value = dial.min + Math.round((v * range) / dial.step) * dial.step;
-        readings = { ...readings, [dial.key]: value };
-        for (const each of cards) each.sky.setReadings({ [dial.key]: value });
+        readings = { ...readings, [dial.key]: dial.min + Math.round((v * range) / dial.step) * dial.step };
+        tell();
       },
     });
   };
@@ -156,119 +123,116 @@ function live(): HTMLElement {
       choices: [{ label: "None" }, { label: "Slight" }, { label: "Heavy" }],
       picked: HAILS.indexOf(readings.hail),
       onPick: (index) => {
-        const hail = HAILS[index] ?? "none";
-        readings = { ...readings, hail };
-        for (const each of cards) each.sky.setReadings({ hail });
+        readings = { ...readings, hail: HAILS[index] ?? "none" };
+        tell();
       },
     });
+  let hailRow = ending("Hail", hailOf());
+  rebuild.push(() => {
+    const fresh = ending("Hail", hailOf());
+    hailRow.replaceWith(fresh);
+    hailRow = fresh;
+  });
   const rows = list([
     ending("Hour", hourDial),
     ending(
       "Weather",
       select({
-        options: WEATHERS.map((w) => NAMES[w]),
+        options: WEATHERS.map((w) => CONDITIONS[w]),
         picked: WEATHERS.indexOf(weather),
         onPick: (index) => {
           weather = WEATHERS[index] ?? "clear";
           readings = { ...TYPICAL[weather].readings };
-          for (const each of cards) {
-            each.sky.setWeather(weather);
-            each.say(weather);
-          }
-          for (const rebuild of rebuildDials) rebuild();
+          tell();
+          for (const each of rebuild) each();
         },
       }),
     ),
     ...DIALS.map((dial) => {
       const made = ending(dial.name, dialOf(dial));
       dials.set(dial.key, made);
-      rebuildDials.push(() => {
+      rebuild.push(() => {
         const fresh = ending(dial.name, dialOf(dial));
         dials.get(dial.key)?.replaceWith(fresh);
         dials.set(dial.key, fresh);
       });
       return made;
     }),
-    (() => {
-      let made = ending("Hail", hailOf());
-      rebuildDials.push(() => {
-        const fresh = ending("Hail", hailOf());
-        made.replaceWith(fresh);
-        made = fresh;
-      });
-      return made;
-    })(),
+    hailRow,
   ]);
-  return stack("s24", "start", stack("s16", "start", cards[0]!.box, row("s16", "end", cards[1]!.box, cards[2]!.box)), within("var(--size-column)", rows));
+  return stack("s24", "start", stack("s8", "start", sized(big.element, "banner"), sized(small.element, "home"), sized(tokyo.element, "city")), within("var(--size-column)", rows));
 }
 
-/** A still card at `hour` in `weather`, for the tables. */
-const still = (size: Size, hour: number, weather: Weather, seed = 0) => () => card({ size, hour, weather, still: true, seed }).box;
-
-/** The nine weathers at `hour`, one still home card each. */
+/** The nine weathers at `hour`, one still city card each, named for its weather. */
 function weathersAt(hour: number): ReturnType<typeof nonEmpty<Variant>> {
-  return nonEmpty(WEATHERS.map((weather, i) => ({ name: NAMES[weather], for: `typical readings, ${clockOf(hour)}`, sample: still("home", hour, weather, i * 7) })));
+  return nonEmpty(
+    WEATHERS.map((weather, i) => ({
+      name: CONDITIONS[weather],
+      for: `typical readings, ${clockOf(hour)}`,
+      sample: () => sized(cityCard({ sky: { hour, weather, seed: i * 7 }, name: CONDITIONS[weather], time: clockOf(hour), temperature: degrees(TYPICAL[weather].readings.feels), offset: "" }).element, "city"),
+    })),
+  );
 }
 
-/** A row of eight still cities, as the popup's second row of cities draws them. */
-function cities(): HTMLElement {
-  const places: readonly [number, Weather][] = [
-    [21, "fair"],
-    [8, "rain"],
-    [13, "overcast"],
-    [13, "snow"],
-    [9, "partly"],
-    [4, "fog"],
-    [23, "clear"],
-    [15, "clear"],
-  ];
-  return stack("s8", "start", ...[places.slice(0, 4), places.slice(4)].map((half) => row("s8", "start", ...half.map(([hour, weather], i) => card({ size: "city", hour, weather, still: true, seed: i * 5 }).box))));
-}
+/** The first `count` sample cities in their row, at the popup's width. */
+const cities = (count: number) => () => sized(cityRow(CITIES.slice(0, count).map((_, i) => city(i))), "banner");
+
+const NIGHT = 22;
+const DAY = 14;
 
 export default page({
   level: "molecules",
   slug: "weather-sky",
   title: "WeatherSky",
-  lede: "A live sky for an hour and a weather, with the forecast's rain, snow or hail landing on the card's text.",
+  lede: "A live sky for an hour and a weather, and the cards that lie on it, what falls landing on their words.",
   code: { unbuilt: "Rust and QML: not built yet" },
   stage: { live, hint: "pick a weather, drag the readings", daylight: true },
   variants: [
-    { name: "Live", for: "the popup's open cards: it moves, things fall", sample: () => card({ size: "home", hour: 14, weather: "rain", readings: { rain: 7.5 }, seed: 3 }).box },
-    { name: "Still", for: "the small city cards: one frame, nothing falls", sample: still("city", 14, "rain", 3) },
-    { name: "Reduced motion", for: "a still sky, nothing falls, no lightning", sample: () => card({ size: "home", hour: 14, weather: "thunderstorm", reduced: true, seed: 3 }).box },
+    { name: "HomeWeatherCard", for: "home's weather, live; a press opens it", sample: () => home({ hour: DAY, weather: "rain", readings: { rain: 7.5 }, seed: 3 }) },
+    { name: "WeatherBanner", for: "the weather view's head, live", sample: () => banner({ hour: DAY, weather: "snow", seed: 5 }) },
+    { name: "CityCard", for: "a city beside the clock, still", sample: () => sized(city(0), "city") },
+    { name: "Reduced motion", for: "a still sky, nothing falls, no lightning", sample: () => home({ hour: DAY, weather: "thunderstorm", reduced: true, seed: 3 }) },
   ],
-  sizes: [
-    { name: "Banner", for: "the weather view's banner, live", sample: () => card({ size: "banner", hour: 14, weather: "snow", seed: 5 }).box },
-    { name: "Home card", for: "the clock view's weather card, live", sample: () => card({ size: "home", hour: 14, weather: "snow", seed: 5 }).box },
-    { name: "City card", for: "a city beside the clock, still", sample: still("city", 14, "snow", 5) },
-  ],
+  sizes: doesntApply("each card's height is its own token; its width is its room."),
   groups: [
-    { title: "By day, 13:00", rows: weathersAt(13) },
+    { title: "By day, 14:00", rows: weathersAt(DAY) },
     { title: "At dusk, 19:00", rows: weathersAt(19) },
-    { title: "By night, 23:00", rows: weathersAt(23) },
+    { title: "By night, 22:00", rows: weathersAt(NIGHT) },
+    {
+      title: "Home's card",
+      rows: nonEmpty([
+        { name: "A reading", for: "live; place · high / low", sample: () => home({ hour: NIGHT, weather: "partly", seed: 2 }) },
+        { name: "Offline, 2 h", for: "the last reading dimmed, its age", sample: () => home({ hour: NIGHT, weather: "partly", seed: 2 }, "2 h ago") },
+        { name: "Offline over a day", for: "No connection, on the surface", sample: () => sized(homeWeatherCard({ home: { state: "no connection", place: HOME.name } }).element, "home") },
+        { name: "No home city", for: "Set your city, on the surface", sample: () => sized(homeWeatherCard({ home: { state: "no city" } }).element, "home") },
+        { name: "Hail", for: "what falls is hail", sample: () => home({ hour: DAY, weather: "hail", seed: 4 }) },
+      ]),
+    },
   ],
   states: {
-    shown: ["rest"],
+    shown: ["rest", "empty", "error"],
     absent: {
-      lit: "it takes no pointer or keyboard",
-      pressed: "it takes no press",
+      lit: "the popup's press target; no light of its own yet",
+      pressed: "the popup opens the weather view",
       disabled: "nothing to disable: reduced motion stills it",
       selected: "it holds no choice",
       loading: "drawn at once; the precipitation follows",
-      empty: "every weather has a sky",
-      error: "with no WebGL its box stays dark",
     },
-    rows: nonEmpty([
-      { name: "Live", cell: () => card({ size: "home", hour: 14, weather: "rain", readings: { rain: 7.5 }, seed: 9 }).box },
-      { name: "Still", cell: still("city", 14, "rain", 9) },
-    ]),
-    looks: { rest: "the sky for its hour and weather" },
+    rows: nonEmpty([{ name: "HomeWeatherCard", cell: (state: "rest" | "empty" | "error") => (state === "rest" ? home({ hour: DAY, weather: "rain", readings: { rain: 7.5 }, seed: 9 }) : sized(homeWeatherCard({ home: state === "empty" ? { state: "no city" } : { state: "no connection", place: HOME.name } }).element, "home")) }]),
+    looks: { rest: "the sky for its hour and weather", empty: "no home city: Set your city", error: "offline past a day: No connection" },
   },
-  focus: doesntApply("not a control: it has no line."),
+  focus: doesntApply("not a control: no line of its own yet."),
   content: {
-    text: doesntApply("the text is its owner's; what falls lands on any."),
+    text: doesntApply("a city's long name is cut with an ellipsis: see Counts."),
     missingPicture: doesntApply("it draws its picture itself; there is nothing to miss."),
-    counts: [{ name: "Eight cities", for: "eight still skies, one WebGL context", sample: cities }],
+    counts: [
+      { name: "One city", for: "the row to itself", sample: cities(1) },
+      { name: "Two", for: "sharing the row", sample: cities(2) },
+      { name: "Three", for: "sharing the row", sample: cities(3) },
+      { name: "Four", for: "a long name cut", sample: () => sized(cityRow([0, 1, 4, 5].map((i) => city(i))), "banner") },
+      { name: "Six", for: "a second row, stretched", sample: cities(6) },
+      { name: "Eight, the most", for: "two rows of four", sample: cities(8) },
+    ],
   },
   motion: {
     arrives: doesntApply("it is drawn with its card."),
@@ -277,12 +241,18 @@ export default page({
   },
   keyboard: doesntApply("it takes no keys; its owner's controls do."),
   measures: {
-    samples: nonEmpty([{ name: "Home card", for: "the sample's inset and corner", sample: () => card({ size: "home", hour: 14, weather: "fair", seed: 1 }).box }]),
+    samples: nonEmpty([
+      { name: "HomeWeatherCard", for: "ink insets, heights", sample: () => home({ hour: DAY, weather: "fair", seed: 1 }) },
+      { name: "CityCard", for: "ink insets, heights", sample: () => sized(city(5), "city") },
+    ]),
     measures: [
-      { part: "Sample text inset", token: "space-s16" },
-      { part: "Sample corner", token: "radius-content" },
-      { part: "Text halo", token: "size-halo" },
+      { part: "Home, banner: ink inset", token: "space-s16" },
+      { part: "City: ink inset", token: "space-s12" },
+      { part: "Home's card height", token: "size-weather_card" },
+      { part: "Banner height", token: "size-weather_banner" },
+      { part: "City card height", token: "size-city_card" },
+      { part: "Between cities", token: "space-s8" },
     ],
-    reflow: doesntApply("it fills whatever box its owner gives it."),
+    reflow: doesntApply("its width is its room; its height its own."),
   },
 });

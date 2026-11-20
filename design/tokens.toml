@@ -292,6 +292,13 @@ lock_blur = 8
 # which follows the glyphs so no shape shows. The lock's kicker, at rest.
 halo_edge = 1
 halo = 6
+# The weather's cards on a sky, by height; their width is the room they are given. Home's card
+# beside the clock popup's time, as tall as the time and its two lines; the weather view's banner,
+# a step taller for its larger figures' room; a city's card, its name over its time with the
+# temperature above, four to the popup's width.
+weather_card = 112
+weather_banner = 132
+city_card = 92
 # A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are.
 thumbnail_width = 256
 thumbnail_height = 160
@@ -910,6 +917,11 @@ clock_date = 0.85
 # street, faint enough that no shape shows round them.
 halo_edge = 0.50
 halo = 0.35
+# Words laid on a live sky (the clock popup's weather cards): `on_picture` with two shadows of the
+# `shadow` role, a tight one round the strokes and one a hair under them, at these. Nothing else
+# lies over the picture, no fade and no scrim, so the sky shows whole behind its words.
+picture_text_edge = 0.55
+picture_text_drop = 0.45
 # An inactive window's border, the highest container over what is behind it,
 # and its neutral shadow, of the `shadow` role. The active window's tube and
 # glow strike on over these (config/hypr/focus.lua).
@@ -1417,6 +1429,9 @@ on_sharing = { dark = { from = "burn_sharing", lightness = 0.25, text_on = ["sha
 
 # A tone's core, the white-hot line along the middle of a lit tube: half way
 # to white.
+# Words on a picture that changes under them (a live sky): white in both modes, held off the picture
+# by the shadows `opacity.picture_text_edge` and `picture_text_drop` give it.
+on_picture = { mix = "surface", white = 1.0 }
 primary_core = { mix = "primary", white = 0.5 }
 cold_core = { mix = "cold", white = 0.5 }
 error_core = { mix = "burn_error", white = 0.5 }

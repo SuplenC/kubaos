@@ -1,0 +1,139 @@
+/* The cards on a WeatherSky (`weather-card.ts`): their heights and corners, and their words set in
+   from the card's edges by their ink, not their boxes. Their width is their owner's. */
+.k-weather-card {
+  --wc-in: var(--space-s16);
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  border-radius: var(--radius-content);
+}
+
+.k-weather-card[data-part="home"] {
+  height: var(--size-weather_card);
+}
+
+.k-weather-card[data-part="banner"] {
+  height: var(--size-weather_banner);
+}
+
+.k-weather-card[data-part="city"] {
+  --wc-in: var(--space-s12);
+  height: var(--size-city_card);
+  border-radius: var(--radius-control);
+}
+
+.k-weather-card[data-plain] {
+  background: var(--color-surface_container);
+}
+
+.k-weather-card[data-pressable] {
+  cursor: pointer;
+}
+
+.k-weather-words {
+  position: absolute;
+  inset: 0;
+}
+
+.k-weather-words[data-dimmed] {
+  opacity: var(--opacity-placeholder);
+}
+
+/* Words on a sky: two shadows of the `shadow` role tight to the letters, and nothing over the
+   picture. The approved lengths, 1.5 px and half a pixel, are under the whole pixel the tokens'
+   lengths come in, so they are written here until the tokens can hold them. */
+.k-weather-card:not([data-plain]) .k-text {
+  text-shadow:
+    0 0 1.5px rgb(from var(--color-shadow) r g b / var(--opacity-picture_text_edge)),
+    0 0.5px 1px rgb(from var(--color-shadow) r g b / var(--opacity-picture_text_drop));
+}
+
+/* Where a line's baseline sits in its box (`.k-text` in `lib.css` sets it there) and how much of the
+   box lies under it: a line `--wc-below` less than the inset above the card's bottom has its
+   baseline the inset above it. */
+.k-weather-card .k-text {
+  --wc-base: round(nearest, calc(var(--t-line) / 2 + var(--mass, 0.35) * var(--t-size)), 1px);
+  --wc-below: calc(var(--t-line) - var(--wc-base));
+}
+
+/* Its ink, not its box, the inset in from the card's left. */
+.k-weather-inked {
+  margin-left: round(nearest, calc(var(--wc-in) - var(--ink-left) * var(--t-size)), 1px);
+}
+
+/* Now: the figures and the lines beside them stand on one baseline, the inset above the bottom. */
+.k-weather-now {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-s16);
+}
+
+.k-weather-sits,
+.k-weather-lines > :last-child {
+  margin-bottom: calc(var(--wc-in) - var(--wc-below));
+}
+
+.k-weather-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.k-weather-plain {
+  position: absolute;
+  left: var(--wc-in);
+  right: var(--wc-in);
+  bottom: 0;
+}
+
+/* City: the temperature's ink the inset from the top and the right. */
+.k-weather-temperature {
+  position: absolute;
+  right: var(--wc-in);
+  top: round(nearest, calc(var(--wc-in) - var(--wc-base) + 1cap), 1px);
+}
+
+/* The name over the time and the offset, which share the time's baseline. */
+.k-weather-place {
+  position: absolute;
+  left: var(--wc-in);
+  right: var(--wc-in);
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.k-weather-name {
+  width: 100%;
+  max-width: 100%;
+}
+
+.k-weather-time-line {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-s8);
+}
+
+.k-weather-place .k-weather-inked {
+  margin-left: round(nearest, calc(-1 * var(--ink-left) * var(--t-size)), 1px);
+}
+
+/* The city cards: rows of up to four, `space.s8` apart, each row's cards sharing it equally. */
+.k-city-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: 100%;
+}
+
+.k-city-line {
+  display: flex;
+  gap: var(--space-s8);
+}
+
+.k-city-line > .k-weather-card {
+  flex: 1 1 0;
+}

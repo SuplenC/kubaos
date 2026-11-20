@@ -481,6 +481,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Media](design/components/media.md)
 - [PictureChoice](design/components/picture-choice.md)
 - [DepthPicture](design/components/depth-picture.md)
+- [WeatherSky, HomeWeatherCard, WeatherBanner, CityCard and CityRow](design/components/weather-sky.md)
 
 **Feedback**
 
