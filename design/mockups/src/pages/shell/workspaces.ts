@@ -16,16 +16,20 @@
 // A workspace with windows can be carried to another place. Pressed and moved `space.s8`, it lifts
 // onto a disc raised to step 1 that eases onto the pointer over `short` on `standard`, its place
 // left as a hole, a dashed circle in `outline`. The numbers are the places and stay; the windows
-// move. The pointer in the middle `scale.snap` of a place, the Overview's magnet, proposes it: the
-// hole moves there, the cells between slide over and the disc snaps onto it, each over `medium` on
-// `standard_decel`; between places the disc follows the pointer and the hole stays. Over another
-// group, that group takes a `primary` outline and opens the hole; over a group's ghost, the hole is
-// its last place. Let go, the disc flies into the hole over `medium`; carried off the pill, the
-// hole goes back home first. The shown workspace is where its windows are, so the indicator follows
-// them.
+// move. It snaps by the Overview's magnet (`lib/magnet.ts`): the pointer in a place's zone proposes
+// it, the hole moves there, the cells between slide over and the disc snaps onto it, each over
+// `medium` on `standard_decel`; in no zone the hole is back home and the disc at the hand. A place
+// is caught where it stands at rest and, in another group, where it stands with the hole open there,
+// so it stays proposed as the hole opening moves it. Over another group, that group takes a
+// `primary` outline and opens the hole, while the home hole stays open, as the Overview's room does,
+// so the home group stands still; over a group's ghost, the hole is its last place. Let go, the disc
+// flies into the hole over `medium` on `emphasized_decel`, then a home hole left behind closes. A slide moves a slot's content,
+// never its piece of a group's tint, so the tint stays one band. The shown workspace is where its
+// windows are, so the indicator follows them. Nothing in the pill is selected by a press or a drag.
 //
 // A right click opens its menu (`lib/menu.ts`) on a popover under it: on a workspace, its own
-// actions, then its group's; on a group's name or its ghost, the group's alone. The deletes are
+// actions under "Workspace N", then its group's under "This group"; on a group's name or its ghost,
+// the group's alone, under its name. The deletes are
 // held. Move to group and Move to screen open their lists in place, Back first, as every submenu.
 //
 // It isn't the library's `Pill`: its cells glide every frame. It has no part in `src/lib/` yet.
@@ -37,11 +41,12 @@ import { raise } from "../../lib/elevation.ts";
 import { focusRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { withHint } from "../../lib/hint.ts";
+import { catchShare, caught, type Rect, type Zone, zoneOf } from "../../lib/magnet.ts";
 import { type MenuEntry, type MenuItemSpec, menu } from "../../lib/menu.ts";
 import { probe } from "../../lib/probe.ts";
 import { advance, centreFor, text, type TypeStyle } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
-import { cubic, durationMs, length, number } from "../../lib/tokens.ts";
+import { cubic, durationMs, length } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 
 /** A workspace: its id (1–10 in the first block, 11–20 in the second), and whether it has windows. */
@@ -168,7 +173,9 @@ function entriesOf(bands: readonly Band[], active: string, held: string | null, 
     if (name !== "") result.push({ ...blank, key: `label${band.block}`, kind: "label", block: band.block, workspace: band.spaces[0]!.id, space: band.spaces[0]!.key, borrowed: true, head: true, label: name, taking: takes });
     band.spaces.forEach((space, at) => {
       const kind: Kind = space.key === held ? "hole" : isGhost(band.spaces, at, active) ? "ghost" : "cell";
-      result.push({ key: space.key, kind, block: band.block, workspace: space.id, space: space.key, borrowed: band.borrowed, head: at === 0 && name === "", tail: at === band.spaces.length - 1, label: "", occupied: space.occupied, taking: takes });
+      // A slot's key is its windows' in its group: carried to another group, it leaves one and
+      // grows in the other, never sliding across the rule with the tint it is drawn on.
+      result.push({ key: `${space.key}@${band.block}`, kind, block: band.block, workspace: space.id, space: space.key, borrowed: band.borrowed, head: at === 0 && name === "", tail: at === band.spaces.length - 1, label: "", occupied: space.occupied, taking: takes });
     });
   });
   return result;
@@ -228,15 +235,6 @@ function landingOf(bands: readonly Band[], key: string): Landing | null {
     if (index >= 0) return { block: band.block, index };
   }
   return null;
-}
-
-/** A place's zone, in the pill's CSS pixels, and where it lands the carried workspace. */
-interface Zone {
-  readonly x: number;
-  readonly y: number;
-  readonly w: number;
-  readonly h: number;
-  readonly landing: Landing;
 }
 
 export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
@@ -311,6 +309,23 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     });
   }
 
+  /**
+   * The groups as drawn while `key` is carried toward `landing`: in its own group its one hole
+   * moves there; in another, its home hole stays open all the while, as the Overview's room does, so
+   * its group stands still, and a second opens where it would land.
+   */
+  function preview(from: readonly Band[], key: string, landing: Landing | null): Band[] {
+    const home = landingOf(from, key);
+    if (!landing || !home || landing.block === home.block) return placed(from, key, landing);
+    const moving = from.find((band) => band.block === home.block)!.spaces[home.index]!;
+    return from.map((band) => {
+      if (band.block !== landing.block) return band;
+      const list = [...band.spaces];
+      list.splice(Math.min(landing.index, list.length), 0, moving);
+      return { ...band, spaces: settle(renumber(band, list)) };
+    });
+  }
+
   const choose = (key: string) => {
     if (options.live && !carry && renaming === null) show(key);
   };
@@ -321,6 +336,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     box.className = "shell-ws-slot";
     box.dataset.key = entry.key;
     box.dataset.kind = entry.kind;
+    box.dataset.block = String(entry.block);
     box.style.setProperty("--slot-width", String(widthOf(entry, kanji)));
     const piece = (name: string) => {
       const made = document.createElement("span");
@@ -380,7 +396,9 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function cellsTo(key: string): number {
     let x = 0;
     for (const entry of entries) {
-      if (entry.kind !== "gap" && entry.kind !== "label" && entry.space === key) return x / px("size-chip");
+      // Carried to another group, its windows are where it would land, not in its home hole.
+      const elsewhere = carry?.key === key && carry.landing !== null && entry.block !== carry.landing.block;
+      if (entry.kind !== "gap" && entry.kind !== "label" && entry.space === key && !elsewhere) return x / px("size-chip");
       x += widthOf(entry, kanji);
     }
     return -1;
@@ -395,9 +413,15 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     indicator.style.setProperty("--ws-end", String(at + 1));
   }
 
-  /** The drawn horizontal offset of `child`: its box, and where a slide running on it has it. */
+  /** What of a slot slides: its content, not its piece of the tint or of the drop outline. */
+  function sliding(child: HTMLElement): HTMLElement[] {
+    return [...child.children].filter((each) => !each.matches(".shell-ws-tint, .shell-ws-drop")) as HTMLElement[];
+  }
+
+  /** The drawn horizontal offset of `child`'s content: its box, and where a slide running on it has it. */
   function drawnLeft(child: HTMLElement): number {
-    const moved = getComputedStyle(child).translate;
+    const first = sliding(child)[0];
+    const moved = first ? getComputedStyle(first).translate : "none";
     return child.offsetLeft + (moved === "none" ? 0 : Number.parseFloat(moved) || 0);
   }
 
@@ -438,8 +462,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (!slides) return;
     for (const [key, made] of kept) {
       const from = was.get(key)! - made.offsetLeft;
-      if (Math.abs(from) < 0.5) continue;
-      made.animate([{ translate: `${from}px 0` }, { translate: "0 0" }], { duration: ms("medium"), easing: easing("standard_decel") });
+      if (Math.abs(from) < 0.5 || ms("medium") === 0) continue;
+      // Its content slides out of its box, which shows it while it does.
+      made.dataset.sliding = "";
+      const slides_ = sliding(made).map((each) => each.animate([{ translate: `${from}px 0` }, { translate: "0 0" }], { duration: ms("medium"), easing: easing("standard_decel") }));
+      Promise.all(slides_.map((each) => each.finished)).then(() => delete made.dataset.sliding, () => {});
     }
   }
 
@@ -491,43 +518,58 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /** The middle of the carried workspace's hole. */
   function holeCentre(): Point {
-    const hole = carry ? content.querySelector<HTMLElement>(`.shell-ws-slot[data-key="${carry.key}"]:not([data-gone])`) : null;
+    const block = carry ? (carry.landing ?? landingOf(carry.from, carry.key))?.block : undefined;
+    const hole = carry ? content.querySelector<HTMLElement>(`.shell-ws-slot[data-kind="hole"][data-block="${block}"]:not([data-gone])`) : null;
     if (!hole) return { x: 0, y: 0 };
     const box = boxOf(hole);
     return { x: box.x + cssPx("size-chip") / 2, y: box.y + box.h / 2 };
   }
 
+  /** The slots of the cells, ghosts and holes `list` draws, in the pill's CSS pixels: where they stand once laid out. */
+  function slotsOf(list: readonly Entry[]): { entry: Entry; box: Rect }[] {
+    const scale = settings().scale;
+    const h = px("size-chip") * scale;
+    let x = cells.offsetLeft;
+    const result: { entry: Entry; box: Rect }[] = [];
+    for (const entry of list) {
+      const w = widthOf(entry, kanji) * scale;
+      if (entry.kind === "cell" || entry.kind === "ghost" || entry.kind === "hole") result.push({ entry, box: { x, y: cells.offsetTop, w, h } });
+      x += w;
+    }
+    return result;
+  }
+
+  /** The zones worked out for a carry: the groups do not change while a workspace is carried. */
+  let zoneCache: { readonly key: string; readonly from: readonly Band[]; readonly zones: readonly Zone<Landing>[] } | null = null;
+
   /**
-   * Every place's zone, from the slots as they are now drawn: the middle `scale.snap` of its width
-   * and height, the Overview's magnet. A place in the carried workspace's own group, or in one
-   * with room, proposes landing there; a group's ghost proposes its last place.
+   * Every place's zone for the carried workspace, as the Overview's `zonesOf`: each group's places
+   * where they stand at rest, with the hole at home, and, for a group it is not from, also where
+   * they stand with the hole open first in it, so a place is caught from either. A cell or the hole
+   * proposes its place; a ghost, the group's last. A group with no room left offers none.
    */
-  function zones(): Zone[] {
+  function zones(): readonly Zone<Landing>[] {
     if (!carry) return [];
     const held = carry;
+    if (zoneCache?.key === held.key && zoneCache.from === held.from) return zoneCache.zones;
     const home = landingOf(held.from, held.key)!;
-    const snap = number("scale-snap");
-    const result: Zone[] = [];
-    let index = 0;
-    let block = -1;
-    for (const child of content.children as HTMLCollectionOf<HTMLElement>) {
-      if (child.hasAttribute("data-gone")) continue;
-      const entry = entries.find((each) => each.key === child.dataset.key);
-      if (!entry || entry.kind === "gap" || entry.kind === "label") continue;
-      if (entry.block !== block) {
-        block = entry.block;
-        index = 0;
+    const rest = slotsOf(entriesOf(held.from, active, held.key, null));
+    const result: Zone<Landing>[] = [];
+    for (const band of held.from) {
+      const others = band.spaces.filter((space) => space.key !== held.key);
+      const room = others.length - (others.length > 0 && isGhost(others, others.length - 1, active) ? 1 : 0);
+      if (band.block !== home.block && room >= 10) continue;
+      const layouts = band.block === home.block ? [rest] : [slotsOf(entriesOf(preview(held.from, held.key, { block: band.block, index: 0 }), active, held.key, band.block)), rest];
+      for (const layout of layouts) {
+        let index = 0;
+        for (const { entry, box } of layout) {
+          if (entry.block !== band.block) continue;
+          const landing = { block: band.block, index: entry.kind === "ghost" ? room : index++ };
+          result.push(zoneOf(box, landing, catchShare(box)));
+        }
       }
-      const before = held.from.find((band) => band.block === entry.block)!.spaces.filter((space) => space.key !== held.key);
-      const ghosted = before.length > 0 && isGhost(before, before.length - 1, active);
-      const room = before.length - (ghosted ? 1 : 0);
-      const at = index++;
-      if (entry.block !== home.block && room >= 10) continue;
-      const box = boxOf(child);
-      const w = box.w * snap;
-      const h = box.h * snap;
-      result.push({ x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h, landing: { block: entry.block, index: Math.min(at, room) } });
     }
+    zoneCache = { key: held.key, from: held.from, zones: result };
     return result;
   }
 
@@ -561,24 +603,31 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return disc;
   }
 
-  /** Lifts the workspace of `key` onto its disc, its place left as a hole. */
+  /**
+   * Lifts the workspace of `key` onto its disc, its place left as a hole. Under `pointer`, it comes
+   * up over `short` on `standard` to the place the pointer proposes, or to the hand; a still is
+   * drawn with its hole at `landing`.
+   */
   function lift(key: string, pointer: Point | null, landing: Landing | null = null): void {
     const space = bands.flatMap((band) => band.spaces).find((each) => each.key === key)!;
     carry = { key, from: bands, landing: null, number: space.id, disc: makeDisc(space.id), landed: false };
+    zoneCache = null;
     element.dataset.carrying = "";
     render(false);
     const centre = holeCentre();
     base = centre;
     discTo(carry.disc, centre);
-    if (landing) propose(landing, false);
-    if (pointer) discTo(carry.disc, pointer, { duration: "short", curve: "standard" });
+    if (!pointer) return void (landing && propose(landing, false));
+    const proposed = caught(pointer, zones());
+    if (proposed) propose(proposed, false);
+    discTo(carry.disc, proposed ? holeCentre() : pointer, { duration: "short", curve: "standard" });
   }
 
   /** The hole moved to `landing`, or home with none: the cells between slide over. */
   function propose(landing: Landing | null, slides: boolean): void {
     if (!carry) return;
     carry.landing = landing;
-    bands = placed(carry.from, carry.key, landing);
+    bands = preview(carry.from, carry.key, landing);
     if (!slides) return draw();
     render(true);
     indicate("medium", "medium", "standard_decel");
@@ -588,33 +637,35 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return a?.block === b?.block && a?.index === b?.index;
   }
 
-  /** The pointer at `point` while carrying: in a place's zone it proposes it and the disc snaps on; between places it follows. */
+  /**
+   * The pointer at `point` while carrying: in a place's zone it proposes that place, and the disc
+   * snaps into the hole there; in none, the hole is home and the disc at the hand. A new proposal
+   * eases the disc over `medium` on `standard_decel`; within one it stays put, or follows the hand.
+   */
   function carryTo(point: Point): void {
     if (!carry || carry.landed) return;
-    const zone = zones().find((each) => point.x >= each.x && point.x <= each.x + each.w && point.y >= each.y && point.y <= each.y + each.h);
-    const inside = point.x >= 0 && point.y >= 0 && point.x <= element.offsetWidth && point.y <= element.offsetHeight;
-    const landing = zone ? zone.landing : inside ? carry.landing : null;
+    const landing = caught(point, zones());
     const moved = !same(landing, carry.landing);
     if (moved) propose(landing, true);
-    const snapped = zone !== undefined;
-    const wasSnapped = carry.disc.hasAttribute("data-snapped");
-    carry.disc.toggleAttribute("data-snapped", snapped);
-    const glide = moved || snapped !== wasSnapped ? { duration: "medium", curve: "standard_decel" } : undefined;
-    discTo(carry.disc, snapped ? holeCentre() : point, glide);
+    const target = landing ? holeCentre() : point;
+    discTo(carry.disc, target, moved ? { duration: "medium", curve: "standard_decel" } : undefined);
   }
 
-  /** Let go: the disc flies into the hole over `medium`, and the hole becomes the workspace. */
+  /** Let go: the disc flies into the hole over `medium` on `emphasized_decel`, and the hole becomes the workspace. */
   function drop(): void {
     if (!carry || carry.landed) return;
     const held = carry;
     held.landed = true;
-    const flight = discTo(held.disc, holeCentre(), { duration: "medium", curve: "standard_decel" });
+    const flight = discTo(held.disc, holeCentre(), { duration: "medium", curve: "emphasized_decel" });
+    // Landed, the move is made: a home hole left in its group shrinks out, the rest closing up.
     const done = () => {
       if (carry !== held) return;
       held.disc.remove();
+      bands = placed(held.from, held.key, held.landing);
       carry = null;
       delete element.dataset.carrying;
       render(false);
+      indicate("medium", "medium", "standard_decel");
     };
     if (flight) flight.finished.then(done, done);
     else done();
@@ -650,7 +701,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   }
 
   /** A menu's entry, with what taking it does. */
-  type Row = "separator" | { readonly spec: MenuItemSpec; readonly act: () => void };
+  type Row = "separator" | { readonly heading: string } | { readonly spec: MenuItemSpec; readonly act: () => void };
 
   /**
    * The menu of a workspace (`workspace`, its windows' key) or of a group (`block`): the
@@ -666,6 +717,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       const key = on.workspace;
       const space = band.spaces.find((each) => each.key === key)!;
       rows.push(
+        { heading: `Workspace ${slotOf(space.id)}` },
         { spec: { label: "Move to group", submenu: true, disabled: others.length === 0 }, act: () => sub(others.map((each) => ({ spec: { label: groupName(each), variable: true, disabled: realOf(each).length >= 10 }, act: () => change(placed(bands, key, { block: each.block, index: realOf(each).length })) }))) },
         { spec: { label: "Close all windows", disabled: !space.occupied }, act: () => closeWindows(band, key) },
         { spec: { label: "Delete workspace", held: true }, act: () => deleteWorkspace(band, key) },
@@ -673,14 +725,15 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       );
     }
     rows.push(
+      { heading: "workspace" in on ? "This group" : groupName(band) },
       { spec: { label: "Rename", disabled: !band.borrowed || band.name === "" }, act: () => rename(band.block) },
       { spec: { label: "Move to screen", submenu: true }, act: () => sub(SCREENS.map((name) => ({ spec: { label: name }, act: () => {} }))) },
       { spec: { label: "Delete group", held: true }, act: () => deleteGroup(band) },
     );
     const showRows = (list: readonly Row[], back: (() => void) | null) => {
       const holding = still?.holding;
-      const held = holding === undefined ? -1 : list.findIndex((row) => row !== "separator" && (row.spec.held ?? false));
-      const entries: MenuEntry[] = list.map((row, index) => (row === "separator" ? row : index === held && holding !== undefined ? { ...row.spec, holding } : row.spec));
+      const held = holding === undefined ? -1 : list.findIndex((row) => row !== "separator" && "spec" in row && (row.spec.held ?? false));
+      const entries: MenuEntry[] = list.map((row, index) => (row === "separator" || "heading" in row ? row : index === held && holding !== undefined ? { ...row.spec, holding } : row.spec));
       const list_ = menu(entries, {
         ...(held >= 0 ? { current: held, pinned: "lit" as const } : {}),
         ...(still
@@ -688,7 +741,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
           : {
               onTake: (index: number) => {
                 const row = list[index];
-                if (!row || row === "separator") return;
+                if (!row || row === "separator" || "heading" in row) return;
                 if (!row.spec.submenu) closeMenu();
                 row.act();
               },
@@ -794,7 +847,6 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       element.setPointerCapture(event.pointerId);
       lift(press.key, point);
       press = null;
-      carryTo(point);
     });
     const end = (event: PointerEvent) => {
       press = null;

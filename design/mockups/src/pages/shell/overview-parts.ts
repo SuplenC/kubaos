@@ -18,6 +18,7 @@ import "./overview.css";
 import { tipLine } from "../../lib/banner.ts";
 import { focusRing, steadyGlow } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
+import { catchShare, caught as zoneCaught, inside, type Zone as Caught, zoneOf } from "../../lib/magnet.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
 import { durationMs, length, number } from "../../lib/tokens.ts";
@@ -1302,8 +1303,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     return { x: box.left + (point.x / worldSize.w) * box.width, y: box.top + (point.y / worldSize.h) * box.height };
   }
 
-  const inside = (point: Point, box: model.Rect): boolean => point.x >= box.x && point.x < box.x + box.w && point.y >= box.y && point.y < box.y + box.h;
-
   /** What is under `point`: a window, a workspace, a group's slot, or the wallpaper. */
   function hit(point: Point): { kind: "window"; id: string; space: string } | { kind: "space"; id: string } | { kind: "plus"; group: string } | { kind: "waiting" } | { kind: "wallpaper" } {
     // The thing waiting in the slot is taken by anywhere on the slot.
@@ -1407,13 +1406,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    */
   function spaceTarget(point: Point): Target | null {
     if (!carry) return null;
-    let best: { target: Target; off: number } | null = null;
-    for (const zone of zonesOf(carry)) {
-      if (!inside(point, zone)) continue;
-      const off = Math.hypot(point.x - (zone.x + zone.w / 2), point.y - (zone.y + zone.h / 2));
-      if (!best || off < best.off) best = { target: zone.target, off };
-    }
-    if (best) return best.target;
+    const best = zoneCaught(point, zonesOf(carry));
+    if (best) return best;
     // Over a full group anywhere, refused.
     const gap = L("space-s24");
     for (const each of views) {
@@ -1428,10 +1422,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /** A place's zone, in world points, the place it lies in, and what it proposes. */
-  interface Zone extends model.Rect {
-    readonly place: model.Rect;
-    readonly target: Target;
-  }
+  type Zone = Caught<Target>;
 
   /** The zones worked out for a carry: the desk does not change while a thing is carried. */
   let zoneCache: { readonly held: Carry; readonly zones: readonly Zone[] } | null = null;
@@ -1450,9 +1441,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     for (const each of views) {
       const rest = arrange(each.size.w, each.size.h, specsOf(each.screen, [home]));
       const add = (slot: model.Rect, target: Target): void => {
-        const share = catchOf(slot, each);
-        const place = { x: each.at.x + slot.x, y: each.at.y + slot.y, w: slot.w, h: slot.h };
-        zones.push({ x: place.x + (slot.w * (1 - share)) / 2, y: place.y + (slot.h * (1 - share)) / 2, w: slot.w * share, h: slot.h * share, place, target });
+        zones.push(zoneOf({ x: each.at.x + slot.x, y: each.at.y + slot.y, w: slot.w, h: slot.h }, target, catchOf(slot, each)));
       };
       for (const group of model.groupsOn(desk, each.screen)) {
         const atRest = rest.sections.find((section) => section.group === group.id);
@@ -1480,8 +1469,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    * ones; and never past the place.
    */
   function catchOf(slot: model.Rect, on: ScreenView): number {
-    const least = (number("scale-snap_least") * Math.min(on.size.w, on.size.h)) / Math.min(slot.w, slot.h);
-    return Math.min(1, Math.max(number("scale-snap"), least));
+    return catchShare(slot, number("scale-snap_least") * Math.min(on.size.w, on.size.h));
   }
 
   /**

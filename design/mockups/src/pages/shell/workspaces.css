@@ -47,6 +47,7 @@
   padding: var(--space-s4);
   border-radius: var(--radius-full);
   background: var(--color-surface_container);
+  user-select: none;
 }
 
 .shell-ws-cells {
@@ -73,25 +74,48 @@
   opacity: var(--ws-shown);
 }
 
-/* A borrowed group's tint: each slot draws its piece, reaching past its inner edges, so only the
-   group's two ends round off. */
-.shell-ws-tint {
+/* A slot whose content slides to it from where it stood: its box clips nothing while it does. */
+.shell-ws-slot[data-sliding] {
+  overflow: visible;
+}
+
+/* A borrowed group's tint, and the outline of a group taking a carried workspace: each slot draws
+   its piece, exactly its own box, so pieces never overlap, and only the group's two ends round off.
+   A piece stays in its box while the slot's content slides. */
+.shell-ws-tint,
+.shell-ws-drop {
   position: absolute;
   z-index: 0;
-  top: 0;
-  left: calc(-1 * var(--size-chip) / 2);
-  right: calc(-1 * var(--size-chip) / 2);
+  inset: 0;
+  box-sizing: border-box;
   height: var(--size-chip);
-  border-radius: var(--radius-full);
+}
+
+.shell-ws-tint {
   background: rgb(from var(--color-secondary) r g b / var(--opacity-tint));
 }
 
-.shell-ws-tint[data-head] {
-  left: 0;
+.shell-ws-drop {
+  --drop-line: max(1px, round(nearest, var(--stroke-thin), 1px));
+  border-block: var(--drop-line) solid var(--color-primary);
 }
 
-.shell-ws-tint[data-tail] {
-  right: 0;
+.shell-ws-drop[data-head] {
+  border-inline-start: var(--drop-line) solid var(--color-primary);
+}
+
+.shell-ws-drop[data-tail] {
+  border-inline-end: var(--drop-line) solid var(--color-primary);
+}
+
+:is(.shell-ws-tint, .shell-ws-drop)[data-head] {
+  border-start-start-radius: var(--radius-full);
+  border-end-start-radius: var(--radius-full);
+}
+
+:is(.shell-ws-tint, .shell-ws-drop)[data-tail] {
+  border-start-end-radius: var(--radius-full);
+  border-end-end-radius: var(--radius-full);
 }
 
 .shell-ws-indicator {
@@ -194,33 +218,16 @@
   opacity: var(--opacity-placeholder);
 }
 
-/* The group a carried workspace would join: a `primary` outline round it, each slot drawing its
-   piece as the tint does, so only the group's two ends round off. */
-.shell-ws-drop {
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  left: calc(-1 * var(--size-chip) / 2);
-  right: calc(-1 * var(--size-chip) / 2);
-  box-sizing: border-box;
-  height: var(--size-chip);
-  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary);
-  border-radius: var(--radius-full);
-}
-
-.shell-ws-drop[data-head] {
-  left: 0;
-}
-
-.shell-ws-drop[data-tail] {
-  right: 0;
-}
-
-/* The carried workspace's place while it is away: a dashed circle a cell wide. */
+/* The carried workspace's place while it is away: a dashed circle a cell wide. As wide as its slot,
+   it shrinks whole with it as the slot closes, never cut to a box. */
 .shell-ws-hole {
   position: absolute;
   z-index: 2;
-  inset: 0;
+  --hole: round(nearest, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
+  left: 0;
+  top: round(down, calc((var(--size-chip) - var(--hole)) / 2), 1px);
+  width: var(--hole);
+  height: var(--hole);
   box-sizing: border-box;
   border: max(1px, round(nearest, var(--stroke-thin), 1px)) dashed var(--color-outline);
   border-radius: var(--radius-full);
@@ -276,8 +283,9 @@
   margin-left: var(--menu-x, 0px);
 }
 
-/* A group's name while it is typed over. */
+/* A group's name while it is typed over: the one thing in the pill that can be selected. */
 .shell-ws-name[contenteditable] {
   outline: none;
   cursor: text;
+  user-select: text;
 }

@@ -48,8 +48,8 @@ const GROWS: Move = {
   name: "A workspace grows in",
   what: "A new ghost after the last: its width over `long` on `emphasized_decel`, its opacity on `standard`.",
   tracks: [
-    { part: "its width", on: "workspace 4", target: '.shell-ws-slot[data-key="w4"]', property: "--present", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "its opacity", on: "workspace 4", target: '.shell-ws-slot[data-key="w4"]', property: "--ws-shown", from: 0, to: 1, duration: "long", curve: "standard" },
+    { part: "its width", on: "workspace 4", target: '.shell-ws-slot[data-key="w4@0"]', property: "--present", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "its opacity", on: "workspace 4", target: '.shell-ws-slot[data-key="w4@0"]', property: "--ws-shown", from: 0, to: 1, duration: "long", curve: "standard" },
   ],
   reduced: "same",
   back: "plays",
@@ -91,7 +91,7 @@ export default page<State>({
       rows: [
         { name: "Lifted", for: "4 on its disc, its place a hole", sample: () => workspaces({ groups: LIVE, drag: { id: 4, loose: true } }) },
         { name: "The hole moved", for: "snapped onto 2: 2 and 3 slid over", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }) },
-        { name: "A group taking it", for: "Desk outlined, its hole open", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 1 } } }) },
+        { name: "A group taking it", for: "Desk outlined, its hole open; the home hole stays", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 1 } } }) },
         { name: "Onto a group's ghost", for: "last in Desk", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 2 } } }) },
       ],
     },
