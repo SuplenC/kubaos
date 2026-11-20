@@ -11,7 +11,7 @@ import signDakuten from "../../../../../system/files/plymouth/kubaos/sign-dakute
 import signKu from "../../../../../system/files/plymouth/kubaos/sign-ku@2x.png?url";
 import signKuba from "../../../../../system/files/plymouth/kubaos/sign-kuba@2x.png?url";
 import signOs from "../../../../../system/files/plymouth/kubaos/sign-os@2x.png?url";
-import { durationMs } from "../../lib/tokens.ts";
+import { durationMs, number } from "../../lib/tokens.ts";
 
 /** The tubes' groups in the order they switch on (`kubaos.script`'s GROUP); they go out the other way. */
 export const GROUPS = ["ku", "ba", "dakuten", "kuba", "os"] as const;
@@ -70,18 +70,17 @@ export function neonRoom(lit: number = GROUPS.length, ...under: Element[]): HTML
 }
 
 /**
- * The lit sign's hum, as the splash plays it once every group is on (`kubaos.script`'s HUM_* and
- * BLINK*): the whole sign steps to a new level between `HUM_FLOOR` and full every `micro`, and
- * every loop of three `scene`s and two `short`s バ blinks a `scene` and a `slow` in, through
- * `BLINK`'s levels a third of a `micro` each. The levels and the blink's step have no tokens: they
- * are the splash's own numbers, held here until the tokens name them.
+ * The lit sign's hum, as the splash plays it once every group is on: the whole sign steps to a new
+ * level between `opacity.neon_hum_floor` and full every `micro`, and every loop of three `scene`s
+ * and two `short`s バ blinks a `scene` and a `slow` in, down to `opacity.neon_blink_low`, back, down
+ * to `opacity.neon_blink_half` and back, each step a `neon_blink`.
  */
-export const HUM_FLOOR = 0.97;
-export const BLINK: readonly number[] = [0.35, 1, 0.5, 1];
+const humFloor = () => number("opacity-neon_hum_floor");
+const blinkLevels = () => [number("opacity-neon_blink_low"), 1, number("opacity-neon_blink_half"), 1];
 
 const loopMs = () => 3 * durationMs("scene") + 2 * durationMs("short");
 const blinkAtMs = () => durationMs("scene") + durationMs("slow");
-const blinkStepMs = () => durationMs("micro") / 3;
+const blinkStepMs = () => durationMs("neon_blink");
 
 /**
  * Starts the hum on every sign in `root`, looping until its animations are cancelled: one
@@ -92,12 +91,13 @@ export function hum(root: ParentNode, speed = 1): void {
   const loop = loopMs() / speed;
   const step = durationMs("micro") / speed;
   const steps = Math.round(loop / step);
-  const levels: Keyframe[] = Array.from({ length: steps }, (_, i) => ({ offset: i / steps, easing: "step-end", opacity: HUM_FLOOR + (1 - HUM_FLOOR) * Math.random() }));
+  const floor = humFloor();
+  const levels: Keyframe[] = Array.from({ length: steps }, (_, i) => ({ offset: i / steps, easing: "step-end", opacity: floor + (1 - floor) * Math.random() }));
   const at = blinkAtMs() / speed;
   const each = blinkStepMs() / speed;
   const blink: Keyframe[] = [
     { offset: 0, easing: "step-end", opacity: 1 },
-    ...BLINK.map((level, i) => ({ offset: (at + i * each) / loop, easing: "step-end", opacity: level })),
+    ...blinkLevels().map((level, i) => ({ offset: (at + i * each) / loop, easing: "step-end", opacity: level })),
     { offset: 1, opacity: 1 },
   ];
   for (const sign of root.querySelectorAll<HTMLElement>(SIGN)) {

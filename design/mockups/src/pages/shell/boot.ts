@@ -42,8 +42,8 @@ const twoMenus = whole(() => screens(named(LAPTOP, screen({ scene: "menu", displ
 
 /** バ's blink as the recipe shows it: down at its cue, back a `micro` later. */
 const BLINKS = [
-  { part: "バ's blink", on: "the boot screen", target: ".neon-sign-ba", property: "opacity", from: 1, to: 0.35, duration: "instant", curve: "standard", cue: ["scene", "slow"] },
-  { part: "バ's blink", on: "the boot screen", target: ".neon-sign-ba", property: "opacity", from: 0.35, to: 1, duration: "instant", curve: "standard", cue: ["scene", "slow", "micro"] },
+  { part: "バ's blink", on: "the boot screen", target: ".neon-sign-ba", property: "opacity", from: 1, to: { opacity: "neon_blink_low" }, duration: "instant", curve: "standard", cue: ["scene", "slow"] },
+  { part: "バ's blink", on: "the boot screen", target: ".neon-sign-ba", property: "opacity", from: { opacity: "neon_blink_low" }, to: 1, duration: "instant", curve: "standard", cue: ["scene", "slow", "micro"] },
 ] as const;
 
 const POWERED = () => {
