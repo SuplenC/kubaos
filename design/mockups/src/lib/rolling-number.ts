@@ -146,6 +146,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
       if (reduced) {
         old?.remove();
         if (fresh) box.append(fresh);
+        else box.remove();
         return;
       }
       box.style.setProperty("--way", String(way));
@@ -155,15 +156,13 @@ export function rollingNumber(options: RollingOptions): Rolling {
         box.append(fresh);
       }
       const roll = box.animate([{ "--roll": 0 }, { "--roll": 1 }], { duration: ms("short"), easing: raw("easing-standard") });
+      // A slot the count shed goes once its figure has rolled away, on the roll's own end.
       roll.finished.then(() => {
         old?.remove();
         if (fresh) delete fresh.dataset.in;
+        else if (!box.querySelector(".k-roll-figure:not([data-out])")) box.remove();
       }, () => {});
     });
-    // A slot the count shed goes once its figure has rolled away; the box keeps its width.
-    const shed = width - words.length;
-    if (shed > 0) setTimeout(() => slots.slice(0, shed).forEach((box) => box.childElementCount === 0 && box.remove()), reduced ? 0 : ms("short"));
-    if (reduced) slots.slice(0, shed).forEach((box) => box.remove());
     value = next;
     shown = words;
     element.setAttribute("aria-label", shown);

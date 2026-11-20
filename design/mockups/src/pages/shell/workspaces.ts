@@ -429,7 +429,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     }
     const value = slotOf(entry.workspace);
     const from = was ?? value;
-    const rolling = rollingNumber({ value: from, widest: String(Math.max(from, value)).replace(/\d/g, "0"), style, color, centre });
+    // One figure at least: the number's box is its figures', so a cell centres a 10 as it does a 1.
+    const rolling = rollingNumber({ value: from, widest: "0", style, color, centre });
     number.append(rolling.element);
     rolling.set(value);
     return number;

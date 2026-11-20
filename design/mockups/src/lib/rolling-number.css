@@ -13,7 +13,10 @@
   flex: none;
   justify-content: flex-end;
   --slot: round(up, calc(var(--figure) * var(--px) - 0.001px), 1px);
-  width: calc(var(--slots) * var(--slot) + var(--marks, 0px));
+  /* As wide as its slots, never under its widest value's: a value wider than that widens it, so its
+     figures are always inside it and an owner centres it by layout. */
+  width: max-content;
+  min-width: calc(var(--slots) * var(--slot) + var(--marks, 0px));
   height: var(--t-line);
 }
 
