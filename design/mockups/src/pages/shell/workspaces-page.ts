@@ -3,10 +3,11 @@
 // carried to another place, and the right-click menu.
 
 import type { Words } from "../../lib/content.ts";
+import { lights, powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { type Group, SHOTS_GROUPS, workspaces } from "./workspaces.ts";
 
-type State = "rest" | "hovered";
+type State = "rest" | "lit";
 
 const ONE: readonly Group[] = [{ block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: true }] }];
 const GROWN: readonly Group[] = [{ block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: true }, { id: 4, occupied: false }] }];
@@ -46,27 +47,16 @@ function stretch(name: string, what: string, from: number, to: number): Move {
 
 const GROWS: Move = {
   name: "A workspace grows in",
-  what: "A new ghost after the last: its width over `long` on `emphasized_decel`, its opacity on `standard`.",
+  what: "Added by `+`, before it: its width over `long` on `emphasized_decel`, its opacity on `standard`.",
   tracks: [
     { part: "its width", on: "workspace 4", target: '.shell-ws-slot[data-key="w4@0"]', property: "--present", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "its opacity", on: "workspace 4", target: '.shell-ws-slot[data-key="w4@0"]', property: "--ws-shown", from: 0, to: 1, duration: "long", curve: "standard" },
   ],
   reduced: "same",
   back: "plays",
-  sample: () => workspaces({ groups: GROWN, active: 3 }),
+  sample: () => workspaces({ groups: GROWN, active: 4 }),
 };
 
-const GHOST: Move = {
-  name: "A ghost turns into a workspace",
-  what: "Shown or given a window: its number fades in and the `add` out, over `short` on `standard`.",
-  tracks: [
-    { part: "its number", on: "the ghost", target: ".shell-ws-cell[data-ghost] > .shell-ws-number", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: "its add", on: "the ghost", target: ".shell-ws-cell[data-ghost] > .shell-ws-ghost", property: "opacity", from: { opacity: "placeholder" }, to: 0, duration: "short", curve: "standard" },
-  ],
-  reduced: "same",
-  back: "plays",
-  sample: () => workspaces(),
-};
 
 const NAME: Words = { short: "TV", long: "Living room" };
 
@@ -105,9 +95,8 @@ export default page<State>({
     },
   ],
   states: {
-    shown: ["rest", "hovered"],
+    shown: ["rest", "lit"],
     absent: {
-      lit: "no keyboard focus: the bar is never a Tab stop",
       pressed: "a click shows the workspace; nothing stays pressed",
       disabled: "always there",
       selected: "the shown workspace: the indicator, in every row",
@@ -116,15 +105,19 @@ export default page<State>({
       error: "nothing it can fail at",
     },
     rows: nonEmpty([
-      { name: "Numbers", cell: (state: State) => workspaces(state === "hovered" ? { pinned: "hover" } : {}) },
-      { name: "Kanji", cell: (state: State) => workspaces({ kanji: true, ...(state === "hovered" ? { pinned: "hover" as const } : {}) }) },
+      { name: "Numbers", cell: (state: State) => workspaces(state === "lit" ? { pinned: "lit" } : {}) },
+      { name: "Kanji", cell: (state: State) => workspaces({ kanji: true, ...(state === "lit" ? { pinned: "lit" as const } : {}) }) },
     ]),
     looks: {
       rest: "`surface_container`; shown `on_primary` on `primary`; with windows `on_surface`",
-      hovered: "the cell under the pointer: a `surface_container_high` circle",
+      lit: "pointer: the pill's tube and glow",
     },
   },
-  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
+  focus: {
+    tubes: [{ name: "The pill", tone: "accent", filled: false, content: false }],
+    looks: { lit: "the tube inside the pill's edge, the glow outside", signsOff: "the tube as glass, no glow" },
+    signsOff: (index: number) => workspaces({ kanji: index === 1, pinned: "signs-off" }),
+  },
   content: {
     text: [{ name: "A group's name", words: NAME, sample: (words: string) => workspaces({ groups: [SHOTS_GROUPS[0]!, { ...SHOTS_GROUPS[1]!, name: words }] }) }],
     missingPicture: doesntApply("numbers and one symbol, `add`, always there."),
@@ -136,12 +129,12 @@ export default page<State>({
   },
   motion: {
     arrives: [GROWS],
-    leaves: doesntApply("an empty workspace left shrinks out: Arriving's move, played back."),
+    leaves: doesntApply("a deleted workspace shrinks out: Arriving's move, played back."),
     between: [
       stretch("To the right", "The leading edge over `medium`, the trailing one over `long`, both `emphasized_decel`.", 0, 2),
       stretch("To the left", "The same stretch, mirrored: the left edge leads.", 2, 0),
-      GHOST,
-      { name: "Hovered", what: "The pointer onto a cell: its circle fades in over `short`.", tracks: [{ part: "the circle", on: "the cell under the pointer", target: ".shell-ws-cell[data-pointer]", property: "--cell-hover", from: 0, to: 1, duration: "short", curve: "standard" }], reduced: "same", back: "plays", sample: () => workspaces() },
+      { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(".shell-ws", "the pill", 0, 1), reduced: "same", back: "plays", sample: () => workspaces() },
+      ...powerMoves(() => workspaces({ pinned: "lit" })),
     ],
   },
   keyboard: {

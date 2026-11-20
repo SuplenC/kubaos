@@ -12,6 +12,10 @@
 // A mark sits in a slot as wide as its own advance, rounded up to a whole device pixel, and never
 // rolls; the box is as wide as the widest value's figures and marks, so a clock that grows an hour
 // keeps its place.
+//
+// Its figures are centred for every figure's mass in their own style, unless an owner sets them on
+// a baseline of its own (`centre`): the bar's workspaces centre each number for one figure in one
+// style, whatever style a number is drawn in, so the pill's numbers share one baseline.
 
 import "./rolling-number.css";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
@@ -30,6 +34,8 @@ export interface RollingOptions {
   readonly format?: (value: number) => string;
   readonly style?: TypeStyle;
   readonly color?: string;
+  /** The words and style every figure is centred for, when not every figure in its own style. */
+  readonly centre?: { readonly style: TypeStyle; readonly words: string };
 }
 
 export interface Rolling {
@@ -47,11 +53,17 @@ function ms(name: string): number {
   return durationMs(name) / settings().speed;
 }
 
-/** One figure in its slot's ink, centred for every figure's mass. */
-function figure(char: string, style: TypeStyle, color: string): HTMLElement {
+/** What a figure is centred for: `words` in `style`. */
+interface Centre {
+  readonly style: TypeStyle;
+  readonly words: string;
+}
+
+/** One figure in its slot's ink, centred for `centre`'s mass, every figure's in its own style without one. */
+function figure(char: string, style: TypeStyle, color: string, centre?: Centre): HTMLElement {
   const made = text(char, style, color);
   made.classList.add("k-roll-figure");
-  centreFor(made, style, FIGURES);
+  centreFor(made, centre?.style ?? style, centre?.words ?? FIGURES);
   return made;
 }
 
@@ -75,11 +87,11 @@ function shape(box: HTMLElement, char: string, style: TypeStyle): void {
 }
 
 /** A slot one figure wide, holding `char`, or nothing for a figure the count hasn't got; a mark's as wide as it. */
-function slot(char: string, style: TypeStyle, color: string): HTMLElement {
+function slot(char: string, style: TypeStyle, color: string, centre?: Centre): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-roll-slot";
   shape(box, char, style);
-  if (char.trim()) box.append(isMark(char) ? markText(char, style, color) : figure(char, style, color));
+  if (char.trim()) box.append(isMark(char) ? markText(char, style, color) : figure(char, style, color, centre));
   return box;
 }
 
@@ -94,6 +106,7 @@ function slotsOf(element: HTMLElement): HTMLElement[] {
 export function rollingNumber(options: RollingOptions): Rolling {
   const style = options.style ?? "mono_large";
   const color = options.color ?? "on_surface";
+  const centre = options.centre;
   const element = document.createElement("span");
   element.className = "k-rolling";
   element.setAttribute("role", "status");
@@ -105,7 +118,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
   element.style.setProperty("--t-line", `var(--type-${style}-line)`);
   let value = options.value;
   let shown = format(value);
-  element.append(...[...shown].map((char) => slot(char, style, color)));
+  element.append(...[...shown].map((char) => slot(char, style, color, centre)));
   element.setAttribute("aria-label", shown);
 
   function set(next: number): void {
@@ -114,7 +127,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
     const words = format(next);
     const width = Math.max(words.length, shown.length);
     const [was, now] = [shown.padStart(width, " "), words.padStart(width, " ")];
-    while (slotsOf(element).length < width) element.prepend(slot("", style, color));
+    while (slotsOf(element).length < width) element.prepend(slot("", style, color, centre));
     const slots = slotsOf(element);
     const reduced = settings().reduced;
     slots.forEach((box, index) => {
@@ -125,11 +138,11 @@ export function rollingNumber(options: RollingOptions): Rolling {
       // takes its new width at once.
       if (isMark(char) || isMark(was[index]!) || box.hasAttribute("data-mark")) {
         shape(box, char, style);
-        box.replaceChildren(...(char ? [isMark(char) ? markText(char, style, color) : figure(char, style, color)] : []));
+        box.replaceChildren(...(char ? [isMark(char) ? markText(char, style, color) : figure(char, style, color, centre)] : []));
         return;
       }
       const old = box.querySelector<HTMLElement>(".k-roll-figure");
-      const fresh = char ? figure(char, style, color) : null;
+      const fresh = char ? figure(char, style, color, centre) : null;
       if (reduced) {
         old?.remove();
         if (fresh) box.append(fresh);

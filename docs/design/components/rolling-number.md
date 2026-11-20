@@ -10,6 +10,8 @@ A count that rolls as it changes, as an odometer does: a counter's value beside 
 
 A number can be written with marks between its figures (`format` in the mockups): a clock's colons, a minus before the time left. A mark sits in a slot as wide as its own advance, rounded up to a whole device pixel, and never rolls; the box is as wide as the widest value's figures and marks, so a clock that grows an hour keeps its place. The media player's times are clocks. *Not built yet: neither library writes marks; only the mockups do.*
 
+Its figures are centred for the mass of every figure in its own style. A number set among others on one baseline is centred for theirs instead (`centre` in the mockups: a style and the words to weigh): the bar's workspace numbers are each centred for a 0 in `button_small`, whether drawn in `button_small` or `label`, so they stand on one baseline. *Not built yet: neither library takes a centre; only the mockups do.*
+
 It isn't a control: it takes no pointer and no focus, and has no disabled, selected, loading or error state. A count that is nothing shows 0.
 
 **Motion.** Only the figures that change roll, the leaving and arriving figure moving together over `short` on `standard`. Going up, the new figure comes in from below as the old one leaves upward; going down, from above as the old one leaves downward. Within its widest value, a figure the count grows comes in from nothing, and one it sheds leaves into nothing. Its first value shows in place. Reduce motion changes the figures in place.

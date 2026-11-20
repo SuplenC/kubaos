@@ -4,16 +4,19 @@
 // windows or shown, medium (`label`) empty, or its kanji in `accent`. Groups come in block order, a
 // hairline `size.chip` / 2 tall in `outline_variant` in a `space.s12` gap between them. A group
 // waiting from a desk position no screen holds is borrowed: a `secondary` tint at `opacity.tint`
-// round it, its name first in `label`, `secondary`. Each group keeps an empty workspace after its
-// last with windows, a ghost: a faint `add` in `outline` at `opacity.placeholder`.
+// round it, its name first in `label`, `secondary`. A group's workspaces are numbered from 1 with no
+// gap, and a group with fewer than ten ends in its `+`, a ghost: a faint `add` in `outline` at
+// `opacity.placeholder`. Clicking it adds a workspace at the next number and shows it; it stays,
+// empty, until it is deleted.
 //
 // The shown workspace sits on the indicator, `primary` at the full radius, between the tints and
 // the cells. Every change of shape glides: an entry grows in or shrinks out, its width over `long`
 // on `emphasized_decel`, its opacity over `long` on `standard`. A new shown workspace stretches the
 // indicator: its leading edge over `medium`, its trailing edge over `long`, both on
-// `emphasized_decel`. A number's colour and the ghost's fade over `short` on `standard`.
+// `emphasized_decel`. A number that changes rolls, as the Overview's do (`lib/rolling-number.ts`):
+// the same windows drawn at another number, a drop, a delete shifting the later ones down.
 //
-// A workspace with windows can be carried to another place. Pressed and moved `space.s8`, it lifts
+// A workspace, empty or not, can be carried to another place; a `+` cannot. Pressed and moved `space.s8`, it lifts
 // onto a disc raised to step 1 that eases onto the pointer over `short` on `standard`, its place
 // left as a hole, a dashed circle in `outline`; nothing else moves. The disc is in the top layer, so
 // nothing cuts it. The numbers are the places and stay; the windows move. While it is carried there
@@ -48,6 +51,7 @@ import { withHint } from "../../lib/hint.ts";
 import { catchShare, caught, type Rect, type Zone, zoneOf } from "../../lib/magnet.ts";
 import { type MenuEntry, type MenuItemSpec, menu } from "../../lib/menu.ts";
 import { probe } from "../../lib/probe.ts";
+import { rollingNumber } from "../../lib/rolling-number.ts";
 import { advance, centreFor, text, type TypeStyle } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { cubic, durationMs, length } from "../../lib/tokens.ts";
@@ -92,14 +96,17 @@ export interface WorkspacesOptions {
   /** The shown workspace's id. */
   readonly active?: number;
   readonly kanji?: boolean;
-  /** Clicks and the wheel move the shown workspace, a ghost turning into a workspace; a drag reorders, a right click opens the menu. */
+  /** Clicks and the wheel move the shown workspace, a group's `+` adds one; a drag reorders, a right click opens the menu. */
   readonly live?: boolean;
   readonly pinned?: Pinned;
   readonly drag?: DragPin;
   readonly menu?: MenuPin;
 }
 
-/** The shots' stand-ins: 1 with a window, 2 shown with one, 3 the ghost; Desk's 11 with a window, 12 its ghost. */
+/**
+ * The shots' stand-ins: 1 with a window, 2 shown with one, 3 the ghost; Desk's 11 with a window, 12
+ * its ghost. A group's last workspace, empty and not shown, is read as the group's ghost, its `+`.
+ */
 export const SHOTS_GROUPS: readonly Group[] = [
   { block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: false }] },
   { block: 1, borrowed: true, name: "Desk", spaces: [{ id: 11, occupied: true }, { id: 12, occupied: false }] },
@@ -110,7 +117,10 @@ const SCREENS = ["Laptop", "External 1"];
 
 const KANJI = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
 
-/** A workspace in the model: its id, and its windows as `key`, which stays with them as they move. */
+/**
+ * A workspace in the model: its id, and its windows as `key`, which stays with them as they move. A
+ * group's workspaces are numbered from its block's first, one after the other, with no gap.
+ */
 interface Place {
   readonly id: number;
   readonly key: string;
@@ -121,8 +131,12 @@ interface Band {
   readonly block: number;
   readonly borrowed: boolean;
   readonly name: string;
+  /** Its workspaces, every one a real one: its `+` is drawn after them, not kept among them. */
   readonly spaces: readonly Place[];
 }
+
+/** The most workspaces a group holds: a block's ten. */
+const MOST = 10;
 
 type Kind = "cell" | "ghost" | "hole" | "gap" | "label";
 
@@ -131,7 +145,7 @@ interface Entry {
   readonly kind: Kind;
   readonly block: number;
   readonly workspace: number;
-  /** The windows' key of a cell, a ghost or a hole; the group's first for its name. */
+  /** The windows' key of a cell or a hole; the group's first for its name; the group's `+` key for its ghost. */
   readonly space: string;
   readonly borrowed: boolean;
   readonly head: boolean;
@@ -160,27 +174,32 @@ function numberStyle(strong: boolean, kanji: boolean): TypeStyle {
   return strong ? "button_small" : "label";
 }
 
-/** Whether `space`, at `at` of `spaces`, is drawn as its group's ghost. */
-function isGhost(spaces: readonly Place[], at: number, active: string): boolean {
-  const space = spaces[at]!;
-  return at === spaces.length - 1 && at > 0 && space.key !== active && !space.occupied;
+/** The key of group `block`'s `+`. */
+function plusKey(block: number): string {
+  return `plus@${block}`;
 }
 
-/** What the pill draws, in order, as `Workspaces.qml`'s `entries`; `held`'s cell as its hole. */
-function entriesOf(bands: readonly Band[], active: string, held: string | null, taking: number | null): Entry[] {
+/**
+ * What the pill draws, in order, as `Workspaces.qml`'s `entries`; `held`'s cell as its hole. A group
+ * with room ends in its `+`, unless `plus` says otherwise: while a workspace is carried, a group
+ * keeps or lacks its `+` as it did at the lift, so the pill keeps its width.
+ */
+function entriesOf(bands: readonly Band[], held: string | null, taking: number | null, plus: (band: Band) => boolean = (band) => band.spaces.length < MOST): Entry[] {
   const result: Entry[] = [];
   const blank = { workspace: 0, space: "", borrowed: false, head: false, tail: false, label: "", occupied: false, taking: false };
   bands.forEach((band, index) => {
     const name = band.borrowed ? band.name : "";
     const takes = band.block === taking;
+    const ends = plus(band);
+    const first = band.block * 10 + 1;
     if (index > 0) result.push({ ...blank, key: `gap${band.block}`, kind: "gap", block: band.block });
-    if (name !== "") result.push({ ...blank, key: `label${band.block}`, kind: "label", block: band.block, workspace: band.spaces[0]!.id, space: band.spaces[0]!.key, borrowed: true, head: true, label: name, taking: takes });
+    if (name !== "") result.push({ ...blank, key: `label${band.block}`, kind: "label", block: band.block, workspace: first, space: band.spaces[0]?.key ?? "", borrowed: true, head: true, label: name, taking: takes });
     band.spaces.forEach((space, at) => {
-      const kind: Kind = space.key === held ? "hole" : isGhost(band.spaces, at, active) ? "ghost" : "cell";
       // A slot's key is its windows' in its group: carried to another group, it leaves one and
       // grows in the other, never sliding across the rule with the tint it is drawn on.
-      result.push({ key: `${space.key}@${band.block}`, kind, block: band.block, workspace: space.id, space: space.key, borrowed: band.borrowed, head: at === 0 && name === "", tail: at === band.spaces.length - 1, label: "", occupied: space.occupied, taking: takes });
+      result.push({ key: `${space.key}@${band.block}`, kind: space.key === held ? "hole" : "cell", block: band.block, workspace: space.id, space: space.key, borrowed: band.borrowed, head: at === 0 && name === "", tail: at === band.spaces.length - 1 && !ends, label: "", occupied: space.occupied, taking: takes });
     });
+    if (ends) result.push({ key: plusKey(band.block), kind: "ghost", block: band.block, workspace: first + band.spaces.length, space: plusKey(band.block), borrowed: band.borrowed, head: band.spaces.length === 0 && name === "", tail: true, label: "", occupied: false, taking: takes });
   });
   return result;
 }
@@ -219,17 +238,9 @@ function easing(name: string): string {
   return `cubic-bezier(${cubic(`easing-${name}`).join(", ")})`;
 }
 
-/** The ids `count` places of a group take: its own in order, then each one past the last. */
-function idsFor(own: readonly number[], count: number): number[] {
-  const ids = own.slice(0, count);
-  while (ids.length < count) ids.push((ids.at(-1) ?? 0) + 1);
-  return ids;
-}
-
-/** `list` on `band`'s places in order: windows moving onto the ids, the later ones shifting over. */
+/** `list` in `band`'s places in order, numbered from its block's first: windows moving onto the numbers, the later ones shifting over. */
 function renumber(band: Band, list: readonly Place[]): Place[] {
-  const ids = idsFor(band.spaces.map((space) => space.id), list.length);
-  return list.map((space, at) => ({ ...space, id: ids[at]! }));
+  return list.map((space, at) => ({ ...space, id: band.block * 10 + at + 1 }));
 }
 
 /** Where a carried workspace's hole stands, by its group's block and its place there. */
@@ -245,13 +256,14 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   const kanji = options.kanji ?? false;
   let mint = 0;
   const fresh = () => `n${mint++}`;
-  let bands: Band[] = (options.groups ?? SHOTS_GROUPS).map((group) => ({
-    block: group.block,
-    borrowed: group.borrowed ?? false,
-    name: group.name ?? "",
-    spaces: group.spaces.map((space) => ({ id: space.id, key: `w${space.id}`, occupied: space.occupied })),
-  }));
   let active = `w${options.active ?? 2}`;
+  let bands: Band[] = (options.groups ?? SHOTS_GROUPS).map((group) => {
+    const spaces = group.spaces.map((space) => ({ id: space.id, key: `w${space.id}`, occupied: space.occupied }));
+    const last = spaces.at(-1);
+    // A group's last workspace, empty and not shown, stands for its `+`, which is drawn, not kept.
+    if (last && spaces.length > 1 && !last.occupied && last.key !== active) spaces.pop();
+    return { block: group.block, borrowed: group.borrowed ?? false, name: group.name ?? "", spaces };
+  });
   const element = document.createElement("span");
   element.className = "shell-ws k-control";
   element.dataset.hot = "";
@@ -275,32 +287,29 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    * hole stands, whether the disc is snapped onto it, and where the disc is held when it is drawn
    * at a place of the pill's rather than at the hand.
    */
-  let carry: { key: string; from: Band[]; home: Landing; landing: Landing; snapped: boolean; disc: HTMLElement; landed: boolean; anchor: (() => Point) | null } | null = null;
+  let carry: { key: string; from: Band[]; home: Landing; landing: Landing; snapped: boolean; disc: HTMLElement; landed: boolean; anchor: (() => Point) | null; number: number } | null = null;
   /** The group whose name is being typed over, by block. */
   let renaming: number | null = null;
   let entries: Entry[] = [];
 
   function entriesNow(): Entry[] {
     const taking = carry && carry.landing.block !== carry.home.block ? carry.landing.block : null;
-    return entriesOf(bands, active, carry?.key ?? null, taking);
+    return entriesOf(bands, carry?.key ?? null, taking, carry ? plusAtLift(carry.from) : undefined);
   }
 
-  /** Keeps one ghost after a group's last workspace with windows or shown, the empty ones after that going. */
-  function settle(list: readonly Place[]): Place[] {
-    const real = [...list];
-    const dropped: Place[] = [];
-    while (real.length > 0 && !real.at(-1)!.occupied && real.at(-1)!.key !== active) dropped.push(real.pop()!);
-    if (real.length === 0) return [list[0]!];
-    const last = real.at(-1)!;
-    if (real.length >= 10 || slotOf(last.id) >= 10) return real;
-    const ghost = dropped.at(0);
-    const id = ghost && ghost.id > last.id ? ghost.id : last.id + 1;
-    return [...real, { id, key: ghost?.key ?? fresh(), occupied: false }];
+  /** Whether a group ends in its `+` while a workspace is carried: as it did at the lift. */
+  function plusAtLift(from: readonly Band[]): (band: Band) => boolean {
+    return (band) => (from.find((each) => each.block === band.block)?.spaces.length ?? 0) < MOST;
+  }
+
+  /** A group left with no workspace keeps an empty one: a group always has its first. */
+  function kept(band: Band, list: readonly Place[]): Place[] {
+    return renumber(band, list.length > 0 ? list : [{ id: 0, key: fresh(), occupied: false }]);
   }
 
   /** The groups with `key`'s windows taken from their place, the later ones shifting down. */
   function without(from: readonly Band[], key: string): Band[] {
-    return from.map((band) => (band.spaces.some((space) => space.key === key) ? { ...band, spaces: settle(renumber(band, band.spaces.filter((space) => space.key !== key))) } : band));
+    return from.map((band) => (band.spaces.some((space) => space.key === key) ? { ...band, spaces: kept(band, band.spaces.filter((space) => space.key !== key)) } : band));
   }
 
   /** The groups with `key`'s windows carried to `landing`, the ones between shifting over by one. */
@@ -308,11 +317,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (!landing) return [...from];
     const moving = from.flatMap((band) => band.spaces).find((space) => space.key === key);
     if (!moving) return [...from];
-    return without(from, key).map((band) => {
-      if (band.block !== landing.block) return band;
-      const list = [...band.spaces];
-      list.splice(Math.min(landing.index, list.length), 0, moving);
-      return { ...band, spaces: settle(renumber(band, list)) };
+    const source = from.find((band) => band.spaces.includes(moving))!;
+    return from.map((band) => {
+      const list = band.spaces.filter((space) => space.key !== key);
+      if (band.block === landing.block) list.splice(Math.min(landing.index, list.length), 0, moving);
+      return band === source || band.block === landing.block ? { ...band, spaces: kept(band, list) } : band;
     });
   }
 
@@ -334,8 +343,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (options.live && !carry && renaming === null) show(key);
   };
 
-  /** One entry's slot: its piece of the tint and the drop outline behind, and its content. */
-  function slot(entry: Entry): HTMLElement {
+  /**
+   * One entry's slot: its piece of the tint and the drop outline behind, and its content. A cell's
+   * number that stood at `was` for the same windows rolls from it to its own.
+   */
+  function slot(entry: Entry, was?: number): HTMLElement {
     const box = document.createElement("span");
     box.className = "shell-ws-slot";
     box.dataset.key = entry.key;
@@ -377,23 +389,52 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       const hole = document.createElement("span");
       hole.className = "shell-ws-hole";
       box.append(hole);
+      // The hole keeps the number the carried windows had, which the cell landing there rolls from.
+      if (carry) box.dataset.number = String(slotOf(carry.number));
       return box;
     }
-    const shown = entry.space === active;
     const cell = document.createElement("span");
     cell.className = "shell-ws-cell";
     cell.toggleAttribute("data-ghost", entry.kind === "ghost");
-    const number = text(numberText(entry.workspace, kanji), numberStyle(shown || entry.occupied, kanji), shown ? "on_primary" : entry.occupied ? "on_surface" : "on_surface_variant");
-    number.classList.add("shell-ws-number");
-    // Every cell centres on the same figure, not its own: a "1" and a "2" weigh differently, and
-    // each centred on its own ink would put the pill's numbers on different baselines.
-    centreFor(number, numberStyle(true, kanji), kanji ? KANJI[KANJI.length - 1]! : "0");
-    const plus = icon("add", "var(--icon-s16)", "var(--color-outline)");
-    plus.classList.add("shell-ws-ghost");
-    cell.append(number, plus);
+    if (entry.kind === "ghost") {
+      const plus = icon("add", "var(--icon-s16)", "var(--color-outline)");
+      plus.classList.add("shell-ws-ghost");
+      cell.append(plus);
+    } else {
+      cell.append(numberOf(entry, was));
+      box.dataset.number = String(slotOf(entry.workspace));
+    }
     cell.addEventListener("click", () => choose(entry.space));
     box.append(cell);
     return box;
+  }
+
+  /**
+   * A cell's number, rolling from `was` when it stood at another for the same windows, as the
+   * Overview's numbers do; a kanji is set in place.
+   */
+  function numberOf(entry: Entry, was?: number): HTMLElement {
+    const shown = entry.space === active;
+    const style = numberStyle(shown || entry.occupied, kanji);
+    const color = shown ? "on_primary" : entry.occupied ? "on_surface" : "on_surface_variant";
+    const number = document.createElement("span");
+    number.className = "shell-ws-number";
+    number.dataset.look = `${style} ${color}`;
+    // Every cell centres on the same figure, not its own: a "1" and a "2" weigh differently, and
+    // each centred on its own ink would put the pill's numbers on different baselines.
+    const centre = { style: numberStyle(true, kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
+    if (kanji) {
+      const glyph = text(numberText(entry.workspace, kanji), style, color);
+      centreFor(glyph, centre.style, centre.words);
+      number.append(glyph);
+      return number;
+    }
+    const value = slotOf(entry.workspace);
+    const from = was ?? value;
+    const rolling = rollingNumber({ value: from, widest: String(Math.max(from, value)).replace(/\d/g, "0"), style, color, centre });
+    number.append(rolling.element);
+    rolling.set(value);
+    return number;
   }
 
   /** Where the cell (or hole) of `key` starts among `entries`, in cells, or -1. */
@@ -409,7 +450,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   /** Draws the entries at once, nothing moving. */
   function draw(): void {
     entries = entriesNow();
-    content.replaceChildren(...entries.map(slot));
+    content.replaceChildren(...entries.map((entry) => slot(entry)));
     const at = cellsTo(active);
     indicator.style.setProperty("--ws-start", String(away ? at + 0.5 : at));
     indicator.style.setProperty("--ws-end", String(away ? at + 0.5 : at + 1));
@@ -484,17 +525,23 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     const old = new Map(children.filter((child) => !child.hasAttribute("data-gone")).map((child) => [child.dataset.key!, child]));
     const was = new Map([...old].map(([key, child]) => [key, drawnLeft(child)]));
     const at = new Map(children.map((child, index) => [child, index]));
+    // The numbers the windows stood at, wherever they were drawn: a number that changes rolls.
+    const numbers = new Map(children.filter((child) => child.dataset.number && !child.hasAttribute("data-gone")).map((child) => [child.dataset.key!.split("@")[0]!, Number(child.dataset.number)]));
     entries = entriesNow();
     const wanted = new Set(entries.map((entry) => entry.key));
     const next: HTMLElement[] = [];
     const kept: [string, HTMLElement][] = [];
     for (const entry of entries) {
-      const made = slot(entry);
+      const made = slot(entry, numbers.get(entry.space));
       const stays = old.get(entry.key);
       if (stays) {
         old.delete(entry.key);
         kept.push([entry.key, made]);
         carryOn(stays, made);
+        // A number standing as it was keeps its element, so a roll still running runs on.
+        const before = stays.querySelector<HTMLElement>(".shell-ws-number");
+        const now = made.querySelector<HTMLElement>(".shell-ws-number");
+        if (before && now && before.dataset.look === now.dataset.look && numbers.get(entry.space) === slotOf(entry.workspace)) now.replaceWith(before);
       } else {
         const back = going.get(entry.key);
         going.delete(entry.key);
@@ -588,12 +635,19 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     indicator.animate([{ "--ws-end": target + 0.5 }, { "--ws-end": target + 1 }], timing);
   }
 
-  /** Shows the workspace of `key`: a ghost becomes a workspace and its group keeps a new ghost after it; an empty one left goes. */
+  /**
+   * Shows the workspace of `key`. A group's `+` adds a workspace after its last, at the next number,
+   * and shows it; it stays, empty, until it is deleted.
+   */
   function show(key: string): void {
     if (key === active) return;
-    const leaving = active;
-    active = key;
-    bands = bands.map((band) => ({ ...band, spaces: settle(band.spaces.filter((space, at) => space.occupied || space.key !== leaving || at === band.spaces.length - 1)) }));
+    const adding = bands.find((band) => plusKey(band.block) === key);
+    if (adding) {
+      if (adding.spaces.length >= MOST) return;
+      const made = { id: 0, key: fresh(), occupied: false };
+      bands = bands.map((band) => (band === adding ? { ...band, spaces: renumber(band, [...band.spaces, made]) } : band));
+      active = made.key;
+    } else active = key;
     render(false);
     indicate("medium", "long", "emphasized_decel");
   }
@@ -656,13 +710,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (zoneCache?.key === held.key && zoneCache.from === held.from) return zoneCache.zones;
     const result: Zone<Landing>[] = [];
     for (const band of held.from) {
-      const others = band.spaces.filter((space) => space.key !== held.key);
-      const ghosted = others.length > 1 && isGhost(others, others.length - 1, active);
-      const room = others.length - (ghosted ? 1 : 0);
-      if (band.block !== held.home.block && room >= 10) continue;
+      const room = band.spaces.filter((space) => space.key !== held.key).length;
+      if (band.block !== held.home.block && room >= MOST) continue;
       for (let index = 0; index <= room; index++) {
         const landing = { block: band.block, index };
-        const layout = slotsOf(entriesOf(carried(held.from, held.key, landing), active, held.key, null));
+        const layout = slotsOf(entriesOf(carried(held.from, held.key, landing), held.key, null, plusAtLift(held.from)));
         const hole = layout.find(({ entry }) => entry.kind === "hole")!;
         result.push(zoneOf(hole.box, landing, catchShare(hole.box)));
         const ghost = index === room ? layout.find(({ entry }) => entry.kind === "ghost" && entry.block === band.block) : undefined;
@@ -726,7 +778,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    */
   function lift(key: string, pointer: Point | null, landing: Landing | null = null): void {
     const home = landingOf(bands, key)!;
-    carry = { key, from: bands, home, landing: home, snapped: false, disc: makeDisc(bands.flatMap((band) => band.spaces).find((each) => each.key === key)!.id), landed: false, anchor: null };
+    const number = bands.flatMap((band) => band.spaces).find((each) => each.key === key)!.id;
+    carry = { key, from: bands, home, landing: home, snapped: false, disc: makeDisc(number), landed: false, anchor: null, number };
     zoneCache = null;
     element.dataset.carrying = "";
     // The shown workspace carried, its place is a hole like any other's: the indicator leaves it.
@@ -785,7 +838,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     const held = carry;
     held.landed = true;
     const flight = discTo(held.disc, holeCentre(), { duration: "medium", curve: "emphasized_decel" });
-    // Landed, the move is made, and the groups tidy their ghosts again.
+    // Landed, the move is made: the cell there rolls from the number the disc carried to its own.
     const done = () => {
       if (carry !== held) return;
       held.disc.remove();
@@ -824,11 +877,6 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return band.name || `Group ${band.block + 1}`;
   }
 
-  /** The workspaces a group has, its ghost aside. */
-  function realOf(band: Band): Place[] {
-    return band.spaces.filter((_, at) => !isGhost(band.spaces, at, active));
-  }
-
   /** A menu's entry, with what taking it does. */
   type Row = "separator" | { readonly heading: string } | { readonly spec: MenuItemSpec; readonly act: () => void };
 
@@ -847,7 +895,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       const space = band.spaces.find((each) => each.key === key)!;
       rows.push(
         { heading: `Workspace ${slotOf(space.id)}` },
-        { spec: { label: "Move to group", submenu: true, disabled: others.length === 0 }, act: () => sub(others.map((each) => ({ spec: { label: groupName(each), variable: true, disabled: realOf(each).length >= 10 }, act: () => change(placed(bands, key, { block: each.block, index: realOf(each).length })) }))) },
+        { spec: { label: "Move to group", submenu: true, disabled: others.length === 0 }, act: () => sub(others.map((each) => ({ spec: { label: groupName(each), variable: true, disabled: each.spaces.length >= MOST }, act: () => change(placed(bands, key, { block: each.block, index: each.spaces.length })) }))) },
         { spec: { label: "Close all windows", disabled: !space.occupied }, act: () => closeWindows(band, key) },
         { spec: { label: "Delete workspace", held: true }, act: () => deleteWorkspace(band, key) },
         "separator",
@@ -890,14 +938,14 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (!still) document.addEventListener("pointerdown", outside, true);
   }
 
-  /** Closes the windows of `key`: it stays, empty, unless it was its group's last, which turns into the ghost. */
+  /** Closes the windows of `key`: it stays, empty. */
   function closeWindows(band: Band, key: string): void {
-    change(bands.map((each) => (each === band ? { ...each, spaces: settle(each.spaces.map((one) => (one.key === key ? { ...one, occupied: false } : one))) } : each)));
+    change(bands.map((each) => (each === band ? { ...each, spaces: each.spaces.map((one) => (one.key === key ? { ...one, occupied: false } : one)) } : each)));
   }
 
   /** Closes the windows of `key` and takes it away, the later ones shifting down; a group's only workspace is emptied and stays. */
   function deleteWorkspace(band: Band, key: string): void {
-    if (realOf(band).length <= 1) return closeWindows(band, key);
+    if (band.spaces.length <= 1) return closeWindows(band, key);
     if (key === active) {
       // The shown workspace's place shows what shifts into it.
       const at = band.spaces.findIndex((space) => space.key === key);
@@ -910,7 +958,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function deleteGroup(band: Band): void {
     const first = band.spaces[0]!;
     if (band.spaces.some((space) => space.key === active)) active = first.key;
-    change(bands.map((each) => (each === band ? { ...each, spaces: [{ ...first, occupied: false }] } : each)));
+    change(bands.map((each) => (each === band ? { ...each, spaces: renumber(each, [{ ...first, occupied: false }]) } : each)));
   }
 
   /** Puts the name of group `block` up for typing over, in place. */
@@ -953,7 +1001,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     element.addEventListener("wheel", (event) => {
       event.preventDefault();
       if (carry) return;
-      const keys = entries.filter((entry) => entry.kind === "cell" || entry.kind === "ghost").map((entry) => entry.space);
+      const keys = entries.filter((entry) => entry.kind === "cell").map((entry) => entry.space);
       const at = keys.indexOf(active);
       const step = event.deltaY > 0 ? 1 : -1;
       show(keys[(at + step + keys.length) % keys.length]!);
@@ -966,7 +1014,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       if (event.button !== 0 || carry || renaming !== null) return;
       const box = (event.target as Element).closest<HTMLElement>(".shell-ws-slot");
       const entry = entries.find((each) => each.key === box?.dataset.key);
-      if (entry?.kind === "cell" && entry.occupied) press = { key: entry.space, at: local(event), pointer: event.pointerId };
+      if (entry?.kind === "cell") press = { key: entry.space, at: local(event), pointer: event.pointerId };
     });
     element.addEventListener("pointermove", (event) => {
       const point = local(event);
