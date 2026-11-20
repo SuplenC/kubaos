@@ -1,5 +1,6 @@
 // The Workspaces page: `config/quickshell/modules/bar/Workspaces.qml`. This screen's workspaces in
-// groups, the shown one on a stretching indicator, each group's ghost after its last.
+// groups, the shown one on a stretching indicator, each group's ghost after its last; a workspace
+// carried to another place, and the right-click menu.
 
 import type { Words } from "../../lib/content.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
@@ -15,6 +16,12 @@ const THREE: readonly Group[] = [
   SHOTS_GROUPS[0]!,
   { block: 1, borrowed: true, name: "Desk", spaces: [{ id: 11, occupied: true }, { id: 12, occupied: false }] },
   { block: 2, borrowed: true, name: "TV", spaces: [{ id: 21, occupied: true }, { id: 22, occupied: false }] },
+];
+
+/** The live sample's: four with windows, 2 shown, and Desk's two. */
+const LIVE: readonly Group[] = [
+  { block: 0, spaces: [1, 2, 3, 4].map((id) => ({ id, occupied: true })).concat([{ id: 5, occupied: false }]) },
+  { block: 1, borrowed: true, name: "Desk", spaces: [{ id: 11, occupied: true }, { id: 12, occupied: true }, { id: 13, occupied: false }] },
 ];
 
 const INDICATOR = ".shell-ws-indicator";
@@ -41,8 +48,8 @@ const GROWS: Move = {
   name: "A workspace grows in",
   what: "A new ghost after the last: its width over `long` on `emphasized_decel`, its opacity on `standard`.",
   tracks: [
-    { part: "its width", on: "workspace 4", target: '.shell-ws-slot[data-key="4"]', property: "--present", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "its opacity", on: "workspace 4", target: '.shell-ws-slot[data-key="4"]', property: "--ws-shown", from: 0, to: 1, duration: "long", curve: "standard" },
+    { part: "its width", on: "workspace 4", target: '.shell-ws-slot[data-key="w4"]', property: "--present", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: "its opacity", on: "workspace 4", target: '.shell-ws-slot[data-key="w4"]', property: "--ws-shown", from: 0, to: 1, duration: "long", curve: "standard" },
   ],
   reduced: "same",
   back: "plays",
@@ -69,7 +76,7 @@ export default page<State>({
   title: "Workspaces",
   lede: "This screen's workspaces in groups: the shown one on the indicator, a ghost after each group's last.",
   code: { qml: "Workspaces" },
-  stage: { live: () => workspaces({ live: true }), hint: "click a number or a ghost; scroll over it", daylight: true },
+  stage: { live: () => workspaces({ groups: LIVE, live: true }), hint: "click or scroll; drag a number; right-click one", daylight: true },
   variants: [
     { name: "Numbers", for: "1–10, as SUPER + 1–0 reach them", sample: () => workspaces() },
     { name: "Kanji", for: "the setting: 一 to 十 in `accent`", sample: () => workspaces({ kanji: true }) },
@@ -78,6 +85,25 @@ export default page<State>({
     { name: "Borrowed, named", for: "its name first, `secondary`", sample: () => workspaces() },
   ],
   sizes: doesntApply("one height, `size.control_sm`; as wide as its entries."),
+  groups: [
+    {
+      title: "Carried",
+      rows: [
+        { name: "Lifted", for: "4 on its disc, its place a hole", sample: () => workspaces({ groups: LIVE, drag: { id: 4, loose: true } }) },
+        { name: "The hole moved", for: "snapped onto 2: 2 and 3 slid over", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }) },
+        { name: "A group taking it", for: "Desk outlined, its hole open", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 1 } } }) },
+        { name: "Onto a group's ghost", for: "last in Desk", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 2 } } }) },
+      ],
+    },
+    {
+      title: "Its menu",
+      rows: [
+        { name: "On a workspace", for: "its actions, then its group's", sample: () => workspaces({ groups: LIVE, menu: { workspace: 3 } }) },
+        { name: "On a group", for: "its name or ghost: the group's alone", sample: () => workspaces({ groups: LIVE, menu: { group: 1 } }) },
+        { name: "Delete held", for: "`error` sweeps across; acts when full", sample: () => workspaces({ groups: LIVE, menu: { workspace: 3, holding: 0.6 } }) },
+      ],
+    },
+  ],
   states: {
     shown: ["rest", "hovered"],
     absent: {
@@ -122,6 +148,8 @@ export default page<State>({
     keys: [
       { keys: ["SUPER+1", "SUPER+0"], does: "workspace 1 to 10 of this screen's group" },
       { keys: ["Wheel"], does: "the next or previous, round, in block order" },
+      { keys: ["Drag"], does: "a workspace with windows to another place or group" },
+      { keys: ["Right click"], does: "its menu; Esc backs out of a list, then closes" },
     ],
     order: "Never a stop for Tab.",
     lands: "The keyboard stays with the window shown.",

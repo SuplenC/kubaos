@@ -193,3 +193,91 @@
 .shell-ws-cell[data-ghost] > .shell-ws-ghost {
   opacity: var(--opacity-placeholder);
 }
+
+/* The group a carried workspace would join: a `primary` outline round it, each slot drawing its
+   piece as the tint does, so only the group's two ends round off. */
+.shell-ws-drop {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: calc(-1 * var(--size-chip) / 2);
+  right: calc(-1 * var(--size-chip) / 2);
+  box-sizing: border-box;
+  height: var(--size-chip);
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary);
+  border-radius: var(--radius-full);
+}
+
+.shell-ws-drop[data-head] {
+  left: 0;
+}
+
+.shell-ws-drop[data-tail] {
+  right: 0;
+}
+
+/* The carried workspace's place while it is away: a dashed circle a cell wide. */
+.shell-ws-hole {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  box-sizing: border-box;
+  border: max(1px, round(nearest, var(--stroke-thin), 1px)) dashed var(--color-outline);
+  border-radius: var(--radius-full);
+}
+
+@property --ws-dx {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --ws-dy {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* The disc a carried workspace rides on, its middle at the point the script works out from the
+   pointer (`--ws-x`, `--ws-y`, in the pill's CSS pixels), less what is still easing out
+   (`--ws-dx`, `--ws-dy`). */
+.shell-ws-disc {
+  --fill: var(--color-surface_container_high);
+  --fill-night: var(--color-surface_container_highest);
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: var(--size-chip);
+  height: var(--size-chip);
+  border-radius: var(--radius-full);
+  translate:
+    round(nearest, calc((var(--ws-x) + var(--ws-dx)) * 1px - var(--size-chip) / 2), 1px)
+    round(nearest, calc((var(--ws-y) + var(--ws-dy)) * 1px - var(--size-chip) / 2), 1px);
+  pointer-events: none;
+}
+
+.shell-ws[data-carrying],
+.shell-ws[data-carrying] * {
+  cursor: grabbing;
+}
+
+/* The pill with its menu under it, the menu's start at the slot it opened on. */
+.shell-ws-room {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.shell-ws-menu {
+  margin-top: calc(var(--space-s12) - var(--space-s4));
+  margin-left: var(--menu-x, 0px);
+}
+
+/* A group's name while it is typed over. */
+.shell-ws-name[contenteditable] {
+  outline: none;
+  cursor: text;
+}
