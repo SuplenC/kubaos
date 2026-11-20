@@ -91,6 +91,8 @@ export default page<State>({
         { name: "On a workspace", for: "its actions, then its group's; it takes a light primary circle", sample: () => workspaces({ groups: LIVE, menu: { workspace: 3 } }) },
         { name: "On a group", for: "its name or ghost: the group's alone", sample: () => workspaces({ groups: LIVE, menu: { group: 1 } }) },
         { name: "Delete held", for: "`error` sweeps across; acts when full", sample: () => workspaces({ groups: LIVE, menu: { workspace: 3, holding: 0.6 } }) },
+        { name: "Delete group, borrowed", for: "Desk's windows close and the whole group goes", sample: () => workspaces({ groups: LIVE, menu: { group: 1, holding: 0.6 } }) },
+        { name: "Delete group, the screen's own", for: "its windows close; one empty workspace stays", sample: () => workspaces({ groups: LIVE, menu: { group: 0, holding: 0.6 } }) },
       ],
     },
   ],
@@ -129,7 +131,7 @@ export default page<State>({
   },
   motion: {
     arrives: [GROWS],
-    leaves: doesntApply("a deleted workspace shrinks out: Arriving's move, played back."),
+    leaves: doesntApply("a deleted workspace, or a deleted borrowed group with its rule and name, shrinks out: Arriving's move, played back."),
     between: [
       stretch("To the right", "The leading edge over `medium`, the trailing one over `long`, both `emphasized_decel`.", 0, 2),
       stretch("To the left", "The same stretch, mirrored: the left edge leads.", 2, 0),

@@ -95,6 +95,11 @@
   background: rgb(from var(--color-secondary) r g b / var(--opacity-tint));
 }
 
+/* A whole group going: its tint fades with its content, every piece together, so no notch opens. */
+.shell-ws-slot[data-group-gone] > .shell-ws-tint {
+  opacity: var(--ws-shown);
+}
+
 .shell-ws-drop {
   --drop-line: max(1px, round(nearest, var(--stroke-thin), 1px));
   border-block: var(--drop-line) solid var(--color-primary);

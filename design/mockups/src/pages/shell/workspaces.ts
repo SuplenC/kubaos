@@ -39,8 +39,10 @@
 // by a circle of `primary` at `opacity.tint` behind its number, fading over `short` on `standard`
 // (none on the shown one, already on the indicator): on a workspace, its own
 // actions under "Workspace N", then its group's under "This group"; on a group's name or its ghost,
-// the group's alone, under its name. The deletes are
-// held. Move to group and Move to screen open their lists in place, Back first, as every submenu.
+// the group's alone, under its name. The deletes are held. Delete group closes every window in the
+// group: the screen's own group keeps one empty workspace and never goes; a borrowed group goes
+// whole, its rule, name and workspaces shrinking out, until its own screen is connected again.
+// Move to group and Move to screen open their lists in place, Back first, as every submenu.
 //
 // It isn't the library's `Pill`: its cells glide every frame. It has no part in `src/lib/` yet.
 
@@ -987,9 +989,45 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /** Closes every window in `band`, leaving it one empty workspace. */
   function deleteGroup(band: Band): void {
+    const showing = band.spaces.some((space) => space.key === active);
+    if (band.borrowed) return dropGroup(band, showing);
     const first = band.spaces[0]!;
-    if (band.spaces.some((space) => space.key === active)) active = first.key;
+    if (showing) active = first.key;
     change(bands.map((each) => (each === band ? { ...each, spaces: renumber(each, [{ ...first, occupied: false }]) } : each)));
+  }
+
+  /**
+   * Closes every window in `band`, a borrowed group, and takes the whole group away: its rule, its
+   * name and its workspaces shrink out, its tint fading with them, and it is back, empty, once its
+   * own screen is connected. Showing one of its workspaces, the screen shows its own group's first
+   * instead: the indicator shrinks out where it was as it grows in there, never crossing the group.
+   */
+  function dropGroup(band: Band, showing: boolean): void {
+    bands = bands.filter((each) => each !== band);
+    if (showing) {
+      active = bands[0]!.spaces[0]!.key;
+      echo();
+      away = true;
+    }
+    render(true);
+    for (const gone of content.querySelectorAll<HTMLElement>(`.shell-ws-slot[data-gone][data-block="${band.block}"]`)) gone.dataset.groupGone = "";
+    if (showing) arrive();
+    else indicate("medium", "medium", "standard_decel");
+  }
+
+  /** A copy of the indicator where it stands, shrinking out into its middle as `leave` does, while the indicator itself goes elsewhere. */
+  function echo(): void {
+    const from = getComputedStyle(indicator);
+    const start = Number.parseFloat(from.getPropertyValue("--ws-start"));
+    const end = Number.parseFloat(from.getPropertyValue("--ws-end"));
+    const middle = (start + end) / 2;
+    const copy = indicator.cloneNode() as HTMLElement;
+    copy.style.setProperty("--ws-start", String(middle));
+    copy.style.setProperty("--ws-end", String(middle));
+    indicator.after(copy);
+    const timing = { duration: ms("medium"), easing: easing("standard_decel") };
+    copy.animate([{ "--ws-start": start }, { "--ws-start": middle }], timing);
+    copy.animate([{ "--ws-end": end }, { "--ws-end": middle }], timing).finished.then(() => copy.remove(), () => copy.remove());
   }
 
   /** Puts the name of group `block` up for typing over, in place. */
