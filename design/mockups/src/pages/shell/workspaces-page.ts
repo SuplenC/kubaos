@@ -91,7 +91,7 @@ export default page<State>({
       rows: [
         { name: "Lifted", for: "4 on its disc, its place a hole", sample: () => workspaces({ groups: LIVE, drag: { id: 4, loose: true } }) },
         { name: "The hole moved", for: "snapped onto 2: 2 and 3 slid over", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }) },
-        { name: "A group taking it", for: "Desk outlined, its hole open; the home hole stays", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 1 } } }) },
+        { name: "A group taking it", for: "Desk outlined, the one hole in it", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 1 } } }) },
         { name: "Onto a group's ghost", for: "last in Desk", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 2 } } }) },
       ],
     },

@@ -15,17 +15,18 @@
 //
 // A workspace with windows can be carried to another place. Pressed and moved `space.s8`, it lifts
 // onto a disc raised to step 1 that eases onto the pointer over `short` on `standard`, its place
-// left as a hole, a dashed circle in `outline`. The numbers are the places and stay; the windows
-// move. It snaps by the Overview's magnet (`lib/magnet.ts`): the pointer in a place's zone proposes
-// it, the hole moves there, the cells between slide over and the disc snaps onto it, each over
-// `medium` on `standard_decel`; in no zone the hole is back home and the disc at the hand. A place
-// is caught where it stands at rest and, in another group, where it stands with the hole open there,
-// so it stays proposed as the hole opening moves it. Over another group, that group takes a
-// `primary` outline and opens the hole, while the home hole stays open, as the Overview's room does,
-// so the home group stands still; over a group's ghost, the hole is its last place. Let go, the disc
-// flies into the hole over `medium` on `emphasized_decel`, then a home hole left behind closes. A slide moves a slot's content,
-// never its piece of a group's tint, so the tint stays one band. The shown workspace is where its
-// windows are, so the indicator follows them. Nothing in the pill is selected by a press or a drag.
+// left as a hole, a dashed circle in `outline`; nothing else moves. The disc is in the top layer, so
+// nothing cuts it. The numbers are the places and stay; the windows move. While it is carried there
+// is one hole: the pill as it stood, the workspace taken out and the hole put where it would land,
+// so one group gives up a slot as another takes one and the pill keeps its width. Each place is
+// hit-tested where the hole would stand there, with the Overview's magnet (`lib/magnet.ts`) on it:
+// in a magnet the hole moves there, the cells between slide over and the disc snaps onto it, each
+// over `medium` on `standard_decel`; between magnets the hole stays and the disc follows the hand;
+// off the pill the hole goes home. Over another group, that group takes a `primary` outline; over a
+// group's ghost, the hole is its last place. Let go, the disc flies into the hole over `medium` on
+// `emphasized_decel`. A slide moves a slot's content, never its piece of a group's tint, so the
+// tint stays one band. The shown workspace is where its windows are, so the indicator follows them.
+// Nothing in the pill is selected by a press or a drag.
 //
 // A right click opens its menu (`lib/menu.ts`) on a popover under it: on a workspace, its own
 // actions under "Workspace N", then its group's under "This group"; on a group's name or its ghost,
@@ -266,15 +267,18 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   if (options.pinned) withHint(element, "Workspaces");
 
   /** The carried workspace: its windows' key, the groups as they stood at the lift, and where it would land. */
-  let carry: { key: string; from: Band[]; landing: Landing | null; number: number; disc: HTMLElement; landed: boolean } | null = null;
+  /**
+   * The carried workspace: its windows' key, the groups as they stood at the lift, where its one
+   * hole stands, whether the disc is snapped onto it, and where the disc is held when it is drawn
+   * at a place of the pill's rather than at the hand.
+   */
+  let carry: { key: string; from: Band[]; home: Landing; landing: Landing; snapped: boolean; disc: HTMLElement; landed: boolean; anchor: (() => Point) | null } | null = null;
   /** The group whose name is being typed over, by block. */
   let renaming: number | null = null;
   let entries: Entry[] = [];
 
   function entriesNow(): Entry[] {
-    const target = carry?.landing ?? null;
-    const home = carry ? landingOf(carry.from, carry.key) : null;
-    const taking = target && home && target.block !== home.block ? target.block : null;
+    const taking = carry && carry.landing.block !== carry.home.block ? carry.landing.block : null;
     return entriesOf(bands, active, carry?.key ?? null, taking);
   }
 
@@ -310,19 +314,16 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   }
 
   /**
-   * The groups as drawn while `key` is carried toward `landing`: in its own group its one hole
-   * moves there; in another, its home hole stays open all the while, as the Overview's room does, so
-   * its group stands still, and a second opens where it would land.
+   * The groups as drawn while `key` is carried: as they stood at the lift with it taken out and its
+   * one hole put at `landing`, nothing else tidied. One group gives up a slot as another takes one,
+   * so the pill is as wide wherever the hole is.
    */
-  function preview(from: readonly Band[], key: string, landing: Landing | null): Band[] {
-    const home = landingOf(from, key);
-    if (!landing || !home || landing.block === home.block) return placed(from, key, landing);
-    const moving = from.find((band) => band.block === home.block)!.spaces[home.index]!;
+  function carried(from: readonly Band[], key: string, landing: Landing): Band[] {
+    const moving = from.flatMap((band) => band.spaces).find((space) => space.key === key)!;
     return from.map((band) => {
-      if (band.block !== landing.block) return band;
-      const list = [...band.spaces];
-      list.splice(Math.min(landing.index, list.length), 0, moving);
-      return { ...band, spaces: settle(renumber(band, list)) };
+      const list = band.spaces.filter((space) => space.key !== key);
+      if (band.block === landing.block) list.splice(Math.min(landing.index, list.length), 0, moving);
+      return list.length === band.spaces.length && band.block !== landing.block ? band : { ...band, spaces: renumber(band, list) };
     });
   }
 
@@ -396,9 +397,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function cellsTo(key: string): number {
     let x = 0;
     for (const entry of entries) {
-      // Carried to another group, its windows are where it would land, not in its home hole.
-      const elsewhere = carry?.key === key && carry.landing !== null && entry.block !== carry.landing.block;
-      if (entry.kind !== "gap" && entry.kind !== "label" && entry.space === key && !elsewhere) return x / px("size-chip");
+      if (entry.kind !== "gap" && entry.kind !== "label" && entry.space === key) return x / px("size-chip");
       x += widthOf(entry, kanji);
     }
     return -1;
@@ -425,13 +424,60 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return child.offsetLeft + (moved === "none" ? 0 : Number.parseFloat(moved) || 0);
   }
 
+  /** How far `child` is in, 0 to 1: its width's share, and its content's opacity. */
+  function presence(child: HTMLElement): { present: number; shown: number } {
+    const drawn = getComputedStyle(child);
+    return { present: Number.parseFloat(drawn.getPropertyValue("--present")) || 0, shown: Number.parseFloat(drawn.getPropertyValue("--ws-shown")) || 0 };
+  }
+
   /**
-   * Draws the entries again: slots that stay keep their place and slide to their new one over
-   * `medium` on `standard_decel` when `slides`; new ones grow from nothing; gone ones shrink out.
+   * Grows `child` in, or shrinks it out (`to` 0, then it goes), from how far in it is: its width
+   * over `duration` on `curve`, its opacity on `standard`. A slot growing rounds its width up and
+   * one shrinking rounds down, so two moving on one clock, one in as the other goes, always add up
+   * to a whole slot and the row's width holds to the pixel.
+   */
+  function grow(child: HTMLElement, from: { present: number; shown: number }, to: 0 | 1, duration: string, curve: string): void {
+    child.toggleAttribute("data-gone", to === 0);
+    child.toggleAttribute("data-coming", to === 1);
+    const timing = { duration: ms(duration), fill: "forwards" as const };
+    child.animate([{ "--ws-shown": from.shown }, { "--ws-shown": to }], { ...timing, easing: easing("standard") });
+    child.animate([{ "--present": from.present }, { "--present": to }], { ...timing, easing: easing(curve) }).finished.then(
+      () => (to === 0 ? child.remove() : delete child.dataset.coming),
+      () => {},
+    );
+  }
+
+  /**
+   * Hands `made`, a slot drawn again, what is still running on `stays`, the one it stands in for, at
+   * the same point in time: a slot still growing in goes on growing on one clock with the slot
+   * going out beside it, instead of standing whole at once.
+   */
+  function carryOn(stays: HTMLElement, made: HTMLElement): void {
+    const coming = stays.hasAttribute("data-coming");
+    made.toggleAttribute("data-coming", coming);
+    for (const running of stays.getAnimations()) {
+      const effect = running.effect as KeyframeEffect | null;
+      if (!effect || running.playState === "finished") continue;
+      const copy = made.animate(effect.getKeyframes().map(({ offset, easing: ease, ...rest }) => ({ ...rest, offset, easing: ease })), effect.getTiming());
+      // HAZARD: copy the start time, not the current time: a current time set on a new animation
+      // starts it a frame later, a frame behind the slot going out beside it, and the row's width
+      // dips by that frame's worth.
+      if (running.startTime !== null) copy.startTime = running.startTime;
+      else copy.currentTime = running.currentTime;
+      if (coming) copy.finished.then(() => delete made.dataset.coming, () => {});
+    }
+  }
+
+  /**
+   * Draws the entries again: slots that stay keep their place, their content sliding to their new
+   * one over `medium` on `standard_decel` when `slides`; new ones grow in and gone ones shrink out,
+   * over `medium` on `standard_decel` while a workspace is carried, else over `long` on
+   * `emphasized_decel`. A slot coming back while it is still going grows on from where it is.
    */
   function render(slides: boolean): void {
+    const [duration, curve] = carry ? ["medium", "standard_decel"] : ["long", "emphasized_decel"];
     const children = [...content.children] as HTMLElement[];
-    const leaving = children.filter((child) => child.hasAttribute("data-gone"));
+    const going = new Map(children.filter((child) => child.hasAttribute("data-gone")).map((child) => [child.dataset.key!, child]));
     const old = new Map(children.filter((child) => !child.hasAttribute("data-gone")).map((child) => [child.dataset.key!, child]));
     const was = new Map([...old].map(([key, child]) => [key, drawnLeft(child)]));
     const at = new Map(children.map((child, index) => [child, index]));
@@ -441,20 +487,22 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     const kept: [string, HTMLElement][] = [];
     for (const entry of entries) {
       const made = slot(entry);
-      if (old.has(entry.key)) {
+      const stays = old.get(entry.key);
+      if (stays) {
         old.delete(entry.key);
         kept.push([entry.key, made]);
+        carryOn(stays, made);
       } else {
-        made.animate([{ "--present": 0 }, { "--present": 1 }], { duration: ms("long"), easing: easing("emphasized_decel") });
-        made.animate([{ "--ws-shown": 0 }, { "--ws-shown": 1 }], { duration: ms("long"), easing: easing("standard") });
+        const back = going.get(entry.key);
+        going.delete(entry.key);
+        grow(made, back ? presence(back) : { present: 0, shown: 0 }, 1, duration, curve);
       }
       next.push(made);
     }
+    const leaving = [...going.values()];
     for (const [key, gone] of old) {
       if (wanted.has(key)) continue;
-      gone.dataset.gone = "";
-      gone.animate([{ "--ws-shown": 1 }, { "--ws-shown": 0 }], { duration: ms("long"), easing: easing("standard"), fill: "forwards" });
-      gone.animate([{ "--present": 1 }, { "--present": 0 }], { duration: ms("long"), easing: easing("emphasized_decel"), fill: "forwards" }).finished.then(() => gone.remove(), () => {});
+      grow(gone, presence(gone), 0, duration, curve);
       leaving.push(gone);
     }
     for (const gone of leaving) next.splice(Math.min(next.length, at.get(gone) ?? next.length), 0, gone);
@@ -516,13 +564,10 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return { x: cells.offsetLeft + child.offsetLeft, y: cells.offsetTop + child.offsetTop, w: child.offsetWidth, h: child.offsetHeight };
   }
 
-  /** The middle of the carried workspace's hole. */
+  /** The middle of the carried workspace's hole, where it stands once laid out, whatever is still growing or going. */
   function holeCentre(): Point {
-    const block = carry ? (carry.landing ?? landingOf(carry.from, carry.key))?.block : undefined;
-    const hole = carry ? content.querySelector<HTMLElement>(`.shell-ws-slot[data-kind="hole"][data-block="${block}"]:not([data-gone])`) : null;
-    if (!hole) return { x: 0, y: 0 };
-    const box = boxOf(hole);
-    return { x: box.x + cssPx("size-chip") / 2, y: box.y + box.h / 2 };
+    const hole = slotsOf(entries).find(({ entry }) => entry.kind === "hole");
+    return hole ? { x: hole.box.x + hole.box.w / 2, y: hole.box.y + hole.box.h / 2 } : { x: 0, y: 0 };
   }
 
   /** The slots of the cells, ghosts and holes `list` draws, in the pill's CSS pixels: where they stand once laid out. */
@@ -543,30 +588,29 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   let zoneCache: { readonly key: string; readonly from: readonly Band[]; readonly zones: readonly Zone<Landing>[] } | null = null;
 
   /**
-   * Every place's zone for the carried workspace, as the Overview's `zonesOf`: each group's places
-   * where they stand at rest, with the hole at home, and, for a group it is not from, also where
-   * they stand with the hole open first in it, so a place is caught from either. A cell or the hole
-   * proposes its place; a ghost, the group's last. A group with no room left offers none.
+   * Every place the carried workspace can land in, hit-tested where its hole would stand if it were
+   * there: the layout drawn with the hole at that place, so the hole opens exactly where the
+   * pointer found it and a pointer that stays never changes the answer. Each place's zone is the
+   * Overview's magnet on the hole's box. A group's ghost is a place too: its last, the ghost's box
+   * as it stands with the hole there. A group with no room left offers none.
    */
   function zones(): readonly Zone<Landing>[] {
     if (!carry) return [];
     const held = carry;
     if (zoneCache?.key === held.key && zoneCache.from === held.from) return zoneCache.zones;
-    const home = landingOf(held.from, held.key)!;
-    const rest = slotsOf(entriesOf(held.from, active, held.key, null));
     const result: Zone<Landing>[] = [];
     for (const band of held.from) {
       const others = band.spaces.filter((space) => space.key !== held.key);
-      const room = others.length - (others.length > 0 && isGhost(others, others.length - 1, active) ? 1 : 0);
-      if (band.block !== home.block && room >= 10) continue;
-      const layouts = band.block === home.block ? [rest] : [slotsOf(entriesOf(preview(held.from, held.key, { block: band.block, index: 0 }), active, held.key, band.block)), rest];
-      for (const layout of layouts) {
-        let index = 0;
-        for (const { entry, box } of layout) {
-          if (entry.block !== band.block) continue;
-          const landing = { block: band.block, index: entry.kind === "ghost" ? room : index++ };
-          result.push(zoneOf(box, landing, catchShare(box)));
-        }
+      const ghosted = others.length > 1 && isGhost(others, others.length - 1, active);
+      const room = others.length - (ghosted ? 1 : 0);
+      if (band.block !== held.home.block && room >= 10) continue;
+      for (let index = 0; index <= room; index++) {
+        const landing = { block: band.block, index };
+        const layout = slotsOf(entriesOf(carried(held.from, held.key, landing), active, held.key, null));
+        const hole = layout.find(({ entry }) => entry.kind === "hole")!;
+        result.push(zoneOf(hole.box, landing, catchShare(hole.box)));
+        const ghost = index === room ? layout.find(({ entry }) => entry.kind === "ghost" && entry.block === band.block) : undefined;
+        if (ghost) result.push(zoneOf(ghost.box, landing, catchShare(ghost.box)));
       }
     }
     zoneCache = { key: held.key, from: held.from, zones: result };
@@ -577,8 +621,16 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   let base: Point = { x: 0, y: 0 };
   let easings: Animation[] = [];
 
-  /** Puts the disc's base at `to`; with `over`, it eases there from where it is drawn now. */
-  function discTo(disc: HTMLElement, to: Point, over?: { duration: string; curve: string }): Animation | null {
+  /** A point in the pill's CSS pixels, in the viewport's, where the disc is drawn. */
+  function client(point: Point): Point {
+    const box = element.getBoundingClientRect();
+    const ratio = box.width / Math.max(1, element.offsetWidth);
+    return { x: box.left + point.x * ratio, y: box.top + point.y * ratio };
+  }
+
+  /** Puts the disc's base at `at`, a point of the pill's; with `over`, it eases there from where it is drawn now. */
+  function discTo(disc: HTMLElement, at: Point, over?: { duration: string; curve: string }): Animation | null {
+    const to = client(at);
     const drawn = getComputedStyle(disc);
     const now = { x: base.x + (Number.parseFloat(drawn.getPropertyValue("--ws-dx")) || 0), y: base.y + (Number.parseFloat(drawn.getPropertyValue("--ws-dy")) || 0) };
     base = to;
@@ -599,35 +651,37 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     number.classList.add("shell-ws-number");
     centreFor(number, numberStyle(true, kanji), kanji ? KANJI[KANJI.length - 1]! : "0");
     disc.append(number);
+    // In the top layer, the disc is never cut by the pill or by any box the pill is drawn in; it
+    // stays in the pill's tree, so it is drawn in the pill's own tokens.
+    disc.popover = "manual";
     element.append(disc);
+    disc.showPopover();
     return disc;
   }
 
   /**
-   * Lifts the workspace of `key` onto its disc, its place left as a hole. Under `pointer`, it comes
-   * up over `short` on `standard` to the place the pointer proposes, or to the hand; a still is
-   * drawn with its hole at `landing`.
+   * Lifts the workspace of `key` onto its disc, its place left as its hole: nothing else moves.
+   * Under `pointer`, the disc comes up over `short` on `standard`, onto the hole if the pointer is
+   * in its magnet, else to the hand. A still is drawn with its hole at `landing`.
    */
   function lift(key: string, pointer: Point | null, landing: Landing | null = null): void {
-    const space = bands.flatMap((band) => band.spaces).find((each) => each.key === key)!;
-    carry = { key, from: bands, landing: null, number: space.id, disc: makeDisc(space.id), landed: false };
+    const home = landingOf(bands, key)!;
+    carry = { key, from: bands, home, landing: home, snapped: false, disc: makeDisc(bands.flatMap((band) => band.spaces).find((each) => each.key === key)!.id), landed: false, anchor: null };
     zoneCache = null;
     element.dataset.carrying = "";
     render(false);
-    const centre = holeCentre();
-    base = centre;
-    discTo(carry.disc, centre);
+    base = client(holeCentre());
+    discTo(carry.disc, holeCentre());
     if (!pointer) return void (landing && propose(landing, false));
-    const proposed = caught(pointer, zones());
-    if (proposed) propose(proposed, false);
-    discTo(carry.disc, proposed ? holeCentre() : pointer, { duration: "short", curve: "standard" });
+    carry.snapped = same(caught(pointer, zones()), home);
+    discTo(carry.disc, carry.snapped ? holeCentre() : pointer, { duration: "short", curve: "standard" });
   }
 
-  /** The hole moved to `landing`, or home with none: the cells between slide over. */
-  function propose(landing: Landing | null, slides: boolean): void {
+  /** The hole moved to `landing`: the cells between slide over, a slot given up by one group as another takes it. */
+  function propose(landing: Landing, slides: boolean): void {
     if (!carry) return;
     carry.landing = landing;
-    bands = preview(carry.from, carry.key, landing);
+    bands = carried(carry.from, carry.key, landing);
     if (!slides) return draw();
     render(true);
     indicate("medium", "medium", "standard_decel");
@@ -637,27 +691,36 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return a?.block === b?.block && a?.index === b?.index;
   }
 
+  /** Whether `point` is on the pill. */
+  function onPill(point: Point): boolean {
+    return point.x >= 0 && point.y >= 0 && point.x < element.offsetWidth && point.y < element.offsetHeight;
+  }
+
   /**
-   * The pointer at `point` while carrying: in a place's zone it proposes that place, and the disc
-   * snaps into the hole there; in none, the hole is home and the disc at the hand. A new proposal
-   * eases the disc over `medium` on `standard_decel`; within one it stays put, or follows the hand.
+   * The pointer at `point` while carrying: in a place's magnet it proposes that place and the disc
+   * snaps onto the hole there; between magnets on the pill, the hole stays where it was last
+   * proposed and the disc follows the hand; off the pill, the hole goes home. The hole moving, or
+   * the disc snapping on or off, eases the disc over `medium` on `standard_decel`.
    */
   function carryTo(point: Point): void {
     if (!carry || carry.landed) return;
-    const landing = caught(point, zones());
+    const magnet = caught(point, zones());
+    const landing = magnet ?? (onPill(point) ? carry.landing : carry.home);
     const moved = !same(landing, carry.landing);
     if (moved) propose(landing, true);
-    const target = landing ? holeCentre() : point;
-    discTo(carry.disc, target, moved ? { duration: "medium", curve: "standard_decel" } : undefined);
+    const snapped = magnet !== null;
+    const glide = moved || snapped !== carry.snapped;
+    carry.snapped = snapped;
+    discTo(carry.disc, snapped ? holeCentre() : point, glide ? { duration: "medium", curve: "standard_decel" } : undefined);
   }
 
-  /** Let go: the disc flies into the hole over `medium` on `emphasized_decel`, and the hole becomes the workspace. */
+  /** Let go: the disc flies into the hole over `medium` on `emphasized_decel`, and the hole becomes the workspace there. */
   function drop(): void {
     if (!carry || carry.landed) return;
     const held = carry;
     held.landed = true;
     const flight = discTo(held.disc, holeCentre(), { duration: "medium", curve: "emphasized_decel" });
-    // Landed, the move is made: a home hole left in its group shrinks out, the rest closing up.
+    // Landed, the move is made, and the groups tidy their ghosts again.
     const done = () => {
       if (carry !== held) return;
       held.disc.remove();
@@ -851,7 +914,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     const end = (event: PointerEvent) => {
       press = null;
       if (!carry || carry.landed) return;
-      if (event.type === "pointercancel") propose(null, true);
+      if (event.type === "pointercancel") propose(carry.home, true);
       swallow = true;
       drop();
     };
@@ -872,9 +935,18 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     requestAnimationFrame(() => {
       const key = `w${still.id}`;
       lift(key, null, still.to ?? null);
-      const centre = holeCentre();
-      const off = cssPx("space-s12");
-      if (carry) discTo(carry.disc, still.loose ? { x: centre.x + off, y: centre.y + off } : centre);
+      const off = still.loose ? cssPx("space-s12") : 0;
+      if (!carry) return;
+      const held = carry;
+      held.anchor = () => ({ x: holeCentre().x + off, y: holeCentre().y + off });
+      discTo(held.disc, held.anchor());
+      // The disc is drawn in the viewport's pixels: as the page scrolls it keeps to the hole.
+      const follow = () => {
+        if (!element.isConnected || carry !== held) return removeEventListener("scroll", follow, true);
+        discTo(held.disc, held.anchor!());
+      };
+      addEventListener("scroll", follow, { capture: true, passive: true });
+      addEventListener("resize", follow, { passive: true });
     });
   }
   if (!room) return made;
@@ -885,7 +957,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     requestAnimationFrame(() => {
       const key = open.workspace !== undefined ? `w${open.workspace}` : null;
       const band = open.group !== undefined ? bands.find((each) => each.block === open.group) : null;
-      const anchorKey = key ?? (band?.name && band.borrowed ? `label${band.block}` : band?.spaces.at(-1)?.key);
+      const anchorKey = key ? `${key}@${bandOf(key)?.block}` : band?.name && band.borrowed ? `label${band.block}` : `${band?.spaces.at(-1)?.key}@${band?.block}`;
       const anchor = content.querySelector<HTMLElement>(`.shell-ws-slot[data-key="${anchorKey}"]`);
       if (!anchor) return;
       openMenu(key ? { workspace: key } : { block: band!.block }, anchor, open.holding !== undefined ? { holding: open.holding } : {});

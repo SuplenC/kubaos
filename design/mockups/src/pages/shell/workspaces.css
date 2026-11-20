@@ -70,6 +70,17 @@
   overflow: clip;
 }
 
+/* A slot growing in rounds its width up and one shrinking out rounds down: two on one clock, one
+   coming as the other goes, add up to a whole slot at every frame, so the row never changes width
+   by a pixel while a carried workspace's hole crosses from one group to another. */
+.shell-ws-slot[data-coming] {
+  width: round(up, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
+}
+
+.shell-ws-slot[data-gone] {
+  width: round(down, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
+}
+
 .shell-ws-slot > * {
   opacity: var(--ws-shown);
 }
@@ -245,16 +256,18 @@
   initial-value: 0;
 }
 
-/* The disc a carried workspace rides on, its middle at the point the script works out from the
-   pointer (`--ws-x`, `--ws-y`, in the pill's CSS pixels), less what is still easing out
-   (`--ws-dx`, `--ws-dy`). */
+/* The disc a carried workspace rides on, a popover in the top layer, so nothing it is drawn over
+   cuts it: its middle at the point the script works out from the pointer (`--ws-x`, `--ws-y`, in
+   the viewport's CSS pixels), less what is still easing out (`--ws-dx`, `--ws-dy`). */
 .shell-ws-disc {
   --fill: var(--color-surface_container_high);
   --fill-night: var(--color-surface_container_highest);
-  position: absolute;
-  z-index: 3;
-  left: 0;
-  top: 0;
+  position: fixed;
+  inset: 0 auto auto 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
   display: grid;
   place-items: center;
   width: var(--size-chip);
