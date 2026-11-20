@@ -27,8 +27,9 @@
 // over `medium` on `standard_decel`, the disc's number rolling to the one it would get there, so it
 // lands already right; between magnets the hole stays and the disc follows the hand;
 // off the pill the hole goes home. Over another group, that group takes a `primary` outline; over a
-// group's ghost, the hole is its last place. Let go, the disc flies into the hole over `medium` on
-// `emphasized_decel`. A slide moves a slot's content, never its piece of a group's tint, so the
+// group's ghost, the hole is its last place; over a full group, ten already, the disc dims to
+// `opacity.locked` and the hole is home, as the Overview refuses (`lib/magnet.ts`'s `refuse`).
+// Let go, the disc flies into the hole over `medium` on `emphasized_decel`. A slide moves a slot's content, never its piece of a group's tint, so the
 // tint stays one band, and a slot going out stays in its group. The shown workspace is where its
 // windows are, so the indicator follows them, gliding within a group. Carried itself, the shown
 // workspace's place is a hole like any other's: the indicator narrows out of its place as it lifts
@@ -53,11 +54,11 @@ import { raise } from "../../lib/elevation.ts";
 import { focusRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { withHint } from "../../lib/hint.ts";
-import { catchShare, caught, type Rect, type Zone, zoneOf } from "../../lib/magnet.ts";
+import { catchShare, caught, type Rect, refuse, type Zone, zoneOf } from "../../lib/magnet.ts";
 import { type MenuEntry, type MenuItemSpec, menu } from "../../lib/menu.ts";
 import { probe } from "../../lib/probe.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
-import { advance, centreFor, text, type TypeStyle } from "../../lib/text.ts";
+import { advance, text, type TypeStyle } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { cubic, durationMs, length } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
@@ -87,6 +88,8 @@ export interface DragPin {
   readonly id: number;
   readonly to?: Landing;
   readonly loose?: boolean;
+  /** Held over group `over`, a full one, which refuses it: it dims there, its hole home. */
+  readonly over?: number;
 }
 
 /** A still of the menu open: on `workspace`, or on `group`'s name, its delete held `holding` of the way. */
@@ -422,22 +425,23 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     const number = document.createElement("span");
     number.className = "shell-ws-number";
     number.dataset.look = `${style} ${color}`;
-    // Every cell centres on the same figure, not its own: a "1" and a "2" weigh differently, and
-    // each centred on its own ink would put the pill's numbers on different baselines.
-    const centre = { style: numberStyle(true, kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
-    if (kanji) {
-      const glyph = text(numberText(entry.workspace, kanji), style, color);
-      centreFor(glyph, centre.style, centre.words);
-      number.append(glyph);
-      return number;
-    }
     const value = slotOf(entry.workspace);
-    const from = was ?? value;
-    // One figure at least: the number's box is its figures', so a cell centres a 10 as it does a 1.
-    const rolling = rollingNumber({ value: from, widest: "0", style, color, centre });
+    const rolling = numeral(was ?? value, style, color);
     number.append(rolling.element);
     rolling.set(value);
     return number;
+  }
+
+  /**
+   * A workspace's number, 1 to 10, as a rolling number: its digits, or its kanji numeral (十 for
+   * ten), one glyph to a slot. Every number centres on the same figure, not its own: a "1" and a
+   * "2" weigh differently, and each centred on its own ink would put the numbers on different
+   * baselines. One figure at least: the box is its figures', so a cell centres a 10 as it does a 1.
+   */
+  function numeral(value: number, style: TypeStyle, color: string): Rolling {
+    const centre = { style: numberStyle(true, kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
+    if (!kanji) return rollingNumber({ value, widest: "0", style, color, centre });
+    return rollingNumber({ value, widest: KANJI[0]!, format: (each) => KANJI[each - 1]!, figures: KANJI.join(""), style, color, centre });
   }
 
   /** Where the cell (or hole) of `key` starts among `entries`, in cells, or -1. */
@@ -459,16 +463,9 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     indicator.style.setProperty("--ws-end", String(away ? at + 0.5 : at + 1));
   }
 
-  /** What of a slot slides: its content, not its piece of the tint or of the drop outline. */
-  function sliding(child: HTMLElement): HTMLElement[] {
-    return [...child.children].filter((each) => !each.matches(".shell-ws-tint, .shell-ws-drop")) as HTMLElement[];
-  }
-
   /** The drawn horizontal offset of `child`'s content: its box, and where a slide running on it has it. */
   function drawnLeft(child: HTMLElement): number {
-    const first = sliding(child)[0];
-    const moved = first ? getComputedStyle(first).translate : "none";
-    return child.offsetLeft + (moved === "none" ? 0 : Number.parseFloat(moved) || 0);
+    return child.offsetLeft + (Number.parseFloat(getComputedStyle(child).getPropertyValue("--ws-slide")) || 0);
   }
 
   /** How far `child` is in, 0 to 1: its width's share, and its content's opacity. */
@@ -580,8 +577,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       if (kind === "label" || kind === "gap" || Math.abs(from) < cssPx("size-chip") / 2 || ms("medium") === 0) continue;
       // Its content slides out of its box, which shows it while it does.
       made.dataset.sliding = "";
-      const slides_ = sliding(made).map((each) => each.animate([{ translate: `${from}px 0` }, { translate: "0 0" }], { duration: ms("medium"), easing: easing("standard_decel") }));
-      Promise.all(slides_.map((each) => each.finished)).then(() => delete made.dataset.sliding, () => {});
+      made.animate([{ "--ws-slide": `${from}px` }, { "--ws-slide": "0px" }], { duration: ms("medium"), easing: easing("standard_decel") }).finished.then(() => delete made.dataset.sliding, () => {});
     }
   }
 
@@ -697,31 +693,57 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return result;
   }
 
+  /** Where each group's entries run on the pill, its name to its `+`, in the pill's CSS pixels. */
+  function spansOf(list: readonly Entry[]): Map<number, Rect> {
+    const scale = settings().scale;
+    const h = px("size-chip") * scale;
+    const spans = new Map<number, Rect>();
+    let x = cells.offsetLeft;
+    for (const entry of list) {
+      const w = widthOf(entry, kanji) * scale;
+      if (entry.kind !== "gap") {
+        const had = spans.get(entry.block);
+        spans.set(entry.block, had ? { ...had, w: x + w - had.x } : { x, y: cells.offsetTop, w, h });
+      }
+      x += w;
+    }
+    return spans;
+  }
+
+  /** What a place proposes: a landing, or a full group's refusal. */
+  type Aim = Landing | "refused";
+
   /** The zones worked out for a carry: the groups do not change while a workspace is carried. */
-  let zoneCache: { readonly key: string; readonly from: readonly Band[]; readonly zones: readonly Zone<Landing>[] } | null = null;
+  let zoneCache: { readonly key: string; readonly from: readonly Band[]; readonly zones: readonly Zone<Aim>[] } | null = null;
 
   /**
    * Every place the carried workspace can land in, hit-tested where its hole would stand if it were
    * there: the layout drawn with the hole at that place, so the hole opens exactly where the
    * pointer found it and a pointer that stays never changes the answer. Each place's zone is the
    * Overview's magnet on the hole's box. A group's ghost is a place too: its last, the ghost's box
-   * as it stands with the hole there. A group with no room left offers none.
+   * as it stands with the hole there. A full group, ten already, offers no place to a workspace from
+   * another: held anywhere over it, as it stands, the workspace is refused, as the Overview's are.
    */
-  function zones(): readonly Zone<Landing>[] {
+  function zones(): readonly Zone<Aim>[] {
     if (!carry) return [];
     const held = carry;
     if (zoneCache?.key === held.key && zoneCache.from === held.from) return zoneCache.zones;
-    const result: Zone<Landing>[] = [];
+    const result: Zone<Aim>[] = [];
+    const rest = spansOf(entriesOf(carried(held.from, held.key, held.home), held.key, null, plusAtLift(held.from)));
     for (const band of held.from) {
       const room = band.spaces.filter((space) => space.key !== held.key).length;
-      if (band.block !== held.home.block && room >= MOST) continue;
+      if (band.block !== held.home.block && room >= MOST) {
+        const span = rest.get(band.block);
+        if (span) result.push(zoneOf<Aim>(span, "refused", 1));
+        continue;
+      }
       for (let index = 0; index <= room; index++) {
         const landing = { block: band.block, index };
         const layout = slotsOf(entriesOf(carried(held.from, held.key, landing), held.key, null, plusAtLift(held.from)));
         const hole = layout.find(({ entry }) => entry.kind === "hole")!;
-        result.push(zoneOf(hole.box, landing, catchShare(hole.box)));
+        result.push(zoneOf<Aim>(hole.box, landing, catchShare(hole.box)));
         const ghost = index === room ? layout.find(({ entry }) => entry.kind === "ghost" && entry.block === band.block) : undefined;
-        if (ghost) result.push(zoneOf(ghost.box, landing, catchShare(ghost.box)));
+        if (ghost) result.push(zoneOf<Aim>(ghost.box, landing, catchShare(ghost.box)));
       }
     }
     zoneCache = { key: held.key, from: held.from, zones: result };
@@ -762,20 +784,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    * The disc the carried workspace rides on, its number the one it would get where it is proposed:
    * a rolling number, as the cells' are, that rolls as the place changes. A kanji is set in place.
    */
-  function makeDisc(id: number): { disc: HTMLElement; roll: Rolling | null } {
+  function makeDisc(id: number): { disc: HTMLElement; roll: Rolling } {
     const disc = raise(document.createElement("span"), 1);
     disc.className += " shell-ws-disc";
-    const centre = { style: numberStyle(true, kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
-    let roll: Rolling | null = null;
-    if (kanji) {
-      const glyph = text(numberText(id, kanji), centre.style, "on_surface");
-      centreFor(glyph, centre.style, centre.words);
-      disc.append(glyph);
-    } else {
-      // As wide as two figures at most: a group's numbers run to 10.
-      roll = rollingNumber({ value: slotOf(id), widest: "0", style: centre.style, color: "on_surface", centre });
-      disc.append(roll.element);
-    }
+    const roll = numeral(slotOf(id), numberStyle(true, kanji), "on_surface");
+    disc.append(roll.element);
     // In the top layer, the disc is never cut by the pill or by any box the pill is drawn in; it
     // stays in the pill's tree, so it is drawn in the pill's own tokens.
     disc.popover = "manual";
@@ -805,7 +818,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     base = client(holeCentre());
     discTo(carry.disc, holeCentre());
     if (!pointer) return landing ? propose(landing, false) : draw();
-    carry.snapped = same(caught(pointer, zones()), home);
+    const aimed = caught(pointer, zones());
+    carry.snapped = aimed !== "refused" && same(aimed, home);
     discTo(carry.disc, carry.snapped ? holeCentre() : pointer, { duration: "short", curve: "standard" });
   }
 
@@ -816,8 +830,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (slides) carry.roll?.set(landing.index + 1);
     else if (carry.roll) {
       // A still shows the disc's number as it stands there, rolled already.
-      const centre = { style: numberStyle(true, kanji), words: "0" };
-      const now = rollingNumber({ value: landing.index + 1, widest: "0", style: centre.style, color: "on_surface", centre });
+      const now = numeral(landing.index + 1, numberStyle(true, kanji), "on_surface");
       carry.roll.element.replaceWith(now.element);
       carry.roll = now;
     }
@@ -844,8 +857,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    */
   function carryTo(point: Point): void {
     if (!carry || carry.landed) return;
-    const magnet = caught(point, zones());
-    const landing = magnet ?? (onPill(point) ? carry.landing : carry.home);
+    const aimed = caught(point, zones());
+    const refused = aimed === "refused";
+    refuse(carry.disc, refused);
+    const magnet = refused ? null : aimed;
+    const landing = refused ? carry.home : (magnet ?? (onPill(point) ? carry.landing : carry.home));
     const moved = !same(landing, carry.landing);
     if (moved) propose(landing, true);
     const snapped = magnet !== null;
@@ -1121,7 +1137,12 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       const off = still.loose ? cssPx("space-s12") : 0;
       if (!carry) return;
       const held = carry;
-      held.anchor = () => ({ x: holeCentre().x + off, y: holeCentre().y + off });
+      const over = still.over;
+      if (over !== undefined) refuse(held.disc, true);
+      held.anchor = () => {
+        const span = over === undefined ? undefined : spansOf(entries).get(over);
+        return span ? { x: span.x + span.w / 2, y: span.y + span.h / 2 } : { x: holeCentre().x + off, y: holeCentre().y + off };
+      };
       discTo(held.disc, held.anchor());
       // The disc is drawn in the viewport's pixels: as the page scrolls it keeps to the hole.
       const follow = () => {

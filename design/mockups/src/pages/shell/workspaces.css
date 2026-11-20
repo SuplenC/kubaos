@@ -70,8 +70,17 @@
 
 /* A slot's content fades as it comes and goes; its piece of a group's tint or outline does not, so
    the band stays whole while the slot narrows. */
+@property --ws-slide {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+/* A slot's content: it fades as the slot comes and goes, and slides by `--ws-slide` from where it
+   stood as the slot takes its new place; its pieces of a group's tint and outline do neither. */
 .shell-ws-slot > :not(.shell-ws-tint, .shell-ws-drop) {
   opacity: var(--ws-shown);
+  translate: var(--ws-slide) 0;
 }
 
 /* A slot whose content slides to it from where it stood: its box clips nothing while it does. */
@@ -173,6 +182,17 @@
 
 /* A workspace whose menu is open: a circle the cell's size in `primary` at `opacity.tint` behind
    its number, as an accent is drawn faintly under itself, fading in and out with the menu. */
+@property --ws-mark {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.shell-ws-cell {
+  --ws-mark: 0;
+  transition: --ws-mark var(--motion-short) var(--easing-standard);
+}
+
 .shell-ws-cell::before {
   content: "";
   grid-area: 1 / 1;
@@ -180,12 +200,11 @@
   height: 100%;
   border-radius: var(--radius-full);
   background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
-  opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
+  opacity: var(--ws-mark);
 }
 
-.shell-ws-slot[data-menu] > .shell-ws-cell::before {
-  opacity: 1;
+.shell-ws-slot[data-menu] > .shell-ws-cell {
+  --ws-mark: 1;
 }
 
 /* A cell's number: a rolling number (`lib/rolling-number.ts`), as the Overview's are, or a kanji,

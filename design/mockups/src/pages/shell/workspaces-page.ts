@@ -3,8 +3,9 @@
 // carried to another place, and the right-click menu.
 
 import type { Words } from "../../lib/content.ts";
+import { rollingMidway } from "../../lib/rolling-number.ts";
 import { lights, powerMoves } from "../../site/moves.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
 import { type Group, SHOTS_GROUPS, workspaces } from "./workspaces.ts";
 
 type State = "rest" | "lit";
@@ -25,7 +26,113 @@ const LIVE: readonly Group[] = [
   { block: 1, borrowed: true, name: "Desk", spaces: [{ id: 11, occupied: true }, { id: 12, occupied: true }, { id: 13, occupied: false }] },
 ];
 
+/** The live sample's, Desk full: ten workspaces, so it has no room for another. */
+const FULL: readonly Group[] = [LIVE[0]!, { block: 1, borrowed: true, name: "Desk", spaces: Array.from({ length: 10 }, (_, index) => ({ id: 11 + index, occupied: true })) }];
+
 const INDICATOR = ".shell-ws-indicator";
+const DISC = ".shell-ws-disc";
+
+/** A move's tracks: on a token's curve, one at least. */
+type Tracks = NonEmpty<Track<Easing>>;
+
+/** The same tracks at once: reduced motion moves nothing, it changes. */
+function atOnce(tracks: Tracks): Tracks {
+  return nonEmpty(tracks.map((track) => ({ ...track, duration: "instant" as const })));
+}
+
+/** The disc eased by (`dx`, `dy`) pixels back to where it is drawn, over `duration` on `curve`. */
+function discMove(name: string, what: string, on: string, dx: number, dy: number, duration: "short" | "medium", curve: "standard" | "standard_decel" | "emphasized_decel", sample: () => HTMLElement): Move {
+  const tracks: Tracks = [
+    { part: "the disc, across", on, target: DISC, property: "--ws-dx", from: dx, to: 0, duration, curve },
+    { part: "the disc, down", on, target: DISC, property: "--ws-dy", from: dy, to: 0, duration, curve },
+  ];
+  return { name, what, tracks, reduced: atOnce(tracks), back: "plays", sample };
+}
+
+const LIFTS = discMove("Lifted onto its disc", "Pressed and moved `space.s8`: the disc rises from its cell onto the hand over `short` on `standard`.", "workspace 4", -12, -12, "short", "standard", () => workspaces({ groups: LIVE, drag: { id: 4, loose: true } }));
+const SNAPS = discMove("Snapped onto a place", "Its magnet reached: the disc eases from the hand onto the place over `medium` on `standard_decel`.", "workspace 4", 12, 12, "medium", "standard_decel", () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }));
+const DROPS = discMove("Dropped", "Let go: the disc flies from the hand into its place over `medium` on `emphasized_decel`.", "workspace 4", 12, 12, "medium", "emphasized_decel", () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }));
+
+const SLIDE: Tracks = [{ part: "its content", on: "the windows of 3, now 2", target: '.shell-ws-slot[data-key="w3@0"]', property: "--ws-slide", from: { length: "size-chip" }, to: 0, duration: "medium", curve: "standard_decel" }];
+const SLIDES: Move = {
+  name: "The cells between sliding over",
+  what: "Its place moved: each cell between slides a place over `medium` on `standard_decel`; its tint stays.",
+  tracks: SLIDE,
+  reduced: atOnce(SLIDE),
+  back: "plays",
+  sample: () => workspaces({ groups: LIVE, drag: { id: 2, to: { block: 0, index: 3 } } }),
+};
+
+const CROSSING: Tracks = [{ part: "its place", on: "Desk's new place", target: '.shell-ws-slot[data-kind="hole"]', property: "--present", from: 0, to: 1, duration: "medium", curve: "standard_decel" }];
+const CROSSES: Move = {
+  name: "Its place changing group",
+  what: "One group gives its place up as the other grows one, together over `medium` on `standard_decel`.",
+  tracks: CROSSING,
+  reduced: atOnce(CROSSING),
+  back: "plays",
+  sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 1 } } }),
+};
+
+const ROLL: Tracks = [
+  { part: "the figure leaving", on: "a number that changes", target: ".k-roll-figure[data-out]", property: "--roll", from: 0, to: 1, duration: "short", curve: "standard" },
+  { part: "the figure arriving", on: "a number that changes", target: ".k-roll-figure[data-in]", property: "--roll", from: 0, to: 1, duration: "short", curve: "standard" },
+];
+const ROLLS: Move = {
+  name: "A number rolling",
+  what: "Windows at another number roll to it over `short` on `standard`; a change of figure count eases the box.",
+  tracks: ROLL,
+  reduced: atOnce(ROLL),
+  back: "cuts",
+  sample: () => rollingMidway(3, 4, "0", "button_small"),
+};
+
+const LEAVING: Tracks = [
+  { part: "its start", on: "the shown workspace", target: INDICATOR, property: "--ws-start", from: 1, to: 1.5, duration: "medium", curve: "standard_decel" },
+  { part: "its end", on: "the shown workspace", target: INDICATOR, property: "--ws-end", from: 2, to: 1.5, duration: "medium", curve: "standard_decel" },
+];
+const ARRIVING: Tracks = [
+  { part: "its start", on: "the shown workspace", target: INDICATOR, property: "--ws-start", from: 1.5, to: 1, duration: "medium", curve: "standard_decel" },
+  { part: "its end", on: "the shown workspace", target: INDICATOR, property: "--ws-end", from: 1.5, to: 2, duration: "medium", curve: "standard_decel" },
+];
+const LEAVES: Move = {
+  name: "The indicator leaving a group",
+  what: "The shown one carried, or its group gone: a circle shrinking into its middle over `medium`, crossing nothing.",
+  tracks: LEAVING,
+  reduced: atOnce(LEAVING),
+  back: "plays",
+  sample: () => workspaces({ groups: LIVE }),
+};
+const ARRIVES: Move = {
+  name: "The indicator arriving in one",
+  what: "Landed, or shown in place of a gone group: a circle growing from its middle over `medium` on `standard_decel`.",
+  tracks: ARRIVING,
+  reduced: atOnce(ARRIVING),
+  back: "plays",
+  sample: () => workspaces({ groups: LIVE }),
+};
+
+const MARK: Tracks = [{ part: "its circle", on: "workspace 3", target: ".shell-ws-slot[data-menu] > .shell-ws-cell", property: "--ws-mark", from: 0, to: 1, duration: "short", curve: "standard" }];
+const MARKS: Move = {
+  name: "The menu's mark",
+  what: "Its menu opened: a circle of `primary` at `opacity.tint` fades in behind it over `short` on `standard`.",
+  tracks: MARK,
+  reduced: atOnce(MARK),
+  back: "plays",
+  sample: () => workspaces({ groups: LIVE, menu: { workspace: 3 } }),
+};
+
+const GONE: Tracks = [
+  { part: "its width", on: "Desk, all of it", target: '.shell-ws-slot[data-block="1"]', property: "--present", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+  { part: "its opacity, its tint's too", on: "Desk, all of it", target: '.shell-ws-slot[data-block="1"]', property: "--ws-shown", from: 1, to: 0, duration: "long", curve: "standard" },
+];
+const GROUP_GOES: Move = {
+  name: "A borrowed group deleted",
+  what: "Its rule, name and workspaces shrink out over `long` on `emphasized_decel`, its tint fading with them.",
+  tracks: GONE,
+  reduced: atOnce(GONE),
+  back: "plays",
+  sample: () => workspaces(),
+};
 
 function stretch(name: string, what: string, from: number, to: number): Move {
   const right = to > from;
@@ -83,6 +190,7 @@ export default page<State>({
         { name: "Its place moved", for: "snapped onto 2, reading 2: 2 and 3 slid over", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }) },
         { name: "A group taking it", for: "Desk outlined, an empty place in it", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 1 } } }) },
         { name: "Onto a group's ghost", for: "last in Desk", sample: () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 1, index: 2 } } }) },
+        { name: "Refused by a full group", for: "over Desk's ten: it dims, its place home", sample: () => workspaces({ groups: FULL, drag: { id: 3, over: 1 } }) },
       ],
     },
     {
@@ -136,6 +244,16 @@ export default page<State>({
       stretch("To the right", "The leading edge over `medium`, the trailing one over `long`, both `emphasized_decel`.", 0, 2),
       stretch("To the left", "The same stretch, mirrored: the left edge leads.", 2, 0),
       { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(".shell-ws", "the pill", 0, 1), reduced: "same", back: "plays", sample: () => workspaces() },
+      LIFTS,
+      SNAPS,
+      SLIDES,
+      CROSSES,
+      DROPS,
+      ROLLS,
+      LEAVES,
+      ARRIVES,
+      MARKS,
+      GROUP_GOES,
       ...powerMoves(() => workspaces({ pinned: "lit" })),
     ],
   },
@@ -143,7 +261,7 @@ export default page<State>({
     keys: [
       { keys: ["SUPER+1", "SUPER+0"], does: "workspace 1 to 10 of this screen's group" },
       { keys: ["Wheel"], does: "the next or previous, round, in block order" },
-      { keys: ["Drag"], does: "a workspace with windows to another place or group" },
+      { keys: ["Drag"], does: "a workspace to another place or group; a full group refuses" },
       { keys: ["Right click"], does: "its menu; Esc backs out of a list, then closes" },
     ],
     order: "Never a stop for Tab.",
