@@ -1475,6 +1475,12 @@ primary_rest = { dark = { from = "primary_unlit", text_on = ["surface", "surface
 # (a Tonal or Text button, an empty checkbox, a switch that is off, a chip):
 # solid glass, the tone unlit, and by day the tone's own line.
 primary_glass = { dark = { from = "primary_unlit" }, light = { from = "primary" } }
+# An accent as a faint tint, as it is seen on the surface under it: `primary` at `opacity.tint`
+# over `surface_container`, the mark on a workspace in the bar whose menu is open, and `secondary`
+# the same, a borrowed group's tint round its workspaces. The parts draw the tint itself; these
+# hold what sits on it to its contrast pairs.
+primary_tint_container = { from = "primary", over = "surface_container", opacity = "tint" }
+secondary_tint_container = { from = "secondary", over = "surface_container", opacity = "tint" }
 cold_glass = { dark = { from = "cold_unlit" }, light = { from = "cold" } }
 error_glass = { dark = { from = "error_unlit" }, light = { from = "error" } }
 success_glass = { dark = { from = "success_unlit" }, light = { from = "success" } }
@@ -1542,6 +1548,10 @@ pairs = [
   { fg = "primary", bg = "surface_container", need = "text", use = "A notification group's \"+N more\" over its fan's turned cards" },
   { fg = "primary", bg = "surface_container_low", need = "text", use = "Accent text in a well" },
   { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar" },
+  { fg = "on_surface", bg = "primary_tint_container", need = "text", use = "A workspace's number, with windows, on the mark of its open menu" },
+  { fg = "on_surface_variant", bg = "primary_tint_container", need = "text", use = "An empty workspace's number on the mark of its open menu" },
+  { fg = "on_surface", bg = "secondary_tint_container", need = "text", use = "A workspace's number, with windows, in a borrowed group's tint" },
+  { fg = "on_surface_variant", bg = "secondary_tint_container", need = "text", use = "An empty workspace's number in a borrowed group's tint" },
   { fg = "on_primary", bg = "primary", need = "text", opacity = "subdued_text", use = "Secondary text on a checked tile" },
   { fg = "on_primary_container", bg = "primary_container", need = "text", use = "Text on the primary container" },
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", use = "A Tonal button, a selected row's title" },

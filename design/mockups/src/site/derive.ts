@@ -5,7 +5,8 @@
 //
 // A recipe starts from a role, mixed toward white or black in sRGB or as it is, may move its OKLCH
 // lightness and chroma (fitted back into sRGB by lowering its chroma alone, so its hue and
-// lightness hold), and may fit its lightness until it holds the ratio its recipe names on every
+// lightness hold), may be drawn at an opacity over another role (a tint as it is seen on a
+// surface), and may fit its lightness until it holds the ratio its recipe names on every
 // background it is text on: 4.5:1, or a little over for a fixed role on the surfaces.
 
 import { words } from "../lib/tokens.ts";
@@ -24,6 +25,9 @@ interface Recipe {
   readonly lighter?: number;
   readonly darker?: number;
   readonly chroma?: number;
+  /** The role it is drawn over, at `alpha`: a tint laid on a surface. */
+  readonly over?: string;
+  readonly alpha?: number;
   readonly text_on?: readonly string[];
   /** The ratio its text is fitted to on `text_on`: the tokens' CSS writes it with every `text_on`. */
   readonly holds?: number;
@@ -119,6 +123,15 @@ function mixed(hex: string, toward: "white" | "black", t: number): string {
   return `#${[1, 3, 5].map((at) => channel(at).toString(16).padStart(2, "0")).join("")}`;
 }
 
+/** `top` at `alpha` over the opaque `under`, blended in sRGB as the toolkits blend, each channel rounded half up. */
+function overlaid(top: string, under: string, alpha: number): string {
+  const channel = (at: number) => {
+    const [t, u] = [top, under].map((hex) => Number.parseInt(hex.slice(at, at + 2), 16)) as [number, number];
+    return Math.min(255, Math.max(0, Math.floor(u + (t - u) * alpha + 0.5)));
+  };
+  return `#${[1, 3, 5].map((at) => channel(at).toString(16).padStart(2, "0")).join("")}`;
+}
+
 /** `colour`'s lightness moved only as far as it takes to hold `minimum` on every one of `backgrounds`. */
 function fitText(colour: string, backgrounds: readonly string[], minimum: number): string {
   const holds = (c: string) => backgrounds.every((bg) => ratio(c, bg) >= minimum);
@@ -155,6 +168,11 @@ function compute(recipe: Recipe, role: (name: string) => string | undefined): st
     lch.l = lch.l * (recipe.lightness ?? 1) + (recipe.lighter ?? 0) - (recipe.darker ?? 0);
     lch.c *= recipe.chroma ?? 1;
     colour = toHex(lch);
+  }
+  if (recipe.over !== undefined && recipe.alpha !== undefined) {
+    const under = role(recipe.over);
+    if (under === undefined) return undefined;
+    colour = overlaid(colour, under, recipe.alpha);
   }
   if (recipe.text_on && recipe.holds !== undefined) {
     const backgrounds = recipe.text_on.map(role);
@@ -209,7 +227,8 @@ export function described(mode: Mode): Described[] {
       ...(recipe.chroma !== undefined ? [`chroma × ${recipe.chroma}`] : []),
     ];
     const fitted = moves.length > 0 ? [`${moves.join(", ")}, fitted into sRGB by its chroma alone`] : [];
+    const laid = recipe.over !== undefined ? [`at ${Math.round((recipe.alpha ?? 0) * 1000) / 10}% over \`${recipe.over}\``] : [];
     const text = recipe.text_on ? [`its lightness fitted to hold ${recipe.holds}:1 on ${recipe.text_on.map((each) => `\`${each}\``).join(", ")}`] : [];
-    return { role, tone, textOn: recipe.text_on ?? [], words: [start, ...fitted, ...text].join("; ") };
+    return { role, tone, textOn: recipe.text_on ?? [], words: [start, ...fitted, ...laid, ...text].join("; ") };
   });
 }

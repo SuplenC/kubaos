@@ -664,7 +664,7 @@ fn check_derived(tokens: &Tokens, role: &str, derived: &Derived, found: &mut Vec
         if derived.dark.is_none() || derived.light.is_none() {
             whys.push("gives one mode's recipe without the other's");
         }
-        if derived.mix.is_some() || derived.from.is_some() || derived.moves_oklch() || derived.text_on.is_some() {
+        if derived.mix.is_some() || derived.from.is_some() || derived.moves_oklch() || derived.over.is_some() || derived.text_on.is_some() {
             whys.push("gives a recipe of its own beside each mode's");
         }
     }
@@ -703,6 +703,12 @@ fn check_derived(tokens: &Tokens, role: &str, derived: &Derived, found: &mut Vec
         }
         if recipe.at_lightness.is_some_and(|at| !(0.0..=1.0).contains(&at)) {
             whys.push("sets a lightness outside 0..=1");
+        }
+        if recipe.over.is_some() != recipe.opacity.is_some() {
+            whys.push("gives `over` without `opacity`, or `opacity` without `over`");
+        }
+        if recipe.opacity.as_ref().is_some_and(|name| !tokens.opacity.contains_key(name)) {
+            whys.push("names an opacity `[opacity]` hasn't got");
         }
     }
     let known = |name: &String| colors.source.contains_key(name) || colors.derived.contains_key(name);
