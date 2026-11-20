@@ -1,0 +1,53 @@
+/* The WeatherSky page's sample cards: a sky at the three sizes the clock popup draws it at, with a
+   stand-in for the text the popup lays on it. The popup's own mockup sets the cards' measures and
+   their text; these are the sizes the approved prototype was judged at. */
+.ws-card {
+  flex: none;
+  border-radius: var(--radius-content);
+}
+
+.ws-card[data-size="home"] {
+  /* design-allow(size): the home card's size in the approved prototype, until the popup's mockup sets it. */
+  width: calc(370 * var(--px));
+  height: calc(112 * var(--px));
+}
+
+.ws-card[data-size="banner"] {
+  /* design-allow(size): the weather view's banner in the approved prototype, until the popup's mockup sets it. */
+  width: calc(556 * var(--px));
+  height: calc(132 * var(--px));
+}
+
+.ws-card[data-size="city"] {
+  /* design-allow(size): a city's still card in the approved prototype, until the popup's mockup sets it. */
+  width: calc(133 * var(--px));
+  height: calc(92 * var(--px));
+  border-radius: var(--radius-control);
+}
+
+/* The sample's text, laid straight on the picture with the halo words on a picture take
+   (`size.halo`, `opacity.halo`). */
+.ws-text {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-s16);
+  height: 100%;
+  padding: var(--space-s16);
+  box-sizing: border-box;
+  text-shadow:
+    0 0 var(--size-halo_edge) rgb(from var(--color-surface) r g b / var(--opacity-halo_edge)),
+    0 0 var(--size-halo) rgb(from var(--color-surface) r g b / var(--opacity-halo));
+}
+
+.ws-card[data-size="city"] .ws-text {
+  gap: var(--space-s4);
+  padding: var(--space-s8);
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.ws-lines {
+  display: flex;
+  flex-direction: column;
+}

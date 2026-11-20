@@ -89,6 +89,7 @@ mockups/popover     design/mockups/src/pages/molecules/popover.ts
 mockups/menu        design/mockups/src/pages/molecules/menu.ts
 mockups/prompt      design/mockups/src/pages/molecules/prompt.ts design/mockups/src/lib/prompt.ts design/mockups/src/lib/prompt.css design/mockups/src/pages/shell/counters-parts.ts design/mockups/src/pages/shell/counters.css design/mockups/src/lib/rolling-number.css design/mockups/src/lib/rolling-number.ts design/mockups/src/pages/notifications.css design/mockups/src/pages/notifications.ts design/mockups/src/pages/shell/bar-parts.ts design/mockups/src/pages/shell/bar-audio-parts.ts design/mockups/src/pages/shell/bar.css design/mockups/src/pages/shell/workspaces.css design/mockups/src/pages/shell/workspaces.ts design/mockups/src/lib/marquee.ts design/mockups/src/lib/marquee.css
 mockups/calendar    design/mockups/src/pages/molecules/calendar.ts
+mockups/weather-sky design/mockups/src/pages/molecules/weather-sky.ts design/mockups/src/pages/molecules/weather-sky.css design/mockups/src/lib/weather-sky.ts design/mockups/src/lib/weather-sky.css design/mockups/src/lib/weather-sky-gl.ts design/mockups/src/lib/weather-sky-data.ts
 mockups/tile        design/mockups/src/pages/molecules/tile.ts
 mockups/collapsible design/mockups/src/pages/molecules/collapsible.ts
 mockups/dialog      design/mockups/src/pages/molecules/dialog.ts
