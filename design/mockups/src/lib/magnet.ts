@@ -2,8 +2,11 @@
 // place it can land in has a zone, a rectangle of the place's shape centred in it, `scale.snap` of
 // its width and height. The pointer in a zone proposes that place, and the thing snaps into it;
 // in none, it is at the hand. Where two zones meet, the nearer middle wins. The same boundary takes
-// it in and lets it out, with nothing remembered between moves.
+// it in and lets it out, with nothing remembered between moves. Held over a place that has no room
+// (a full group), the carried thing is refused: it dims to `opacity.locked` (`magnet.css`) and goes
+// back where it came from when let go.
 
+import "./magnet.css";
 import { number } from "./tokens.ts";
 
 export interface Rect {
@@ -40,6 +43,12 @@ export function zoneOf<T>(place: Rect, target: T, share = catchShare(place)): Zo
 /** Whether `point` is in `box`: its start edges in, its end edges out, so two boxes that touch never share a point. */
 export function inside(point: Point, box: Rect): boolean {
   return point.x >= box.x && point.x < box.x + box.w && point.y >= box.y && point.y < box.y + box.h;
+}
+
+/** Marks `element`, a carried thing, refused where it is held, or not: it dims while refused. */
+export function refuse(element: HTMLElement, refused: boolean): void {
+  element.classList.add("k-carried");
+  element.toggleAttribute("data-refused", refused);
 }
 
 /** What the zone `point` is in proposes, the nearest middle's where zones meet; null in none. */

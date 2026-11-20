@@ -72,6 +72,20 @@ function growingSample(): HTMLElement {
   return cell;
 }
 
+/** A kanji numeral's glyphs, 一 to 十, as a workspace's number reads in kanji. */
+const KANJI = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+
+/** 九 to 十 and back, a second apart while it is shown live: a kanji numeral rolls as a digit does. */
+function kanjiSample(): HTMLElement {
+  const made = rollingNumber({ value: 9, widest: KANJI[0]!, format: (each) => KANJI[each - 1]!, figures: KANJI.join(""), style: "accent" });
+  const cell = document.createElement("span");
+  cell.className = "rn-cell";
+  cell.append(made.element);
+  const tick = () => made.element.isConnected && (made.set(made.value() === 9 ? 10 : 9), setTimeout(tick, 1000));
+  if (CHROME) setTimeout(tick, 1000);
+  return cell;
+}
+
 export default page<"rest">({
   level: "atoms",
   slug: "rolling-number",
@@ -88,6 +102,7 @@ export default page<"rest">({
     { name: "Going down", for: "the new figure in from above", sample: () => rollingMidway(100, 99, WIDEST) },
     { name: "A clock", for: "figures roll, colons keep their place: a player's time", sample: clockSample },
     { name: "One figure to two", for: "9 ↔ 10 centred: its box eases its width with the roll", sample: growingSample },
+    { name: "Kanji", for: "九 ↔ 十, one glyph to a slot, rolling as digits do", sample: kanjiSample },
   ],
   sizes: doesntApply("one size: `mono_large`, a counter's value beside its buttons."),
   states: {

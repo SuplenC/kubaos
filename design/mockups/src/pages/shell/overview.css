@@ -264,11 +264,6 @@
   box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
 }
 
-/* Refused by a full group: it dims, and goes back where it came from when let go. */
-.ov-ws[data-refused] {
-  opacity: var(--opacity-locked);
-}
-
 /* ── A window ────────────────────────────────────────────────────────────────────────────────── */
 
 /* At its tile on its desktop; carried, where its pose puts it. Its corner is the frame's less the
@@ -331,10 +326,6 @@
     calc(var(--radius-surface) - var(--space-s8)),
     calc((var(--radius-control) - var(--space-s8) * var(--ov-sx)) / var(--ov-sx))
   );
-}
-
-.ov-win[data-refused] {
-  opacity: var(--opacity-locked);
 }
 
 .ov-win[data-landing] {

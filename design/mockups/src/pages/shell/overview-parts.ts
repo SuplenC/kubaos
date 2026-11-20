@@ -18,7 +18,7 @@ import "./overview.css";
 import { tipLine } from "../../lib/banner.ts";
 import { focusRing, steadyGlow } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
-import { catchShare, caught as zoneCaught, inside, type Zone as Caught, zoneOf } from "../../lib/magnet.ts";
+import { catchShare, caught as zoneCaught, inside, refuse, type Zone as Caught, zoneOf } from "../../lib/magnet.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
 import { durationMs, length, number } from "../../lib/tokens.ts";
@@ -1072,7 +1072,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       setSlot(aim, box, first ? "none" : "reflow");
       aim.dataset.shown = "";
     } else delete aim.dataset.shown;
-    if (carry) carry.element.toggleAttribute("data-refused", target?.kind === "refused");
+    if (carry) refuse(carry.element, target?.kind === "refused");
     for (const [group, element] of plusEls) element.toggleAttribute("data-proposed", target?.kind === "plus" && target.group === group);
   }
 
@@ -1889,7 +1889,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     delete root.dataset.carrying;
     // Let go in the reach it stays above the desk: it waits in the slot exactly as it is drawn.
     if (target?.kind !== "bin") delete was.element.dataset.held;
-    delete was.element.dataset.refused;
+    refuse(was.element, false);
     // Let go, it is no longer held: the slot calms from its solid red.
     lightBin(false);
     if (target?.kind === "bin") {

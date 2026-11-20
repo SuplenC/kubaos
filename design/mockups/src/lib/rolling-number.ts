@@ -17,6 +17,9 @@
 // rolls; the box is as wide as the widest value's figures and marks, so a clock that grows an hour
 // keeps its place.
 //
+// Its figures are the digits unless it is given others (`figures`): a kanji numeral's, one glyph to
+// a slot as wide as the widest of them, rolling as a digit does, 十 for ten.
+//
 // Its figures are centred for every figure's mass in their own style, unless an owner sets them on
 // a baseline of its own (`centre`): the bar's workspaces centre each number for one figure in one
 // style, whatever style a number is drawn in, so the pill's numbers share one baseline.
@@ -39,6 +42,11 @@ export interface RollingOptions {
   readonly format?: (value: number) => string;
   readonly style?: TypeStyle;
   readonly color?: string;
+  /**
+   * The glyphs that roll, one to a slot, when they are not the digits: a kanji numeral's, 一 to 十.
+   * Each slot is as wide as the widest of them; anything else is a mark.
+   */
+  readonly figures?: string;
   /** The words and style every figure is centred for, when not every figure in its own style. */
   readonly centre?: { readonly style: TypeStyle; readonly words: string };
 }
@@ -65,10 +73,10 @@ interface Centre {
 }
 
 /** One figure in its slot's ink, centred for `centre`'s mass, every figure's in its own style without one. */
-function figure(char: string, style: TypeStyle, color: string, centre?: Centre): HTMLElement {
+function figure(char: string, style: TypeStyle, color: string, centre?: Centre, figures = FIGURES): HTMLElement {
   const made = text(char, style, color);
   made.classList.add("k-roll-figure");
-  centreFor(made, centre?.style ?? style, centre?.words ?? FIGURES);
+  centreFor(made, centre?.style ?? style, centre?.words ?? figures);
   return made;
 }
 
@@ -80,23 +88,28 @@ function markText(char: string, style: TypeStyle, color: string): HTMLElement {
 }
 
 /** Whether `char` is a mark, written between figures and never rolled: a clock's colon. */
-function isMark(char: string): boolean {
-  return char !== "" && char !== " " && !FIGURES.includes(char);
+function isMark(char: string, figures = FIGURES): boolean {
+  return char !== "" && char !== " " && !figures.includes(char);
 }
 
 /** Makes `box` a figure's slot, or a mark's as wide as `char`'s own advance. */
-function shape(box: HTMLElement, char: string, style: TypeStyle): void {
-  const mark = isMark(char);
+function shape(box: HTMLElement, char: string, style: TypeStyle, figures = FIGURES): void {
+  const mark = isMark(char, figures);
   box.toggleAttribute("data-mark", mark);
   box.style.setProperty("--mark", mark ? String(advance(style, char)) : "");
 }
 
+/** A figure's room in `style`: a tabular digit's, or the widest of `figures` when they are not digits. */
+function figureWidth(style: TypeStyle, figures: string): number {
+  return figures === FIGURES ? tabularFigure(style) : Math.max(...[...figures].map((char) => advance(style, char)));
+}
+
 /** A slot one figure wide, holding `char`, or nothing for a figure the count hasn't got; a mark's as wide as it. */
-function slot(char: string, style: TypeStyle, color: string, centre?: Centre): HTMLElement {
+function slot(char: string, style: TypeStyle, color: string, centre?: Centre, figures = FIGURES): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-roll-slot";
-  shape(box, char, style);
-  if (char.trim()) box.append(isMark(char) ? markText(char, style, color) : figure(char, style, color, centre));
+  shape(box, char, style, figures);
+  if (char.trim()) box.append(isMark(char, figures) ? markText(char, style, color) : figure(char, style, color, centre, figures));
   return box;
 }
 
@@ -112,18 +125,19 @@ export function rollingNumber(options: RollingOptions): Rolling {
   const style = options.style ?? "mono_large";
   const color = options.color ?? "on_surface";
   const centre = options.centre;
+  const figures = options.figures ?? FIGURES;
   const element = document.createElement("span");
   element.className = "k-rolling";
   element.setAttribute("role", "status");
   const format = options.format ?? ((value: number) => COUNT.format(value));
   const widest = [...options.widest];
-  element.style.setProperty("--slots", String(widest.filter((char) => !isMark(char)).length));
-  element.style.setProperty("--marks", widest.filter(isMark).map((char) => `round(up, calc(${advance(style, char)} * var(--px) - 0.001px), 1px)`).join(" + ") || "0px");
-  element.style.setProperty("--figure", String(tabularFigure(style)));
+  element.style.setProperty("--slots", String(widest.filter((char) => !isMark(char, figures)).length));
+  element.style.setProperty("--marks", widest.filter((char) => isMark(char, figures)).map((char) => `round(up, calc(${advance(style, char)} * var(--px) - 0.001px), 1px)`).join(" + ") || "0px");
+  element.style.setProperty("--figure", String(figureWidth(style, figures)));
   element.style.setProperty("--t-line", `var(--type-${style}-line)`);
   let value = options.value;
   let shown = format(value);
-  element.append(...[...shown].map((char) => slot(char, style, color, centre)));
+  element.append(...[...shown].map((char) => slot(char, style, color, centre, figures)));
   element.setAttribute("aria-label", shown);
   let resizing: Animation | null = null;
   // Its widest value's width, the least it is ever drawn at, as `.k-rolling`'s `min-width` has it.
@@ -132,12 +146,12 @@ export function rollingNumber(options: RollingOptions): Rolling {
   /** A slot's width, as the CSS rounds it: a figure's or a mark's advance at the box's scale, up to a whole pixel. */
   function roomOf(char: string): number {
     const scale = (element.isConnected && Number.parseFloat(getComputedStyle(element).getPropertyValue("--scale"))) || settings().scale;
-    return Math.ceil((isMark(char) ? advance(style, char) : tabularFigure(style)) * scale - 0.001);
+    return Math.ceil((isMark(char, figures) ? advance(style, char) : figureWidth(style, figures)) * scale - 0.001);
   }
 
   /** What `boxes` take side by side, the box never under its widest value. */
   function across(boxes: readonly HTMLElement[]): number {
-    return Math.max(least, boxes.reduce((sum, box) => sum + roomOf(box.hasAttribute("data-mark") ? box.textContent ?? "" : "0"), 0));
+    return Math.max(least, boxes.reduce((sum, box) => sum + roomOf(box.hasAttribute("data-mark") ? box.textContent ?? "" : figures[0]!), 0));
   }
 
   function set(next: number): void {
@@ -154,7 +168,7 @@ export function rollingNumber(options: RollingOptions): Rolling {
     const words = format(next);
     const width = Math.max(words.length, shown.length);
     const [was, now] = [shown.padStart(width, " "), words.padStart(width, " ")];
-    while (slotsOf(element).length < width) element.prepend(slot("", style, color, centre));
+    while (slotsOf(element).length < width) element.prepend(slot("", style, color, centre, figures));
     const slots = slotsOf(element);
     const reduced = settings().reduced;
     slots.forEach((box, index) => {
@@ -163,13 +177,13 @@ export function rollingNumber(options: RollingOptions): Rolling {
       for (const left of box.querySelectorAll("[data-out]")) left.remove();
       // A mark changes in place, never rolling: a slot that turns from a figure to a mark or back
       // takes its new width at once.
-      if (isMark(char) || isMark(was[index]!) || box.hasAttribute("data-mark")) {
-        shape(box, char, style);
-        box.replaceChildren(...(char ? [isMark(char) ? markText(char, style, color) : figure(char, style, color, centre)] : []));
+      if (isMark(char, figures) || isMark(was[index]!, figures) || box.hasAttribute("data-mark")) {
+        shape(box, char, style, figures);
+        box.replaceChildren(...(char ? [isMark(char, figures) ? markText(char, style, color) : figure(char, style, color, centre, figures)] : []));
         return;
       }
       const old = box.querySelector<HTMLElement>(".k-roll-figure");
-      const fresh = char ? figure(char, style, color, centre) : null;
+      const fresh = char ? figure(char, style, color, centre, figures) : null;
       if (reduced) {
         old?.remove();
         if (fresh) box.append(fresh);
@@ -195,10 +209,10 @@ export function rollingNumber(options: RollingOptions): Rolling {
     // width is already the new figures' and nothing moves when the slot goes.
     const staying = slotsOf(element).filter((box) => !box.hasAttribute("data-shed"));
     const after = across(staying);
-    let right = staying.reduce((sum, box) => sum + roomOf(box.hasAttribute("data-mark") ? box.textContent ?? "" : "0"), 0);
+    let right = staying.reduce((sum, box) => sum + roomOf(box.hasAttribute("data-mark") ? box.textContent ?? "" : figures[0]!), 0);
     for (const box of slotsOf(element).filter((each) => each.hasAttribute("data-shed")).reverse()) {
       box.style.right = `${right}px`;
-      right += roomOf("0");
+      right += roomOf(figures[0]!);
     }
     if (!reduced && Math.abs(after - before) >= 0.5) {
       element.dataset.resizing = "";
