@@ -25,7 +25,10 @@
 // off the pill the hole goes home. Over another group, that group takes a `primary` outline; over a
 // group's ghost, the hole is its last place. Let go, the disc flies into the hole over `medium` on
 // `emphasized_decel`. A slide moves a slot's content, never its piece of a group's tint, so the
-// tint stays one band. The shown workspace is where its windows are, so the indicator follows them.
+// tint stays one band, and a slot going out stays in its group. The shown workspace is where its
+// windows are, so the indicator follows them, gliding within a group. Carried itself, the shown
+// workspace's place is a hole like any other's: the indicator narrows out of its place as it lifts
+// and widens into its new one as it lands, never crossing a rule, a gap or a name.
 // Nothing in the pill is selected by a press or a drag.
 //
 // A right click opens its menu (`lib/menu.ts`) on a popover under it: on a workspace, its own
@@ -408,8 +411,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     entries = entriesNow();
     content.replaceChildren(...entries.map(slot));
     const at = cellsTo(active);
-    indicator.style.setProperty("--ws-start", String(at));
-    indicator.style.setProperty("--ws-end", String(at + 1));
+    indicator.style.setProperty("--ws-start", String(away ? at + 0.5 : at));
+    indicator.style.setProperty("--ws-end", String(away ? at + 0.5 : at + 1));
   }
 
   /** What of a slot slides: its content, not its piece of the tint or of the drop outline. */
@@ -505,12 +508,26 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       grow(gone, presence(gone), 0, duration, curve);
       leaving.push(gone);
     }
-    for (const gone of leaving) next.splice(Math.min(next.length, at.get(gone) ?? next.length), 0, gone);
+    // A slot going out keeps its group's outline only while its group still takes the drop.
+    const taking = entries.find((entry) => entry.taking)?.block;
+    for (const gone of leaving) if (Number(gone.dataset.block) !== taking) gone.querySelector(".shell-ws-drop")?.remove();
+    // A slot going out stays in its group: just before what followed it, or after what came before.
+    const order = [...at.keys()];
+    for (const gone of leaving.sort((a, b) => at.get(a)! - at.get(b)!)) {
+      const from = at.get(gone)!;
+      const after = order.slice(from + 1).find((each) => next.some((made) => made.dataset.key === each.dataset.key && !made.hasAttribute("data-gone")));
+      const before = order.slice(0, from).reverse().find((each) => next.some((made) => made.dataset.key === each.dataset.key));
+      const anchor = after ? next.findIndex((made) => made.dataset.key === after.dataset.key && !made.hasAttribute("data-gone")) : before ? next.findIndex((made) => made.dataset.key === before.dataset.key) + 1 : next.length;
+      next.splice(anchor, 0, gone);
+    }
     content.replaceChildren(...next);
     if (!slides) return;
     for (const [key, made] of kept) {
       const from = was.get(key)! - made.offsetLeft;
-      if (Math.abs(from) < 0.5 || ms("medium") === 0) continue;
+      // Only a workspace's slot slides, and only by whole slots: a group's name and the rule move
+      // with the widths round them, and a pixel left by a slot still growing or going is no slide.
+      const kind = made.dataset.kind;
+      if (kind === "label" || kind === "gap" || Math.abs(from) < cssPx("size-chip") / 2 || ms("medium") === 0) continue;
       // Its content slides out of its box, which shows it while it does.
       made.dataset.sliding = "";
       const slides_ = sliding(made).map((each) => each.animate([{ translate: `${from}px 0` }, { translate: "0 0" }], { duration: ms("medium"), easing: easing("standard_decel") }));
@@ -520,6 +537,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /** The indicator onto the shown workspace's place: its leading edge over `lead`, its trailing one over `trail`. */
   function indicate(lead: string, trail: string, curve: string): void {
+    if (away) return;
     const target = cellsTo(active);
     const from = getComputedStyle(indicator);
     const start = Number.parseFloat(from.getPropertyValue("--ws-start"));
@@ -530,6 +548,44 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     indicator.style.setProperty("--ws-end", String(target + 1));
     indicator.animate([{ "--ws-start": start }, { "--ws-start": target }], { duration: ms(right ? trail : lead), easing: easing(curve) });
     indicator.animate([{ "--ws-end": end }, { "--ws-end": target + 1 }], { duration: ms(right ? lead : trail), easing: easing(curve) });
+  }
+
+  /**
+   * Whether the indicator has left: the shown workspace is carried, its place a hole, and the
+   * indicator is drawn on no place until it lands.
+   */
+  let away = false;
+
+  /**
+   * The indicator leaves its place, as a hole leaves a group: a circle shrinking into its middle
+   * over `medium` on `standard_decel`, where it is, crossing nothing.
+   */
+  function leave(): void {
+    if (away) return;
+    away = true;
+    const from = getComputedStyle(indicator);
+    const start = Number.parseFloat(from.getPropertyValue("--ws-start"));
+    const end = Number.parseFloat(from.getPropertyValue("--ws-end"));
+    const middle = (start + end) / 2;
+    for (const running of indicator.getAnimations()) running.cancel();
+    indicator.style.setProperty("--ws-start", String(middle));
+    indicator.style.setProperty("--ws-end", String(middle));
+    const timing = { duration: ms("medium"), easing: easing("standard_decel") };
+    indicator.animate([{ "--ws-start": start }, { "--ws-start": middle }], timing);
+    indicator.animate([{ "--ws-end": end }, { "--ws-end": middle }], timing);
+  }
+
+  /** The indicator arrives at the shown workspace's place, as a hole comes into a group: a circle growing from its middle over `medium` on `standard_decel`. */
+  function arrive(): void {
+    if (!away) return;
+    away = false;
+    const target = cellsTo(active);
+    for (const running of indicator.getAnimations()) running.cancel();
+    indicator.style.setProperty("--ws-start", String(target));
+    indicator.style.setProperty("--ws-end", String(target + 1));
+    const timing = { duration: ms("medium"), easing: easing("standard_decel") };
+    indicator.animate([{ "--ws-start": target + 0.5 }, { "--ws-start": target }], timing);
+    indicator.animate([{ "--ws-end": target + 0.5 }, { "--ws-end": target + 1 }], timing);
   }
 
   /** Shows the workspace of `key`: a ghost becomes a workspace and its group keeps a new ghost after it; an empty one left goes. */
@@ -621,11 +677,15 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   let base: Point = { x: 0, y: 0 };
   let easings: Animation[] = [];
 
-  /** A point in the pill's CSS pixels, in the viewport's, where the disc is drawn. */
+  /**
+   * A point in the pill's CSS pixels, from the viewport's corner in the disc's own pixels: the page
+   * may be zoomed, and the disc, fixed to the viewport, is zoomed with it, so the pill's corner is
+   * taken out of the zoom the pill is drawn at.
+   */
   function client(point: Point): Point {
     const box = element.getBoundingClientRect();
-    const ratio = box.width / Math.max(1, element.offsetWidth);
-    return { x: box.left + point.x * ratio, y: box.top + point.y * ratio };
+    const unzoom = element.offsetWidth / Math.max(1, box.width);
+    return { x: box.left * unzoom + point.x, y: box.top * unzoom + point.y };
   }
 
   /** Puts the disc's base at `at`, a point of the pill's; with `over`, it eases there from where it is drawn now. */
@@ -669,10 +729,15 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     carry = { key, from: bands, home, landing: home, snapped: false, disc: makeDisc(bands.flatMap((band) => band.spaces).find((each) => each.key === key)!.id), landed: false, anchor: null };
     zoneCache = null;
     element.dataset.carrying = "";
+    // The shown workspace carried, its place is a hole like any other's: the indicator leaves it.
+    if (key === active) {
+      if (pointer) leave();
+      else away = true;
+    }
     render(false);
     base = client(holeCentre());
     discTo(carry.disc, holeCentre());
-    if (!pointer) return void (landing && propose(landing, false));
+    if (!pointer) return landing ? propose(landing, false) : draw();
     carry.snapped = same(caught(pointer, zones()), home);
     discTo(carry.disc, carry.snapped ? holeCentre() : pointer, { duration: "short", curve: "standard" });
   }
@@ -728,7 +793,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       carry = null;
       delete element.dataset.carrying;
       render(false);
-      indicate("medium", "medium", "standard_decel");
+      if (away) arrive();
+      else indicate("medium", "medium", "standard_decel");
     };
     if (flight) flight.finished.then(done, done);
     else done();

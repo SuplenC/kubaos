@@ -81,7 +81,9 @@
   width: round(down, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
 }
 
-.shell-ws-slot > * {
+/* A slot's content fades as it comes and goes; its piece of a group's tint or outline does not, so
+   the band stays whole while the slot narrows. */
+.shell-ws-slot > :not(.shell-ws-tint, .shell-ws-drop) {
   opacity: var(--ws-shown);
 }
 
@@ -129,13 +131,16 @@
   border-end-end-radius: var(--radius-full);
 }
 
+/* The indicator: as wide as its edges are apart, a cell tall; narrower than a cell, as it leaves
+   or arrives, a circle as wide, so it shrinks and grows as a hole does. */
 .shell-ws-indicator {
+  --ws-wide: max(0px, round(nearest, calc((var(--ws-end) - max(0, var(--ws-start))) * var(--size-chip)), 1px));
   position: absolute;
   z-index: 1;
-  top: 0;
+  top: round(down, calc((var(--size-chip) - min(var(--size-chip), var(--ws-wide))) / 2), 1px);
   left: round(nearest, calc(max(0, var(--ws-start)) * var(--size-chip)), 1px);
-  width: max(0px, round(nearest, calc((var(--ws-end) - max(0, var(--ws-start))) * var(--size-chip)), 1px));
-  height: var(--size-chip);
+  width: var(--ws-wide);
+  height: min(var(--size-chip), var(--ws-wide));
   border-radius: var(--radius-full);
   background: var(--color-primary);
 }
