@@ -4085,6 +4085,22 @@
   height: var(--size-control_md);
 }
 
+/* Without its week numbers the month is the seven days wide. */
+.k-calendar[data-unnumbered] {
+  width: calc(7 * var(--size-control_md));
+}
+
+/* Today's week on a soft band: the content colour at the state layer's lit share, a pill. */
+.k-cal-week[data-this-week] {
+  border-radius: var(--radius-full);
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-hover));
+}
+
+.k-cal-week-line {
+  display: block;
+  padding-inline: round(down, calc((var(--size-control_md) - var(--size-control_sm)) / 2), 1px);
+}
+
 .k-cal-weeks {
   display: block;
   translate: round(nearest, calc(var(--cal-slide) * var(--from, 1) * var(--space-s64)), 1px) 0;

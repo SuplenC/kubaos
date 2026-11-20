@@ -9,6 +9,10 @@
 // holiday has a `tertiary` dot under its number and its name in a hint; the days of the months
 // around are dimmed to `opacity.disabled_content`. The first weekday is the owner's.
 //
+// Its owner may leave out the week numbers' column and tell the week instead by a line under the
+// month, `small` in `on_surface_variant`: the week of the row the pointer is over, today's when it
+// is over none, today's week lying on a soft band (the content colour at `opacity.hover`, a pill).
+//
 // A day is a control in the state model (`.k-control` in `lib.css`): lit, its tube burns inside its
 // disc's edge, today's core inside its fill. The month grid is one stop for Tab: the arrows move a
 // day or a week, Page Up and Page Down a month, Home and End to the week's ends, and the pointer
@@ -50,6 +54,15 @@ export interface CalendarOptions {
   readonly pinned?: Pinned;
   /** The side the shown month came from, for a move's sample: 1 the next, -1 the last. */
   readonly from?: 1 | -1;
+  /** Each week led by its number; true unless set. */
+  readonly weekNumbers?: boolean;
+  /**
+   * Today's week on a soft band, and a line under the month naming the week of the row the pointer
+   * is over, today's when it is over none: the week told without a column of numbers.
+   */
+  readonly weekLine?: boolean;
+  /** Told of each day picked, by a click or Enter. */
+  readonly onPick?: (day: Day) => void;
 }
 
 const DAY_MS = 86_400_000;
@@ -203,9 +216,12 @@ export function calendar(options: CalendarOptions): HTMLElement {
   let picked = options.picked;
   let current: Day = options.current ?? picked ?? options.today;
   let yearView = options.year ?? false;
+  const numbered = options.weekNumbers ?? true;
+  const todaysWeek = isoWeek(options.today);
 
   const root = document.createElement("span");
   root.className = "k-calendar";
+  root.toggleAttribute("data-unnumbered", !numbered);
 
   const monthTitle = new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" });
   const shortMonth = new Intl.DateTimeFormat(locale, { month: "short", timeZone: "UTC" });
@@ -239,11 +255,19 @@ export function calendar(options: CalendarOptions): HTMLElement {
   year.setAttribute("role", "grid");
   body.append(grid, year);
   root.append(head, body);
+  const weekLine = document.createElement("span");
+  weekLine.className = "k-cal-week-line";
+  if (options.weekLine) root.append(weekLine);
+
+  /** The line under the month says week `number`. */
+  function sayWeek(number: number): void {
+    weekLine.replaceChildren(text(`Week ${number}`, "small", "on_surface_variant"));
+  }
+  rows.addEventListener("pointerleave", () => sayWeek(todaysWeek));
 
   /** The weekdays' names from the first weekday: two letters, as the build has them. */
   function drawNames(): void {
-    const week = centred("Wk", "caption", "on_surface_variant");
-    const cells = [week];
+    const cells = numbered ? [centred("Wk", "caption", "on_surface_variant")] : [];
     for (let n = 0; n < 7; n++) {
       const day = (first + n) % 7;
       // 2023-01-01 was a Sunday.
@@ -263,7 +287,7 @@ export function calendar(options: CalendarOptions): HTMLElement {
   function drawWeeks(): void {
     const made = weeks(shown.year, shown.month, first).map((days) => {
       const thursday = days.find((day) => weekday(day) === 4)!;
-      const number = box(centred(String(isoWeek(thursday)), "caption", "on_surface_variant"), "k-cal-week-number");
+      const number = isoWeek(thursday);
       const cells = days.map((day) => {
         const look: DayLook = {
           day,
@@ -284,7 +308,9 @@ export function calendar(options: CalendarOptions): HTMLElement {
       const week = document.createElement("span");
       week.className = "k-cal-week";
       week.setAttribute("role", "row");
-      week.append(number, ...cells);
+      week.append(...(numbered ? [box(centred(String(number), "caption", "on_surface_variant"), "k-cal-week-number")] : []), ...cells);
+      week.toggleAttribute("data-this-week", options.weekLine === true && days.some((day) => same(day, options.today)));
+      if (options.weekLine) week.addEventListener("pointerenter", () => sayWeek(number));
       return week;
     });
     rows.replaceChildren(...made);
@@ -366,6 +392,7 @@ export function calendar(options: CalendarOptions): HTMLElement {
 
   function pick(day: Day): void {
     picked = day;
+    options.onPick?.(day);
     current = day;
     if (day.month !== shown.month || day.year !== shown.year) goTo(day);
     for (const cell of rows.querySelectorAll<HTMLElement>(".k-cal-day")) {
@@ -445,6 +472,7 @@ export function calendar(options: CalendarOptions): HTMLElement {
 
   drawNames();
   drawWeeks();
+  sayWeek(todaysWeek);
   if (yearView) drawYear();
   show();
   new ResizeObserver(placeTitle).observe(head);
