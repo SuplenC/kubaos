@@ -2917,6 +2917,19 @@
 }
 
 
+/* A group's heading: a quiet line, its words inset as the items' are, so they start `space.s12`
+   from the popover's edge. It stands clear of its first item's words as a list's section label
+   stands clear of its first row's: `space.s8` over it, `space.s12` under it, before the item's own
+   room round its words. */
+.k-menu-heading {
+  display: block;
+  flex: none;
+  align-self: stretch;
+  padding: var(--space-s8) var(--space-s8) var(--space-s12);
+  cursor: default;
+  user-select: none;
+}
+
 /* How far a select is open, 0 to 1: its surface grows, rises and lifts its fill, its hairline goes
    and its chevron turns, all together. */
 @property --select-open {

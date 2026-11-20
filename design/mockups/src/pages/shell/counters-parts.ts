@@ -10,7 +10,7 @@ import { withHint } from "../../lib/hint.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { divider, filling, row, stack } from "../../lib/layout.ts";
 import { flush, listRow, listRows, scrolled, well } from "../../lib/list.ts";
-import { type MenuEntry, menu, menuSeparator } from "../../lib/menu.ts";
+import { isItem, type MenuEntry, menu, menuSeparator } from "../../lib/menu.ts";
 import { pill } from "../../lib/pill.ts";
 import { floatUnder, type PromptHeld, prompt } from "../../lib/prompt.ts";
 import { rollingNumber } from "../../lib/rolling-number.ts";
@@ -407,7 +407,7 @@ const TAKES = ["rename", "reset", "auto", "history", "", "remove"] as const;
 
 /** A counter's menu on its popover. */
 export function counterMenu(counter: Counter, options: { current?: number; holding?: number; hooks?: MenuHooks } = {}): HTMLElement {
-  const entries = menuEntries(counter).map((entry) => (entry !== "separator" && entry.held && options.holding !== undefined ? { ...entry, holding: options.holding } : entry));
+  const entries = menuEntries(counter).map((entry) => (isItem(entry) && entry.held && options.holding !== undefined ? { ...entry, holding: options.holding } : entry));
   const list = menu(entries, {
     ...(options.current !== undefined ? { current: options.current, ...(options.holding !== undefined ? { pinned: "lit" as const } : {}) } : {}),
     ...(options.hooks

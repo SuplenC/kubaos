@@ -574,11 +574,9 @@ function moreEntries(state: PlayerState, rung: number): MenuEntry[] {
   return [...joined, ...(joined.length > 0 ? (["separator"] as const) : []), ...visualiser, { label: `Speed · ${speedWords(state.speed ?? 1)}`, icon: "speed", submenu: true }, { label: "Screenshot", icon: "photo_camera", keys: "S" }];
 }
 
-/** A popover's menu with a heading over it: the tracks' two groups. */
+/** A popover's menu headed by its group's name: the tracks' two groups. */
 function group(heading: string, entries: readonly MenuEntry[]): HTMLElement {
-  const title = text(heading, "label", "on_surface_variant");
-  title.classList.add("mp-menu-heading");
-  return stack(0, "start", title, menu(entries));
+  return menu([{ heading }, ...entries]);
 }
 
 /** What a button of the controller opens, on a popover by it. */

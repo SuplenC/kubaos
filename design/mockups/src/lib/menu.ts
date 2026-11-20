@@ -7,7 +7,9 @@
 // − `space.s4`), and `space.s8` inside, so its words start `space.s12` from the popover's edge. An
 // item holds an optional symbol, 16, its words in `body` on one line, the keys that do the same as
 // keycaps at its end, and a check whose room is kept when unchecked. A hairline, inset to the words
-// and `space.s4` clear of each side, separates groups. The item the keyboard is on is lit, on
+// and `space.s4` clear of each side, separates groups. A heading names the group under it: a quiet
+// line in `label` and `on_surface_variant`, inset to the words, `space.s8` above it and `space.s12`
+// under, cut with an ellipsis; it is no item, so the keys and the pointer pass over it. The item the keyboard is on is lit, on
 // `secondary_container`, its keycaps in `primary`; the pointer moving onto an item puts the
 // keyboard on it, so one item is current at a time, but an item the pointer put there is quiet: the
 // state layer, a faint shape at its radius, no container (`data-pointer`). One that destroys something is in `error`; one that
@@ -61,8 +63,18 @@ export interface MenuItemSpec {
   readonly holding?: number;
 }
 
-/** An entry of a menu: an item, or the hairline between two groups. */
-export type MenuEntry = MenuItemSpec | "separator";
+/** A group's name over its items: no item, never lit or taken. */
+export interface MenuHeading {
+  readonly heading: string;
+}
+
+/** An entry of a menu: an item, the hairline between two groups, or a group's heading. */
+export type MenuEntry = MenuItemSpec | MenuHeading | "separator";
+
+/** Whether `entry` is an item, not a hairline or a heading. */
+export function isItem(entry: MenuEntry | undefined): entry is MenuItemSpec {
+  return entry !== undefined && entry !== "separator" && !("heading" in entry);
+}
 
 /**
  * A state an item is pinned in, as the specimens pin them: the keyboard on it, the pointer over it,
@@ -160,6 +172,16 @@ export function menuSeparator(): HTMLElement {
   return rule;
 }
 
+/** A group's heading: its name in `label`, `on_surface_variant`, inset as the items' words are. */
+export function menuHeading(words: string): HTMLElement {
+  const line = clamped(words, "label", "on_surface_variant");
+  const heading = document.createElement("span");
+  heading.className = "k-menu-heading";
+  heading.setAttribute("role", "presentation");
+  heading.append(line);
+  return probe(heading, { role: "component", name: "MenuHeading", variant: "", fixed: { width: false, height: false } });
+}
+
 export interface MenuOptions {
   /** The item the keyboard is on, by its index among the entries. */
   readonly current?: number;
@@ -175,7 +197,7 @@ export interface MenuOptions {
 
 /** Whether `entry` can be taken: an item that isn't disabled. */
 function takes(entry: MenuEntry | undefined): entry is MenuItemSpec {
-  return entry !== undefined && entry !== "separator" && !entry.disabled;
+  return isItem(entry) && !entry.disabled;
 }
 
 /**
@@ -193,6 +215,7 @@ export function menu(entries: readonly MenuEntry[], options: MenuOptions = {}): 
   const holds = new Map<number, Holding>();
   const items = entries.map((entry, index) => {
     if (entry === "separator") return menuSeparator();
+    if (!isItem(entry)) return menuHeading(entry.heading);
     const item = menuItem(entry, index === current, index === current ? options.pinned : undefined);
     if (takes(entry)) {
       // Only a pointer that moves takes the keyboard: a menu opening under a resting pointer keeps
