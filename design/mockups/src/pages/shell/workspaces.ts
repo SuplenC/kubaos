@@ -18,13 +18,14 @@
 //
 // A workspace, empty or not, can be carried to another place; a `+` cannot. Pressed and moved `space.s8`, it lifts
 // onto a disc raised to step 1 that eases onto the pointer over `short` on `standard`, its place
-// left as a hole, a dashed circle in `outline`; nothing else moves. The disc is in the top layer, so
+// left as a hole, empty space a cell wide; nothing else moves. The disc is in the top layer, so
 // nothing cuts it. The numbers are the places and stay; the windows move. While it is carried there
 // is one hole: the pill as it stood, the workspace taken out and the hole put where it would land,
 // so one group gives up a slot as another takes one and the pill keeps its width. Each place is
 // hit-tested where the hole would stand there, with the Overview's magnet (`lib/magnet.ts`) on it:
 // in a magnet the hole moves there, the cells between slide over and the disc snaps onto it, each
-// over `medium` on `standard_decel`; between magnets the hole stays and the disc follows the hand;
+// over `medium` on `standard_decel`, the disc's number rolling to the one it would get there, so it
+// lands already right; between magnets the hole stays and the disc follows the hand;
 // off the pill the hole goes home. Over another group, that group takes a `primary` outline; over a
 // group's ghost, the hole is its last place. Let go, the disc flies into the hole over `medium` on
 // `emphasized_decel`. A slide moves a slot's content, never its piece of a group's tint, so the
@@ -51,7 +52,7 @@ import { withHint } from "../../lib/hint.ts";
 import { catchShare, caught, type Rect, type Zone, zoneOf } from "../../lib/magnet.ts";
 import { type MenuEntry, type MenuItemSpec, menu } from "../../lib/menu.ts";
 import { probe } from "../../lib/probe.ts";
-import { rollingNumber } from "../../lib/rolling-number.ts";
+import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { advance, centreFor, text, type TypeStyle } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { cubic, durationMs, length } from "../../lib/tokens.ts";
@@ -287,7 +288,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    * hole stands, whether the disc is snapped onto it, and where the disc is held when it is drawn
    * at a place of the pill's rather than at the hand.
    */
-  let carry: { key: string; from: Band[]; home: Landing; landing: Landing; snapped: boolean; disc: HTMLElement; landed: boolean; anchor: (() => Point) | null; number: number } | null = null;
+  let carry: { key: string; from: Band[]; home: Landing; landing: Landing; snapped: boolean; disc: HTMLElement; landed: boolean; anchor: (() => Point) | null; number: number; roll: Rolling | null } | null = null;
   /** The group whose name is being typed over, by block. */
   let renaming: number | null = null;
   let entries: Entry[] = [];
@@ -386,11 +387,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       return box;
     }
     if (entry.kind === "hole") {
-      const hole = document.createElement("span");
-      hole.className = "shell-ws-hole";
-      box.append(hole);
-      // The hole keeps the number the carried windows had, which the cell landing there rolls from.
-      if (carry) box.dataset.number = String(slotOf(carry.number));
+      // The hole stands for the number the disc shows, so the cell landing there has nothing to roll.
+      if (carry) box.dataset.number = String(carry.landing.index + 1);
       return box;
     }
     const cell = document.createElement("span");
@@ -755,20 +753,30 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     return easings[0]!;
   }
 
-  /** The disc the carried workspace rides on: its number, as at its lift. */
-  function makeDisc(id: number): HTMLElement {
+  /**
+   * The disc the carried workspace rides on, its number the one it would get where it is proposed:
+   * a rolling number, as the cells' are, that rolls as the place changes. A kanji is set in place.
+   */
+  function makeDisc(id: number): { disc: HTMLElement; roll: Rolling | null } {
     const disc = raise(document.createElement("span"), 1);
     disc.className += " shell-ws-disc";
-    const number = text(numberText(id, kanji), numberStyle(true, kanji), "on_surface");
-    number.classList.add("shell-ws-number");
-    centreFor(number, numberStyle(true, kanji), kanji ? KANJI[KANJI.length - 1]! : "0");
-    disc.append(number);
+    const centre = { style: numberStyle(true, kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
+    let roll: Rolling | null = null;
+    if (kanji) {
+      const glyph = text(numberText(id, kanji), centre.style, "on_surface");
+      centreFor(glyph, centre.style, centre.words);
+      disc.append(glyph);
+    } else {
+      // As wide as two figures at most: a group's numbers run to 10.
+      roll = rollingNumber({ value: slotOf(id), widest: "0", style: centre.style, color: "on_surface", centre });
+      disc.append(roll.element);
+    }
     // In the top layer, the disc is never cut by the pill or by any box the pill is drawn in; it
     // stays in the pill's tree, so it is drawn in the pill's own tokens.
     disc.popover = "manual";
     element.append(disc);
     disc.showPopover();
-    return disc;
+    return { disc, roll };
   }
 
   /**
@@ -779,7 +787,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function lift(key: string, pointer: Point | null, landing: Landing | null = null): void {
     const home = landingOf(bands, key)!;
     const number = bands.flatMap((band) => band.spaces).find((each) => each.key === key)!.id;
-    carry = { key, from: bands, home, landing: home, snapped: false, disc: makeDisc(number), landed: false, anchor: null, number };
+    const { disc, roll } = makeDisc(number);
+    carry = { key, from: bands, home, landing: home, snapped: false, disc, roll, landed: false, anchor: null, number };
     zoneCache = null;
     element.dataset.carrying = "";
     // The shown workspace carried, its place is a hole like any other's: the indicator leaves it.
@@ -799,6 +808,14 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function propose(landing: Landing, slides: boolean): void {
     if (!carry) return;
     carry.landing = landing;
+    if (slides) carry.roll?.set(landing.index + 1);
+    else if (carry.roll) {
+      // A still shows the disc's number as it stands there, rolled already.
+      const centre = { style: numberStyle(true, kanji), words: "0" };
+      const now = rollingNumber({ value: landing.index + 1, widest: "0", style: centre.style, color: "on_surface", centre });
+      carry.roll.element.replaceWith(now.element);
+      carry.roll = now;
+    }
     bands = carried(carry.from, carry.key, landing);
     if (!slides) return draw();
     render(true);
@@ -838,7 +855,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     const held = carry;
     held.landed = true;
     const flight = discTo(held.disc, holeCentre(), { duration: "medium", curve: "emphasized_decel" });
-    // Landed, the move is made: the cell there rolls from the number the disc carried to its own.
+    // Landed, the move is made: the cell there already shows the number the disc carried.
     const done = () => {
       if (carry !== held) return;
       held.disc.remove();

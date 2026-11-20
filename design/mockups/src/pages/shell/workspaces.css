@@ -166,39 +166,15 @@
   grid-area: 1 / 1;
 }
 
-/* A cell's number: a rolling number (`lib/rolling-number.ts`), as the Overview's are, its figures
-   on whole device pixels across the cell; a kanji centred. */
+/* A cell's number: a rolling number (`lib/rolling-number.ts`), as the Overview's are, or a kanji,
+   centred in its cell by the cell. */
 .shell-ws-number {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--size-chip);
-  height: var(--size-chip);
-}
-
-.shell-ws-number > .k-rolling {
-  margin-right: auto;
-  margin-left: round(down, calc((var(--size-chip) - var(--slots) * var(--slot) - var(--marks, 0px)) / 2), 1px);
 }
 
 /* A group's `+`: a faint `add`. */
 .shell-ws-ghost {
   opacity: var(--opacity-placeholder);
-}
-
-/* The carried workspace's place while it is away: a dashed circle a cell wide. As wide as its slot,
-   it shrinks whole with it as the slot closes, never cut to a box. */
-.shell-ws-hole {
-  position: absolute;
-  z-index: 2;
-  --hole: round(nearest, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
-  left: 0;
-  top: round(down, calc((var(--size-chip) - var(--hole)) / 2), 1px);
-  width: var(--hole);
-  height: var(--hole);
-  box-sizing: border-box;
-  border: max(1px, round(nearest, var(--stroke-thin), 1px)) dashed var(--color-outline);
-  border-radius: var(--radius-full);
 }
 
 @property --ws-dx {

@@ -1,6 +1,6 @@
 // A count that rolls as it changes, as an odometer does: `RollingNumber`, new, in neither library
-// yet. Its figures are tabular, each in a slot one figure wide and the style's line tall that cuts
-// what leaves it (a figure's advance rounded up to a whole device pixel, so each starts on one),
+// yet. Its figures are tabular, each set in the middle of a slot one figure wide and the style's
+// line tall that cuts what leaves it (a figure's advance rounded up to a whole device pixel, so each starts on one),
 // and the box is as many slots wide as the widest value it is given, its figures held to its end, so nothing beside it moves as the count grows a figure.
 //
 // Only the figures that change roll. Going up, the new one comes in from below as the old one leaves

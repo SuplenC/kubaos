@@ -20,7 +20,7 @@
 /* A slot is a figure's advance rounded up to a whole device pixel, so every figure starts on one. */
 .k-roll-slot {
   position: relative;
-  display: block;
+  display: grid;
   flex: none;
   width: var(--slot);
   height: var(--t-line);
@@ -34,19 +34,21 @@
 }
 
 /* Tabular whatever its style, as its slot is: a narrow figure (a 1) sits in a figure's room, never
-   leaving a hole before what follows the number, a percent sign or a unit. */
-.k-roll-figure {
-  position: absolute;
-  top: 0;
-  left: 0;
+   leaving a hole before what follows the number, a percent sign or a unit. A figure fills its slot
+   and is set in its middle, the leaving and the arriving one in the same place, so the number's box
+   is its figures' and an owner centres it by layout alone. */
+.k-roll-slot > .k-roll-figure {
+  grid-area: 1 / 1;
+  width: 100%;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
 /* Going up, the old figure leaves upward and the new one comes in from below; down, the reverse. */
-.k-roll-figure[data-out] {
+.k-roll-slot > .k-roll-figure[data-out] {
   translate: 0 calc(var(--roll) * var(--way, 1) * -100%);
 }
 
-.k-roll-figure[data-in] {
+.k-roll-slot > .k-roll-figure[data-in] {
   translate: 0 calc((1 - var(--roll)) * var(--way, 1) * 100%);
 }
