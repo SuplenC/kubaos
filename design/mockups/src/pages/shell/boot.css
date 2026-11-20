@@ -59,14 +59,15 @@
   gap: var(--space-s16);
 }
 
-/* GRUB's terminal: `8%` in from the left and the top, `84%` wide and `80%` tall, its box a
-   hairline in `outline_variant` at the surface radius. */
+/* GRUB's terminal: `8%` in from the left and the top, `84%` wide and `80%` tall, each rounded down
+   to a whole device pixel as GRUB places it, its box a hairline in `outline_variant` at the surface
+   radius. */
 .boot-terminal {
   position: absolute;
-  left: 8%;
-  top: 8%;
-  width: 84%;
-  height: 80%;
+  left: round(down, 8%, 1px);
+  top: round(down, 8%, 1px);
+  width: round(down, 84%, 1px);
+  height: round(down, 80%, 1px);
   box-sizing: border-box;
   padding: var(--space-s32);
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
