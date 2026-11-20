@@ -27,7 +27,7 @@ import { focusRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import { withHint } from "../../lib/hint.ts";
 import { probe } from "../../lib/probe.ts";
-import { advance, text, type TypeStyle } from "../../lib/text.ts";
+import { advance, centreFor, text, type TypeStyle } from "../../lib/text.ts";
 import { cubic, durationMs, length } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
 
@@ -173,6 +173,9 @@ function slot(entry: Entry, kanji: boolean, active: number, pointer: number, cho
   cell.toggleAttribute("data-ghost", entry.kind === "ghost");
   const number = text(numberText(entry.workspace, kanji), numberStyle(shown || entry.occupied, kanji), shown ? "on_primary" : entry.occupied ? "on_surface" : "on_surface_variant");
   number.classList.add("shell-ws-number");
+  // Every cell centres on the same figure, not its own: a "1" and a "2" weigh differently, and
+  // each centred on its own ink would put the pill's numbers on different baselines.
+  centreFor(number, numberStyle(true, kanji), kanji ? KANJI[KANJI.length - 1]! : "0");
   const plus = icon("add", "var(--icon-s16)", "var(--color-outline)");
   plus.classList.add("shell-ws-ghost");
   cell.append(number, plus);
