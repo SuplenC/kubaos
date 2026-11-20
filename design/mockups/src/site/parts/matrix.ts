@@ -5,7 +5,7 @@
 // than the page, the columns wrap onto bands.
 
 import { el, label, mockCell } from "../dom.ts";
-import { applies, type DoesntApply, type Focus, drawsScreen, HOVERED, hovered, LOOK_NAMES, STATE_NAMES, type State, type StateColumn, stateColumns, type States } from "../page.ts";
+import { applies, type DoesntApply, type Focus, drawsScreen, HOVERED, hoveredOf, LOOK_NAMES, STATE_NAMES, type State, type StateColumn, stateColumns, type States } from "../page.ts";
 import { type Mode, settings } from "../settings.ts";
 import { bandedGrid } from "./bands.ts";
 import { type Group, type Item, sampleOf } from "./shelf.ts";
@@ -32,8 +32,9 @@ export function matrix<S extends State>(states: States<S>, focus: Focus | Doesnt
   const columns = (mode: Mode) =>
     stateColumns(states.shown).flatMap((state): Column<S>[] => (off && mode === "dark" && state === "lit" ? [state, "signsOff"] : [state]));
   const name = (column: Column<S>) => (column === "signsOff" ? LOOK_NAMES.signsOff : column === "hovered" ? HOVERED.name : STATE_NAMES[column]);
-  const words = (column: Column<S>) => (column === "signsOff" ? off!.looks.signsOff : column === "hovered" ? HOVERED.look : states.looks[column]);
-  const draw = (row: States<S>["rows"][number], column: S | "hovered") => (column === "hovered" ? hovered(row.cell("rest" as S)) : row.cell(column));
+  const hover = hoveredOf(states);
+  const words = (column: Column<S>) => (column === "signsOff" ? off!.looks.signsOff : column === "hovered" ? hover.look : states.looks[column]);
+  const draw = (row: States<S>["rows"][number], column: S | "hovered") => (column === "hovered" ? hover.draw(row) : row.cell(column));
   const items: Item[] = MODES.flatMap((mode) =>
     states.rows.flatMap((row, index) =>
       columns(mode).map((column) => ({

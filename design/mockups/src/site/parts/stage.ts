@@ -10,7 +10,7 @@
 
 import { el, holdScaled, label, relayout, sampleBox } from "../dom.ts";
 import { fullScreenControl, isScreen } from "../full-screen.ts";
-import { applies, type DoesntApply, type Focus, HOVERED, hovered, LOOK_NAMES, STATE_NAMES, type Stage, type State, stateColumns, type States } from "../page.ts";
+import { applies, type DoesntApply, type Focus, HOVERED, hoveredOf, LOOK_NAMES, STATE_NAMES, type Stage, type State, stateColumns, type States } from "../page.ts";
 import { ALL, type Mode, settings } from "../settings.ts";
 import { picker } from "./picker.ts";
 import { painted } from "./swatches.ts";
@@ -150,7 +150,10 @@ function statePicks(states: States<State>, focus: Focus | DoesntApply): Pick[] {
   const off = applies(focus) && states.shown.includes("lit") ? focus : null;
   const pinned = (state: State) => (): Element[] => states.rows.map((row) => row.cell(state));
   return stateColumns(states.shown).flatMap((state): Pick[] => {
-    if (state === "hovered") return [{ name: HOVERED.name, hint: HOVERED.look, draw: () => states.rows.map((row) => hovered(row.cell("rest"))) }];
+    if (state === "hovered") {
+      const hover = hoveredOf(states);
+      return [{ name: HOVERED.name, hint: hover.look, draw: () => states.rows.map((row) => hover.draw(row)) }];
+    }
     const pick = { name: STATE_NAMES[state], hint: states.looks[state], draw: pinned(state) };
     if (!(off && state === "lit")) return [pick];
     // By day the signs are off, so the signs-off look is Lit's.

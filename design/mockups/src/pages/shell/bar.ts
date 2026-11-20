@@ -8,7 +8,7 @@ import type { Shown } from "../../lib/control.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { slider } from "../../lib/slider.ts";
 import { text } from "../../lib/text.ts";
-import { lights, powerMoves, press } from "../../site/moves.ts";
+import { hovers, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { WINDOWS } from "../../site/settings.ts";
 import { LONG_SONG } from "./bar-audio-parts.ts";
@@ -87,7 +87,7 @@ const PLAYING_LONG: BarContent = { ...PLAYING, song: LONG_SONG };
 /** The title long: now playing folds, so the title keeps its room. */
 const PLAYING_TITLED: BarContent = { ...EVERYDAY, playing: true };
 
-export default page<"rest" | "lit" | "pressed">({
+export default page<"rest" | "hovered" | "pressed">({
   level: "shell",
   slug: "bar",
   title: "Bar",
@@ -107,8 +107,9 @@ export default page<"rest" | "lit" | "pressed">({
   ],
   sizes: doesntApply("one height, `size.bar`; its width is the screen's, and its steps the Reflow's."),
   states: {
-    shown: ["rest", "lit", "pressed"],
+    shown: ["rest", "hovered", "pressed"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       disabled: "a pill with nothing to do is gone",
       selected: "the shown workspace is the Workspaces page's",
       loading: "a pill shows once its service answers",
@@ -116,24 +117,16 @@ export default page<"rest" | "lit" | "pressed">({
       error: "each pill says its own",
     },
     rows: nonEmpty([
-      { name: "Everyday", cell: (state: "rest" | "lit" | "pressed") => strip(logicalWidth(LAPTOP.width), EVERYDAY, state) },
-      { name: "Everything on", cell: (state: "rest" | "lit" | "pressed") => strip(WIDE, EVERYTHING, state) },
+      { name: "Everyday", cell: (state: "rest" | "hovered" | "pressed") => strip(logicalWidth(LAPTOP.width), EVERYDAY, state) },
+      { name: "Everything on", cell: (state: "rest" | "hovered" | "pressed") => strip(WIDE, EVERYTHING, state) },
     ]),
     looks: {
       rest: "the frame's glass, each pill on `surface_container`",
-      lit: "keyboard only, which the bar never takes",
+      hovered: "the pill under the pointer a step on, its hint",
       pressed: "that pill's fill a step past hover",
     },
   },
-  focus: {
-    tubes: [
-      { name: "Its pills", tone: "accent", filled: false, content: false },
-      { name: "Recording", tone: "error", filled: false, content: false },
-      { name: "Live preview", tone: "cold", filled: false, content: false },
-    ],
-    looks: { lit: "each pill's tube, glow outside", signsOff: "the tube as glass, no glow" },
-    signsOff: (index: number) => (index === 0 ? strip(logicalWidth(LAPTOP.width), EVERYDAY, "signs-off") : strip(WIDE, EVERYTHING, "signs-off")),
-  },
+  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
   content: {
     text: [{ name: "The window title", words: { short: "Firefox", long: TITLE }, sample: (words: string) => strip(logicalWidth(LAPTOP.width), { ...EVERYDAY, title: words }) }],
     missingPicture: doesntApply("its symbols are always there; a tray app's missing picture is the Tray page's."),
@@ -149,10 +142,9 @@ export default page<"rest" | "lit" | "pressed">({
     leaves: doesntApply("it goes with the frame: the Frame page's reveal."),
     between: [
       TITLE_SWAP,
-      { name: "Lit", what: "The pointer onto a pill: it lights over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width)) },
-      { name: "Back to rest", what: "The pointer off: back to rest over `short`.", tracks: lights(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "lit") },
-      { name: "Pressed", what: "Over `micro` the tube runs white-hot; by day its ink tints it.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "lit") },
-      ...powerMoves(() => strip(logicalWidth(LAPTOP.width), EVERYDAY, "lit")),
+      { name: "Hovered", what: "The pointer onto a pill: its fill a step on over `short`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width)) },
+      { name: "Back to rest", what: "The pointer off: back to rest over `short`.", tracks: hovers(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "hovered") },
+      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered, with no line and no glow.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "hovered") },
     ],
   },
   keyboard: doesntApply("never a stop for Tab; its actions are Items in the Command menu."),

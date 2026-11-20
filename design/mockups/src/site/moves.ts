@@ -17,7 +17,12 @@ export function lights(target: string, on: string, from: 0 | 1, to: 0 | 1): NonE
   return [{ part: "lit", on, target, property: "--lit", from, to, duration: "short", curve: "standard" }];
 }
 
-/** A lit control pressed, `--press` from 0 to 1 over `micro`. */
+/** A control under the pointer, `--hover` from `from` to `to` over `short`: its quiet fill. */
+export function hovers(target: string, on: string, from: 0 | 1, to: 0 | 1): NonEmpty<Track<"standard">> {
+  return [{ part: "hovered", on, target, property: "--hover", from, to, duration: "short", curve: "standard" }];
+}
+
+/** A control pressed, `--press` from 0 to 1 over `micro`. */
 export function press(target: string, on: string): NonEmpty<Track<"standard">> {
   return [{ part: "pressed", on, target, property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" }];
 }

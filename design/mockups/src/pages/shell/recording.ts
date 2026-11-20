@@ -7,11 +7,11 @@ import type { Shown } from "../../lib/control.ts";
 import { row } from "../../lib/layout.ts";
 import { makePill, pillChanging } from "../../lib/pill.ts";
 import { ALL } from "../../site/settings.ts";
-import { lights, powerMoves, press, pillSwap } from "../../site/moves.ts";
+import { hovers, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import { CLOCK, clockContent, clockPill, idleContent, idleOptions, idlePill, recordingContent, recordingPill } from "./bar-parts.ts";
 
-type State = "rest" | "lit" | "pressed";
+type State = "rest" | "hovered" | "pressed";
 
 /** Seconds as the recorder and Keep awake say them: m:ss, h:mm:ss, or whole days past two. */
 function face(seconds: number): string {
@@ -84,8 +84,9 @@ export default page<State>({
     { name: "Two days or more", for: "whole days", sample: () => idlePill({ keepAwake: false, scheduled: { icon: "schedule", left: "3 d" } }) },
   ],
   states: {
-    shown: ["rest", "lit", "pressed"],
+    shown: ["rest", "hovered", "pressed"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       disabled: "shown only while it runs",
       selected: "no pick",
       loading: "it shows once it runs",
@@ -95,18 +96,11 @@ export default page<State>({
     rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => make(state) }))),
     looks: {
       rest: "recording on `error_container`; the rest on `surface_container`",
-      lit: "keyboard only, which the bar never takes: tube and glow",
+      hovered: "the state layer over its tone's fill, its hint",
       pressed: "fill a step past hover; a click stops or cancels it",
     },
   },
-  focus: {
-    tubes: [
-      { name: "Recording", tone: "error", filled: false, content: false },
-      { name: "Keep awake, the clock", tone: "accent", filled: false, content: false },
-    ],
-    looks: { lit: "the tube inside the edge, the glow outside", signsOff: "the tube as glass, no glow" },
-    signsOff: (index: number) => ROWS[index]!.make("signs-off"),
-  },
+  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
   content: {
     text: [{ name: "The countdown's name", words: NAME, sample: (words: string) => clockPill({ countdown: `${words} 52 d 2 h` }) }],
     missingPicture: doesntApply("its symbols are always there."),
@@ -123,9 +117,8 @@ export default page<State>({
         back: "plays",
         sample: () => pillChanging({ lone: false, tone: "recording" }, recordingContent({ elapsed: "9:59" }), recordingContent({ elapsed: "10:00" })),
       },
-      { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => row("s8", "centre", recordingPill(), idlePill()) },
-      { name: "Pressed", what: "Over `micro` the tube runs white-hot.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => row("s8", "centre", recordingPill({ state: "lit" }), idlePill({ state: "lit" })) },
-      ...powerMoves(() => row("s8", "centre", recordingPill({ state: "lit" }), idlePill({ state: "lit" }))),
+      { name: "Hovered", what: "The pointer onto it: its fill a step on over `short`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => row("s8", "centre", recordingPill(), idlePill()) },
+      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered, with no glow.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => row("s8", "centre", recordingPill({ state: "hovered" }), idlePill({ state: "hovered" })) },
     ],
   },
   keyboard: {

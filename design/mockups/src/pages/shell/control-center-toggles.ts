@@ -108,7 +108,7 @@ export default page<Shown>({
         back: "plays",
         sample: () => inRoom(toggles({ detail: {} })),
       },
-      { name: "A tile lights up", what: "Pointer or keyboard: the tube and glow fade in.", tracks: lights(".k-tile", "Do not disturb", 0, 1), reduced: "same", back: "plays", sample: () => half(TILES.dnd) },
+      { name: "A tile lights up", what: "The keyboard onto it: the tube and glow fade in.", tracks: lights(".k-tile", "Do not disturb", 0, 1), reduced: "same", back: "plays", sample: () => half(TILES.dnd) },
       { name: "A tile pressed", what: "A lit tile pressed: its tube runs hot.", tracks: press(".k-tile", "Do not disturb"), reduced: "same", back: "plays", sample: () => half({ ...TILES.dnd, pinned: "lit" }) },
       ...powerMoves(() => inRoom(toggles())),
     ],

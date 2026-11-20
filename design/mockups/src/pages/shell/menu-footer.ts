@@ -132,7 +132,7 @@ export default page<Shown>({
     arrives: [TOAST_IN],
     leaves: [TOAST_OUT],
     between: [
-      { name: "Problems lights", what: "The pointer onto it: its tube fades in.", tracks: lights(".k-menu-footer .k-button", "Problems", 0, 1), reduced: "same", back: "plays", sample: () => with_(withProblems(footerKeys(SELECT), 2)) },
+      { name: "Problems lights", what: "The keyboard onto it: its tube fades in.", tracks: lights(".k-menu-footer .k-button", "Problems", 0, 1), reduced: "same", back: "plays", sample: () => with_(withProblems(footerKeys(SELECT), 2)) },
       { name: "Problems pressed", what: "Pressed: its fill presses.", tracks: press(".k-menu-footer .k-button", "Problems"), reduced: "same", back: "plays", sample: () => with_(withProblems(footerKeys(SELECT), 2, "lit")) },
       ...powerMoves(() => with_(withProblems(footerKeys(SELECT), 2, "lit"))),
     ],

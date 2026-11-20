@@ -9,7 +9,7 @@ import { type Shown, stateOptions } from "../../lib/control.ts";
 import { hintRoom } from "../../lib/hint.ts";
 import { stack, within } from "../../lib/layout.ts";
 import { type SliderOptions, type SliderSize, type SliderToggle, slider } from "../../lib/slider.ts";
-import { lights, powerMoves, press } from "../../site/moves.ts";
+import { hovers, lights, powerMoves, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 
 const PROFILES: Words = { short: "Saver", long: "Max Performance" };
@@ -165,9 +165,9 @@ const TOGGLES: Move = {
 };
 
 const ICON: Move = {
-  name: "Its icon lights",
-  what: "The pointer on the icon lights its button, not the slider, over `short` on `standard`, with its hint.",
-  tracks: lights(".k-slider-icon-button", "the icon's button", 0, 1),
+  name: "Its icon's button hovered",
+  what: "The pointer on the icon fills its button, not the slider, over `short` on `standard`, with its hint.",
+  tracks: hovers(".k-slider-icon-button", "the icon's button", 0, 1),
   reduced: "same",
   back: "plays",
   sample: pair(),
@@ -297,7 +297,7 @@ export default page({
     arrives: doesntApply("a slider comes with its surface."),
     leaves: doesntApply("a slider goes with its surface."),
     between: [
-      { name: "Focus arrives", what: "Pointer or keyboard: over `short` on `standard`, the fill brightens, tube and glow fade in.", tracks: lights(".k-slider", ON, 0, 1), reduced: "same", back: "cuts", sample: pair() },
+      { name: "Focus arrives", what: "The keyboard onto it: over `short` on `standard`, the tube and glow fade in.", tracks: lights(".k-slider", ON, 0, 1), reduced: "same", back: "cuts", sample: pair() },
       { name: "Focus leaves", what: "Back to rest over `short` on `standard`.", tracks: lights(".k-slider", ON, 1, 0), reduced: "same", back: "cuts", sample: pair("lit") },
       { name: "Held", what: "Pressed or dragged: the fill to `opacity.held`, the glow to `focus.pressed_glow`, over `micro`.", tracks: press(".k-slider", ON), reduced: "same", back: "plays", sample: pair("lit") },
       TOGGLES,
@@ -305,7 +305,7 @@ export default page({
       NUMBER,
       EASES,
       SETTLES,
-      { name: "The knob lights", what: "Pointer or keyboard: over `short` on `standard`, the knob brightens, tube and glow fade in.", tracks: lights(".k-slider", KNOBS, 0, 1), reduced: "same", back: "plays", sample: knobs(0.35) },
+      { name: "The knob lights", what: "The keyboard onto it: over `short` on `standard`, the knob's tube and glow fade in.", tracks: lights(".k-slider", KNOBS, 0, 1), reduced: "same", back: "plays", sample: knobs(0.35) },
       { name: "The knob held", what: "Pressed or dragged: the knob to `opacity.held`, the glow to `focus.pressed_glow`, over `micro`.", tracks: press(".k-slider", KNOBS), reduced: "same", back: "plays", sample: knobs(0.35, "lit") },
       CAUGHT,
       KNOB_SET,

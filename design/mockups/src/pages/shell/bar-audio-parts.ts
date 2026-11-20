@@ -23,7 +23,7 @@ import spotify from "../../assets/apps/spotify.svg?url";
 import strawberry from "../../assets/apps/strawberry.svg?url";
 
 /** A circle pinned in a state, as the specimens pin them. */
-export type CirclePinned = "lit" | "pressed";
+export type CirclePinned = "hover" | "pressed";
 
 export interface CircleOptions {
   /** On the accent's fill, its content `on_primary`: play or pause. */
@@ -320,7 +320,7 @@ export function nowPlayingOpen(options: { players?: readonly Player[]; active?: 
   const active = options.active ?? 0;
   const room = document.createElement("span");
   room.className = "shell-tray-room";
-  const bar = nowPlaying({ players, active, playing: options.playing ?? true, folded: options.folded ?? false, pinned: { part: "icon", state: "lit" } });
+  const bar = nowPlaying({ players, active, playing: options.playing ?? true, folded: options.folded ?? false, pinned: { part: "icon", state: "hover" } });
   const { card } = playersMenu({ players, active, current: options.current ?? active });
   room.append(bar, card);
   requestAnimationFrame(() => {

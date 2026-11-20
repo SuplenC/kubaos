@@ -5,9 +5,10 @@
 // more, and ending as far before a trailing one, and it fills the room it is given. Small (`Sm`),
 // the size a list row's control takes, it is `size.control_sm` tall, its value and icons `body`'s.
 //
-// It is a control in the state model (`.k-control` in `lib.css`): hovered or with the keyboard in
-// it, it is lit, the tube over its hairline in its tone (the accent, or the error's on an invalid
-// field) with the glow outside. With the keyboard in it, it also shows the caret, or the selection.
+// It is a control in the state model (`.k-control` in `lib.css`): with the keyboard in it, it is
+// lit, the tube over its hairline in its tone (the accent, or the error's on an invalid field) with
+// the glow outside, and it shows the caret, or the selection. Under the pointer it is quiet: its
+// fill a step on, no line, no glow, no caret.
 // A read-only field lights and selects but never edits; a disabled one never lights or edits, and
 // shows no caret, but still selects and copies.
 //
@@ -59,10 +60,8 @@ export interface FieldOptions {
   readonly state?: FieldState;
   /** `Md` by default; `Sm` in a list row (`ROW_CONTROL` in `lib/list.ts`). */
   readonly size?: ControlSize;
-  /** A state the field is pinned in: lit, with the keyboard in it unless `pointer`, or signs off. */
+  /** A state the field is pinned in: lit or signs off, with the keyboard in it; hovered, with none. */
   readonly pinned?: Pinned;
-  /** Pinned lit under the pointer rather than with the keyboard in it: no caret. */
-  readonly pointer?: boolean;
   /** The caret, while the keyboard is in the field; at the end of the value unless given. */
   readonly caret?: Caret;
   /** What the value changing does besides: a search's results following what is typed. */
@@ -337,7 +336,7 @@ export function field(options: FieldOptions = {}): HTMLElement {
     element.classList.add("k-control");
     element.tabIndex = 0;
     pin(element, options.pinned);
-    if (options.pinned && !options.pointer) element.dataset.keyboard = "";
+    if (options.pinned === "lit" || options.pinned === "signs-off" || options.pinned === "focus-hover") element.dataset.keyboard = "";
     const ring = focusRing(element, "control", "accent", false);
     ring.dataset.pressable = "";
     // The tone fades from the accent to the error's as the field turns invalid, so the tube, its

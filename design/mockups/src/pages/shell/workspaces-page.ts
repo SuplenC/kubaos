@@ -2,11 +2,10 @@
 // groups, the shown one on a stretching indicator, each group's ghost after its last.
 
 import type { Words } from "../../lib/content.ts";
-import { lights, powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { type Group, SHOTS_GROUPS, workspaces } from "./workspaces.ts";
 
-type State = "rest" | "lit";
+type State = "rest" | "hovered";
 
 const ONE: readonly Group[] = [{ block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: true }] }];
 const GROWN: readonly Group[] = [{ block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: true }, { id: 4, occupied: false }] }];
@@ -80,8 +79,9 @@ export default page<State>({
   ],
   sizes: doesntApply("one height, `size.control_sm`; as wide as its entries."),
   states: {
-    shown: ["rest", "lit"],
+    shown: ["rest", "hovered"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       pressed: "a click shows the workspace; nothing stays pressed",
       disabled: "always there",
       selected: "the shown workspace: the indicator, in every row",
@@ -90,19 +90,15 @@ export default page<State>({
       error: "nothing it can fail at",
     },
     rows: nonEmpty([
-      { name: "Numbers", cell: (state: State) => workspaces(state === "lit" ? { pinned: "lit" } : {}) },
-      { name: "Kanji", cell: (state: State) => workspaces({ kanji: true, ...(state === "lit" ? { pinned: "lit" as const } : {}) }) },
+      { name: "Numbers", cell: (state: State) => workspaces(state === "hovered" ? { pinned: "hover" } : {}) },
+      { name: "Kanji", cell: (state: State) => workspaces({ kanji: true, ...(state === "hovered" ? { pinned: "hover" as const } : {}) }) },
     ]),
     looks: {
       rest: "`surface_container`; shown `on_primary` on `primary`; with windows `on_surface`",
-      lit: "keyboard only, which the bar never takes: tube and glow",
+      hovered: "the cell under the pointer: a `surface_container_high` circle",
     },
   },
-  focus: {
-    tubes: [{ name: "The pill", tone: "accent", filled: false, content: false }],
-    looks: { lit: "the tube inside the pill's edge, the glow outside", signsOff: "the tube as glass, no glow" },
-    signsOff: (index: number) => workspaces({ kanji: index === 1, pinned: "signs-off" }),
-  },
+  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
   content: {
     text: [{ name: "A group's name", words: NAME, sample: (words: string) => workspaces({ groups: [SHOTS_GROUPS[0]!, { ...SHOTS_GROUPS[1]!, name: words }] }) }],
     missingPicture: doesntApply("numbers and one symbol, `add`, always there."),
@@ -119,8 +115,7 @@ export default page<State>({
       stretch("To the right", "The leading edge over `medium`, the trailing one over `long`, both `emphasized_decel`.", 0, 2),
       stretch("To the left", "The same stretch, mirrored: the left edge leads.", 2, 0),
       GHOST,
-      { name: "Lit", what: "The pointer onto it: it lights over `short` on `standard`.", tracks: lights(".shell-ws", "the pill", 0, 1), reduced: "same", back: "plays", sample: () => workspaces() },
-      ...powerMoves(() => workspaces({ pinned: "lit" })),
+      { name: "Hovered", what: "The pointer onto a cell: its circle fades in over `short`.", tracks: [{ part: "the circle", on: "the cell under the pointer", target: ".shell-ws-cell[data-pointer]", property: "--cell-hover", from: 0, to: 1, duration: "short", curve: "standard" }], reduced: "same", back: "plays", sample: () => workspaces() },
     ],
   },
   keyboard: {

@@ -121,7 +121,7 @@ export default page<Shown>({
     arrives: [OPENS],
     leaves: [CLOSES],
     between: [
-      { name: "An entry lights", what: "↓ or the pointer: the entry fades onto its container.", tracks: lights(".k-menu-item:nth-child(3)", "an entry", 0, 1), reduced: "same", back: "plays", sample: () => alone() },
+      { name: "An entry lights", what: "↓: the entry fades onto its container.", tracks: lights(".k-menu-item:nth-child(3)", "an entry", 0, 1), reduced: "same", back: "plays", sample: () => alone() },
       { name: "An entry pressed", what: "A lit entry pressed: its container lifts.", tracks: press(".k-menu-item[data-current]", "the lit entry"), reduced: "same", back: "plays", sample: () => alone(ACTIONS, 1, "lit") },
       ...powerMoves(() => alone(ACTIONS, 1, "lit")),
     ],

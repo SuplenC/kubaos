@@ -98,9 +98,14 @@ export interface VariantGroup {
   readonly rows: NonEmpty<Variant>;
 }
 
-/** Every state the mockup skill names, and open, which only a part that opens has. */
+/**
+ * Every state the mockup skill names, open, which only a part that opens has, and hovered, which
+ * the site draws beside Lit for every part that has it and a part that never takes the keyboard
+ * (a bar pill) shows on its own.
+ */
 export const STATES = [
   "rest",
+  "hovered",
   "lit",
   "pressed",
   "open",
@@ -112,10 +117,11 @@ export const STATES = [
 ] as const;
 export type State = (typeof STATES)[number];
 /** The states only some parts have: a page without one leaves it out with no word on why. */
-type Optional = "open";
+type Optional = "open" | "hovered";
 
 export const STATE_NAMES: Record<State, string> = {
   rest: "Rest",
+  hovered: "Hovered",
   lit: "Focused",
   pressed: "Pressed",
   open: "Open",
@@ -128,7 +134,8 @@ export const STATE_NAMES: Record<State, string> = {
 
 /**
  * A column of the states: a state the page shows, or Hovered, which every part with a lit state
- * has and the site draws for it (`HOVERED`), so no page builds its own.
+ * has and the site draws for it from its rest sample (`HOVERED`), unless the page shows Hovered
+ * itself.
  */
 export type StateColumn<S extends State> = S | "hovered";
 
@@ -138,6 +145,16 @@ export type StateColumn<S extends State> = S | "hovered";
  * sample with its controls pinned under the pointer.
  */
 export const HOVERED = { name: "Hovered", look: "pointer: the fill a step on, no line, no glow" } as const;
+
+/** Hovered's sample and its look: the page's own where it shows Hovered, else drawn from rest. */
+export function hoveredOf<S extends State>(states: States<S>): { readonly look: Cell; readonly draw: (row: States<S>["rows"][number]) => Element } {
+  const own = (states.shown as readonly State[]).includes("hovered");
+  const looks = states.looks as Partial<Record<State, Cell>>;
+  return {
+    look: own ? (looks.hovered ?? HOVERED.look) : HOVERED.look,
+    draw: (row) => (own ? row.cell("hovered" as S) : hovered(row.cell("rest" as S))),
+  };
+}
 
 /**
  * The parts a sample pins under the pointer: the library's controls, and a page's own press target
@@ -162,10 +179,11 @@ export function hovered(sample: Element): Element {
 
 /**
  * The columns `shown` draws, in the order the states go: Rest, Hovered, Pressed, then Focused
- * (Lit), then the rest; Hovered only where Lit is shown.
+ * (Lit), then the rest; Hovered added only where Lit is shown and the page doesn't show Hovered
+ * itself, which keeps its own order.
  */
 export function stateColumns<S extends State>(shown: readonly S[]): StateColumn<S>[] {
-  if (!(shown as readonly State[]).includes("lit")) return [...shown];
+  if ((shown as readonly State[]).includes("hovered") || !(shown as readonly State[]).includes("lit")) return [...shown];
   const others = shown.filter((state) => state !== "lit");
   const after = others.indexOf("pressed" as S) >= 0 ? others.indexOf("pressed" as S) : others.indexOf("rest" as S);
   const columns: StateColumn<S>[] = [...others];

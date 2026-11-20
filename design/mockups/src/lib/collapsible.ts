@@ -12,7 +12,7 @@
 // `standard_accel`, the chevron turning and the rail growing with it; with reduce motion it opens
 // at once, what it holds fades in and the chevron jumps.
 //
-// The rail is a control too, for the pointer alone: under it the rail lights, a hint beside it
+// The rail is a control too, for the pointer alone: under it the strip takes a faint fill, a hint beside it
 // follows the pointer, and a press closes the part, scrolling the header back into view where it
 // has scrolled out. It is no stop for Tab; the keyboard has the header.
 

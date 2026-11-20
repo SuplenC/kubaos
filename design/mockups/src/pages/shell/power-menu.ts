@@ -237,7 +237,7 @@ export default page<Shown>({
     arrives: [OPENING],
     leaves: [CLOSING, LOCKS, SLEEPS, LOGS_OUT, GOES_DOWN],
     between: [
-      { name: "Lit", what: "The keyboard or pointer onto a tile: it lights over `short`, and its action plays.", tracks: lights(".power-tile[data-action=\"suspend\"]", "a tile", 0, 1), reduced: "same", back: "cuts", sample: held(open(LOCK, { played: false })) },
+      { name: "Lit", what: "The keyboard onto a tile: it lights over `short`, and its action plays.", tracks: lights(".power-tile[data-action=\"suspend\"]", "a tile", 0, 1), reduced: "same", back: "cuts", sample: held(open(LOCK, { played: false })) },
       ...LOOKS,
       CYCLE,
       HOLDS,

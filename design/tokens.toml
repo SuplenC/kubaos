@@ -1547,6 +1547,7 @@ pairs = [
   { fg = "on_primary_fill", bg = "primary_fill", need = "text", use = "A Filled button's label at rest" },
   { fg = "on_primary_fill_lit", bg = "primary_fill", need = "text", use = "A Filled button's label, lit" },
   { fg = "on_primary_fill_lit", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed" },
+  { fg = "on_primary_fill", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed by the pointer: its rest label, unlit" },
   { fg = "on_secondary_container_rest", bg = "secondary_container", need = "text", use = "A Tonal button's label at rest" },
   { fg = "on_secondary_container", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed" },
   { fg = "primary_rest", bg = "surface", need = "text", use = "A Text button's label at rest, on a page" },

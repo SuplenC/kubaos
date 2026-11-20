@@ -29,7 +29,7 @@ export function glyph(name: string, color = "on_surface_variant"): SVGElement {
 
 type Interactive = Omit<PillOptions, "content" | "lone" | "interactive" | "tooltip" | "pinned">;
 
-/** An interactive pill in `state`, saying `tooltip` while it is lit. */
+/** An interactive pill in `state`, saying `tooltip` while the pointer is on it. */
 function control(content: Element[], tooltip: string, state: Shown, options: Interactive & { lone?: boolean } = {}): HTMLElement {
   return pill({ lone: false, ...options, content, interactive: true, tooltip, ...stateOptions(state) });
 }
@@ -413,7 +413,7 @@ export const TRAY: readonly TrayApp[] = [
 ];
 
 /** One app's circle, a chip tall, the picture at the bar's 16 in its middle. */
-export function trayItem(app: TrayApp, pinned?: "lit" | "pressed"): HTMLElement {
+export function trayItem(app: TrayApp, pinned?: "hover" | "pressed"): HTMLElement {
   const item = document.createElement("span");
   item.className = "shell-tray-item";
   item.dataset.hoverable = "";
@@ -439,7 +439,7 @@ export function trayItem(app: TrayApp, pinned?: "lit" | "pressed"): HTMLElement 
   return item;
 }
 
-export function trayPill(apps: readonly TrayApp[] = TRAY, pinned?: { index: number; state: "lit" | "pressed" }): HTMLElement {
+export function trayPill(apps: readonly TrayApp[] = TRAY, pinned?: { index: number; state: "hover" | "pressed" }): HTMLElement {
   return pill({ lone: false, end: "s4", gap: 0, content: apps.map((app, index) => trayItem(app, pinned?.index === index ? pinned.state : undefined)) });
 }
 
@@ -680,8 +680,8 @@ function draw(content: BarContent, state: BarState, shown: Shown, options: Works
   if (content.update && state.update) left.append(updatePill(undefined, shown));
   const titled = content.title !== "" && state.title ? title(content.title) : null;
   if (titled) left.append(titled);
-  // The audio pills' circles take the state layer in a pill's place: lit or pressed, the first's.
-  const circle = shown === "lit" || shown === "pressed" ? shown : undefined;
+  // The audio pills' circles take the state layer in a pill's place: hovered or pressed, the first's.
+  const circle = shown === "hovered" ? "hover" : shown === "pressed" ? shown : undefined;
   if (content.playing && state.playing !== "none") left.append(nowPlaying({ folded: state.playing === "folded", ...(content.song ? { song: content.song } : {}), ...(circle ? { pinned: { part: "play", state: circle } } : {}) }));
   const clock = compactClock({ date: state.date, countdown: content.countdown && state.countdown, state: shown });
   const right = document.createElement("span");

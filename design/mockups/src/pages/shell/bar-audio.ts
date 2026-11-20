@@ -29,7 +29,7 @@ import {
 } from "./bar-audio-parts.ts";
 import { bellPill, statusPill } from "./bar-parts.ts";
 
-type State = "rest" | "lit" | "pressed" | "open";
+type State = "rest" | "hovered" | "pressed" | "open";
 
 /** The bar's right end: the mute pill, the bell, status. */
 function end(mute: MuteOptions = {}): HTMLElement {
@@ -89,7 +89,7 @@ function live(): HTMLElement {
       active,
       playing,
       song: SONGS[song]!,
-      ...(card ? { pinned: { part: "icon" as const, state: "lit" as CirclePinned } } : {}),
+      ...(card ? { pinned: { part: "icon" as const, state: "hover" as CirclePinned } } : {}),
       onIcon: () => (card ? closeMenu() : openMenu()),
       onPlay: () => {
         playing = !playing;
@@ -233,11 +233,11 @@ const FIVE: readonly Player[] = [...PLAYERS, LONG_PLAYER, { app: "mpv" }];
 /** A row's cell: the mute pill or now playing, pinned on its first circle, or open. */
 function muteCell(state: State): HTMLElement {
   if (state === "open") return panelShot({ device: HEADSET });
-  return state === "rest" ? mutePill({ input: { recording: true } }) : mutePill({ input: { recording: true }, pinned: { side: "output", state } });
+  return state === "rest" ? mutePill({ input: { recording: true } }) : mutePill({ input: { recording: true }, pinned: { side: "output", state: state === "hovered" ? "hover" : state } });
 }
 
 function playingCell(players: readonly Player[], folded = false): (state: State) => HTMLElement {
-  return (state) => (state === "open" ? nowPlayingOpen({ players, folded }) : state === "rest" ? nowPlaying({ players, folded }) : nowPlaying({ players, folded, pinned: { part: "icon", state } }));
+  return (state) => (state === "open" ? nowPlayingOpen({ players, folded }) : state === "rest" ? nowPlaying({ players, folded }) : nowPlaying({ players, folded, pinned: { part: "icon", state: state === "hovered" ? "hover" : state } }));
 }
 
 export default page<State>({
@@ -256,10 +256,10 @@ export default page<State>({
     { name: "An app recording", for: "the microphone's dot on the mic", sample: () => mutePill({ input: { recording: true } }) },
     { name: "Recording, mic muted", for: "crossed; no dot, nothing is heard", sample: () => mutePill({ input: { recording: true, muted: true } }) },
     { name: "Output low", for: "its symbol by the level", sample: () => mutePill({ level: 0.2 }) },
-    { name: "No output device", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ output: { missing: true }, pinned: { side: "output", state: "lit" }, onPanel: toPanel }, HINTS.noOutput) },
-    { name: "No mic", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ input: { missing: true }, pinned: { side: "input", state: "lit" }, onPanel: toPanel }, HINTS.noMic) },
-    { name: "Volume's hint", for: "lit: where the output stands", sample: () => hinted({ pinned: { side: "output", state: "lit" } }, HINTS.volume("62%")) },
-    { name: "Mic muted, its hint", for: "lit: the mic's side, muted", sample: () => hinted({ input: { muted: true }, pinned: { side: "input", state: "lit" } }, HINTS.micMuted) },
+    { name: "No output device", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ output: { missing: true }, pinned: { side: "output", state: "hover" }, onPanel: toPanel }, HINTS.noOutput) },
+    { name: "No mic", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ input: { missing: true }, pinned: { side: "input", state: "hover" }, onPanel: toPanel }, HINTS.noMic) },
+    { name: "Volume's hint", for: "hovered: where the output stands", sample: () => hinted({ pinned: { side: "output", state: "hover" } }, HINTS.volume("62%")) },
+    { name: "Mic muted, its hint", for: "hovered: the mic's side, muted", sample: () => hinted({ input: { muted: true }, pinned: { side: "input", state: "hover" } }, HINTS.micMuted) },
     { name: "Playing", for: "pause on the accent's fill", sample: () => nowPlaying() },
     { name: "Paused", for: "play on the fill; the words hold still", sample: () => nowPlaying({ playing: false, song: LONG_SONG }) },
     { name: "A long song", for: "scrolling in its fixed room", sample: () => nowPlaying({ song: LONG_SONG }) },
@@ -272,8 +272,9 @@ export default page<State>({
     { name: "Mute pill", for: "one size: two circles", sample: () => mutePill() },
   ],
   states: {
-    shown: ["rest", "lit", "pressed", "open"],
+    shown: ["rest", "hovered", "pressed", "open"],
     absent: {
+      lit: "no keyboard focus: the bar is never a Tab stop",
       disabled: "a side with no device: crossed, its press opens the panel",
       selected: "the active player is checked in its Menu",
       loading: "each pill shows once PipeWire or MPRIS answers",
@@ -288,7 +289,7 @@ export default page<State>({
     ]),
     looks: {
       rest: "symbols on the pill, no fill but play's",
-      lit: "pointer: the state layer at `opacity.hover`; a mute circle's Hint",
+      hovered: "the state layer at `opacity.hover`; a mute circle's Hint",
       pressed: "the circle at `opacity.press`",
       open: "right-click: the Audio panel; the icon: its Menu",
     },

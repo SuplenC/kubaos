@@ -10,12 +10,13 @@
  */
 export type Pinned = "lit" | "signs-off" | "hover" | "pressed" | "focus-hover";
 
-/** Every state a sample is drawn in: at rest, disabled, or pinned. */
-export type Shown = "rest" | "disabled" | Pinned;
+/** Every state a sample is drawn in: at rest, disabled, hovered (as the site's states name it), or pinned. */
+export type Shown = "rest" | "disabled" | "hovered" | Pinned;
 
 /** The options a control takes for a state: disabled, or pinned. */
 export function stateOptions(state: Shown): { disabled?: boolean; pinned?: Pinned } {
   if (state === "rest") return {};
+  if (state === "hovered") return { pinned: "hover" };
   return state === "disabled" ? { disabled: true } : { pinned: state };
 }
 
