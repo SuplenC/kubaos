@@ -10,7 +10,9 @@
 // A row is `size.row` tall with one line and `size.row_two_line` with two: a leading symbol or
 // tile, the title over its subtitle, then at its end the facts and controls it carries, `space.s12`
 // apart. The row the keyboard is on is lit, on `secondary_container`, and the pointer moving onto a
-// row puts the keyboard on it, so one row is lit at a time; a danger row lights in `error`. A
+// row puts the keyboard on it, so one row is current at a time; a row the pointer put there is
+// quiet, the state layer's faint shape and its content at rest (`data-pointer`), except in a list
+// whose selection slides (the Command menu's), which keeps one highlight for both; a danger row lights in `error`. A
 // picked row shows its tick, its title in `primary_lit`. A row that can't be taken is dimmed and is
 // passed over.
 //
@@ -131,8 +133,11 @@ export type ListRowSpec = RowTaking & {
  */
 export const ROW_CONTROL: ControlSize = "Sm";
 
-/** A state a row is pinned in, as the specimens pin them: the keyboard on it, or pressed. */
-export type RowPinned = "lit" | "pressed";
+/**
+ * A state a row is pinned in, as the specimens pin them: the keyboard on it, the pointer over it,
+ * or the pointer pressing it.
+ */
+export type RowPinned = "lit" | "hover" | "pressed" | "focus-hover";
 
 /** Whether `spec` shows two lines: a subtitle, a tall row, or a loading one. */
 export function twoLines(spec: ListRowSpec): boolean {
@@ -431,20 +436,26 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
   box.setAttribute("role", "listbox");
   let at: HTMLElement | null = rowsOf()[options.current ?? -1] ?? null;
   let pointer = false;
+  // Whether the pointer, not a key, put the keyboard on the current row.
+  let pointed = false;
   const highlight = options.slides ? slider(box, rowsOf()) : null;
   const index = () => (at ? rowsOf().indexOf(at) : -1);
 
   /** Shows the current row lit while the list has the keyboard or the pointer. */
   function show(): void {
     const shown = pointer || box.matches(":focus") || options.current !== undefined;
-    for (const each of rowsOf()) each.toggleAttribute("data-current", shown && each === at);
+    for (const each of rowsOf()) {
+      each.toggleAttribute("data-current", shown && each === at);
+      each.toggleAttribute("data-pointer", shown && each === at && pointed && !options.slides);
+    }
     highlight?.(shown ? index() : -1);
   }
 
-  function move(to: number): void {
+  function move(to: number, byPointer = false): void {
     const item = rowsOf()[to];
     if (!item) return;
     at = item;
+    pointed = byPointer;
     show();
     if (!pane) return;
     const inset = length("space-s12") * scaleOf(box);
@@ -513,7 +524,7 @@ export function listRows(box: HTMLElement, pane: HTMLElement | null, rowsOf: () 
     pointer = true;
     const item = rowAt(event);
     // Back over the row it left, it lights again: `move` runs only for another row.
-    if (item && item !== at) move(rowsOf().indexOf(item));
+    if (item && (item !== at || !pointed)) move(rowsOf().indexOf(item), true);
     else if (back) show();
   });
   box.addEventListener("click", (event) => {

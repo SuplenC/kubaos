@@ -114,8 +114,8 @@
 
 /* An object: drawn to scale in `surface_container_high` at the control radius, its sunken hairline
    round it, its number in `headline` and its size in `mono` under it, centred; the size left out
-   where it doesn't fit. It lights as a control does under the pointer, and the selected one burns
-   the neon tube inside its edge. It glides to its new box over `medium` on `standard_decel` when the
+   where it doesn't fit. Under the pointer its fill rises toward the highest container as a
+   control's does, quiet, and the selected one burns the neon tube inside its edge. It glides to its new box over `medium` on `standard_decel` when the
    arrangement fits again; while dragged it follows the pointer every frame, with nothing easing it.
    A screen plugged in fades in over `medium`, one unplugged fades out. */
 .k-cv-screen {
@@ -126,13 +126,14 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-control);
-  background: var(--color-surface_container_high);
+  background: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--rise) * 100%));
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
   cursor: grab;
   touch-action: none;
   opacity: 1;
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     opacity var(--motion-medium) var(--easing-standard);
 }

@@ -163,7 +163,7 @@
 /* A row (`lib/list.ts`): `size.row` tall with one line, `size.row_two_line` with two, `space.s16`
    inside, so its words start `space.s24` from the well's edge, at the row radius, concentric in the
    well's (`radius.content` − `space.s8`). Lit (the keyboard
-   on it, which the pointer moves) it fades onto `secondary_container` over `short`, its content to
+   on it) it fades onto `secondary_container` over `short`, its content to
    `on_secondary_container` and its subtitle and facts to that at `opacity.subdued_text`, its
    keycaps' keys and edges to `primary`; pressed, the container lifts to
    `secondary_container_pressed` over `micro`. A danger row's content is `error`, and lit it fades
@@ -183,7 +183,10 @@
   border-radius: var(--radius-row);
   cursor: pointer;
   --lit: 0;
+  --hover: 0;
   --press: 0;
+  --layer: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-press) * max(calc(var(--hover) * var(--opacity-hover) / var(--opacity-press)), var(--press) * (1 - var(--lit)))));
+  background-image: linear-gradient(var(--layer), var(--layer));
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --rest-ink: var(--color-on_surface);
   --rest-muted: var(--color-on_surface_variant);
@@ -194,9 +197,10 @@
   --title: color-mix(in srgb, var(--rest-title), var(--lit-ink) calc(var(--lit) * 100%));
   --tick: var(--title);
   --container: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
-  background: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
+  background-color: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
 }
 
@@ -212,7 +216,7 @@
 /* A lit row lights the control at its end that the keys on the row reach, as the keyboard in the
    control itself would: a field's or a select's edge, a choice's picked stretch. One shut, its own
    rules win: an open select lights nothing. */
-.k-list-row[data-current]:not([aria-disabled="true"]) :where(.k-field.k-control, .k-select.k-control, .k-tabs):where(:not([aria-disabled="true"])) {
+.k-list-row[data-current]:not([aria-disabled="true"], [data-pointer]) :where(.k-field.k-control, .k-select.k-control, .k-tabs):where(:not([aria-disabled="true"])) {
   --lit: 1;
 }
 
@@ -259,8 +263,14 @@
   filter: drop-shadow(0 0 var(--focus-label_near) rgb(from var(--color-primary) r g b / calc(var(--focus-label_glow) * var(--signs) * (1 - var(--lit)))));
 }
 
-.k-list-row:is([data-current], [data-pinned]) {
+.k-list-row:is([data-current]:not([data-pointer]), [data-pinned="lit"], [data-pinned="focus-hover"]) {
   --lit: 1;
+}
+
+/* Put there by the pointer, the current row is quiet: the state layer, `on_surface` at
+   `opacity.hover`, a faint shape at the row radius, its content at rest; pressed, `opacity.press`. */
+.k-list-row:is([data-current][data-pointer], [data-pinned="hover"], [data-pinned="pressed"], [data-pinned="focus-hover"]) {
+  --hover: 1;
 }
 
 .k-list-row:is(:active, [data-pinned="pressed"], [data-keyed]):not([aria-disabled="true"], [data-loading]) {
@@ -275,6 +285,7 @@
 .k-list-row:is([aria-disabled="true"], [data-loading]) {
   cursor: default;
   --lit: 0;
+  --hover: 0;
   --rest-ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
   --rest-muted: var(--rest-ink);
   --rest-title: var(--rest-ink);
@@ -489,9 +500,10 @@
 }
 
 /* A row: `size.row_compact` tall at the row radius, no fill, its words `on_surface` and its
-   numbers `on_surface_variant`. Lit, its tube; pressed by day the tone tints it, as under a Text
-   button. Picked, `secondary_container`, its words `on_secondary_container` and its numbers that at
-   `opacity.subdued_text`; pressed, the container lifts. */
+   numbers `on_surface_variant`. Lit from the keyboard, its tube; hovered and pressed, the state
+   layer (`--layer`), a faint shape at the row radius. Picked, `secondary_container`, its words `on_secondary_container` and its numbers that at
+   `opacity.subdued_text`; hovered, the container lifts part way toward
+   `secondary_container_pressed`, and pressed all the way. */
 .k-table-row {
   position: relative;
   height: var(--size-row_compact);
@@ -499,18 +511,22 @@
   cursor: pointer;
   --ink: var(--color-on_surface);
   --muted: var(--color-on_surface_variant);
-  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  --tint: var(--layer);
   background: linear-gradient(var(--tint), var(--tint)), transparent;
 }
 
 .k-table-row[data-picked] {
   --ink: var(--color-on_secondary_container);
   --muted: rgb(from var(--color-on_secondary_container) r g b / var(--opacity-subdued_text));
-  background: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
+  background: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--rise) * 100%));
 }
 
-.k-table-row.k-control[data-current] {
+.k-table-row.k-control[data-current]:not([data-pointer]) {
   --lit: 1;
+}
+
+.k-table-row.k-control[data-current][data-pointer] {
+  --hover: 1;
 }
 
 /* A description list (`lib/description.ts`): labels a quarter of the width and values the rest,
@@ -739,9 +755,14 @@
   cursor: pointer;
 }
 
-/* The keys on the line light its button, as a row is lit. */
-.k-list-disclosure[data-current] > .k-control {
+/* The keys on the line light its button, as a row is lit; the pointer on the line gives it the
+   quiet hover alone. */
+.k-list-disclosure[data-current]:not([data-pointer]) > .k-control {
   --lit: 1;
+}
+
+.k-list-disclosure[data-current][data-pointer] > .k-control {
+  --hover: 1;
 }
 
 /* The forget × (`forget`): centred on the tick's room, quiet until the row or the × is lit. */

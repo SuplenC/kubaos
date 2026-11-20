@@ -141,10 +141,10 @@
 }
 
 .shell-tray-item:hover,
-.shell-tray-item[data-pinned="lit"],
+.shell-tray-item:is([data-pinned="lit"], [data-pinned="hover"]),
 .shell-tray-item[data-pinned="pressed"],
 .shell-pill-item:hover,
-.shell-pill-item[data-pinned="lit"],
+.shell-pill-item:is([data-pinned="lit"], [data-pinned="hover"]),
 .shell-pill-item[data-pinned="pressed"] {
   --hovered: 1;
 }

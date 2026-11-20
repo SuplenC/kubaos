@@ -242,7 +242,7 @@ export default page({
     looks: {
       rest: "`surface_container_high`, a sunken hairline, its number and size",
       lit: "the tube inside its edge, glow at night",
-      pressed: "the tube runs hot, glow × `focus.pressed_glow`, following the pointer",
+      pressed: "the fill at the highest container, following the pointer",
       selected: "the tube stays lit; the settings are its own",
     },
   },

@@ -4,7 +4,7 @@
 // is one muted line in its place, not a section. Every page is checked for its words first
 // (`wordy`): a page with a field past its kind's most isn't drawn.
 
-import { type AnyPage, applies, type DoesntApply, type Foundation, isFoundation, LEVELS, type Page, STATE_NAMES, type State, wordy } from "./page.ts";
+import { type AnyPage, applies, type DoesntApply, type Foundation, HOVERED, isFoundation, LEVELS, type Page, STATE_NAMES, type State, stateColumns, wordy } from "./page.ts";
 import { el, label, prose } from "./dom.ts";
 import { typeset } from "../lib/text.ts";
 import { content } from "./parts/content.ts";
@@ -118,7 +118,7 @@ function renderFoundation(page: Foundation): Part[] {
 /** The states table: each state shown and the few words of its look, then those it hasn't, muted. */
 function statesTable(page: Page): HTMLElement {
   const { states } = page;
-  const shown = states.shown.map((state) => ({ cells: [STATE_NAMES[state], states.looks[state]] }));
+  const shown = stateColumns(states.shown).map((state) => ({ cells: state === "hovered" ? [HOVERED.name, HOVERED.look] : [STATE_NAMES[state], states.looks[state]] }));
   const absent = (Object.entries(states.absent) as [State, string][]).map(([state, why]) => ({ cells: [STATE_NAMES[state], `doesn't apply: ${why}`], muted: true }));
   return specTable({ heads: ["State", "Look"] }, [...shown, ...absent]).element;
 }

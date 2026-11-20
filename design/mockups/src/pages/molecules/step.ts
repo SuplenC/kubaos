@@ -130,7 +130,7 @@ export default page<"rest" | "lit" | "pressed" | "selected" | "error">({
     looks: {
       rest: "no fill; its chip or mark says where it stands",
       lit: "the accent's tube inside its edge, glow at night",
-      pressed: "tube white-hot at night; by day `opacity.press_tint`",
+      pressed: "the state layer at `opacity.press`; no line, no glow",
       selected: "`secondary_container`; in a rail, a quiet `opacity.hover` fill",
       error: "its symbol is `error`, in `error`",
     },

@@ -187,7 +187,7 @@ export default page({
     looks: {
       rest: "no fill; open, the rail unlit at `opacity.spinner_track`",
       lit: "the `primary` tube inside the header; the rail burns as the core",
-      pressed: "white-hot, glow × `focus.pressed_glow`; the rail toward `primary_flash`",
+      pressed: "the state layer at `opacity.press`; no line, no glow",
       disabled: "words and chevron at `opacity.disabled_content`, no press, no Tab stop",
     },
   },

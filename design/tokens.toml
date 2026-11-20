@@ -61,7 +61,8 @@ thin = 2
 # symbol is never drawn with a fractional stroke.
 symbol = 2
 
-# The neon of a lit control (hovered or focused, one state), one rule for every
+# The neon of a lit control (focused from the keyboard; the pointer's hover and
+# press are quiet fills with no neon, `[opacity]`), one rule for every
 # component: one line inside the control's edge, at its corner, and the glow
 # outside it in the control's tone. On a control not filled with its tone the
 # line is the tube, `tube` wide, over the control's outline; on a filled one
@@ -89,7 +90,8 @@ content_glow = 0.4
 # letters, fading from its opacity to nothing at its reach, in logical pixels.
 label_near = 2
 label_glow = 0.3
-# A pressed control's glow, at night: the lit glow this many times brighter.
+# A focused control pressed by a key, at night: the lit glow this many times
+# brighter. A pointer's press draws no glow.
 pressed_glow = 1.25
 # The band a picture keeps round itself inside its own box where its
 # neighbours leave no more room: a wallpaper thumbnail inside its grid cell,
@@ -603,11 +605,11 @@ use = "What must not lag: the caret, typed text, reduced moves."
 
 [duration.micro]
 ms = 100
-use = "A control pressed, a state layer, a colour change under the pointer."
+use = "A control pressed, a state layer's press."
 
 [duration.short]
 ms = 200
-use = "A control lighting or resting, a knob, a mark, a toast arriving."
+use = "A control lighting, hovered or resting, a knob, a mark, a toast arriving."
 
 [duration.medium]
 ms = 300
@@ -776,6 +778,11 @@ use = "A colour change speeding up: a theme change, dark ⇄ light."
 # Opacities laid over a colour role.
 [opacity]
 # The state layer: the content colour over a surface, on hover and on press.
+# Hover is quiet, one rule for every control: a control with no surface of its
+# own (a Text button, a row, a menu item) takes `on_surface` at `hover` as a
+# faint shape, and at `press` pressed. A control with a fill goes the share
+# `hover` / `press` of the way to its pressed fill hovered, and all the way
+# pressed, so hover is the smaller step in the direction a press goes.
 hover = 0.08
 focus = 0.12
 press = 0.14
@@ -784,7 +791,9 @@ press = 0.14
 # state layer's press is too faint on a fill already the accent; under the
 # pointer the fill takes `press`.
 held = 0.40
-# A Text button pressed in daylight: its tone as a faint fill under it.
+# A Text button pressed in daylight, as the libraries draw it: its tone as a
+# faint fill under it. The state model's press is the state layer instead
+# (`press`), the same by night and by day.
 press_tint = 0.10
 # A disabled control's content, and its container.
 disabled_content = 0.38
@@ -1366,8 +1375,10 @@ burn_recording = "oklch(0.55 0.22 29)"
 # model's: the mockups' CSS computes them; the iced and QML outputs don't build
 # them yet.
 #
-# The states (`docs/DESIGN.md`, "States"): rest, lit (hovered or focused, one
-# state), pressed and disabled. At night a control rests unlit and lights up;
+# The states (`docs/DESIGN.md`, "States"): rest, hovered, pressed, lit (focused
+# from the keyboard) and disabled. Hovered and pressed are quiet: the fill a
+# step, then a step further, toward its `_pressed` role (`[opacity]` `hover`),
+# with no line and no glow. At night a control rests unlit and lights up;
 # by day nothing glows. Lit has two looks: with the signs on, the neon burns;
 # with them off (by day always, at night while a power change has the lights
 # out), the line stays inside the edge as unlit glass, a `_glass` role, with no

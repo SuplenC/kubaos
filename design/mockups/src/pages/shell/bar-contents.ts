@@ -150,8 +150,8 @@ export default page<State>({
     rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => make(state) }))),
     looks: {
       rest: "`surface_container`, content in its roles; rings `primary`",
-      lit: "pointer only: tube in its tone, glow at night, hint",
-      pressed: "tube white-hot; by day an ink tint",
+      lit: "keyboard only, which the bar never takes: tube and glow",
+      pressed: "fill a step past hover; no line, no glow",
     },
   },
   focus: {

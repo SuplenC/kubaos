@@ -6,8 +6,9 @@
 // ellipsis; numbers at its end in `mono_large`, so their digits line up, as their header does.
 //
 // The whole row is one control in the state model (`.k-control` in `lib.css`), as a Collapsible's
-// header is: lit (the pointer on it, or the keyboard, which the pointer moves) its tube burns
-// inside its edge; pressed, the tube runs white-hot. The picked row is `secondary_container`, its
+// header is: lit (the keyboard on it) its tube burns inside its edge, and a key's press runs it
+// white-hot. The pointer moving onto a row puts the keyboard on it, but quietly (`data-pointer`):
+// the state layer's faint shape, no tube. The picked row is `secondary_container`, its
 // words `on_secondary_container`, and lit it keeps its tube on that, as a Tonal button does.
 
 import "./lists.css";
@@ -32,7 +33,7 @@ export interface TableRowSpec {
 }
 
 /** A state a row is pinned in, as the specimens pin them. */
-export type TablePinned = "lit" | "signs-off" | "pressed";
+export type TablePinned = "lit" | "signs-off" | "hover" | "pressed" | "focus-hover";
 
 /** One cell: words at its column's start, or a number at its end. */
 function cell(words: string, column: Column, header: boolean): HTMLElement {
@@ -88,15 +89,18 @@ export function table(columns: readonly Column[], rows: readonly TableRowSpec[],
     box.style.setProperty("--columns", widths.map((each) => `${each}px`).join(" "));
   }).observe(box);
 
-  function move(index: number): void {
+  /** Puts the keyboard on row `index`; `pointer` when the pointer put it there, so it shows quiet. */
+  function move(index: number, pointer = false): void {
     items[current]?.removeAttribute("data-current");
+    items[current]?.removeAttribute("data-pointer");
     current = index;
     items[current]?.setAttribute("data-current", "");
+    items[current]?.toggleAttribute("data-pointer", pointer);
   }
 
   items.forEach((item, index) => {
     item.addEventListener("pointermove", () => {
-      if (current !== index) move(index);
+      if (current !== index || !item.hasAttribute("data-pointer")) move(index, true);
     });
     item.addEventListener("click", () => options.onPick?.(index));
   });

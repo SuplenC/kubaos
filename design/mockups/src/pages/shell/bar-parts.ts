@@ -416,6 +416,7 @@ export const TRAY: readonly TrayApp[] = [
 export function trayItem(app: TrayApp, pinned?: "lit" | "pressed"): HTMLElement {
   const item = document.createElement("span");
   item.className = "shell-tray-item";
+  item.dataset.hoverable = "";
   item.setAttribute("role", "button");
   if (pinned) item.dataset.pinned = pinned;
   let picture: HTMLElement;

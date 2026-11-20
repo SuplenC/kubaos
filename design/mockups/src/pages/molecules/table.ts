@@ -83,7 +83,7 @@ export default page({
     looks: {
       rest: "no fill; picked, `secondary_container`",
       lit: "tube inside its edge, glow at night; picked, on its fill",
-      pressed: "tube white-hot; picked lifts to `secondary_container_pressed`",
+      pressed: "state layer at `opacity.press`; picked lifts to `secondary_container_pressed`",
     },
   },
   focus: {

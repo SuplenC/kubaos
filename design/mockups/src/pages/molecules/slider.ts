@@ -258,7 +258,7 @@ export default page({
     looks: {
       rest: "`primary` fill or knob; toggled, `secondary`; compact hides its number",
       lit: "fill or knob + `opacity.press`, tube, glow; icon rows: the button",
-      pressed: "fill or knob + `opacity.held`, glow × `focus.pressed_glow`",
+      pressed: "fill or knob + `opacity.held`; no glow",
       disabled: "every part at `opacity.disabled_content`; no pointer, keys or Tab",
     },
   },

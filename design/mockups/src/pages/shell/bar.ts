@@ -121,8 +121,8 @@ export default page<"rest" | "lit" | "pressed">({
     ]),
     looks: {
       rest: "the frame's glass, each pill on `surface_container`",
-      lit: "pointer only: one pill's tube and its hint",
-      pressed: "that pill's tube white-hot",
+      lit: "keyboard only, which the bar never takes",
+      pressed: "that pill's fill a step past hover",
     },
   },
   focus: {

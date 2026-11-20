@@ -95,7 +95,7 @@ export default page<State>({
     ]),
     looks: {
       rest: "`surface_container`; shown `on_primary` on `primary`; with windows `on_surface`",
-      lit: "pointer: the pill's tube and glow",
+      lit: "keyboard only, which the bar never takes: tube and glow",
     },
   },
   focus: {

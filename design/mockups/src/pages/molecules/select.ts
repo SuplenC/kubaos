@@ -182,7 +182,7 @@ export default page({
     looks: {
       rest: "`surface_container_high`, an `outline_variant` hairline",
       lit: "fill to `…_highest`, the `primary` tube, glow at night",
-      pressed: "as lit, glow × `focus.pressed_glow`",
+      pressed: "the fill at the highest container; no line, no glow",
       open: "raised to step 2, no hairline or tube, chevron up",
       disabled: "grey, no hairline, no Tab stop",
     },

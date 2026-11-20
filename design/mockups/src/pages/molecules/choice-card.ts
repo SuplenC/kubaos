@@ -108,7 +108,7 @@ export default page({
     looks: {
       rest: "flat, soft hairline; picked, `primary_lit` words and a filled mark",
       lit: "the cold tube inside its edge, glow at night",
-      pressed: "`cold_core`, glow × `focus.pressed_glow`; the title goes `primary_lit`",
+      pressed: "state layer at `opacity.press`, no glow; the title goes `primary_lit`",
       disabled: "content at `opacity.disabled_content`, no line, skipped by keys",
     },
   },

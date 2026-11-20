@@ -65,7 +65,7 @@ export default page({
     looks: {
       rest: "off on `surface_container_highest`; on `primary_fill`, unlit",
       lit: "the tube or the core, with its glow; the knob brightens",
-      pressed: "glow × `focus.pressed_glow`; tube white-hot, or the fill lifts",
+      pressed: "the state layer at `opacity.press`, or the fill lifts; no glow",
       disabled: "grey, its knob where its value puts it; no Tab stop",
     },
   },

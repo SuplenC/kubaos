@@ -83,7 +83,7 @@ export default page<Shown>({
     rows: [{ name: "Keyboard tab", cell }],
     looks: {
       rest: "no row lit; the one typed with ticked",
-      lit: "the row under the pointer or keys, as any list's",
+      lit: "the keys' row, as any list's; the pointer's is quiet",
       pressed: "the lit row's fill presses",
       selected: "typing with the second: the tick moves, the order stays",
       disabled: "four layouts, the most: + off",

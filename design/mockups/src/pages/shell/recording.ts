@@ -95,8 +95,8 @@ export default page<State>({
     rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => make(state) }))),
     looks: {
       rest: "recording on `error_container`; the rest on `surface_container`",
-      lit: "pointer: tube in its tone, glow at night, hint",
-      pressed: "tube white-hot; a click stops or cancels it",
+      lit: "keyboard only, which the bar never takes: tube and glow",
+      pressed: "fill a step past hover; a click stops or cancels it",
     },
   },
   focus: {

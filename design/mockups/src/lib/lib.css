@@ -265,12 +265,6 @@
   top: round(nearest, calc((var(--height) - var(--icon-size)) / 2), 1px);
 }
 
-/* A Text button pressed by day: its tone as a faint tint under it, the accent or the sharing
-   violet it wears (`--kind-tone`). By night it has no fill. */
-.k-button[data-kind="Text"] {
-  background: rgb(from var(--kind-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
-}
-
 .k-button:disabled {
   cursor: default;
   --shown: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
@@ -311,7 +305,7 @@
   --line: max(1px, round(nearest, var(--stroke-thin), 1px));
 }
 
-:not(.k-control, :disabled):is(:focus-visible, [data-pinned]) > .k-ring {
+:not(.k-control, :disabled):is(:focus-visible, [data-pinned]:not([data-pinned="hover"])) > .k-ring {
   --lit: 1;
 }
 
@@ -469,8 +463,10 @@
    inside its edge and a knob of `outline`, which brightens to `on_surface_variant` while lit with
    the signs on. On, it is filled with the accent: at night the unlit fill (`primary_fill`) with a
    knob of `on_primary_fill`, which brightens to `on_primary_fill_lit` with the signs on, as a
-   Filled button's label does; pressed, the fill lifts. Off and pressed by day, the tone tints the
-   track, as under a Text button. Its line is the tube off and the core on (`--edge`). */
+   Filled button's label does. Hovered and pressed it is quiet: on, the fill lifts toward
+   `primary_fill_pressed` (`--rise`); off, the track, already the top of the container ladder,
+   takes the state layer (`--layer`). Its line is the tube off and the core on (`--edge`), and shows
+   only with focus. */
 .k-switch {
   all: unset;
   box-sizing: border-box;
@@ -481,8 +477,8 @@
   height: var(--size-switch_height);
   border-radius: var(--radius-full);
   cursor: pointer;
-  --track-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
-  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  --track-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--rise) * 100%));
+  --tint: rgb(from var(--layer) r g b / calc(alpha * (1 - var(--checked))));
   background:
     linear-gradient(var(--tint), var(--tint)),
     color-mix(in srgb, var(--color-surface_container_highest), var(--track-on) calc(var(--checked) * 100%));
@@ -531,9 +527,10 @@
 /* A checkbox or a radio (`lib/check.ts`): its box, then its label, one press target. Unpicked,
    the box is the highest container with a hairline of `outline` inside its edge. Picked, it is
    filled with the accent: at night the unlit fill (`primary_fill`) with its mark `on_primary_fill`,
-   brightening to `on_primary_fill_lit` with the signs on, as a Filled button's label does;
-   pressed, the fill lifts. Unpicked and pressed by day, the tone tints the box, as under a Text
-   button. The fill, the outline and the mark fade on `--checked`; its line is the tube unpicked
+   brightening to `on_primary_fill_lit` with the signs on, as a Filled button's label does.
+   Hovered and pressed it is quiet: picked, the fill lifts toward `primary_fill_pressed`
+   (`--rise`); unpicked, the box, already the top of the container ladder, takes the state layer
+   (`--layer`). The fill, the outline and the mark fade on `--checked`; its line is the tube unpicked
    and the core picked (`--edge`). The label is `on_surface` and doesn't light. */
 .k-check {
   all: unset;
@@ -542,8 +539,8 @@
   display: inline-flex;
   flex: none;
   cursor: pointer;
-  --fill-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
-  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  --fill-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--rise) * 100%));
+  --tint: rgb(from var(--layer) r g b / calc(alpha * (1 - var(--checked))));
   --box: color-mix(in srgb, var(--color-surface_container_highest), var(--fill-on) calc(var(--checked) * 100%));
   --mark: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
   --words: var(--color-on_surface);
@@ -634,8 +631,9 @@
 /* A chip (`lib/chip.ts`): `size.chip` tall at the control radius, a pill; its label starts where
    the curve ends, an icon sits closer in, and a close button ends it with no padding after. Its
    content is centred down it: every part is an even number of device pixels shorter than the chip
-   at every scale. Its colours are its kind's (`.k-kind`); pressed by day, a chip with no fill of
-   its tone's own takes its tone as a faint tint, as a Text button does. Disabled, it is grey. */
+   at every scale. Its colours are its kind's (`.k-kind`); hovered and pressed, a chip whose fill
+   is a tint of its tone takes the state layer over it (`--layer`), as far as it is on. Disabled,
+   it is grey. */
 .k-chip {
   position: relative;
   display: inline-flex;
@@ -645,7 +643,6 @@
   padding: 0 var(--space-s12);
   border-radius: var(--radius-control);
   outline: none;
-  --tint: rgb(from var(--tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
 }
 
 .k-chip[data-icon] {
@@ -667,8 +664,9 @@
   cursor: pointer;
 }
 
-.k-chip.k-control[data-hot] {
-  background-image: linear-gradient(var(--tint), var(--tint));
+.k-chip.k-control[data-tinted] {
+  --tinted-layer: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-press) * var(--rise) * var(--checked)));
+  background-image: linear-gradient(var(--tinted-layer), var(--tinted-layer));
 }
 
 .k-chip[aria-disabled="true"] {
@@ -679,7 +677,8 @@
 
 /* Its close button: a circle as tall as the chip, its symbol `space.s4` in, which lights as a Text
    icon button does in the chip's tone: the tube inside its edge, whose curve is the chip's own, or
-   the core on a Filled chip. Over it, the pointer lights the close button alone. */
+   the core on a Filled chip. Under the pointer it takes the state layer, a faint circle, and the
+   chip under it rests. */
 .k-chip-close {
   all: unset;
   box-sizing: border-box;
@@ -691,30 +690,31 @@
   padding: var(--space-s4);
   border-radius: var(--radius-full);
   cursor: pointer;
-  --tint: rgb(from var(--tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
-  background: var(--tint);
+  background: var(--layer);
 }
 
 .k-chip-close:disabled {
   cursor: default;
 }
 
-.k-chip.k-control:has(.k-chip-close:is(:hover, :active)):not(:focus-visible, [data-pinned]) {
-  --lit: 0;
+.k-chip.k-control:has(.k-chip-close:is(:hover, :active)):not([data-pinned]) {
+  --hover: 0;
   --press: 0;
 }
 
 /* A control painted in its kind's roles (a button, an icon button, a chip): its fill and label at
    rest (`--fill`, `--label`), lit with the signs on (`--fill-lit`, `--label-lit`) and off
    (`--fill-off`, `--label-off`), and pressed (`--fill-pressed`), crossfaded as it lights, as the
-   signs go off and on, and as it is pressed. `--shown` is the label's colour now. A chip that is
+   signs go off and on, and as it rises toward its pressed fill (`--rise`: part way hovered, all of
+   it pressed). A kind with no fill presses to the state layer (`lib/button.ts`), so under the
+   pointer it takes a faint shape of its own. `--shown` is the label's colour now. A chip that is
    no control rests: its signs don't matter. */
 .k-kind {
   --lit-fill: color-mix(in srgb, var(--fill-off), var(--fill-lit) calc(var(--signs) * 100%));
   background: color-mix(
     in srgb,
     color-mix(in srgb, var(--fill), var(--lit-fill) calc(var(--lit) * 100%)),
-    var(--fill-pressed) calc(var(--press) * 100%)
+    var(--fill-pressed) calc(var(--rise, 0) * 100%)
   );
   --lit-label: color-mix(in srgb, var(--label-off), var(--label-lit) calc(var(--signs) * 100%));
   --shown: color-mix(in srgb, var(--label), var(--lit-label) calc(var(--lit) * 100%));
@@ -725,17 +725,28 @@
 }
 
 /* A control in the state model (`docs/DESIGN.md`, "States"): a button, an icon button, a switch,
-   a checkbox, a radio, a pressable chip. Its states are numbers: `--lit`, hovered or focused, and
-   `--press`. Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while
-   the lights do (`--before`, `--after`), never by day. Signs on, the neon burns; signs off, the
-   line is glass and nothing glows. So a sequence flickers a lit control down to its signs-off look
-   and strikes it back, and its line is never gone. `--on` is how much of the neon shows. Each is
-   worked out here, on the control, so a ring anywhere inside it (a checkbox's on its box) keeps
-   them: a ring's own `--lit` is for a bare one. Placed after every control's own rule, whose
-   `all: unset` would throw out its transition. */
+   a checkbox, a radio, a pressable chip. Its states are numbers: `--lit`, focused from the
+   keyboard, `--hover`, the pointer over it, and `--press`. Hover and focus are two states: the
+   neon (the line inside the edge, the glow outside, a label's light) is focus's alone, and the
+   pointer only lays a quiet fill. `--rise` is how far the control's fill has gone toward its
+   pressed fill: hovered `opacity.hover` / `opacity.press` of the way, pressed all of it, so hover
+   is the smaller step in the direction a press goes, lighter at night and darker by day.
+   `--layer` is that rise as a state layer, `on_surface` at `opacity.hover` hovered and
+   `opacity.press` pressed: the faint shape a control with no surface of its own (a Text button, a
+   row, a menu item) takes under the pointer.
+   Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while the lights
+   do (`--before`, `--after`), never by day. Signs on, the neon burns; signs off, the line is glass
+   and nothing glows. So a sequence flickers a lit control down to its signs-off look and strikes
+   it back, and its line is never gone. `--on` is how much of the neon shows. Each is worked out
+   here, on the control, so a ring anywhere inside it (a checkbox's on its box) keeps them: a
+   ring's own `--lit` is for a bare one. Placed after every control's own rule, whose `all: unset`
+   would throw out its transition. */
 .k-control {
   --lit: 0;
+  --hover: 0;
   --press: 0;
+  --rise: max(calc(var(--hover) * var(--opacity-hover) / var(--opacity-press)), var(--press));
+  --layer: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-press) * var(--rise)));
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --on: calc(var(--lit) * var(--signs));
   --line-shown: var(--lit);
@@ -743,18 +754,23 @@
      are fades, never the flicker, which is for power changes. */
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     --checked var(--motion-short) var(--easing-standard),
     --toggled var(--motion-short) var(--easing-standard),
     --invalid var(--motion-short) var(--easing-standard);
 }
 
-.k-control:not(:disabled, [aria-disabled="true"]):is(:hover, :focus-visible, [data-pinned], [data-keyed]) {
+/* `data-keyed`: held by a key that another control has the focus for, as Space on a slider holds
+   its icon's button: a key's press, so the neon burns with it. */
+.k-control:not(:disabled, [aria-disabled="true"]):is(:focus-visible, [data-pinned="lit"], [data-pinned="signs-off"], [data-pinned="focus-hover"], [data-keyed]) {
   --lit: 1;
 }
 
-/* `data-keyed`: held by a key that another control has the focus for, as Space on a slider holds
-   its icon's button. */
+.k-control:not(:disabled, [aria-disabled="true"]):is(:hover, [data-pinned="hover"], [data-pinned="pressed"], [data-pinned="focus-hover"]) {
+  --hover: 1;
+}
+
 .k-control:not(:disabled, [aria-disabled="true"]):is(:active, [data-pinned="pressed"], [data-keyed]) {
   --press: 1;
 }
@@ -772,8 +788,9 @@
 
 /* A control's line and glow (`lib/focus.ts`'s ring): the line inside its edge whenever it is lit,
    with the signs on in its lit colour and with them off as glass; the glow outside only with the
-   signs on, a pressed glow `focus.pressed_glow` times the lit one (the mask holds the pressed glow;
-   lit shows it at its share). A control names its line's two colours (`--edge`, `--edge-off`) when
+   signs on, and a key pressed on a lit control swells it to `focus.pressed_glow` times the lit one
+   (the mask holds that glow; lit shows it at its share). A pointer's press is quiet, as its hover
+   is: no line and no glow, so the swell needs the light as well. A control names its line's two colours (`--edge`, `--edge-off`) when
    they are roles of its own (a filled one's core and glass); otherwise the line is the ring's tube
    and its glass, the tone's solid `_glass`. A label that glows lit (a Filled button's, a
    Text button's) keeps its own colour: only the glow round it shows, with the signs on. */
@@ -783,7 +800,7 @@
 }
 
 .k-control .k-ring > .k-glow {
-  opacity: calc(var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)) / var(--focus-pressed_glow));
+  opacity: calc(var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press) * var(--lit)) / var(--focus-pressed_glow));
   filter: none;
 }
 
@@ -939,14 +956,11 @@
   cursor: pointer;
 }
 
-/* Pressed by day, the tone tints a pressable card's fill as it does a Text button: by night its
-   tube runs white-hot instead. */
+/* Hovered and pressed, a pressable card's fill takes the state layer (`--layer`): its fill is
+   whichever container its host names, so the layer is its step, lighter at night and darker by
+   day, with no line and no glow. */
 .k-card.k-control {
-  --tint-tone: var(--color-primary);
-  background-image: linear-gradient(
-    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press))),
-    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)))
-  );
+  background-image: linear-gradient(var(--layer), var(--layer));
 }
 
 .k-card[aria-disabled="true"] {
@@ -962,10 +976,10 @@
    picked or pressed, fading over `short`, with the label glow round them at night while the signs
    are on. Its mark is the checkbox's and the radio's own box, lit and pressed with the card. */
 .k-choice-card {
-  --tint-tone: var(--color-cold);
   --title-colour: color-mix(in srgb, var(--color-on_surface), var(--color-primary_lit) calc(max(var(--picked), var(--press)) * 100%));
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     --checked var(--motion-short) var(--easing-standard),
     --picked var(--motion-short) var(--easing-standard);
@@ -988,8 +1002,8 @@
    reads round the whole card, at night while the signs are on; its tile tinted `primary` at
    `opacity.tint` and glowing far, its symbol, its title and its box glowing near; the lines at its
    foot lit. Its fill takes `primary` only at `opacity.hover`, so its words keep their contrast. By
-   day there is no glow: the tube, the tile and the title say it. The cold tube of the pointer and
-   the keyboard (the card's ring) stays over it. */
+   day there is no glow: the tube, the tile and the title say it. The cold tube of the keyboard
+   (the card's ring) stays over it. */
 .k-choice-card[data-size="Lg"] {
   --lit-now: calc(var(--picked) * var(--choice-burn));
   --lit-glow: calc(var(--lit-now) * (1 - var(--day)));
@@ -1167,6 +1181,7 @@
 .k-picture-tile.k-control {
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
 }
 
@@ -1188,13 +1203,14 @@
   display: none;
 }
 
-/* Pressed by day, the cold tone tints the picture, as it does a Text button. */
+/* Hovered and pressed, the state layer over the picture (`--layer`): a picture has no surface to
+   lighten, so the layer is its quiet step. */
 .k-picture-tint {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: rgb(from var(--color-cold) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: var(--layer);
 }
 
 /* Its name over its foot: light on the scrim darkening from nothing 40% down the tile to the
@@ -1253,9 +1269,10 @@
 
 /* A field (`lib/field.ts`): `size.control_md` tall at the control radius (small, `size.control_sm`,
    its value and icons `body`'s), filling its room, its
-   sunken edge in `outline` at full, or `error` while invalid. Lit, hovered or with the
-   keyboard in it, its fill rises to the highest container (an invalid one keeps its own) and its
-   tube is drawn over the hairline. Its value is clipped to its room, `space.s12` in at each side
+   sunken edge in `outline` at full, or `error` while invalid. With the keyboard in it, its fill
+   rises to the highest container (an invalid one keeps its own) and its tube is drawn over the
+   hairline; hovered, the fill alone goes `opacity.hover` / `opacity.press` of the way there, with
+   no line and no glow. Its value is clipped to its room, `space.s12` in at each side
    (or past the icon and `space.s8` more, and as far before a trailing one); with the keyboard in
    it, the text scrolls left to keep the caret inside the room. */
 .k-field {
@@ -1283,7 +1300,7 @@
     var(--color-surface_container_highest),
     var(--color-surface_container_high) calc(var(--invalid) * 100%)
   );
-  background: color-mix(in srgb, var(--rest-fill), var(--lit-fill) calc(var(--lit) * 100%));
+  background: color-mix(in srgb, var(--rest-fill), var(--lit-fill) calc(max(var(--lit), var(--rise, 0)) * 100%));
   --sunken-tone: var(--color-outline);
   --sunken-strength: 1;
   --edge-line: color-mix(in srgb, var(--sunken-line), var(--color-error) calc(var(--invalid) * 100%));
@@ -1922,7 +1939,8 @@
 
 /* A pill (`lib/pill.ts`): `size.control_sm` tall at the full radius on its fill, its content a row
    centred on device pixels, `space.s12` at each end, `space.s8` round a lone symbol. An
-   interactive one pressed by day takes its tone's tint, as a Text button does. */
+   interactive one is quiet under the pointer: hovered its fill goes a step on (`--fill-hover`),
+   pressed a step further (`--fill-pressed`), with no line and no glow (`lib/pill.ts`). */
 .k-pill {
   position: relative;
   display: inline-flex;
@@ -1931,9 +1949,7 @@
   height: var(--size-control_sm);
   border-radius: var(--radius-full);
   --end: var(--space-s12);
-  background:
-    linear-gradient(rgb(from var(--ink) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0))), rgb(from var(--ink) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0)))),
-    var(--fill);
+  background: var(--fill);
   color: var(--ink);
 }
 
@@ -1943,6 +1959,7 @@
 
 .k-pill.k-control {
   cursor: pointer;
+  background: color-mix(in srgb, color-mix(in srgb, var(--fill), var(--fill-hover) calc(var(--hover) * 100%)), var(--fill-pressed) calc(var(--press) * 100%));
 }
 
 .k-pill-clip {
@@ -2125,7 +2142,8 @@
    The track is the highest container at `opacity.track`; the fill, from the start to the value's
    round end on a whole device pixel, is the accent, fading to the softer `secondary` as
    `--toggled` goes to 1, and lifts toward the palette's bright end (`on_surface` at night,
-   `surface` by day) by `opacity.press` while lit and by `opacity.held` while held. Its content is
+   `surface` by day) by `opacity.hover` under the pointer and by `opacity.held` while held or
+   dragged; focus from the keyboard draws the tube and glow over it and lifts nothing. Its content is
    the fill's content colour on the fill and `on_surface` on the track. Disabled, every part is at
    `opacity.disabled_content`. */
 .k-slider {
@@ -2147,7 +2165,7 @@
   --tone: color-mix(in srgb, var(--color-primary), var(--color-secondary) calc(var(--toggled) * 100%));
   --on-tone: color-mix(in srgb, var(--color-on_primary), var(--color-on_secondary) calc(var(--toggled) * 100%));
   --bright: color-mix(in srgb, var(--color-on_surface), var(--color-surface) calc(var(--day) * 100%));
-  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  --lift: max(calc(var(--hover) * var(--opacity-hover)), calc(var(--press) * var(--opacity-held)));
   --on-fill: rgb(from var(--on-tone) r g b / var(--dim));
   --on-track: rgb(from var(--color-on_surface) r g b / var(--dim));
 }
@@ -2161,8 +2179,9 @@
   --anchor: var(--size-slider_anchor_compact);
 }
 
+/* Held or dragged by the pointer, it is quiet, as a press is: the fill lifts, nothing glows. */
 .k-slider:is([data-held], [data-dragging]):not([aria-disabled="true"]) {
-  --lit: 1;
+  --hover: 1;
   --press: 1;
 }
 
@@ -2302,10 +2321,11 @@
 }
 
 /* The icon's button, where the icon steps or toggles: the circle at the fill's start, holding the
-   icon. At rest nothing shows it is a button. Lit, it is a Filled icon button in the fill's tone:
-   its circle lifts toward the bright end as the fill does, by `opacity.press` lit and
-   `opacity.held` pressed, and its tube burns inside the circle's edge. The circle shows only as
-   far as it is lit, so at rest the fill shows through it. */
+   icon. At rest nothing shows it is a button. Hovered or focused, it is a Filled icon button in
+   the fill's tone: its circle lifts toward the bright end as the fill does, by `opacity.hover`
+   hovered and `opacity.held` pressed, and focused from the keyboard its tube burns inside the
+   circle's edge. The circle shows only as far as it is hovered or focused, so at rest the fill
+   shows through it. */
 .k-slider-icon-button {
   all: unset;
   position: absolute;
@@ -2315,13 +2335,13 @@
   height: var(--side);
   border-radius: var(--radius-full);
   cursor: pointer;
-  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
-  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / var(--lit));
+  --lift: max(calc(var(--hover) * var(--opacity-hover)), calc(var(--press) * var(--opacity-held)));
+  background: rgb(from color-mix(in srgb, var(--tone), var(--bright) calc(var(--lift) * 100%)) r g b / max(var(--lit), var(--hover)));
 }
 
-/* Under the pointer or pinned, the icon's button is what is lit and pressed, not the slider. */
-.k-slider:has(.k-slider-icon-button:is(:hover, :active, [data-pinned])):not(:focus-visible, [data-pinned], [data-held], [data-dragging]) {
-  --lit: 0;
+/* Under the pointer or pinned, the icon's button is what is hovered and pressed, not the slider. */
+.k-slider:has(.k-slider-icon-button:is(:hover, :active, [data-pinned])):not([data-pinned], [data-held], [data-dragging]) {
+  --hover: 0;
   --press: 0;
 }
 
@@ -2366,8 +2386,7 @@
    is lit, under its words, square at both ends: the core at night with the content glow round it,
    as the spinner's arc, the tone by day with none, and solid glass (`primary_glass`) while the
    signs are off. The rail is `tabs.rail` thick at night and `tabs.rail_day` by day, in whole device
-   pixels. Lit (the pointer over the well, the keyboard in it, or the list row it ends lit), as a
-   field's edge lights, over `short` on `standard`: the picked stretch flares with a lit control's
+   pixels. Lit (the keyboard in it, or the list row it ends lit), as a field's edge lights, over `short` on `standard`: the picked stretch flares with a lit control's
    glow round it, near and far, and the rest of the rail steps up to `opacity.track_lit` with no
    glow; by day and with the signs off nothing glows, so the lit well shows as the stronger rail.
    The focus tube is the whole well's edge, drawn under the rail. Disabled, every part is at
@@ -2395,7 +2414,7 @@
   transition: --lit var(--motion-short) var(--easing-standard);
 }
 
-.k-tabs:not([aria-disabled="true"]):is(:hover, :has(> .k-tab:focus-visible), [data-stranded]:focus-visible, [data-pinned], [data-pointed]) {
+.k-tabs:not([aria-disabled="true"]):is(:has(> .k-tab:focus-visible), [data-stranded]:focus-visible, [data-pinned], [data-pointed]) {
   --lit: 1;
 }
 
@@ -2482,10 +2501,12 @@
 
 /* A choice: as tall as the well less its padding, `space.s12` inside its sides, its words
    `button_small` with an optional symbol `space.s4` before them. Not picked, the words are
-   `on_surface_variant`, brightening to `on_surface` under the pointer (`--lit`); picked, they are
+   `on_surface_variant`, brightening to `on_surface` with the keyboard on it (`--lit`); picked, they are
    `primary_lit` (the core at night, fitted to the well; the tone by day), at night with the label
    glow round them while the signs are on. Pressed, a choice's words go to the picked colour over
-   `micro`, before letting go picks it. The pick fades the words over `short`. */
+   `micro`, before letting go picks it. The pick fades the words over `short`. Under the pointer
+   the choice takes the state layer (`--layer`), a faint pill inside the well, and pressed the
+   layer's press. */
 .k-tab {
   all: unset;
   box-sizing: border-box;
@@ -2495,6 +2516,8 @@
   flex: none;
   height: calc(var(--size-control_sm) - 2 * var(--space-s4));
   padding: 0 var(--space-s12);
+  border-radius: var(--radius-full);
+  background: var(--layer, transparent);
   cursor: pointer;
   --rest-words: color-mix(in srgb, var(--color-on_surface_variant), var(--color-on_surface) calc(var(--lit) * 100%));
   --picked-words: color-mix(in srgb, var(--rest-words), var(--color-primary_lit) calc(max(var(--picked), var(--press)) * 100%));
@@ -2535,6 +2558,7 @@
 .k-tab.k-control {
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     --picked var(--motion-short) var(--easing-standard);
 }
@@ -2608,16 +2632,16 @@
 }
 
 /* A swatch: `size.chip` round. The ring of the one picked is cut from what it sits on by a gap of
-   the picker's surface. It lights and presses as a pressable Neutral chip does: the accent's tube
-   inside its edge, running to the core pressed, and by day pressed the accent as a faint tint over
-   it (`--tint`). */
+   the picker's surface. Focused from the keyboard, the accent's tube burns inside its edge, running
+   to the core as a key presses it. Hovered and pressed, the state layer goes over its colour
+   (`--tint`, the control's `--layer`): a colour is no surface to lighten. */
 .k-colour-swatch {
   all: unset;
   position: relative;
   width: var(--size-chip);
   height: var(--size-chip);
   border-radius: var(--radius-full);
-  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  --tint: var(--layer);
   background: linear-gradient(var(--tint), var(--tint)), var(--k-colour-swatch);
   cursor: pointer;
   box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim));
@@ -2627,6 +2651,7 @@
 .k-colour-swatch.k-control {
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
 }
 
@@ -2661,13 +2686,14 @@
    the hue picked, its value at the far end. The tone and chroma it draws the hues at are the
    picker's own (`--k-colour-hue-tone`, `--k-colour-hue-chroma`). It lights and is held as a
    slider is, the hues brightening toward the palette's bright end as a slider's fill does: by
-   `opacity.press` lit, by `opacity.held` held. */
+   `opacity.hover` under the pointer, by `opacity.held` held; focus from the keyboard draws the
+   tube and lifts nothing. */
 .k-colour-hue {
   position: relative;
   height: var(--size-slider_compact);
   border-radius: var(--radius-full);
   --bright: color-mix(in srgb, var(--color-on_surface), var(--color-surface) calc(var(--day) * 100%));
-  --lift: calc(var(--lit) * var(--opacity-press) + var(--press) * (var(--opacity-held) - var(--opacity-press)));
+  --lift: max(calc(var(--hover) * var(--opacity-hover)), calc(var(--press) * var(--opacity-held)));
   --lifted: rgb(from var(--bright) r g b / var(--lift));
   background:
     linear-gradient(var(--lifted), var(--lifted)),
@@ -2678,7 +2704,7 @@
 }
 
 .k-colour-hue[data-held]:not([aria-disabled="true"]) {
-  --lit: 1;
+  --hover: 1;
   --press: 1;
 }
 
@@ -2722,10 +2748,11 @@
 
 /* A menu's item, a select's option too: `size.control_sm` tall, `space.s8` inside, at the row
    radius, concentric inside its surface's (`radius.control` − `space.s4`). Lit (the keyboard on
-   it, which the pointer moves), it fades onto `secondary_container` with its words, symbol and
-   check `on_secondary_container`, and its keycaps' keys and edges `primary`, over `short`;
-   pressed, the container lifts to
-   `secondary_container_pressed` over `micro`. At rest its content is `on_surface`, or `error` on a
+   it), it fades onto `secondary_container` with its words, symbol and check
+   `on_secondary_container`, and its keycaps' keys and edges `primary`, over `short`; pressed, the
+   container lifts to `secondary_container_pressed` over `micro`. Put there by the pointer
+   (`data-pointer`) it is quiet: the state layer, `on_surface` at `opacity.hover`, a faint shape at
+   its radius, and `opacity.press` pressed, its content at rest. At rest its content is `on_surface`, or `error` on a
    danger item, whose keycaps keep their own colours; disabled, `on_surface` at
    `opacity.disabled_content`. Its description and trailing symbol are `on_surface_variant`, and
    lit `on_secondary_container` at `opacity.subdued_text`, a list row's subtitle's. */
@@ -2740,14 +2767,18 @@
   border-radius: var(--radius-row);
   cursor: pointer;
   --lit: 0;
+  --hover: 0;
   --press: 0;
+  --layer: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-press) * max(calc(var(--hover) * var(--opacity-hover) / var(--opacity-press)), var(--press) * (1 - var(--lit)))));
+  background-image: linear-gradient(var(--layer), var(--layer));
   --rest-ink: var(--color-on_surface);
   --ink: color-mix(in srgb, var(--rest-ink), var(--color-on_secondary_container) calc(var(--lit) * 100%));
   --muted: color-mix(in srgb, var(--color-on_surface_variant), rgb(from var(--color-on_secondary_container) r g b / var(--opacity-subdued_text)) calc(var(--lit) * 100%));
   --container: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--press) * 100%));
-  background: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
+  background-color: color-mix(in srgb, transparent, var(--container) calc(var(--lit) * 100%));
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
 }
 
@@ -2761,8 +2792,9 @@
   height: var(--size-row_three_line);
 }
 
-/* A danger item lights in the error itself, not the accent's container, so under the pointer and
-   the keyboard it reads as what it is: a step that destroys something. */
+/* A danger item lights in the error itself, not the accent's container, so under the keyboard it
+   reads as what it is: a step that destroys something. Under the pointer it takes the same quiet
+   layer as any item, its words staying `error`. */
 .k-menu-item[data-danger] {
   --muted: var(--ink);
   --rest-ink: var(--color-error);
@@ -2770,8 +2802,12 @@
   --container: color-mix(in srgb, var(--color-error), var(--color-error_pressed) calc(var(--press) * 100%));
 }
 
-.k-menu-item:is([data-current], [data-pinned]) {
+.k-menu-item:is([data-current]:not([data-pointer]), [data-pinned="lit"], [data-pinned="focus-hover"]) {
   --lit: 1;
+}
+
+.k-menu-item:is([data-current][data-pointer], [data-pinned="hover"], [data-pinned="pressed"], [data-pinned="focus-hover"]) {
+  --hover: 1;
 }
 
 .k-menu-item:is(:active, [data-pinned="pressed"]):not([aria-disabled="true"]) {
@@ -2786,6 +2822,7 @@
 .k-menu-item[aria-disabled="true"] {
   cursor: default;
   --lit: 0;
+  --hover: 0;
   --ink: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
   --muted: var(--ink);
 }
@@ -2845,13 +2882,13 @@
   initial-value: 0;
 }
 
-/* A held item (`holdable` in `lib/menu.ts`): lit, `error` at `opacity.tint` under its `error` words,
+/* A held item (`holdable` in `lib/menu.ts`): lit or under the pointer, `error` at `opacity.tint` under its `error` words,
    so the sweep has room to show. The sweep is `error` from its start to `--hold` of its width, over
    the item's content, its own copy of it `on_error`, so the words read on either side of its edge;
    the item's corners round its start, and its edge is straight. */
 .k-menu-item[data-held]:not([aria-disabled="true"]) {
   --ink: var(--color-error);
-  background: color-mix(in srgb, transparent, rgb(from var(--color-error) r g b / var(--opacity-tint)) calc(var(--lit) * 100%));
+  background-color: color-mix(in srgb, transparent, rgb(from var(--color-error) r g b / var(--opacity-tint)) calc(max(var(--lit), var(--hover)) * 100%));
 }
 
 .k-menu-hold {
@@ -2931,9 +2968,10 @@
 }
 
 /* The select: shut, a field's look, `size.control_md` tall at the control radius,
-   `surface_container_high` with a field's sunken edge, `outline` at full. Lit, as a field
-   is, its fill rises to the highest container and its tube burns inside its edge; pressed, the
-   glow brightens. Open, the same box grows by its list into a surface raised to step 2: the step's
+   `surface_container_high` with a field's sunken edge, `outline` at full. Lit from the keyboard,
+   as a field is, its fill rises to the highest container and its tube burns inside its edge.
+   Under the pointer the fill alone rises, `opacity.hover` / `opacity.press` of the way, and
+   pressed all the way, with no line and no glow. Open, the same box grows by its list into a surface raised to step 2: the step's
    shadow and rim, `surface_container_high` by day and the highest container at night; its hairline
    goes and so does its tube. It grows down from where it is, or up where `data-up` says. */
 .k-select {
@@ -2949,7 +2987,7 @@
   cursor: pointer;
   --raised: var(--select-open);
   --rest-fill: var(--color-surface_container_high);
-  --shut-fill: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(var(--lit) * 100%));
+  --shut-fill: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(max(var(--lit), var(--rise, 0)) * 100%));
   --fill: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_high) calc(var(--select-open) * 100%));
   --fill-night: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_highest) calc(var(--select-open) * 100%));
   --sunken-tone: var(--color-outline);
@@ -2971,6 +3009,7 @@
 /* Open or folding, nothing lights it: the keyboard is in its list. */
 .k-select-room:is([data-open], [data-folding]) > .k-select.k-control {
   --lit: 0;
+  --hover: 0;
   --press: 0;
 }
 
@@ -3128,13 +3167,17 @@
   transition: --select-open var(--motion-micro) var(--easing-emphasized_accel) var(--motion-micro);
 }
 
-/* The words and the chevron, `on_surface_variant`; lit, both `primary_lit`, a lit Text button's
-   words. No box, no line and no glow: the colour alone says it is lit. */
+/* The words and the chevron, `on_surface_variant`; lit from the keyboard, both `primary_lit`, a
+   lit Text button's words. No box, no line and no glow: the colour alone says it is lit. Under the
+   pointer they rest, and the state layer (`--layer`) lays a faint shape at the row radius over
+   their own box. */
 .k-select-inline {
   display: flex;
   max-width: 100%;
   outline: none;
   cursor: pointer;
+  border-radius: var(--radius-row);
+  background: var(--layer, transparent);
   --value: color-mix(in srgb, var(--color-on_surface_variant), var(--color-primary_lit) calc(var(--lit) * 100%));
   --mark: var(--value);
 }
@@ -3248,8 +3291,8 @@
 }
 
 /* The header: `size.row` tall at the control radius, `space.s12` inside, no fill. Its title is
-   `on_surface`, its chevron and summary `on_surface_variant`; lit it draws the tube, pressed by
-   day the tone tints it as under a Text button. Disabled, all three are at
+   `on_surface`, its chevron and summary `on_surface_variant`; lit from the keyboard it draws the
+   tube, and hovered and pressed it takes the state layer (`--layer`), a faint shape. Disabled, all three are at
    `opacity.disabled_content`. */
 .k-collapsible-header {
   appearance: none;
@@ -3268,7 +3311,7 @@
   outline: none;
   --title: var(--color-on_surface);
   --mark: var(--color-on_surface_variant);
-  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: var(--layer);
 }
 
 .k-collapsible-header > .k-row {
@@ -3328,11 +3371,12 @@
 /* The rail: a strip `size.collapsible_rail` wide down what it holds, from its top to its foot
    inside its padding, centred under the chevron, that takes the pointer; the line drawn down its
    middle, `tabs.rail` thick at night and `tabs.rail_day` by day in whole device pixels, as the
-   tabs' rail is. At rest the line is the tone at the spinner's ring's `opacity.spinner_track`; lit
-   under the pointer it fades over `short` to the core with the content glow round it at night, the
-   tone by day, and solid glass (`primary_glass`) with the signs off. Pressed, at night the core
-   goes toward `primary_flash` and the glow swells to `focus.pressed_glow` times its own; by day the
-   tone tints the strip at `opacity.press_tint`. Disabled, the line is at
+   tabs' rail is. At rest the line is the tone at the spinner's ring's `opacity.spinner_track`;
+   lit (pinned so on a page) it fades over `short` to the core with the content glow round it at
+   night, the tone by day, and solid glass (`primary_glass`) with the signs off, and a key's press
+   takes the core toward `primary_flash` and swells the glow to `focus.pressed_glow` times its own.
+   Under the pointer it is quiet: the strip takes the state layer (`--layer`), a faint pill, and
+   the line rests. Disabled, the line is at
    `opacity.disabled_content` and the strip takes no pointer. */
 .k-collapsible-rail {
   position: absolute;
@@ -3344,7 +3388,7 @@
   cursor: pointer;
   --dim: 1;
   --rail: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
-  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: var(--layer);
 }
 
 .k-collapsible-rail[aria-disabled="true"] {
@@ -3360,10 +3404,10 @@
   width: var(--rail);
   --unlit: rgb(from var(--color-primary) r g b / var(--opacity-spinner_track));
   --colour: color-mix(in srgb, var(--color-primary_glass), var(--color-primary_core) calc(var(--signs) * 100%));
-  --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--press) * var(--signs) * 100%));
+  --flashed: color-mix(in srgb, var(--colour), var(--color-primary_flash) calc(var(--press) * var(--lit) * var(--signs) * 100%));
   background: color-mix(in srgb, var(--unlit), var(--flashed) calc(var(--lit) * 100%));
   opacity: var(--dim);
-  --glow: calc(var(--focus-content_glow) * var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)));
+  --glow: calc(var(--focus-content_glow) * var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press) * var(--lit)));
   filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / var(--glow)));
 }
 
@@ -3377,12 +3421,12 @@
 }
 
 /* A tile (`lib/tile.ts`): `size.row_two_line` tall at the control radius, `space.s12` inside,
-   filling its room. Off, `surface_container_high`, rising to the highest container lit, as a
-   select's fill does; its title `on_surface`, its symbol and status line `on_surface_variant`; by
-   day the tone tints it pressed. On, filled with the accent: at night the unlit fill
+   filling its room. Off, `surface_container_high`, rising to the highest container lit from the
+   keyboard and pressed, and `opacity.hover` / `opacity.press` of the way there hovered, as a
+   select's fill does; its title `on_surface`, its symbol and status line `on_surface_variant`. On, filled with the accent: at night the unlit fill
    (`primary_fill`), every part of its content `on_primary_fill`, brightening to
-   `on_primary_fill_lit` with the signs on, as a Filled button's label does; pressed, the fill
-   lifts. It fades between the two over `short` on `--checked`; its line is the tube off and the
+   `on_primary_fill_lit` with the signs on, as a Filled button's label does; hovered the fill lifts
+   part way toward `primary_fill_pressed` and pressed all the way. It fades between the two over `short` on `--checked`; its line is the tube off and the
    core on (`--edge`). */
 .k-tile {
   position: relative;
@@ -3395,12 +3439,9 @@
   border-radius: var(--radius-control);
   cursor: pointer;
   outline: none;
-  --off-fill: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--lit) * 100%));
-  --on-fill: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
-  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
-  background:
-    linear-gradient(var(--tint), var(--tint)),
-    color-mix(in srgb, var(--off-fill), var(--on-fill) calc(var(--checked) * 100%));
+  --off-fill: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(max(var(--lit), var(--rise)) * 100%));
+  --on-fill: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--rise) * 100%));
+  background: color-mix(in srgb, var(--off-fill), var(--on-fill) calc(var(--checked) * 100%));
   --on-ink: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
   --title: color-mix(in srgb, var(--color-on_surface), var(--on-ink) calc(var(--checked) * 100%));
   --muted: color-mix(in srgb, var(--color-on_surface_variant), var(--on-ink) calc(var(--checked) * 100%));
@@ -3426,14 +3467,14 @@
   --muted: var(--title);
 }
 
-/* While the pointer is on the detail arrow, the tile gives way to it: only the arrow is lit. */
-.k-tile.k-control:has(.k-tile-detail:is(:hover, :active, [data-pinned])):not(:focus-visible, [data-pinned]) {
-  --lit: 0;
+/* While the pointer is on the detail arrow, the tile gives way to it: only the arrow takes its fill. */
+.k-tile.k-control:has(.k-tile-detail:is(:hover, :active, [data-pinned])):not([data-pinned]) {
+  --hover: 0;
   --press: 0;
 }
 
 /* The detail arrow: a circle `size.control_sm` across, `space.s12` from the tile's end and centred
-   down it on a whole device pixel, no fill; pressed by day the tone tints it. */
+   down it on a whole device pixel, no fill; hovered and pressed, the state layer, a faint circle. */
 .k-tile-detail {
   position: absolute;
   right: var(--space-s12);
@@ -3442,12 +3483,13 @@
   width: var(--size-control_sm);
   height: var(--size-control_sm);
   border-radius: var(--radius-full);
-  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: var(--layer);
 }
 
 .k-tile[aria-disabled="true"] > .k-tile-detail {
   pointer-events: none;
   --lit: 0;
+  --hover: 0;
   --press: 0;
 }
 
@@ -3913,8 +3955,8 @@
 
 /* The title: a small control tall at the control radius, as the year's months are, `space.s12`
    inside, its words `subheading` in
-   `on_surface`; open on the year, Tonal: `secondary_container` with `on_secondary_container`. Lit,
-   its tube; pressed by day, the tone's tint. */
+   `on_surface`; open on the year, Tonal: `secondary_container` with `on_secondary_container`. Lit
+   from the keyboard, its tube; hovered and pressed, the state layer (`--layer`). */
 .k-cal-title {
   appearance: none;
   position: relative;
@@ -3930,7 +3972,7 @@
   cursor: pointer;
   outline: none;
   --words: var(--color-on_surface);
-  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  --tint: var(--layer);
   background: linear-gradient(var(--tint), var(--tint)), transparent;
 }
 
@@ -4007,6 +4049,7 @@
   --dot: var(--color-tertiary);
   transition:
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard),
     --picked var(--motion-short) var(--easing-standard);
 }
@@ -4053,7 +4096,7 @@
   width: var(--size-control_sm);
   height: var(--size-control_sm);
   border-radius: var(--radius-full);
-  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+  background: var(--layer);
 }
 
 .k-cal-day[data-today] > .k-cal-disc {
@@ -4096,7 +4139,8 @@
 }
 
 /* A month of the year: `size.control_md` tall at the control radius, `surface_container_high`
-   with its name `body_strong` in `on_surface`; the one shown `primary` with `on_primary`. */
+   with its name `body_strong` in `on_surface`, rising toward the highest container hovered and to
+   it pressed; the one shown `primary` with `on_primary`, the state layer over it. */
 .k-cal-month {
   position: relative;
   display: block;
@@ -4104,13 +4148,12 @@
   border-radius: var(--radius-control);
   cursor: pointer;
   --num: var(--color-on_surface);
-  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
-  background: linear-gradient(var(--tint), var(--tint)), var(--color-surface_container_high);
+  background: color-mix(in srgb, var(--color-surface_container_high), var(--color-surface_container_highest) calc(var(--rise) * 100%));
 }
 
 .k-cal-month[data-shown] {
   --num: var(--color-on_primary);
-  background: var(--color-primary);
+  background: linear-gradient(var(--layer), var(--layer)), var(--color-primary);
 }
 
 .k-cal-year:focus-visible .k-cal-month[data-current] {

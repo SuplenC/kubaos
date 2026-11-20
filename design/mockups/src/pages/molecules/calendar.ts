@@ -108,7 +108,7 @@ export default page({
     looks: {
       rest: "only today filled, `primary`; holidays `tertiary`; other months dimmed",
       lit: "the tube inside the disc, glow at night",
-      pressed: "white-hot, glow × `focus.pressed_glow`; by day a tint",
+      pressed: "the state layer at `opacity.press`; no line, no glow",
     },
   },
   focus: {

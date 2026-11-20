@@ -211,8 +211,8 @@ export default page<State>({
     ],
     looks: {
       rest: "its symbol in its ink on its container",
-      lit: "pointer: its tube in its colour, glow at night, hint",
-      pressed: "the tube white-hot",
+      lit: "keyboard only, which the bar never takes: tube and glow",
+      pressed: "the fill a step past hover; no glow",
       open: "its panel under it; the pill rests, its hint off the title",
     },
   },

@@ -178,7 +178,7 @@ export default page({
     looks: {
       rest: "`on_surface_variant`, no fill, no line",
       lit: "the tube inside its edge, glow at night, words `on_surface`",
-      pressed: "the tube runs hot over `micro`; by day the glass darkens",
+      pressed: "the state layer at `opacity.press` over `micro`; no glow",
       selected: "filled `surface_container_high`, symbol `primary`; a sub-section, the bar",
     },
   },

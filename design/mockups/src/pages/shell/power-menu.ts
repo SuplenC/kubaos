@@ -213,7 +213,7 @@ export default page<Shown>({
     looks: {
       rest: "another tile current; its symbol muted",
       lit: "its tube and glow; the desktop plays it",
-      pressed: "white-hot; held ones fill with the tint",
+      pressed: "the state layer; held ones fill with the tint",
     },
   },
   focus: {

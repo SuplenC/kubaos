@@ -412,11 +412,11 @@
   --step-corner: var(--radius-row);
   --step-ink: var(--color-on_surface);
   --step-muted: var(--color-on_surface_variant);
-  --tint-tone: var(--color-primary);
-  background-image: linear-gradient(
-    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0))),
-    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press, 0)))
-  );
+}
+
+/* A pressable step hovered and pressed: the state layer over its fill, quiet. */
+.k-step.k-control {
+  background-image: linear-gradient(var(--layer), var(--layer));
 }
 
 .k-step > .k-row {

@@ -67,7 +67,7 @@ export default page<Shown>({
     looks: {
       rest: "off: `surface_container_high`, status `on_surface_variant`",
       lit: "tube inside its edge, glow at night",
-      pressed: "the glow brightens; by day the tone tints it",
+      pressed: "the fill a step past hover; no glow",
       selected: "on: `primary_fill`, content `on_primary_fill`",
     },
   },

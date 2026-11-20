@@ -94,8 +94,8 @@ export default page<Shown>({
     ],
     looks: {
       rest: "`surface_container`; the dismiss hidden, its room kept",
-      lit: "pointer or keyboard: the accent's tube, the dismiss shows",
-      pressed: "the tube white-hot; by day `opacity.press_tint`",
+      lit: "keyboard: the accent's tube and glow, the dismiss shows",
+      pressed: "the state layer at `opacity.press`, no line, no glow",
       open: "unfolded to its whole text, chevron up",
     },
   },

@@ -101,8 +101,8 @@ export default page({
     rows: nonEmpty(ROWS.map(({ name }, index) => ({ name, cell: (state: MatrixState) => cell(index, state) }))),
     looks: {
       rest: "its fill, its content in its ink",
-      lit: "pointer only: tube in its tone, glow at night, name hint",
-      pressed: "tube white-hot, glow × `focus.pressed_glow`; by day an ink tint",
+      lit: "keyboard only, which the bar never takes: tube and glow",
+      pressed: "`surface_container_highest`, a step past hover; no line, no glow",
     },
   },
   focus: {

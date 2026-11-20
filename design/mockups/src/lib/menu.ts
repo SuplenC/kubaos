@@ -9,7 +9,8 @@
 // keycaps at its end, and a check whose room is kept when unchecked. A hairline, inset to the words
 // and `space.s4` clear of each side, separates groups. The item the keyboard is on is lit, on
 // `secondary_container`, its keycaps in `primary`; the pointer moving onto an item puts the
-// keyboard on it, so one item is lit at a time. One that destroys something is in `error`; one that
+// keyboard on it, so one item is current at a time, but an item the pointer put there is quiet: the
+// state layer, a faint shape at its radius, no container (`data-pointer`). One that destroys something is in `error`; one that
 // can't be taken is dimmed and is passed over.
 //
 // A held item destroys something that can't be taken back, so it is taken only by holding it for
@@ -63,8 +64,11 @@ export interface MenuItemSpec {
 /** An entry of a menu: an item, or the hairline between two groups. */
 export type MenuEntry = MenuItemSpec | "separator";
 
-/** A state an item is pinned in, as the specimens pin them: the keyboard on it, or pressed. */
-export type ItemPinned = "lit" | "pressed";
+/**
+ * A state an item is pinned in, as the specimens pin them: the keyboard on it, the pointer over it,
+ * or the pointer pressing it.
+ */
+export type ItemPinned = "lit" | "hover" | "pressed" | "focus-hover";
 
 /** One item, the keyboard on it when `current`. */
 export function menuItem(spec: MenuItemSpec, current = false, pinned?: ItemPinned): HTMLElement {
@@ -194,7 +198,7 @@ export function menu(entries: readonly MenuEntry[], options: MenuOptions = {}): 
       // Only a pointer that moves takes the keyboard: a menu opening under a resting pointer keeps
       // the keyboard on its picked item.
       item.addEventListener("pointermove", () => {
-        if (current !== index) move(index);
+        if (current !== index || !item.hasAttribute("data-pointer")) move(index, true);
       });
       // A held item is taken once it has been held for `duration.hold`, never by a click.
       if (entry.held) holds.set(index, holdable(item, () => options.onTake?.(index)));
@@ -204,14 +208,19 @@ export function menu(entries: readonly MenuEntry[], options: MenuOptions = {}): 
   });
   list.append(...items);
 
-  /** Puts the keyboard on the item at `index`, scrolled into view. */
-  function move(index: number): void {
-    holds.get(current)?.release();
+  /**
+   * Puts the keyboard on the item at `index`, scrolled into view; `pointer` when the pointer put it
+   * there, so it shows quiet.
+   */
+  function move(index: number, pointer = false): void {
+    if (current !== index) holds.get(current)?.release();
     items[current]?.removeAttribute("data-current");
+    items[current]?.removeAttribute("data-pointer");
     current = index;
     const item = items[index];
     if (!item) return;
     item.setAttribute("data-current", "");
+    item.toggleAttribute("data-pointer", pointer);
     if (item.offsetTop < list.scrollTop) list.scrollTop = item.offsetTop;
     else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight;
   }

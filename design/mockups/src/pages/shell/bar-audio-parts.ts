@@ -41,6 +41,7 @@ export interface CircleOptions {
 export function pillCircle(content: Element, options: CircleOptions): HTMLElement {
   const item = document.createElement("span");
   item.className = "shell-pill-item";
+  item.dataset.hoverable = "";
   item.setAttribute("role", "button");
   item.setAttribute("aria-label", options.label);
   item.toggleAttribute("data-filled", options.filled ?? false);

@@ -25,9 +25,10 @@
 }
 
 /* The card: flat on what holds it, one container role above it, its corners the panel's surface
-   radius `space.s8` in. A card a click does something on is a control in the state model: hover
-   and the keyboard light the accent's tube inside its edge, and pressed, by day, the tone tints its
-   fill as under a pressable card (`.k-card.k-control`). Its own buttons light theirs instead. */
+   radius `space.s8` in. A card a click does something on is a control in the state model: the
+   keyboard lights the accent's tube inside its edge, and hovered and pressed, the state layer goes
+   over its fill as over a pressable card (`.k-card.k-control`). Its own buttons take the pointer
+   instead. */
 .k-notif-card {
   position: relative;
   display: flex;
@@ -49,15 +50,11 @@
 
 .k-notif-card.k-control {
   cursor: pointer;
-  --tint-tone: var(--color-primary);
-  background-image: linear-gradient(
-    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press))),
-    rgb(from var(--tint-tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)))
-  );
+  background-image: linear-gradient(var(--layer), var(--layer));
 }
 
 .k-notif-card.k-control:not([data-pinned]):has(.k-notif-dismiss:hover, .k-notif-buttons:hover) {
-  --lit: 0;
+  --hover: 0;
   --press: 0;
 }
 
@@ -142,6 +139,7 @@
   transition:
     --unfold var(--motion-medium) var(--easing-standard_decel),
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
 }
 
@@ -149,6 +147,7 @@
   transition:
     --unfold var(--motion-short) var(--easing-standard_accel),
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
 }
 
@@ -158,6 +157,7 @@
   transition:
     --unfold 0s,
     --lit var(--motion-short) var(--easing-standard),
+    --hover var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
 }
 
