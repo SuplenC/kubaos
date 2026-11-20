@@ -32,42 +32,41 @@ type Eased = Track<Easing>;
 /** GRUB's entries, as `10_linux` names them from os-release. */
 export const ENTRIES: readonly string[] = ["KubaOS Shinjuku", "Advanced options for KubaOS Shinjuku", "KubaOS snapshots", "UEFI Firmware Settings"];
 
-/** A long entry: a recovery kernel's, as Advanced options lists it. */
-export const LONG_ENTRY: Words = { short: "KubaOS Shinjuku", long: "KubaOS Shinjuku, with Linux 6.17.0-14-generic (recovery mode)" };
+/** A long entry: the longest the menu has of its own. */
+export const LONG_ENTRY: Words = { short: "KubaOS Shinjuku", long: "Advanced options for KubaOS Shinjuku" };
 
-/** Many entries: Advanced options opened, each kernel twice. */
-export const MANY: readonly string[] = [
-  "KubaOS Shinjuku, with Linux 6.17.0-14-generic",
-  "KubaOS Shinjuku, with Linux 6.17.0-14-generic (recovery mode)",
-  "KubaOS Shinjuku, with Linux 6.17.0-12-generic",
-  "KubaOS Shinjuku, with Linux 6.17.0-12-generic (recovery mode)",
-  "KubaOS Shinjuku, with Linux 6.14.0-37-generic",
-  "KubaOS Shinjuku, with Linux 6.14.0-37-generic (recovery mode)",
-  "KubaOS Shinjuku, with Linux 6.8.0-90-generic",
-  "KubaOS Shinjuku, with Linux 6.8.0-90-generic (recovery mode)",
-];
+// The menu says what an entry is, not what the tool that writes it does today: one line of plain
+// words a row, no columns, no file names. The build writes these titles itself.
 
-/**
- * Advanced options' submenu: Ubuntu's `10_linux` lists each kernel installed, newest first, with
- * its recovery mode after it, named after os-release's PRETTY_NAME by our wrapper.
- */
+
+/** A kernel by its version alone, and its recovery mode after it. */
+const kernel = (version: string) => [`Linux ${version}`, `Linux ${version} · Recovery`];
+
+/** Many entries: Advanced options with four kernels installed. */
+export const MANY: readonly string[] = ["6.17.0-14", "6.17.0-12", "6.14.0-37", "6.8.0-90"].flatMap(kernel);
+
+/** Advanced options' submenu: each kernel installed, newest first, its recovery mode after it. */
 export const ADVANCED: readonly string[] = MANY.slice(0, 4);
 
 /**
- * KubaOS snapshots' submenu, as grub-btrfs titles it with `GRUB_BTRFS_TITLE_FORMAT=("date"
- * "description")`: a header row, then each snapshot newest first, its date as btrfs gives it and
- * its snapper description: the hourly timeline, apt's pre and post pair, and the install's own.
+ * KubaOS snapshots' submenu: each snapshot newest first, its date and time, a middle dot, and what
+ * it is: snapper's hourly timeline, apt's pair round an update, and the install's own three.
  */
 export const SNAPSHOTS: readonly string[] = [
-  "|        Date         | Description       |",
-  "| 2026-11-19 14:00:01 | timeline          |",
-  "| 2026-11-19 13:00:01 | timeline          |",
-  "| 2026-11-18 21:42:17 | apt               |",
-  "| 2026-11-18 21:41:55 | apt               |",
-  "| 2026-11-02 18:20:44 | home-manager base |",
-  "| 2026-11-02 18:05:12 | hyprland base     |",
-  "| 2026-11-02 17:48:30 | clean base        |",
+  "19 Nov, 14:00 · Hourly",
+  "19 Nov, 13:00 · Hourly",
+  "18 Nov, 21:42 · Before an update",
+  "18 Nov, 21:40 · After an update",
+  "02 Nov, 10:46 · Apps set up",
+  "02 Nov, 10:31 · Desktop installed",
+  "02 Nov, 10:15 · Fresh install",
 ];
+
+/**
+ * A snapshot's kernels: `/boot` stays out of the snapshots, so each boots with the kernels
+ * installed now, newest first.
+ */
+export const KERNELS: readonly string[] = ["Linux 6.17.0-14", "Linux 6.17.0-12"];
 
 /** The main menu's entries that open a submenu, and what they list. */
 export const SUBMENUS: ReadonlyMap<number, readonly string[]> = new Map([
@@ -442,8 +441,8 @@ const wait = (name: Duration) => new Promise<void>((done) => window.setTimeout(d
 
 /**
  * The sequence live, from the boot menu: ↑ ↓ pick, Enter boots, E and C open GRUB's text screens
- * and Esc leaves them. Advanced options and KubaOS snapshots open their submenus, Esc going back to
- * the entry they opened from; UEFI Firmware Settings leaves for the firmware, black. The splash
+ * and Esc leaves them. Advanced options and KubaOS snapshots open their submenus, a snapshot its
+ * kernels, Esc going back to the row each opened from; UEFI Firmware Settings leaves for the firmware, black. The splash
  * takes the passphrase (`kuba` opens it; anything else is wrong), then the lock; with another
  * password a key stands in for typing it. On the desktop or the firmware's black, a key restarts.
  * The clock is stopped, as after a key. With two screens, the first is the primary.
@@ -455,10 +454,10 @@ export function liveBoot(world: World): HTMLElement {
   type Phase = "menu" | "shell" | "edit" | "starting" | "prompt" | "busy" | "lock" | "desktop" | "firmware" | "moving";
   let phase: Phase = "menu";
   let at = 0;
-  // In a submenu: its entries, and the main menu's row it opened from, lit again on the way back.
-  let sub: readonly string[] | null = null;
-  let opened = 0;
-  const entries = () => sub ?? ENTRIES;
+  // The lists opened on the way here, each with the row it was left on, lit again on the way back.
+  let trail: { readonly entries: readonly string[]; readonly at: number }[] = [];
+  let list: readonly string[] = ENTRIES;
+  const entries = () => list;
   let typed = "";
   let shown: Screen[] = [];
   const primary = () => shown[0]!;
@@ -528,7 +527,8 @@ export function liveBoot(world: World): HTMLElement {
   async function restart(): Promise<void> {
     phase = "moving";
     at = 0;
-    sub = null;
+    trail = [];
+    list = ENTRIES;
     draw("black");
     await play(root, restarting());
     phase = "menu";
@@ -549,21 +549,23 @@ export function liveBoot(world: World): HTMLElement {
           at = Math.max(0, Math.min(count - 1, at + (event.key === "ArrowDown" ? 1 : -1)));
           drawMenu(primary().menu, entries(), at);
         } else if (event.key === "Enter") {
-          const opens = sub === null ? SUBMENUS.get(at) : undefined;
+          const main = list === ENTRIES;
+          const opens = main ? SUBMENUS.get(at) : list === SNAPSHOTS ? KERNELS : undefined;
           if (opens) {
-            opened = at;
-            sub = opens;
+            trail.push({ entries: list, at });
+            list = opens;
             at = 0;
-            drawMenu(primary().menu, sub, at);
-          } else if (sub === null && at === FIRMWARE) {
+            drawMenu(primary().menu, list, at);
+          } else if (main && at === FIRMWARE) {
             // The machine leaves for its firmware's setup: GRUB draws nothing more.
             phase = "firmware";
             draw("black");
-          } else if (!(sub === SNAPSHOTS && at === 0)) void boot();
-        } else if (event.key === "Escape" && sub !== null) {
-          sub = null;
-          at = opened;
-          drawMenu(primary().menu, ENTRIES, at);
+          } else void boot();
+        } else if (event.key === "Escape" && trail.length > 0) {
+          const back = trail.pop()!;
+          list = back.entries;
+          at = back.at;
+          drawMenu(primary().menu, list, at);
         } else if (event.key.toLowerCase() === "e" || event.key.toLowerCase() === "c") {
           phase = event.key.toLowerCase() === "e" ? "edit" : "shell";
           draw(phase);

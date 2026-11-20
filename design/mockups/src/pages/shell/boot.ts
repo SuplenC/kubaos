@@ -8,6 +8,7 @@ import { goingDown, goingDownReduced, goingDownUnflickered, room, SHUTDOWN } fro
 import {
   ADVANCED,
   type Drawn,
+  KERNELS,
   ENTRIES,
   choosing,
   from,
@@ -172,7 +173,8 @@ export default page<Shown>({
   variants: [
     { name: "Boot menu", for: "the sign unlit, the entries under it; nothing animates", sample: at({ scene: "menu" }) },
     { name: "Advanced options", for: "its submenu: each kernel, then its recovery mode", sample: at({ scene: "menu", entries: ADVANCED, countdown: null }) },
-    { name: "KubaOS snapshots", for: "grub-btrfs' submenu: a header, then snapshots by date", sample: at({ scene: "menu", entries: SNAPSHOTS, countdown: null }) },
+    { name: "KubaOS snapshots", for: "its submenu: each snapshot by date, then what it is", sample: at({ scene: "menu", entries: SNAPSHOTS, countdown: null }) },
+    { name: "A snapshot's kernels", for: "Enter on a snapshot: the kernels it can boot with", sample: at({ scene: "menu", entries: KERNELS, countdown: null }) },
     { name: "UEFI Firmware Settings", for: "the machine leaves for its firmware: black", sample: at({ scene: "black" }) },
     { name: "Clock stopped", for: "after any key: the countdown goes, the hints stay", sample: at({ scene: "menu", countdown: null, at: 2 }) },
     { name: "Entry chosen", for: "the menu gone, the unlit sign where it was", sample: at({ scene: "chosen" }) },
@@ -204,6 +206,7 @@ export default page<Shown>({
         { name: "A quiet kernel", for: "`quiet splash loglevel=3`: no text between menu and splash", sample: at({ scene: "chosen" }) },
         { name: "The menu's picture kept", for: "no mode set after GRUB: its last frame stays until the splash", sample: at({ scene: "chosen" }) },
         { name: "The menu on the primary", for: "the target: GRUB on the primary alone; firmware often mirrors", sample: twoMenus },
+        { name: "Titles written by the build", for: "plain dates and words; no tool's columns or file names", sample: at({ scene: "menu", entries: SNAPSHOTS, countdown: null }) },
         { name: "One place for the sign", for: "GRUB and the splash centre it alike, to the pixel", sample: at({ scene: "splash", lit: 0 }) },
         { name: "The sign's size per screen", for: "the splash scales it per screen, its @2× on HiDPI", sample: twoScreens(false) },
         { name: "Hand-off to the lock", for: "the splash quits onto the lock's first frame, never black", sample: whole(() => screen({ scene: "splash", lock: true }).element) },
@@ -249,9 +252,9 @@ export default page<Shown>({
   keyboard: {
     keys: [
       { keys: ["↑", "↓"], does: "the menu: the entry above or below, no wrap" },
-      { keys: ["Enter"], does: "the menu: boots, opens a submenu, or leaves for the firmware" },
+      { keys: ["Enter"], does: "the menu: boots, opens a list, or leaves for the firmware" },
       { keys: ["E", "C"], does: "the menu: edit the entry, or GRUB's shell" },
-      { keys: ["Esc"], does: "a submenu, edit or shell: back, its entry lit again" },
+      { keys: ["Esc"], does: "a list, edit or shell: back, the row it came from lit" },
       { keys: ["Ctrl+X", "F10"], does: "edit: boots the edited entry" },
       { keys: ["Any key"], does: "the menu: stops the countdown" },
       { keys: ["Typing", "Backspace"], does: "the splash: into the passphrase's field" },
