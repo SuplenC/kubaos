@@ -303,7 +303,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    * hole stands, whether the disc is snapped onto it, and where the disc is held when it is drawn
    * at a place of the pill's rather than at the hand.
    */
-  let carry: { key: string; from: Band[]; home: Landing; landing: Landing; snapped: boolean; disc: HTMLElement; landed: boolean; anchor: (() => Point) | null; number: number; roll: Rolling | null } | null = null;
+  type Carry = { key: string; from: Band[]; home: Landing; landing: Landing; snapped: boolean; disc: HTMLElement; landed: boolean; anchor: (() => Point) | null; number: number; roll: Rolling | null };
+  let carry: Carry | null = null;
   /** The group whose name is being typed over, by block. */
   let renaming: number | null = null;
   let entries: Entry[] = [];
@@ -475,7 +476,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /** The drawn horizontal offset of `child`'s content: its box, and where a slide running on it has it. */
   function drawnLeft(child: HTMLElement): number {
-    return child.offsetLeft + (Number.parseFloat(getComputedStyle(child).getPropertyValue("--ws-slide")) || 0);
+    return child.offsetLeft + (Number.parseFloat(getComputedStyle(child).getPropertyValue("--ws-slide")) || 0) * cssPx("size-chip");
   }
 
   /** How far `child` is in, 0 to 1: its width's share, and its content's opacity. */
@@ -587,7 +588,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       if (kind === "label" || kind === "gap" || Math.abs(from) < cssPx("size-chip") / 2 || ms("medium") === 0) continue;
       // Its content slides out of its box, which shows it while it does.
       made.dataset.sliding = "";
-      made.animate([{ "--ws-slide": `${from}px` }, { "--ws-slide": "0px" }], { duration: ms("medium"), easing: easing("standard_decel") }).finished.then(() => delete made.dataset.sliding, () => {});
+      // In cells: a slide is always by whole places.
+      made.animate([{ "--ws-slide": from / cssPx("size-chip") }, { "--ws-slide": 0 }], { duration: ms("medium"), easing: easing("standard_decel") }).finished.then(() => delete made.dataset.sliding, () => {});
     }
   }
 
@@ -779,14 +781,18 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function discTo(disc: HTMLElement, at: Point, over?: { duration: string; curve: string }): Animation | null {
     const to = client(at);
     const drawn = getComputedStyle(disc);
-    const now = { x: base.x + (Number.parseFloat(drawn.getPropertyValue("--ws-dx")) || 0), y: base.y + (Number.parseFloat(drawn.getPropertyValue("--ws-dy")) || 0) };
+    const glide = Number.parseFloat(drawn.getPropertyValue("--ws-glide")) || 0;
+    const offset = (name: string) => Number.parseFloat(drawn.getPropertyValue(name)) || 0;
+    const now = { x: base.x + offset("--ws-ox") * glide, y: base.y + offset("--ws-oy") * glide };
     base = to;
     disc.style.setProperty("--ws-x", String(to.x));
     disc.style.setProperty("--ws-y", String(to.y));
     if (!over) return null;
     for (const each of easings) each.cancel();
-    const timing = { duration: ms(over.duration), easing: easing(over.curve) };
-    easings = [disc.animate([{ "--ws-dx": now.x - to.x }, { "--ws-dx": 0 }], timing), disc.animate([{ "--ws-dy": now.y - to.y }, { "--ws-dy": 0 }], timing)];
+    // How far it has to come, fixed as it starts; `--ws-glide` takes it from all of that to none.
+    disc.style.setProperty("--ws-ox", String(now.x - to.x));
+    disc.style.setProperty("--ws-oy", String(now.y - to.y));
+    easings = [disc.animate([{ "--ws-glide": 1 }, { "--ws-glide": 0 }], { duration: ms(over.duration), easing: easing(over.curve) })];
     return easings[0]!;
   }
 
@@ -801,9 +807,13 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     disc.append(roll.element);
     // In the top layer, the disc is never cut by the pill or by any box the pill is drawn in; it
     // stays in the pill's tree, so it is drawn in the pill's own tokens.
+    // It floats over the page, out of the pill's box, as a select's open list does: a plain box,
+    // held to its own boxes rather than the pill's.
+    probe(disc, { role: "box" }, { floats: true });
     disc.popover = "manual";
     element.append(disc);
-    disc.showPopover();
+    // A still's pill may not be on the page yet: its disc shows once it is (`onPage`).
+    if (element.isConnected) disc.showPopover();
     return { disc, roll };
   }
 
@@ -982,6 +992,9 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       card = popover(2, list_);
       card.classList.add("shell-ws-menu");
       card.style.setProperty("--menu-x", `${boxOf(anchor).x}px`);
+      const placed = card;
+      // Built before the pill is on the page, the menu stands at its slot once it is laid out.
+      onPage(() => placed.style.setProperty("--menu-x", `${boxOf(anchor).x}px`));
       room.append(card);
       if (!still) list_.focus({ preventScroll: true });
     };
@@ -1138,44 +1151,57 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   }
 
   const made = probe(element, { role: "component", name: "Workspaces", variant: kanji ? "kanji" : "", fixed: { width: false, height: true } });
+  /**
+   * Runs `then` once the pill is on the page and laid out, at once if it is: a still is built
+   * whole before a page puts it anywhere, so its motion's tracks find every part, and placed after.
+   * A pill never put on a page gives up after a few seconds of frames.
+   */
+  function onPage(then: () => void, tries = 300): void {
+    if (element.isConnected) return then();
+    if (tries > 0) requestAnimationFrame(() => onPage(then, tries - 1));
+  }
+
   const still = options.drag;
   if (still) {
-    // A still is laid out once it is on the page: the hole and the disc are placed from the slots.
-    requestAnimationFrame(() => {
-      const key = `w${still.id}`;
-      lift(key, null, still.to ?? null);
+    lift(`w${still.id}`, null, still.to ?? null);
+    // HAZARD: read as its declared type: the checker can't see that `lift` set it, and takes it
+    // for the null it was given.
+    const held = carry as Carry | null;
+    if (held) {
       const off = still.loose ? cssPx("space-s12") : 0;
-      if (!carry) return;
-      const held = carry;
+      // Where its last glide came from, for its move's player: the cell it lifted from, or the hand.
+      const from = still.loose ? -cssPx("space-s12") : cssPx("space-s12");
+      held.disc.style.setProperty("--ws-ox", String(from));
+      held.disc.style.setProperty("--ws-oy", String(from));
       const over = still.over;
       if (over !== undefined) refuse(held.disc, true);
       held.anchor = () => {
         const span = over === undefined ? undefined : spansOf(entries).get(over);
         return span ? { x: span.x + span.w / 2, y: span.y + span.h / 2 } : { x: holeCentre().x + off, y: holeCentre().y + off };
       };
-      discTo(held.disc, held.anchor());
-      // The disc is drawn in the viewport's pixels: as the page scrolls it keeps to the hole.
-      const follow = () => {
-        if (!element.isConnected || carry !== held) return removeEventListener("scroll", follow, true);
+      onPage(() => {
+        if (!held.disc.matches(":popover-open")) held.disc.showPopover();
         discTo(held.disc, held.anchor!());
-      };
-      addEventListener("scroll", follow, { capture: true, passive: true });
-      addEventListener("resize", follow, { passive: true });
-    });
+        // The disc is drawn in the viewport's pixels: as the page scrolls it keeps to the hole.
+        const follow = () => {
+          if (!element.isConnected || carry !== held) return removeEventListener("scroll", follow, true);
+          discTo(held.disc, held.anchor!());
+        };
+        addEventListener("scroll", follow, { capture: true, passive: true });
+        addEventListener("resize", follow, { passive: true });
+      });
+    }
   }
   if (!room) return made;
   room.className = "shell-ws-room";
   room.append(made);
   const open = options.menu;
   if (open) {
-    requestAnimationFrame(() => {
-      const key = open.workspace !== undefined ? `w${open.workspace}` : null;
-      const band = open.group !== undefined ? bands.find((each) => each.block === open.group) : null;
-      const anchorKey = key ? `${key}@${bandOf(key)?.block}` : band?.name && band.borrowed ? `label${band.block}` : `${band?.spaces.at(-1)?.key}@${band?.block}`;
-      const anchor = content.querySelector<HTMLElement>(`.shell-ws-slot[data-key="${anchorKey}"]`);
-      if (!anchor) return;
-      openMenu(key ? { workspace: key } : { block: band!.block }, anchor, open.holding !== undefined ? { holding: open.holding } : {});
-    });
+    const key = open.workspace !== undefined ? `w${open.workspace}` : null;
+    const band = open.group !== undefined ? bands.find((each) => each.block === open.group) : null;
+    const anchorKey = key ? `${key}@${bandOf(key)?.block}` : band?.name && band.borrowed ? `label${band.block}` : `${band?.spaces.at(-1)?.key}@${band?.block}`;
+    const anchor = content.querySelector<HTMLElement>(`.shell-ws-slot[data-key="${anchorKey}"]`);
+    if (anchor) openMenu(key ? { workspace: key } : { block: band!.block }, anchor, open.holding !== undefined ? { holding: open.holding } : {});
   }
   return room;
 }

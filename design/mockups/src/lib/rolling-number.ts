@@ -27,7 +27,7 @@
 import "./rolling-number.css";
 import { centreOnPixels } from "./centre.ts";
 import { FIXED_HEIGHT, probe } from "./probe.ts";
-import { advance, centreFor, tabularFigure, text, type TypeStyle } from "./text.ts";
+import { advance, centreFor, tabularFigure, text, type TypeStyle, widestGlyph } from "./text.ts";
 import { durationMs, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
@@ -101,7 +101,7 @@ function shape(box: HTMLElement, char: string, style: TypeStyle, figures = FIGUR
 
 /** A figure's room in `style`: a tabular digit's, or the widest of `figures` when they are not digits. */
 function figureWidth(style: TypeStyle, figures: string): number {
-  return figures === FIGURES ? tabularFigure(style) : Math.max(...[...figures].map((char) => advance(style, char)));
+  return figures === FIGURES ? tabularFigure(style) : widestGlyph(style, figures);
 }
 
 /** A slot one figure wide, holding `char`, or nothing for a figure the count hasn't got; a mark's as wide as it. */

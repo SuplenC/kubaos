@@ -71,16 +71,16 @@
 /* A slot's content fades as it comes and goes; its piece of a group's tint or outline does not, so
    the band stays whole while the slot narrows. */
 @property --ws-slide {
-  syntax: "<length>";
+  syntax: "<number>";
   inherits: true;
-  initial-value: 0px;
+  initial-value: 0;
 }
 
 /* A slot's content: it fades as the slot comes and goes, and slides by `--ws-slide` from where it
    stood as the slot takes its new place; its pieces of a group's tint and outline do neither. */
 .shell-ws-slot > :not(.shell-ws-tint, .shell-ws-drop) {
   opacity: var(--ws-shown);
-  translate: var(--ws-slide) 0;
+  translate: calc(var(--ws-slide) * var(--size-chip)) 0;
 }
 
 /* A slot whose content slides to it from where it stood: its box clips nothing while it does. */
@@ -259,13 +259,7 @@
   opacity: var(--opacity-placeholder);
 }
 
-@property --ws-dx {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
-}
-
-@property --ws-dy {
+@property --ws-glide {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
@@ -273,7 +267,8 @@
 
 /* The disc a carried workspace rides on, a popover in the top layer, so nothing it is drawn over
    cuts it: its middle at the point the script works out from the pointer (`--ws-x`, `--ws-y`, in
-   the viewport's CSS pixels), less what is still easing out (`--ws-dx`, `--ws-dy`). */
+   the viewport's CSS pixels), plus what is still easing out: the offset it started from
+   (`--ws-ox`, `--ws-oy`, its pixels) times how much of it is left (`--ws-glide`, 1 to 0). */
 .shell-ws-disc {
   --fill: var(--color-surface_container_high);
   --fill-night: var(--color-surface_container_highest);
@@ -289,8 +284,8 @@
   height: var(--size-chip);
   border-radius: var(--radius-full);
   translate:
-    round(nearest, calc((var(--ws-x) + var(--ws-dx)) * 1px - var(--size-chip) / 2), 1px)
-    round(nearest, calc((var(--ws-y) + var(--ws-dy)) * 1px - var(--size-chip) / 2), 1px);
+    round(nearest, calc((var(--ws-x) + var(--ws-ox, 0) * var(--ws-glide)) * 1px - var(--size-chip) / 2), 1px)
+    round(nearest, calc((var(--ws-y) + var(--ws-oy, 0) * var(--ws-glide)) * 1px - var(--size-chip) / 2), 1px);
   pointer-events: none;
 }
 

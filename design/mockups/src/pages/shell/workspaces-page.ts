@@ -39,20 +39,17 @@ function atOnce(tracks: Tracks): Tracks {
   return nonEmpty(tracks.map((track) => ({ ...track, duration: "instant" as const })));
 }
 
-/** The disc eased by (`dx`, `dy`) pixels back to where it is drawn, over `duration` on `curve`. */
-function discMove(name: string, what: string, on: string, dx: number, dy: number, duration: "short" | "medium", curve: "standard" | "standard_decel" | "emphasized_decel", sample: () => HTMLElement): Move {
-  const tracks: Tracks = [
-    { part: "the disc, across", on, target: DISC, property: "--ws-dx", from: dx, to: 0, duration, curve },
-    { part: "the disc, down", on, target: DISC, property: "--ws-dy", from: dy, to: 0, duration, curve },
-  ];
+/** The disc easing from where its glide started (its cell, or the hand) to where it is drawn, over `duration` on `curve`. */
+function discMove(name: string, what: string, on: string, duration: "short" | "medium", curve: "standard" | "standard_decel" | "emphasized_decel", sample: () => HTMLElement): Move {
+  const tracks: Tracks = [{ part: "the disc", on, target: DISC, property: "--ws-glide", from: 1, to: 0, duration, curve }];
   return { name, what, tracks, reduced: atOnce(tracks), back: "plays", sample };
 }
 
-const LIFTS = discMove("Lifted onto its disc", "Pressed and moved `space.s8`: the disc rises from its cell onto the hand over `short` on `standard`.", "workspace 4", -12, -12, "short", "standard", () => workspaces({ groups: LIVE, drag: { id: 4, loose: true } }));
-const SNAPS = discMove("Snapped onto a place", "Its magnet reached: the disc eases from the hand onto the place over `medium` on `standard_decel`.", "workspace 4", 12, 12, "medium", "standard_decel", () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }));
-const DROPS = discMove("Dropped", "Let go: the disc flies from the hand into its place over `medium` on `emphasized_decel`.", "workspace 4", 12, 12, "medium", "emphasized_decel", () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }));
+const LIFTS = discMove("Lifted onto its disc", "Pressed and moved `space.s8`: the disc rises from its cell onto the hand over `short` on `standard`.", "workspace 4", "short", "standard", () => workspaces({ groups: LIVE, drag: { id: 4, loose: true } }));
+const SNAPS = discMove("Snapped onto a place", "Its magnet reached: the disc eases from the hand onto the place over `medium` on `standard_decel`.", "workspace 4", "medium", "standard_decel", () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }));
+const DROPS = discMove("Dropped", "Let go: the disc flies from the hand into its place over `medium` on `emphasized_decel`.", "workspace 4", "medium", "emphasized_decel", () => workspaces({ groups: LIVE, drag: { id: 4, to: { block: 0, index: 1 } } }));
 
-const SLIDE: Tracks = [{ part: "its content", on: "the windows of 3, now 2", target: '.shell-ws-slot[data-key="w3@0"]', property: "--ws-slide", from: { length: "size-chip" }, to: 0, duration: "medium", curve: "standard_decel" }];
+const SLIDE: Tracks = [{ part: "its content", on: "the windows of 3, now 2", target: '.shell-ws-slot[data-key="w3@0"]', property: "--ws-slide", from: 1, to: 0, duration: "medium", curve: "standard_decel" }];
 const SLIDES: Move = {
   name: "The cells between sliding over",
   what: "Its place moved: each cell between slides a place over `medium` on `standard_decel`; its tint stays.",
