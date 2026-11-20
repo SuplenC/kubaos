@@ -45,10 +45,26 @@ function tween(element: HTMLElement, each: Track, delay: number): Promise<void> 
   const to = String(css(each.to));
   map.get(key)?.cancel();
   element.style.setProperty(key, to);
-  const frames: Keyframe[] = struck(each.curve)
-    ? [...stepsOf(each.curve).map((step, i, all) => ({ offset: i / all.length, easing: "step-end", [key]: String(between(each, step)) })), { offset: 1, [key]: to }]
-    : [{ [key]: from }, { [key]: to }];
-  const animation = element.animate(frames, { duration: Math.max(1, ms(milliseconds(each.duration))), delay, easing: struck(each.curve) ? "linear" : curveOf(each.curve as Easing), fill: "backwards" });
+  const length = Math.max(1, ms(milliseconds(each.duration)));
+  if (struck(each.curve)) {
+    // A strike's first step is already part lit, so it can't stand in for the wait before its cue
+    // as a backwards fill would make it: the wait is the animation's own first stretch, held at
+    // where the tube stood.
+    const total = delay + length;
+    const frames: Keyframe[] = [
+      { offset: 0, easing: "step-end", [key]: from },
+      ...stepsOf(each.curve).map((step, i, all) => ({ offset: (delay + (i * length) / all.length) / total, easing: "step-end", [key]: String(between(each, step)) })),
+      { offset: 1, [key]: to },
+    ];
+    const animation = element.animate(frames, { duration: total, easing: "linear" });
+    map.set(key, animation);
+    return animation.finished.then(
+      () => undefined,
+      () => undefined,
+    );
+  }
+  const frames: Keyframe[] = [{ [key]: from }, { [key]: to }];
+  const animation = element.animate(frames, { duration: length, delay, easing: curveOf(each.curve as Easing), fill: "backwards" });
   map.set(key, animation);
   return animation.finished.then(
     () => undefined,
