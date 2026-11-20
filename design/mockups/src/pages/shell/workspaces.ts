@@ -16,6 +16,11 @@
 // `emphasized_decel`. A number that changes rolls, as the Overview's do (`lib/rolling-number.ts`):
 // the same windows drawn at another number, a drop, a delete shifting the later ones down.
 //
+// The cell under the pointer takes a neutral circle a step up the container ladder,
+// `surface_container_high`, and pressed `surface_container_highest`, fading over `short`, as any
+// control's quiet hover does; the pill itself draws no line and no glow for the pointer. The shown
+// workspace's cell takes none: it is already where you are. A `+` is a cell and takes it too.
+//
 // A workspace, empty or not, can be carried to another place; a `+` cannot. Pressed and moved `space.s8`, it lifts
 // onto a disc raised to step 1 that eases onto the pointer over `short` on `standard`, its place
 // left as a hole, empty space a cell wide; nothing else moves. The disc is in the top layer, so
@@ -107,6 +112,8 @@ export interface WorkspacesOptions {
   /** Clicks and the wheel move the shown workspace, a group's `+` adds one; a drag reorders, a right click opens the menu. */
   readonly live?: boolean;
   readonly pinned?: Pinned;
+  /** The workspace whose cell the pointer is on while pinned hovered or pressed: the one after the shown one, unless named. */
+  readonly pointer?: number;
   readonly drag?: DragPin;
   readonly menu?: MenuPin;
 }
@@ -265,6 +272,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   let mint = 0;
   const fresh = () => `n${mint++}`;
   let active = `w${options.active ?? 2}`;
+  const pointer = options.pointer ?? (options.active ?? 2) + 1;
   let bands: Band[] = (options.groups ?? SHOTS_GROUPS).map((group) => {
     const spaces = group.spaces.map((space) => ({ id: space.id, key: `w${space.id}`, occupied: space.occupied }));
     const last = spaces.at(-1);
@@ -400,6 +408,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     }
     const cell = document.createElement("span");
     cell.className = "shell-ws-cell";
+    cell.toggleAttribute("data-shown", entry.space === active);
+    cell.toggleAttribute("data-pointer", entry.workspace === pointer);
     cell.toggleAttribute("data-ghost", entry.kind === "ghost");
     if (entry.kind === "ghost") {
       const plus = icon("add", "var(--icon-s16)", "var(--color-outline)");

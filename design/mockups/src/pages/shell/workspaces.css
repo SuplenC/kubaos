@@ -180,8 +180,23 @@
   grid-area: 1 / 1;
 }
 
-/* A workspace whose menu is open: a circle the cell's size in `primary` at `opacity.tint` behind
-   its number, as an accent is drawn faintly under itself, fading in and out with the menu. */
+/* The circle behind a cell's number. The pointer's: a step up the ladder hovered, two pressed,
+   fading over `short` and pressing over `micro`; pinned on the pill, the cell named as under the
+   pointer (`data-pointer`) shows it. The shown cell takes none: it is where you are already. While
+   a workspace's menu is open, its cell's circle is the menu's mark instead, `primary` at
+   `opacity.tint`, fading over `short` on `standard`: the mark wins over the pointer's. */
+@property --cell-hover {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --cell-press {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 @property --ws-mark {
   syntax: "<number>";
   inherits: true;
@@ -189,22 +204,48 @@
 }
 
 .shell-ws-cell {
+  --cell-hover: 0;
+  --cell-press: 0;
   --ws-mark: 0;
-  transition: --ws-mark var(--motion-short) var(--easing-standard);
+  transition:
+    --cell-hover var(--motion-short) var(--easing-standard),
+    --cell-press var(--motion-micro) var(--easing-standard),
+    --ws-mark var(--motion-short) var(--easing-standard);
 }
 
 .shell-ws-cell::before {
   content: "";
   grid-area: 1 / 1;
-  width: 100%;
-  height: 100%;
+  align-self: stretch;
+  justify-self: stretch;
   border-radius: var(--radius-full);
-  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
-  opacity: var(--ws-mark);
+  background: color-mix(
+    in srgb,
+    color-mix(
+      in srgb,
+      color-mix(in srgb, transparent, var(--color-surface_container_high) calc(var(--cell-hover) * 100%)),
+      var(--color-surface_container_highest) calc(var(--cell-press) * 100%)
+    ),
+    rgb(from var(--color-primary) r g b / var(--opacity-tint)) calc(var(--ws-mark) * 100%)
+  );
+}
+
+.shell-ws-cell:not([data-shown]):hover,
+.shell-ws:is([data-pinned="hover"], [data-pinned="pressed"]) .shell-ws-cell[data-pointer]:not([data-shown]) {
+  --cell-hover: 1;
+}
+
+.shell-ws-cell:not([data-shown]):active,
+.shell-ws[data-pinned="pressed"] .shell-ws-cell[data-pointer]:not([data-shown]) {
+  --cell-press: 1;
 }
 
 .shell-ws-slot[data-menu] > .shell-ws-cell {
   --ws-mark: 1;
+}
+
+.shell-ws[data-pinned] .shell-ws-cell {
+  transition: none;
 }
 
 /* A cell's number: a rolling number (`lib/rolling-number.ts`), as the Overview's are, or a kanji,
