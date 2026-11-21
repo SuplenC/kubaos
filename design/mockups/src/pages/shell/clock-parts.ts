@@ -74,6 +74,8 @@ export interface ClockOptions {
   readonly live?: boolean;
   /** Drawn this far through the turn to the weather view, 0 to 1: a picture of it moving. */
   readonly turning?: number;
+  /** The picture of the turn is of the way back to the clock. */
+  readonly turningBack?: boolean;
 }
 
 /** A duration token in milliseconds under the speed setting; none with reduced motion. */
@@ -317,44 +319,133 @@ function boxIn(element: HTMLElement, within: HTMLElement): { readonly x: number;
   return { x: (own.left - outer.left) / zoom, y: (own.top - outer.top) / zoom, w: own.width / zoom, h: own.height / zoom };
 }
 
+/** A box in the body's pixels. */
+type Box = ReturnType<typeof boxIn>;
+
+const px = (box: Box) => ({ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px` });
+
+/** A copy of `card`'s sky as it is now: its own pixels, laid as `cover` in whatever box holds it. */
+function skyCopy(card: HTMLElement): HTMLCanvasElement {
+  const copy = document.createElement("canvas");
+  copy.className = "ck-morph-picture";
+  const source = card.querySelector<HTMLCanvasElement>(".k-weather-sky-picture");
+  if (!source) return copy;
+  copy.width = source.width;
+  copy.height = source.height;
+  copy.getContext("2d")?.drawImage(source, 0, 0);
+  return copy;
+}
+
+/** A copy of `card`'s words, laid out in `box` as on the card, with no sky under them. */
+function wordsCopy(card: HTMLElement, box: Box): HTMLElement {
+  const holder = document.createElement("div");
+  holder.className = "k-weather-card ck-morph-words";
+  holder.dataset.part = card.dataset.part ?? "";
+  Object.assign(holder.style, px(box));
+  const words = card.querySelector(".k-weather-words");
+  if (words) holder.append(words.cloneNode(true));
+  return holder;
+}
+
+/** The card and the banner of a turn, and the layer the morph is drawn in over both views. */
+interface Morph {
+  readonly layer: HTMLElement;
+  readonly sky: HTMLElement;
+  readonly cardSky: HTMLElement;
+  readonly bannerSky: HTMLElement;
+  readonly cardWords: HTMLElement;
+  readonly bannerWords: HTMLElement;
+  readonly card: Box;
+  readonly banner: Box;
+  readonly cardRadius: string;
+  readonly bannerRadius: string;
+}
+
 /**
- * The turn between the views, played forwards (to the weather) or backwards (to the clock): the
- * card grows into the banner's place, clipped to the card's size and moved onto it at the start;
- * the clock view fades; the weather view's rows rise `space.s16` one after another, `micro` apart;
- * the panel's height eases from the one view's to the other's. Every part over `long` on
- * `emphasized_decel`, the fade over `short`. Played backwards, it runs the same curves in reverse.
+ * Lays the morph over both views and hides the card and the banner under it. The sky is the one
+ * thing that moves: a box from the card's to the banner's, holding both skies' pixels, which
+ * cross-fade as it grows. The card's words and the banner's each stay in their own box, whole, so
+ * no frame cuts a glyph, and at either end the morph is the resting card or the resting banner.
  */
-function turn(body: HTMLElement, clock: View, weather: View & { readonly banner: HTMLElement }, from: HTMLElement | null, back: boolean): Animation[] {
+function morphOf(body: HTMLElement, from: HTMLElement, banner: HTMLElement): Morph {
+  const card = boxIn(from, body);
+  const big = boxIn(banner, body);
+  const layer = document.createElement("div");
+  layer.className = "ck-morph";
+  const sky = document.createElement("div");
+  sky.className = "ck-morph-sky";
+  const cardSky = skyCopy(from);
+  const bannerSky = skyCopy(banner);
+  sky.append(cardSky, bannerSky);
+  const cardWords = wordsCopy(from, card);
+  const bannerWords = wordsCopy(banner, big);
+  layer.append(sky, cardWords, bannerWords);
+  body.append(layer);
+  from.style.visibility = "hidden";
+  banner.style.visibility = "hidden";
+  return { layer, sky, cardSky, bannerSky, cardWords, bannerWords, card, banner: big, cardRadius: getComputedStyle(from).borderTopLeftRadius, bannerRadius: getComputedStyle(banner).borderTopLeftRadius };
+}
+
+/** Takes the morph away and shows the card and the banner again. */
+function unmorph(morph: Morph, from: HTMLElement, banner: HTMLElement): void {
+  morph.layer.remove();
+  from.style.visibility = "";
+  banner.style.visibility = "";
+}
+
+/** One part's move, running forwards from its first keyframe to its last, held at both ends. */
+function moved(element: Element, frames: Keyframe[], duration: number, curve: string, delay = 0): Animation {
+  return element.animate(frames, { duration, delay, easing: easing(curve), fill: "both" });
+}
+
+/**
+ * The turn between the views, each way a move of its own that runs forwards: there and back, every
+ * part lands softly on `emphasized_decel`, its fades on `standard`, and the two views are never
+ * both to be read at once.
+ *
+ * To the weather: the clock view and the card's words fade over `short`; the sky grows from the
+ * card's box into the banner's over `long`, its picture turning from the card's to the banner's;
+ * once the clock view is gone, the weather view's rows rise `space.s16` into place one after
+ * another, `micro` apart, and the banner's words fade in as the sky lands. The panel's height eases
+ * from the one view's to the other's over `long`.
+ *
+ * Back to the clock: the weather view's rows and the banner's words fade together over `short`,
+ * sinking `space.s16`; the sky shrinks into the card over `long`; once the rows are gone, the clock
+ * view fades in over `short`, and the card's words with it as the sky lands.
+ */
+function turn(body: HTMLElement, clock: View, weather: View & { readonly banner: HTMLElement }, morph: Morph | null, back: boolean): Animation[] {
   const long = ms("long");
   const short = ms("short");
   const micro = ms("micro");
-  const decel = easing("emphasized_decel");
-  const direction: PlaybackDirection = back ? "reverse" : "normal";
-  const played: Animation[] = [];
-  const clockHeight = clock.element.offsetHeight;
-  const weatherHeight = weather.element.offsetHeight;
-  played.push(body.animate([{ height: `${clockHeight}px` }, { height: `${weatherHeight}px` }], { duration: long, easing: decel, direction, fill: "both" }));
-  played.push(clock.element.animate([{ opacity: 1 }, { opacity: 0 }], { duration: short, easing: easing("standard"), direction, fill: "both" }));
-  if (from) {
-    const card = boxIn(from, body);
-    const banner = boxIn(weather.banner, body);
-    const cardRadius = getComputedStyle(from).borderTopLeftRadius;
-    const bannerRadius = getComputedStyle(weather.banner).borderTopLeftRadius;
-    played.push(
-      weather.banner.animate(
-        [
-          { translate: `${card.x - banner.x}px ${card.y - banner.y}px`, clipPath: `inset(0 ${banner.w - card.w}px ${banner.h - card.h}px 0 round ${cardRadius})` },
-          { translate: "0 0", clipPath: `inset(0 0 0 0 round ${bannerRadius})` },
-        ],
-        { duration: long, easing: decel, direction, fill: "both" },
-      ),
-    );
-  }
   const rise = length("space-s16");
-  weather.rows.forEach((each, index) => {
-    played.push(each.animate([{ opacity: 0, translate: `0 ${rise}px` }, { opacity: 1, translate: "0 0" }], { duration: long, delay: back ? 0 : index * micro, endDelay: back ? index * micro : 0, easing: decel, direction, fill: "both" }));
-  });
+  const heights = [{ height: `${clock.element.offsetHeight}px` }, { height: `${weather.element.offsetHeight}px` }];
+  const played: Animation[] = [moved(body, back ? heights.reverse() : heights, long, "emphasized_decel")];
+  const shown = { opacity: 1 };
+  const gone = { opacity: 0 };
+  // Without a card to grow from, the banner comes and goes as a row.
+  const rows = morph ? weather.rows : [weather.rows[0]!, weather.banner, ...weather.rows.slice(1)];
+  if (!back) {
+    played.push(moved(clock.element, [shown, gone], short, "standard"));
+    rows.forEach((each, index) => played.push(moved(each, [{ opacity: 0, translate: `0 ${rise}px` }, { opacity: 1, translate: "0 0" }], long, "emphasized_decel", short + index * micro)));
+  } else {
+    for (const each of rows) played.push(moved(each, [{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: `0 ${rise}px` }], short, "emphasized_decel"));
+    played.push(moved(clock.element, [gone, shown], short, "standard", short));
+  }
+  if (morph) {
+    const [start, end] = back ? [morph.banner, morph.card] : [morph.card, morph.banner];
+    const [startRadius, endRadius] = back ? [morph.bannerRadius, morph.cardRadius] : [morph.cardRadius, morph.bannerRadius];
+    played.push(moved(morph.sky, [{ ...px(start), borderRadius: startRadius }, { ...px(end), borderRadius: endRadius }], long, "emphasized_decel"));
+    played.push(moved(back ? morph.bannerSky : morph.cardSky, [shown, gone], long, "standard"));
+    played.push(moved(back ? morph.cardSky : morph.bannerSky, [gone, shown], long, "standard"));
+    played.push(moved(back ? morph.bannerWords : morph.cardWords, [shown, gone], short, "standard"));
+    played.push(moved(back ? morph.cardWords : morph.bannerWords, [gone, shown], short, "standard", long - short));
+  }
   return played;
+}
+
+/** Runs `then` once the views just drawn have laid out and drawn their skies. */
+function drawn(then: () => void): void {
+  requestAnimationFrame(() => requestAnimationFrame(then));
 }
 
 /** The popup's content: the container padding at its sides, `space.s20` above and below. */
@@ -374,20 +465,44 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     view.element.remove();
   };
 
-  /** Puts `top` over `under` while they turn, and settles on `stays` after. */
-  function overlay(under: View, top: View, played: Animation[], stays: View): void {
+  /**
+   * Turns between `clock` and `weather`, `weather` lying over `clock` meanwhile, and settles on
+   * the weather or, `back`, on the clock. `hold` draws it held that far through, a picture of it.
+   */
+  function play(clock: View, weather: View & { readonly banner: HTMLElement }, from: HTMLElement | null, back: boolean, hold?: number): void {
     busy = true;
-    top.element.classList.add("ck-turning");
-    void Promise.all(played.map((each) => each.finished)).then(
-      () => {
-        for (const each of played) each.cancel();
-        top.element.classList.remove("ck-turning");
-        free(stays === under ? top : under);
-        shown = stays;
-        busy = false;
-      },
-      () => (busy = false),
-    );
+    // Until the move starts, the view it starts from is all there is: the other is drawn unseen
+    // and the panel keeps the first's height.
+    body.style.height = `${(back ? weather : clock).element.offsetHeight}px`;
+    weather.element.classList.add("ck-turning");
+    (back ? clock : weather).element.style.opacity = "0";
+    drawn(() => {
+      const morph = from ? morphOf(body, from, weather.banner) : null;
+      const played = turn(body, clock, weather, morph, back);
+      body.style.height = "";
+      clock.element.style.opacity = "";
+      weather.element.style.opacity = "";
+      if (hold !== undefined) {
+        // One moment for every part: that far through the whole turn, its last part included.
+        const whole = Math.max(...played.map((each) => Number(each.effect?.getComputedTiming().endTime ?? 0)));
+        for (const each of played) {
+          each.pause();
+          each.currentTime = hold * whole;
+        }
+        return;
+      }
+      void Promise.all(played.map((each) => each.finished)).then(
+        () => {
+          for (const each of played) each.cancel();
+          if (morph && from) unmorph(morph, from, weather.banner);
+          weather.element.classList.remove("ck-turning");
+          free(back ? weather : clock);
+          shown = back ? clock : weather;
+          busy = false;
+        },
+        () => (busy = false),
+      );
+    });
   }
 
   function go(to: Whose, from: HTMLElement | null): void {
@@ -396,14 +511,12 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     const clock = shown;
     const weather = freshWeather(to);
     body.append(weather.element);
-    weather.element.classList.add("ck-turning");
     if (settings().reduced) {
       free(clock);
-      weather.element.classList.remove("ck-turning");
       shown = weather;
       return;
     }
-    overlay(clock, weather, turn(body, clock, weather, from, false), weather);
+    play(clock, weather, from, false);
   }
 
   function back(): void {
@@ -411,32 +524,21 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     const weather = shown as View & { readonly banner: HTMLElement };
     const clock = freshClock();
     body.prepend(clock.element);
-    weather.element.classList.add("ck-turning");
     if (settings().reduced) {
       free(weather);
       shown = clock;
       return;
     }
-    overlay(clock, weather, turn(body, clock, weather, clock.cardOf(whose), true), clock);
+    play(clock, weather, clock.cardOf(whose), true);
   }
 
   if (options.turning !== undefined) {
-    // A picture of the turn: both views drawn, every part held where it is that far through.
+    // A picture of the turn, there or back: both views drawn, every part held that far through.
     const clock = freshClock();
-    body.append(clock.element);
-    shown = clock;
-    requestAnimationFrame(() => {
-      const weather = freshWeather(whose);
-      weather.element.classList.add("ck-turning");
-      body.append(weather.element);
-      const played = turn(body, clock, weather, clock.cardOf(whose), false);
-      // One moment for every part: that far through the whole turn, its last row's rise included.
-      const whole = Math.max(...played.map((each) => Number(each.effect?.getComputedTiming().endTime ?? 0)));
-      for (const each of played) {
-        each.pause();
-        each.currentTime = (options.turning ?? 0) * whole;
-      }
-    });
+    const weather = freshWeather(whose);
+    body.append(clock.element, weather.element);
+    shown = options.turningBack ? weather : clock;
+    play(clock, weather, clock.cardOf(whose), options.turningBack ?? false, options.turning);
   } else if ((options.view ?? "clock") === "weather") {
     shown = weatherView(options, () => back());
     body.append(shown.element);
