@@ -49,4 +49,4 @@ One payload build at a time, they eat the RAM. How it all fits together: [`insta
 
 ## Licence
 
-MIT OR Apache-2.0, except the wallpapers, the fonts, and third-party app icons and files under `apps/*/`, which are under their own licences: each names its licence in its header comment, and that licence's text is in [`LICENSES/`](LICENSES). See [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE) and the wallpapers' credits in [SuplenC/kubaos-wallpapers](https://github.com/SuplenC/kubaos-wallpapers).
+MIT OR Apache-2.0, except the wallpapers, the fonts, and third-party app icons and files under `apps/*/`, which are under their own licences: each names its licence in its header comment, and that licence's text is in [`LICENSES/`](LICENSES). See [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE) and the wallpapers' credits in [SuplenC/kubaos-wallpapers](https://github.com/SuplenC/kubaos-wallpapers). Everything external KubaOS builds on or is made with is credited in [`CREDITS.md`](CREDITS.md).

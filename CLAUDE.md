@@ -34,6 +34,10 @@ A new feature ships with its Kotodama integration in the same PR, through the Ku
 
 In-shell searches over lists use Kotodama's engine, never a hand-rolled filter (see the QML rules in `docs/agents/code-quality.md`).
 
+## Credits
+
+Anything external that KubaOS uses, whether it ships it or is made with it (a library, a vendored file, an asset, a font, a data source, a service or a development tool), is credited in `CREDITS.md` in the same PR that adds it, with its creators, its licence and a link.
+
 ## Git
 
 - **Commits**: [Conventional Commits](https://www.conventionalcommits.org/). `<type>(<scope>)?: <description>`, types `feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert`; `!` or a `BREAKING CHANGE:` footer for breaking changes.
