@@ -17,7 +17,7 @@
 
 import "./sheet.css";
 import { probe } from "./probe.ts";
-import { durationMs, raw } from "./tokens.ts";
+import { durationMs, length, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
 
 export interface ScreenOptions {
@@ -176,6 +176,32 @@ function ms(name: string): number {
 }
 
 /**
+ * A panel's content changing view, the panels' slide and fade: the leaving view slides
+ * `space.s24` away from where the arriving one comes from over `micro` on `emphasized_accel`,
+ * fading on `standard_accel`; the arriving one slides in that far from its side over `short` on
+ * `emphasized_decel`, `duration.swap_lag` later, and fades in on `standard` over
+ * `duration.swap_fade` once the leaving one is gone, so the two are never drawn over each other.
+ * `toward` is the side the arriving view comes from: 1 the right, a view further in; -1 the left,
+ * coming back. Only `translate` and `opacity` move, so the compositor plays it. Each animation
+ * holds where it lands; its owner settles them. `leaving` may be none: a view arriving alone.
+ */
+export function swapViews(leaving: HTMLElement | null, arriving: HTMLElement, toward: 1 | -1): Animation[] {
+  const travel = Math.round(length("space-s24"));
+  const moves: Animation[] = [];
+  if (leaving) {
+    moves.push(
+      leaving.animate([{ translate: "0px 0px" }, { translate: `${-toward * travel}px 0px` }], { duration: ms("micro"), easing: raw("easing-emphasized_accel"), fill: "forwards" }),
+      leaving.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms("micro"), easing: raw("easing-standard_accel"), fill: "forwards" }),
+    );
+  }
+  moves.push(
+    arriving.animate([{ translate: `${toward * travel}px 0px` }, { translate: "0px 0px" }], { duration: ms("short"), delay: ms("swap_lag"), easing: raw("easing-emphasized_decel"), fill: "both" }),
+    arriving.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ms("swap_fade"), delay: ms("micro"), easing: raw("easing-standard"), fill: "both" }),
+  );
+  return moves;
+}
+
+/**
  * Twins on `on`'s right edge: one asked for while another is open takes the surface over where it
  * is, and only the content changes. The old content slides `space.s24` away from the new one's
  * button and fades over `micro`; the new one slides in from its button's side over `short`,
@@ -247,8 +273,8 @@ export function twins(on: Screen, panels: readonly Twin[]): Twins {
       const standard = raw("easing-standard");
       const style = getComputedStyle(back);
       moving = [
-        back.animate([{ "--swap-shift": style.getPropertyValue("--swap-shift") }, { "--swap-shift": "0" }], { duration: ms("short"), easing: decel, fill: "forwards" }),
-        back.animate([{ "--swap-presence": style.getPropertyValue("--swap-presence") }, { "--swap-presence": "1" }], { duration: ms("short"), easing: standard, fill: "forwards" }),
+        back.animate([{ translate: style.translate === "none" ? "0px 0px" : style.translate }, { translate: "0px 0px" }], { duration: ms("short"), easing: decel, fill: "forwards" }),
+        back.animate([{ opacity: style.opacity }, { opacity: 1 }], { duration: ms("short"), easing: standard, fill: "forwards" }),
       ];
       panels[to]!.land?.();
       return;
@@ -267,16 +293,7 @@ export function twins(on: Screen, panels: readonly Twin[]): Twins {
     leaving = { index: from, element: old };
     current = to;
     started = performance.now();
-    const accel = raw("easing-emphasized_accel");
-    const fade = raw("easing-standard_accel");
-    const decel = raw("easing-emphasized_decel");
-    const standard = raw("easing-standard");
-    moving = [
-      old.animate([{ "--swap-shift": "0" }, { "--swap-shift": String(-toward) }], { duration: ms("micro"), easing: accel, fill: "forwards" }),
-      old.animate([{ "--swap-presence": "1" }, { "--swap-presence": "0" }], { duration: ms("micro"), easing: fade, fill: "forwards" }),
-      arriving.animate([{ "--swap-shift": String(toward) }, { "--swap-shift": "0" }], { duration: ms("short"), delay: ms("swap_lag"), easing: decel, fill: "backwards" }),
-      arriving.animate([{ "--swap-presence": "0" }, { "--swap-presence": "1" }], { duration: ms("swap_fade"), delay: ms("micro"), easing: standard, fill: "backwards" }),
-    ];
+    moving = swapViews(old, arriving, toward < 0 ? -1 : 1);
     const last = moving[2]!;
     last.finished.then(() => {
       if (leaving?.element === old) settleSwap();

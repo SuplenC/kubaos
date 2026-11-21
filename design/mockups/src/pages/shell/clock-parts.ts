@@ -7,9 +7,10 @@
 // - The weather view: Back and the city's name, its banner, its warning, twelve hours, six tiles,
 //   the week, and where the forecast comes from.
 //
-// A press on a weather card turns the panel to that city's weather: the card grows into the
-// banner's place while the clock view fades, and the weather view's rows rise in one after
-// another; Back plays it backwards into the card it came from. Reduced motion swaps the views.
+// A press on a weather card turns the panel to that city's weather: the views change as a side
+// panel's content changes view (the clock view slides and fades out to the left, the weather view
+// slides and fades in from the right) while the card's live sky grows into the banner's place;
+// Back mirrors it, the sky shrinking into the card it came from. Reduced motion swaps the views.
 // The clock's pages build their samples from these. This file is no page.
 //
 // The clock popup's old settings page stays below (`clockSettingsOnScreen`) for its own page,
@@ -27,10 +28,10 @@ import { iconButton } from "../../lib/icon-button.ts";
 import { icon } from "../../lib/icon.ts";
 import { container, fill, filling, flow, row, stack } from "../../lib/layout.ts";
 import { select } from "../../lib/select.ts";
-import { hang, sheet } from "../../lib/sheet.ts";
+import { hang, sheet, swapViews } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { clamped, text } from "../../lib/text.ts";
-import { cubic, durationMs, length } from "../../lib/tokens.ts";
+import { cubic, durationMs } from "../../lib/tokens.ts";
 import { type CardSky, carry, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
 import { TYPICAL, type Weather } from "../../lib/weather-sky.ts";
 import { settings } from "../../site/settings.ts";
@@ -179,7 +180,7 @@ interface View {
   readonly cards: WeatherCard[];
   /** The card each city's weather turns from and back into, by whose it is. */
   readonly cardOf: (whose: Whose) => WeatherCard | null;
-  /** The rows that rise in one after another, top to bottom. */
+  /** The view's rows, top to bottom. */
   readonly rows: HTMLElement[];
 }
 
@@ -333,43 +334,28 @@ interface Turning {
 }
 
 /**
- * The turn between the views, each way a move of its own that runs forwards: there and back, every
- * part lands softly on `emphasized_decel`, its fades on `standard`, and the two views are never
- * both to be read at once.
+ * The turn between the views, each way a move of its own that runs forwards, the two views never
+ * both to be read at once. The views change as a panel's content changes view (`swapViews`): to
+ * the weather, the clock view slides `space.s24` to the left and fades, and the weather view slides
+ * in from the right and fades in once it has gone; back to the clock, the same mirrored.
  *
- * The card's own live sky is carried into the banner's place, or the banner's back into the card's
- * (`carry`), over `long`, still drawing, its words travelling on it.
- *
- * To the weather: the clock view fades over `short`; as it finishes, the weather view's rows rise
- * `space.s16` into place one after another, `micro` apart, starting half a `short` in. The panel's
- * height eases from the one view's to the other's over `long`.
- *
- * Back to the clock: the weather view's rows fade together over `short`, sinking `space.s16`;
- * once they are gone, the clock view fades in over `short`.
+ * The card's own live sky is the one thing that carries across: it grows into the banner's place,
+ * or the banner's shrinks back into the card's (`carry`), over `long` on `emphasized_decel`, still
+ * drawing, its words travelling on it, sliding with neither view. Its two boxes are read in the
+ * views' resting layouts, before either moves. The panel's height eases from the one view's to the
+ * other's over `long` on `emphasized_decel`.
  */
 function turn(body: HTMLElement, clock: View, weather: View & { readonly banner: WeatherCard }, from: WeatherCard | null, back: boolean): Turning {
   const long = ms("long");
   const short = ms("short");
-  const micro = ms("micro");
-  const rise = length("space-s16");
+  // The sky's two boxes first, in the resting layouts.
+  const carried = from ? carry(back ? weather.banner : from, back ? from : weather.banner, body, { duration: long, easing: easing("emphasized_decel"), fade: short, fadeEasing: easing("standard") }) : null;
   const heights = [{ height: `${clock.element.offsetHeight}px` }, { height: `${weather.element.offsetHeight}px` }];
   const played: Animation[] = [moved(body, back ? heights.reverse() : heights, long, "emphasized_decel")];
-  const shown = { opacity: 1 };
-  const gone = { opacity: 0 };
-  // Without a card to carry, the banner comes and goes as a row.
-  const rows = from ? weather.rows : [weather.rows[0]!, weather.banner.element, ...weather.rows.slice(1)];
-  if (!back) {
-    played.push(moved(clock.element, [shown, gone], short, "standard"));
-    rows.forEach((each, index) => played.push(moved(each, [{ opacity: 0, translate: `0 ${rise}px` }, { opacity: 1, translate: "0 0" }], long, "emphasized_decel", short / 2 + index * micro)));
-  } else {
-    for (const each of rows) played.push(moved(each, [{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: `0 ${rise}px` }], short, "emphasized_decel"));
-    played.push(moved(clock.element, [gone, shown], short, "standard", short));
-  }
-  // Only the carried sky moves: the leaving clock view's others hold still while it fades.
+  played.push(...(back ? swapViews(weather.element, clock.element, -1) : swapViews(clock.element, weather.element, 1)));
+  // Only the carried sky moves: the leaving clock view's others hold still while it goes.
   if (!back) for (const card of clock.cards) if (card !== from) card.sky?.pause();
-  if (!from) return { played, land: () => {} };
-  const carried = carry(back ? weather.banner : from, back ? from : weather.banner, body, { duration: long, easing: easing("emphasized_decel"), fade: short, fadeEasing: easing("standard") });
-  return { played: [...played, ...carried.moves], land: carried.land };
+  return carried ? { played: [...played, ...carried.moves], land: carried.land } : { played, land: () => {} };
 }
 
 /** Runs `then` once the views just drawn have laid out and drawn their skies. */
