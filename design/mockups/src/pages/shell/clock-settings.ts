@@ -41,7 +41,7 @@ export default page<Shown>({
   states: {
     shown: ["rest", "open", "selected", "error"],
     absent: {
-      lit: "each control lights on its own page",
+      lit: "keyboard focus lights each control on its own page",
       pressed: "each control presses on its own page",
       disabled: "every setting can change",
       loading: "the engine answers before it opens",

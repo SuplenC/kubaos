@@ -69,7 +69,7 @@ export default page<Shown>({
   title: "Clock popup",
   lede: "Under the bar's clock pill: the time, home's weather, the other cities, the month, and each city's weather.",
   code: { qml: "ClockPopup" },
-  from: nonEmpty(["weather-sky", "panel-page", "calendar", "description-list", "banner", "card", "tabs", "button", "pill"]),
+  from: nonEmpty(["weather-sky", "day-strip", "panel-page", "calendar", "description-list", "banner", "card", "button", "pill"]),
   stage: { live: () => shot({ live: true }), hint: "click a weather card, then Clock; the bar's time and temperature", daylight: true },
   variants: [
     { name: "Home's weather", for: "the weather view, home's warning", sample: () => shot({ view: "weather", whose: "home" }) },
@@ -115,7 +115,7 @@ export default page<Shown>({
   states: {
     shown: ["rest", "empty", "error"],
     absent: {
-      lit: "its parts light on their own pages",
+      lit: "keyboard focus lights its parts, each on its own page",
       pressed: "its parts press on their own pages",
       disabled: "open or gone",
       selected: "the month and the week pick on their pages",

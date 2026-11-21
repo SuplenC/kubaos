@@ -29,7 +29,7 @@ import { icon } from "../../lib/icon.ts";
 import { container, fill, filling, flow, row, stack } from "../../lib/layout.ts";
 import { select } from "../../lib/select.ts";
 import { hang, sheet, swapViews } from "../../lib/sheet.ts";
-import { tabs } from "../../lib/tabs.ts";
+import { dayStrip } from "../../lib/day-strip.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { cubic, durationMs } from "../../lib/tokens.ts";
 import { type CardSky, carry, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
@@ -108,6 +108,14 @@ const dayOfYear = (day: Day) => 1 + Math.round((utc(day) - Date.UTC(day.year, 0,
 
 const holidayOf = (day: Day) => HOLIDAYS[`${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`];
 
+/** How many days `year` has. */
+const daysIn = (year: number) => Math.round((Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / DAY_MS);
+
+const PLURAL = new Intl.PluralRules("en-GB");
+
+/** The working days left in a month, a message by the count's plural form. */
+const WORKING = { one: "{count} working day", other: "{count} working days" } as const;
+
 /** Working days after `day` to its month's end: Monday to Friday, holidays left out. */
 function workingDaysLeft(day: Day): number {
   const last = new Date(Date.UTC(day.year, day.month, 0)).getUTCDate();
@@ -156,10 +164,13 @@ function pickedDay(day: Day): HTMLElement {
   const today = utc(day) === utc(TODAY);
   const title = text(today ? `Today, ${DAY_TITLE.format(utc(day))}` : DAY_TITLE.format(utc(day)), "body_strong");
   const holiday = holidayOf(day);
+  // Labels of one short word, so none wraps in the list's label column at the popup's width; the
+  // values carry the rest of the words.
+  const left = workingDaysLeft(day);
   const facts = descriptionList([
     { label: "Week", value: String(weekOf(day)) },
-    { label: "Day of the year", value: String(dayOfYear(day)) },
-    { label: "Working days left", value: String(workingDaysLeft(day)) },
+    { label: "Day", value: `${dayOfYear(day)} of ${daysIn(day.year)}` },
+    { label: "Left", value: WORKING[PLURAL.select(left) === "one" ? "one" : "other"].replace("{count}", String(left)) },
     ...(holiday ? [{ label: "Holiday", value: holiday }] : []),
   ]);
   const ahead = Math.round((utc(day) - utc(TODAY)) / DAY_MS);
@@ -280,31 +291,23 @@ function weatherView(options: ClockOptions, back: () => void): View & { readonly
   else if (typeof place.warning === "object") rows.push(filling(clamped(place.warning.noSource, "small", "on_surface_variant")));
   let hours = hoursRow(place, day);
   let tiles = tilesRow(place, day);
-  const week = document.createElement("div");
-  week.className = "ck-week";
-  const ranges = document.createElement("div");
-  ranges.className = "ck-ranges";
-  for (let d = 0; d < 7; d++) {
-    const [high, low] = dayRange(place, d);
-    ranges.append(text(`${degrees(high)} / ${degrees(low)}`, "small", "on_surface_variant"));
-  }
-  week.append(
-    tabs({
-      choices: Array.from({ length: 7 }, (_, d) => ({ label: dayName(d), icon: symbolOf(place.week[d]!) })),
-      picked: day,
-      onPick: (index) => {
-        day = index;
-        big.show(bannerOf(place, day));
-        const freshHours = hoursRow(place, day);
-        hours.replaceWith(freshHours);
-        hours = freshHours;
-        const freshTiles = tilesRow(place, day);
-        tiles.replaceWith(freshTiles);
-        tiles = freshTiles;
-      },
+  const week = dayStrip({
+    days: Array.from({ length: 7 }, (_, d) => {
+      const [high, low] = dayRange(place, d);
+      return { name: dayName(d), symbol: symbolOf(place.week[d]!), high: degrees(high), low: degrees(low) };
     }),
-    ranges,
-  );
+    picked: day,
+    onPick: (index) => {
+      day = index;
+      big.show(bannerOf(place, day));
+      const freshHours = hoursRow(place, day);
+      hours.replaceWith(freshHours);
+      hours = freshHours;
+      const freshTiles = tilesRow(place, day);
+      tiles.replaceWith(freshTiles);
+      tiles = freshTiles;
+    },
+  });
   const foot = row(0, "centre", text("Weather from Open-Meteo", "small", "on_surface_variant"), fill(), text(`Updated ${UPDATED}`, "small", "on_surface_variant"));
   rows.push(hours, tiles, week, filling(foot));
   const element = document.createElement("div");

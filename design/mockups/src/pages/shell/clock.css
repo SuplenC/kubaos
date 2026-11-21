@@ -1,6 +1,6 @@
 /* The clock popup's own boxes (`clock-parts.ts`): its body, the two views and how they lie while
-   they turn, the clock view's top and month rows, and the weather view's hours, tiles and week. The
-   cards, the month, the tabs and the banner are the library's. */
+   they turn, the clock view's top and month rows, and the weather view's hours and tiles. The
+   cards, the month, the day strip and the banner are the library's. */
 
 /* `space.s20` above and below; the container's padding at the sides; the column's width. */
 .ck-popup {
@@ -69,22 +69,4 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-s8);
-}
-
-/* The week: its days as tabs, and under each its high and low, centred under its tab. */
-.ck-week {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s8);
-}
-
-.ck-week > .k-tabs,
-.ck-week > :first-child {
-  width: 100%;
-}
-
-.ck-ranges {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  justify-items: center;
 }
