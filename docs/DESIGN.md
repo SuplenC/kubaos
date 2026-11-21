@@ -482,6 +482,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [PictureChoice](design/components/picture-choice.md)
 - [DepthPicture](design/components/depth-picture.md)
 - [WeatherSky, HomeWeatherCard, WeatherBanner, CityCard and CityRow](design/components/weather-sky.md)
+- [DayStrip](design/components/day-strip.md)
 
 **Feedback**
 
