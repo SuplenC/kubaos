@@ -502,8 +502,11 @@ export function clockOnScreen(options: ClockOptions = {}, width = 1440, height =
   const popup = clockPopupOf(options);
   hang(room, sheet({ content: popup.element, edge: "top", ...(reveal !== undefined ? { reveal } : {}) }));
   if (options.live) {
-    room.element.querySelector(".shell-clock-capsule")?.addEventListener("click", () => popup.toClock());
-    room.element.querySelector(".shell-clock-weather")?.addEventListener("click", () => popup.toWeather("home"));
+    // The pill's weather opens home's weather; anywhere else on the pill opens the clock.
+    room.element.querySelector(".shell-clock-pill")?.addEventListener("click", (event) => {
+      if ((event.target as Element).closest(".shell-clock-weather")) popup.toWeather("home");
+      else popup.toClock();
+    });
   }
   return room.element;
 }

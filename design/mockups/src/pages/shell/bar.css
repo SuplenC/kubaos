@@ -275,6 +275,31 @@
   margin-inline-end: var(--space-s8);
 }
 
+/* The weather is a press target of its own, and the rest of the pill opens the clock: its target
+   reaches from the middle of the gap before it (half the row's `space.s8`) to the pill's end edge
+   (its `space.s8` from the curve and the pill's end padding), the pill's full height, so no point
+   of the pill is dead or opens the other, its corners included. Its look is the pill's own: it is
+   drawn by nothing. */
+.shell-clock-weather {
+  position: relative;
+}
+
+/* The pill's own box takes the press in its rounded corners too, as the weather's target does at
+   its end: the inner box draws nothing, so square corners change nothing seen. */
+.shell-clock-pill > .k-pill-clip {
+  border-radius: 0;
+}
+
+.shell-clock-weather::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(-1 * var(--space-s4));
+  right: calc(-1 * (var(--space-s8) + var(--end)));
+  height: var(--size-control_sm);
+  translate: 0 -50%;
+}
+
 /* The weekday's seal: its kanji on a disc of `cold`. */
 .shell-clock-seal {
   position: relative;
