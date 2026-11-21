@@ -16,6 +16,9 @@ export const KICKER_PART = "the kicker";
 export const WINDOWS = "the windows";
 export const BAR = "the bar's pills";
 export const BAR_TIME = "the bar's time";
+/** The seal, the date and the weather round the bar clock's capsule: they come once the digits are in it. */
+export const AROUND = "the bar clock's seal, date and weather";
+const AROUND_TARGET = ".k-lock-bar-clock .k-clock-pill-around";
 export const TOP = "the frame's top edge";
 export const GLASS = "the frame's glass";
 export const PUSH = "the push";
@@ -68,8 +71,9 @@ export function reducedRest(on: string = ON, scope = ""): [Eased, ...Eased[]] {
 
 /**
  * Super+L: the desktop's still leaves, its frame sliding off the screen with the bar's pills, and the
- * bar's time hands over to the lock's clock where it stands, which then grows out of the bar to the
- * rest clock behind the city, as the picture and its city push in.
+ * bar's time hands over to the lock's clock where it stands, leaving the bar clock's capsule empty
+ * as the seal, the date and the weather round it go, and the clock grows out of the bar to the rest
+ * clock behind the city, as the picture and its city push in.
  */
 export function locking(on: string, scope = ""): [Eased, ...Eased[]] {
   const landed: Eased[] = [
@@ -83,6 +87,7 @@ export function locking(on: string, scope = ""): [Eased, ...Eased[]] {
     { part: TOP, on, target: within(scope, ".k-lock"), property: "--barred", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: BAR_TIME, on, target: within(scope, ".k-lock-bar-time"), property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
+    { part: AROUND, on, target: within(scope, AROUND_TARGET), property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
     { part: CLOCK, on, target: within(scope, ".k-lock-clock"), property: "--dock", from: 1, to: 0, duration: "long", cue: "micro", curve: "emphasized_decel" },
     { part: PUSH, on, target: within(scope, ".k-lock"), property: "--push", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
     ...landed,
@@ -104,7 +109,11 @@ export function lockingReduced(on: string, scope = ""): [Eased, ...Eased[]] {
   ];
 }
 
-/** The clock's flight into the bar and the desktop coming up round it, from `cue` on. */
+/**
+ * The clock's flight into the bar and the desktop coming up round it, from `cue` on: the digits land
+ * in the bar clock's capsule, which waits empty for them, become its time, and then the seal, the
+ * date and the weather come round it.
+ */
 export function intoTheBar(on: string, cue: Eased["cue"], scope = ""): Eased[] {
   const at = (...more: Duration[]): Eased["cue"] => {
     const before: Duration[] = cue === undefined ? [] : typeof cue === "string" ? [cue] : [...cue];
@@ -117,6 +126,7 @@ export function intoTheBar(on: string, cue: Eased["cue"], scope = ""): Eased[] {
     timed({ part: CLOCK, on, target: within(scope, ".k-lock-clock"), property: "--dock", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }, at()),
     timed({ part: TOP, on, target: within(scope, ".k-lock"), property: "--barred", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }, at()),
     timed({ part: BAR_TIME, on, target: within(scope, ".k-lock-bar-time"), property: "opacity", from: 0, to: 1, duration: "micro", curve: "standard" }, at("long")),
+    timed({ part: AROUND, on, target: within(scope, AROUND_TARGET), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }, at("long")),
     timed({ part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 1, to: 0, duration: "instant", curve: "standard" }, at("long", "micro")),
   ];
 }

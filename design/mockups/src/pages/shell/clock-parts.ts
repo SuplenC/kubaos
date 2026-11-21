@@ -488,8 +488,8 @@ export function clockOnScreen(options: ClockOptions = {}, width = 1440, height =
   hang(room, sheet({ content: popup.element, edge: "top", ...(reveal !== undefined ? { reveal } : {}) }));
   if (options.live) {
     // The pill's weather opens home's weather; anywhere else on the pill opens the clock.
-    room.element.querySelector(".shell-clock-pill")?.addEventListener("click", (event) => {
-      if ((event.target as Element).closest(".shell-clock-weather")) popup.toWeather("home");
+    room.element.querySelector(".k-clock-pill")?.addEventListener("click", (event) => {
+      if ((event.target as Element).closest(".k-clock-pill-weather")) popup.toWeather("home");
       else popup.toClock();
     });
   }

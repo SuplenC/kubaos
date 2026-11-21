@@ -150,6 +150,7 @@ const SHEET = ".power-sheet";
 const WINDOWS_BOX = ".k-lock-windows";
 const CLOCK = ".k-lock-clock";
 const BAR_TIME = ".k-lock-bar-time";
+const AROUND = ".k-lock-bar-clock .k-clock-pill-around";
 const KICKER = ".k-lock-kicker";
 const BAR = ".k-bar";
 const FRAME = ".k-frame";
@@ -229,6 +230,7 @@ export function previewing(index: number, situation: Situation = CALM, reduced =
         ? [track("the clock's flight", CLOCK, "--dock", 1, 0, "instant", "standard"), track("the clock's fade", CLOCK, "opacity", 0, 1, "short", "standard")]
         : [track("the clock's fade", CLOCK, "opacity", 0, 1, "instant", "standard"), track("the clock's flight", CLOCK, "--dock", 1, 0, "long", "emphasized_decel")]),
       track("the bar's time", BAR_TIME, "opacity", 1, 0, "micro", "standard"),
+      track("the bar clock's seal, date and weather", AROUND, "opacity", 1, 0, "micro", "standard"),
     );
   }
   out.push(
@@ -253,11 +255,17 @@ export function previewing(index: number, situation: Situation = CALM, reduced =
 export function unpreviewing(reduced = false): Eased[] {
   return [
     ...(reduced
-      ? [track("the clock's fade", CLOCK, "opacity", 1, 0, "short", "standard"), track("the clock's flight", CLOCK, "--dock", 0, 1, "instant", "standard", "short"), track("the bar's time", BAR_TIME, "opacity", 0, 1, "short", "standard", "short")]
+      ? [
+          track("the clock's fade", CLOCK, "opacity", 1, 0, "short", "standard"),
+          track("the clock's flight", CLOCK, "--dock", 0, 1, "instant", "standard", "short"),
+          track("the bar's time", BAR_TIME, "opacity", 0, 1, "short", "standard", "short"),
+          track("the bar clock's seal, date and weather", AROUND, "opacity", 0, 1, "short", "standard", "short"),
+        ]
       : [
           track("the clock's flight", CLOCK, "--dock", 0, 1, "long", "emphasized_decel"),
           track("the clock's fade", CLOCK, "opacity", 1, 0, "instant", "standard", "long"),
           track("the bar's time", BAR_TIME, "opacity", 0, 1, "instant", "standard", "long"),
+          track("the bar clock's seal, date and weather", AROUND, "opacity", 0, 1, "short", "standard", "long"),
         ]),
   ];
 }
@@ -552,6 +560,7 @@ const REST: readonly (readonly [string, string, number | string])[] = [
   [CLOCK, "--clock-above", 1],
   [CLOCK, "opacity", 0],
   [BAR_TIME, "opacity", 1],
+  [AROUND, "opacity", 1],
   [KICKER, "opacity", 0],
   [WINDOWS_BOX, "opacity", 1],
   [WINDOWS_BOX, "scale", 1],

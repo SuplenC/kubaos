@@ -11,12 +11,12 @@ import { meter } from "../../lib/meter.ts";
 import { sparkline, minute } from "../../lib/meter.ts";
 import { makePill, type Pill, type PillOptions, paired, pill } from "../../lib/pill.ts";
 import { type Screen, screen } from "../../lib/sheet.ts";
-import { widestTime } from "../../lib/lock.ts";
 import { declare } from "../../lib/probe.ts";
 import { advance, clamped, text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
 import { APP_ICONS } from "../../site/app-icons.ts";
 import { settings } from "../../site/settings.ts";
+import { capsuleExtents, clockPill as libraryClockPill, type ClockPillWords } from "../../lib/clock-pill.ts";
 import { mutePill, nowPlaying, type Song } from "./bar-audio-parts.ts";
 import { degrees, HOME, NOW_HOUR, symbolOf } from "./weather-data.ts";
 import { workspaces, type WorkspacesOptions, SHOTS_GROUPS } from "./workspaces.ts";
@@ -38,101 +38,28 @@ function control(content: Element[], tooltip: string, state: Shown, options: Int
 // The clock.
 
 /** The clock pill's words at the shots' moment: Tuesday 27 October, 21:47, 12° in Warsaw. */
-export const CLOCK = { kanji: "火", date: "Tue 27 Oct", day: "Tue 27", time: "21:47", temperature: degrees(HOME.temperature), symbol: symbolOf(HOME.weather, NOW_HOUR) } as const;
-
-/**
- * The time in `body`, Geist's own proportional figures, centred in a slot as wide as the widest
- * time a 24-hour clock shows, as the lock's bar clock is: the pill keeps its width as the minutes
- * turn, and the bar's steps never meet a wider time than they were laid out for.
- */
-export function clockTime(time: string = CLOCK.time, color = "on_surface"): HTMLElement {
-  const shown = text(time, "body", color);
-  shown.classList.add("shell-clock-time");
-  shown.style.setProperty("--slot", String(widestTime("body", false)));
-  return shown;
-}
+export const CLOCK: ClockPillWords = {
+  kanji: "火",
+  date: "Tue 27 Oct",
+  day: "Tue 27",
+  time: "21:47",
+  whole: "Tuesday, 27 October 2026",
+  weather: { symbol: symbolOf(HOME.weather, NOW_HOUR), temperature: degrees(HOME.temperature) },
+};
 
 /** What the clock pill shows, as far as a narrow bar has shed it. */
 export interface ClockOptions {
-  /** The weekday's seal. */
   readonly seal?: boolean;
   readonly date?: "full" | "day" | "none";
   /** Home's weather: none with no home city, or once a narrow bar sheds it. */
   readonly weather?: boolean;
-  /** Recording merged in on a narrow bar: the recording's colours, its dot leading. */
   readonly recording?: boolean;
   readonly state?: Shown;
 }
 
-/**
- * The clock pill: the weekday's seal (its kanji on a disc of `cold`), the date plain, the time in a
- * capsule of `primary`, and home's weather plain like the date. The capsule is the screen's exact
- * middle, the pill laid out round it (`centreCapsule`). Recording merged in, the pill and its
- * capsule take the recording's colours and its dot leads.
- */
+/** The bar's clock pill (`lib/clock-pill.ts`) with the shots' words. */
 export function clockPill(options: ClockOptions = {}): HTMLElement {
-  const recording = options.recording ?? false;
-  const ink = (role: string) => (recording ? "on_error_container" : role);
-  const parts: Element[] = [];
-  if (recording) {
-    const dot = document.createElement("span");
-    dot.className = "shell-dot shell-clock-plain";
-    parts.push(dot);
-  }
-  if (options.seal ?? true) {
-    const seal = document.createElement("span");
-    seal.className = "shell-clock-seal";
-    seal.append(text(CLOCK.kanji, "accent", recording ? "error_container" : "on_cold"));
-    parts.push(seal);
-  }
-  const date = options.date ?? "full";
-  if (date !== "none") parts.push(plainPart(text(date === "full" ? CLOCK.date : CLOCK.day, "body", ink("on_surface_variant"))));
-  const capsule = document.createElement("span");
-  capsule.className = "shell-clock-capsule";
-  capsule.append(clockTime(CLOCK.time, recording ? "on_error" : "on_primary"));
-  parts.push(capsule);
-  if (options.weather ?? true) {
-    const weather = paired(glyph(CLOCK.symbol, ink("on_surface_variant")), text(CLOCK.temperature, "body", ink("on_surface_variant")));
-    weather.classList.add("shell-clock-weather");
-    parts.push(plainPart(weather));
-  }
-  const tip = recording ? "Recording. Tuesday, 27 October 2026" : "Tuesday, 27 October 2026";
-  const made = control(parts, tip, options.state ?? "rest", { end: "s4", ...(recording ? { tone: "recording" as const } : {}) });
-  made.classList.add("shell-clock-pill");
-  made.toggleAttribute("data-recording", recording);
-  centreCapsule(made);
-  return made;
-}
-
-/** A plain part of the clock pill: at an end of the pill it stands `space.s12` from the curve. */
-function plainPart<E extends Element>(element: E): E {
-  element.classList.add("shell-clock-plain");
-  return element;
-}
-
-/** Where the capsule's middle sits in `pill`, from its left, in the pill's own pixels. */
-function capsuleExtents(pill: HTMLElement): { readonly before: number; readonly after: number } {
-  const capsule = pill.querySelector<HTMLElement>(".shell-clock-capsule");
-  const box = pill.getBoundingClientRect();
-  if (!capsule || box.width === 0) return { before: box.width / 2, after: box.width / 2 };
-  const own = capsule.getBoundingClientRect();
-  const middle = own.left + own.width / 2 - box.left;
-  return { before: middle, after: box.width - middle };
-}
-
-/**
- * Keeps the capsule on the screen's exact middle: the bar centres the pill's box, so the side of
- * the capsule with less beside it takes a margin of the difference, which the bar's grid then
- * centres with the pill. A width worked out from the layout, which the CSS can't read.
- */
-function centreCapsule(pill: HTMLElement): void {
-  new ResizeObserver(() => {
-    const zoom = pill.getBoundingClientRect().width / Math.max(1, pill.offsetWidth) || 1;
-    const { before, after } = capsuleExtents(pill);
-    const spare = Math.round((before - after) / zoom);
-    pill.style.setProperty("--capsule-before", `${Math.max(0, -spare)}px`);
-    pill.style.setProperty("--capsule-after", `${Math.max(0, spare)}px`);
-  }).observe(pill);
+  return libraryClockPill({ words: CLOCK, ...options }).element;
 }
 
 // The status pill.

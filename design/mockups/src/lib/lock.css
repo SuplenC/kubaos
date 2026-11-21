@@ -205,11 +205,12 @@
   height: var(--size-bar);
 }
 
-/* The bar's clock, centred on the screen as `modules/bar/Bar.qml` centres it, on whole device
-   pixels. */
-.k-lock-bar-clock {
+/* The bar's clock, its time's capsule on the screen's middle as the bar places it, on whole device
+   pixels; the pill's own margins, which centre it in the bar's row, have no part here. */
+.k-lock .k-lock-bar-clock {
   position: absolute;
-  left: round(down, calc((100% - var(--pill-width, 0px)) / 2), 1px);
+  margin-inline: 0;
+  left: round(down, calc(50% - var(--capsule-x, 0px)), 1px);
 }
 
 /* The bar's time: a slot as wide as the widest time its format shows (`--slot`, measured from the
@@ -594,7 +595,8 @@
   visibility: hidden;
 }
 
-.k-lock[data-clockless] .k-lock-bar-time {
+.k-lock[data-clockless] .k-lock-bar-time,
+.k-lock[data-clockless] .k-lock-bar-clock .k-clock-pill-around {
   opacity: 1 !important;
 }
 
