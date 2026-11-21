@@ -77,20 +77,43 @@ export interface Item {
   readonly keywords?: readonly string[];
   /** What it answers, at the row's end where an alias would be: the weather now, a city's time. */
   readonly answer?: string;
+  /** Its own Actions, in the Action panel in place of the shots' sample ones. */
+  readonly actions?: Result["actions"];
 }
 
-/** The clock's Items: the popup, the weather at home, tomorrow and in each city, the cities' times, and the clock's settings. */
+/** A clock Item's Actions: its own way in, the answer copied, and its settings. */
+function clockActions(open: string, answer?: string): Result["actions"] {
+  return [{ title: open, keys: "↵" }, ...(answer ? [{ title: `Copy “${answer}”`, keys: "⌃⇧C" }] : []), { title: "Open in Settings", keys: "" }];
+}
+
+/** A weather Item: its answer at the row's end, its Actions opening the weather. */
+function weatherItem(title: string, subtitle: string, symbol: string, keywords: readonly string[], answer: string): Item {
+  return { title, subtitle, extension: "clock", symbol, keywords, answer, actions: clockActions("Open weather", answer) };
+}
+
+/** The settings Items' one Action: their rows in Settings › Date & time. */
+const SETTINGS_ACTIONS: Result["actions"] = [{ title: "Open in Settings", keys: "↵" }];
+
+/** A city's answer: its time, then its weather. */
+const cityAnswer = (place: (typeof CITIES)[number]) => `${clockOf(hourOf(place))}, ${degrees(place.temperature)} ${CONDITIONS[place.weather].toLowerCase()}`;
+
+/** The clock's Items: the popup, the weather at home and tomorrow, each city, and the clock's settings. */
 const CLOCK_ITEMS: readonly Item[] = [
-  { title: "Clock", subtitle: "The time, your cities and the month", extension: "clock", symbol: "schedule", keywords: ["calendar", "date", "time"], answer: "21:47" },
-  { title: "Weather", subtitle: "Warsaw now and this week", extension: "clock", symbol: symbolOf(HOME.weather, NOW_HOUR), keywords: ["forecast", "temperature"], answer: `${degrees(HOME.temperature)}, ${CONDITIONS[HOME.weather].toLowerCase()}` },
-  { title: "Weather tomorrow", subtitle: "Wednesday in Warsaw", extension: "clock", symbol: symbolOf(HOME.week[1]!), keywords: ["forecast"], answer: `${degrees(dayRange(HOME, 1)[0])} / ${degrees(dayRange(HOME, 1)[1])}, ${CONDITIONS[HOME.week[1]!].toLowerCase()}` },
-  ...CITIES.slice(0, 4).flatMap((place): Item[] => [
-    { title: `Weather in ${place.name}`, subtitle: `${place.name} now and this week`, extension: "clock", symbol: symbolOf(place.weather, hourOf(place)), keywords: ["forecast"], answer: `${degrees(place.temperature)}, ${CONDITIONS[place.weather].toLowerCase()}` },
-    { title: `Time in ${place.name}`, subtitle: `${offsetOf(place)} from yours`, extension: "clock", symbol: "schedule", keywords: ["clock", "zone"], answer: clockOf(hourOf(place)) },
-  ]),
-  { title: "Settings: Date & time", subtitle: "Zone, format, the bar's clock, cities, weather", extension: "kubaos", symbol: "schedule", keywords: ["clock", "weather", "calendar"] },
-  { title: "Settings: Cities", subtitle: "Add or remove the clock's cities", extension: "kubaos", symbol: "add_location_alt", keywords: ["clock", "weather", "time zone"] },
-  { title: "Settings: Weather", subtitle: "On or off, home city, units", extension: "kubaos", symbol: "fair_day", keywords: ["forecast", "temperature", "units"] },
+  { title: "Clock", subtitle: "The time, your cities and the month", extension: "clock", symbol: "schedule", keywords: ["calendar", "date", "time"], answer: "21:47", actions: clockActions("Open clock", "21:47") },
+  weatherItem("Weather", "Warsaw now and this week", symbolOf(HOME.weather, NOW_HOUR), ["forecast", "temperature"], `${degrees(HOME.temperature)}, ${CONDITIONS[HOME.weather].toLowerCase()}`),
+  weatherItem("Weather tomorrow", "Wednesday in Warsaw", symbolOf(HOME.week[1]!), ["forecast"], `${degrees(dayRange(HOME, 1)[0])} / ${degrees(dayRange(HOME, 1)[1])}, ${CONDITIONS[HOME.week[1]!].toLowerCase()}`),
+  ...CITIES.slice(0, 4).map((place): Item => ({
+    title: place.name,
+    subtitle: `Weather and time there, ${offsetOf(place)} from yours`,
+    extension: "clock",
+    symbol: symbolOf(place.weather, hourOf(place)),
+    keywords: ["weather", "time", "forecast", "clock", place.iana],
+    answer: cityAnswer(place),
+    actions: clockActions("Open weather", cityAnswer(place)),
+  })),
+  { title: "Settings: Date & time", subtitle: "Zone, format, the bar's clock, cities, weather", extension: "kubaos", symbol: "schedule", keywords: ["clock", "weather", "calendar"], actions: SETTINGS_ACTIONS },
+  { title: "Settings: Cities", subtitle: "Add or remove the clock's cities", extension: "kubaos", symbol: "add_location_alt", keywords: ["clock", "weather", "time zone"], actions: SETTINGS_ACTIONS },
+  { title: "Settings: Weather", subtitle: "On or off, home city, units", extension: "kubaos", symbol: "fair_day", keywords: ["forecast", "temperature", "units"], actions: SETTINGS_ACTIONS },
 ];
 
 /** The shots' Items, in the Daemon's order. */
@@ -169,7 +192,7 @@ export function result(item: Item, index: number, typed = ""): Result {
     tight: true,
   };
   const kind = [kindLabel(item.extension), item.alias ?? ""].filter((each) => each !== "").join(" · ");
-  return { row, kind, actions: ACTIONS, hints: hintsOf(index) };
+  return { row, kind, actions: item.actions ?? ACTIONS, hints: hintsOf(index) };
 }
 
 /** The Results for `typed`: the Items whose title or a keyword holds it, as the stand-in matches. */
