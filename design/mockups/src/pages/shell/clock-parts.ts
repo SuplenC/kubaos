@@ -365,6 +365,8 @@ function turn(body: HTMLElement, clock: View, weather: View & { readonly banner:
     for (const each of rows) played.push(moved(each, [{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: `0 ${rise}px` }], short, "emphasized_decel"));
     played.push(moved(clock.element, [gone, shown], short, "standard", short));
   }
+  // Only the carried sky moves: the leaving clock view's others hold still while it fades.
+  if (!back) for (const card of clock.cards) if (card !== from) card.sky?.pause();
   if (!from) return { played, land: () => {} };
   const carried = carry(back ? weather.banner : from, back ? from : weather.banner, body, { duration: long, easing: easing("emphasized_decel"), fade: short, fadeEasing: easing("standard") });
   return { played: [...played, ...carried.moves], land: carried.land };

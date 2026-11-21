@@ -143,6 +143,7 @@
 .k-weather-card.k-weather-carried {
   position: absolute;
   margin: 0;
+  will-change: transform, clip-path;
 }
 
 .k-weather-card.k-weather-carrier[data-part] {

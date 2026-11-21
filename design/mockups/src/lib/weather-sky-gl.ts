@@ -9,7 +9,7 @@
 const VERTEX = `attribute vec2 a; void main(){ gl_Position = vec4(a, 0., 1.); }`;
 
 const FRAGMENT = `precision highp float;
-uniform vec2 uRes; uniform float uT, uCover, uFog, uFlash, uStars, uDrift, uSunUp, uMoonUp, uHaze, uGlare, uHalo, uSmog;
+uniform vec2 uRes; uniform vec4 uView; uniform float uT, uCover, uFog, uFlash, uStars, uDrift, uSunUp, uMoonUp, uHaze, uGlare, uHalo, uSmog;
 uniform vec3 uTop, uBot, uLit, uShade, uSunCol; uniform vec2 uSun, uMoon;
 float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3. - 2.*f);
@@ -62,7 +62,8 @@ vec3 scene(vec2 p){
   return col;
 }
 void main(){
-  vec2 p = (gl_FragCoord.xy - .5 * uRes) / uRes.y;
+  // The sky is laid out on the part of the canvas in view: a box changing size is the same sky.
+  vec2 p = (gl_FragCoord.xy - uView.xy - .5 * uView.zw) / uView.w;
   vec3 col = scene(p);
   // A dither under one step of 8 bits, so the dark gradients never band.
   col += (hash(gl_FragCoord.xy + fract(uT)) - .5) / 255.;
@@ -92,7 +93,7 @@ export interface SkyFrame {
   readonly smog: number;
 }
 
-const NAMES = ["uRes", "uT", "uCover", "uFog", "uFlash", "uStars", "uDrift", "uSunUp", "uMoonUp", "uHaze", "uGlare", "uHalo", "uSmog", "uTop", "uBot", "uLit", "uShade", "uSunCol", "uSun", "uMoon"] as const;
+const NAMES = ["uRes", "uView", "uT", "uCover", "uFog", "uFlash", "uStars", "uDrift", "uSunUp", "uMoonUp", "uHaze", "uGlare", "uHalo", "uSmog", "uTop", "uBot", "uLit", "uShade", "uSunCol", "uSun", "uMoon"] as const;
 
 /** The context every sky draws in, its program and its uniforms. */
 class Painter {
@@ -131,9 +132,10 @@ class Painter {
 
   /**
    * Draws `frame` at `time` seconds, with the lightning at `flash` and the clouds `drift` along, in
-   * `width` × `height` device pixels, and copies it into `into`.
+   * `width` × `height` device pixels, and copies it into `into`. The sky is laid out on `view`, the
+   * part of those pixels in view from their top left, in device pixels; all of them unless given.
    */
-  paint(into: CanvasRenderingContext2D, frame: SkyFrame, time: number, drift: number, flash: number, width: number, height: number): void {
+  paint(into: CanvasRenderingContext2D, frame: SkyFrame, time: number, drift: number, flash: number, width: number, height: number, view?: { readonly width: number; readonly height: number }): void {
     const gl = this.gl;
     if (!gl) return;
     // The canvas only grows, so skies of different sizes drawn one after another never reallocate it.
@@ -146,6 +148,8 @@ class Painter {
     // The colours are mixed in linear light and drawn in sRGB, as the canvas shows them.
     const encoded = (c: Vec3) => c.map((v) => Math.max(v, 0) ** (1 / 2.2));
     gl.uniform2f(this.at.get("uRes") ?? null, width, height);
+    const seen = view ?? { width, height };
+    gl.uniform4f(this.at.get("uView") ?? null, 0, height - seen.height, seen.width, seen.height);
     one("uT", time);
     one("uCover", frame.cover);
     one("uFog", frame.fog);

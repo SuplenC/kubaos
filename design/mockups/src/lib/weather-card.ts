@@ -320,7 +320,7 @@ function piecesOf(words: HTMLElement): Map<string, HTMLElement> {
   return new Map([...words.querySelectorAll<HTMLElement>("[data-piece]")].map((each) => [each.dataset.piece ?? "", each]));
 }
 
-/** A layer over the sky that holds a card's words as its box moves, its part's insets, nothing cut. */
+/** A layer holding a card's words laid out in `box`, over the sky, nothing cut. */
 function carrier(part: string, words: HTMLElement, box: Box): HTMLElement {
   const layer = document.createElement("div");
   layer.className = "k-weather-card k-weather-carrier";
@@ -328,6 +328,16 @@ function carrier(part: string, words: HTMLElement, box: Box): HTMLElement {
   Object.assign(layer.style, placed(box));
   layer.append(words);
   return layer;
+}
+
+/** Where each named piece of `words` sits in `within` now. */
+function piecesAt(words: HTMLElement, within: HTMLElement): Map<string, { readonly x: number; readonly y: number; readonly size: number }> {
+  return new Map(
+    [...piecesOf(words)].map(([name, each]) => {
+      const at = boxIn(each, within);
+      return [name, { x: at.x, y: at.y, size: Number(each.dataset.size ?? 1) }] as const;
+    }),
+  );
 }
 
 /**
@@ -338,6 +348,14 @@ function carrier(part: string, words: HTMLElement, box: Box): HTMLElement {
  * one to its place and size on the other, on the box's curve; a piece only `from` has fades out as
  * the move starts, and one only `to` has fades in as it lands. `from`'s place keeps its room,
  * empty, until its owner takes it away. Plain cards carry nothing.
+ *
+ * Everything that moves is the compositor's: the sky's element is sized once to the larger box and
+ * moved and clipped (`transform`, `clip-path`), its buffers never resized, the shader laid out on
+ * the part in view (`WeatherSky.follow`); each piece of the words, laid out once in its own card's
+ * box, moves by `transform` alone, on a straight line between where its box's move takes it at the
+ * start and at the end, which is exactly where it would sit in the box between them, since a
+ * piece's place in a box is a straight function of the box's size. Nothing is laid out again
+ * until it lands; meanwhile what falls lands on nothing.
  */
 export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, timing: CarryTiming): Carrying {
   const a = insides.get(from);
@@ -349,6 +367,8 @@ export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, t
   const startRadius = getComputedStyle(a.element).borderTopLeftRadius;
   const endRadius = getComputedStyle(b.element).borderTopLeftRadius;
   const carried = a.element;
+  const width = Math.max(start.w, end.w);
+  const height = Math.max(start.h, end.h);
 
   // `from`'s place keeps its room; `to`'s own sky goes, its place kept unseen until the landing.
   const room = document.createElement("div");
@@ -358,69 +378,72 @@ export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, t
   b.element.style.visibility = "hidden";
   if (a.onPress) carried.removeEventListener("click", a.onPress);
 
-  carried.classList.add("k-weather-carried");
-  Object.assign(carried.style, placed(start));
+  // The words, each card's laid out once in its own box: measured there and at the other end.
   const leaving = carrier(a.part, a.words, start);
   const coming = carrier(b.part, b.words, start);
+  carried.classList.add("k-weather-carried");
+  Object.assign(carried.style, { left: "0px", top: "0px", width: `${width}px`, height: `${height}px`, borderRadius: "0" });
   within.append(carried, leaving, coming);
-  sky.setStill(false);
-  sky.resizing(true);
-  sky.landOn([a.words, b.words]);
-
-  // Where each piece sits in its layer with the box at its start and at its end.
-  const at = (layer: HTMLElement) => {
-    const origin = layer.getBoundingClientRect();
-    const zoom = origin.width / Math.max(1, layer.offsetWidth) || 1;
-    const read = (words: HTMLElement) =>
-      new Map([...piecesOf(words)].map(([name, each]) => {
-        const own = each.getBoundingClientRect();
-        return [name, { x: (own.left - origin.left) / zoom, y: (own.top - origin.top) / zoom, size: Number(each.dataset.size ?? 1) }] as const;
-      }));
-    return read;
-  };
-  const fromAtStart = at(leaving)(a.words);
-  const toAtStart = at(coming)(b.words);
-  for (const layer of [leaving, coming]) Object.assign(layer.style, placed(end));
-  const fromAtEnd = at(leaving)(a.words);
-  const toAtEnd = at(coming)(b.words);
-  for (const layer of [leaving, coming]) Object.assign(layer.style, placed(start));
+  // Two layouts: each card's words read at the one end, then at the other, where they stay.
+  const fromAtStart = piecesAt(a.words, within);
+  const toAtStart = piecesAt(b.words, within);
+  Object.assign(leaving.style, placed(end));
+  Object.assign(coming.style, placed(end));
+  const fromAtEnd = piecesAt(a.words, within);
+  const toAtEnd = piecesAt(b.words, within);
+  Object.assign(leaving.style, placed(start));
 
   const moving = { duration: timing.duration, easing: timing.easing, fill: "both" as const };
-  const boxes = [placed(start), placed(end)];
-  const moves: Animation[] = [
-    carried.animate([{ ...boxes[0], borderRadius: startRadius }, { ...boxes[1], borderRadius: endRadius }], moving),
-    leaving.animate(boxes, moving),
-    coming.animate(boxes, moving),
-  ];
+  const clip = (box: Box, radius: string) => `inset(0px ${width - box.w}px ${height - box.h}px 0px round ${radius})`;
+  const skyMove = carried.animate(
+    [
+      { transform: `translate(${start.x}px, ${start.y}px)`, clipPath: clip(start, startRadius) },
+      { transform: `translate(${end.x}px, ${end.y}px)`, clipPath: clip(end, endRadius) },
+    ],
+    moving,
+  );
+  // The part of the sky in view, for the shader: the box the clip shows, on the move's own curve.
+  const eased = () => Number(skyMove.effect?.getComputedTiming().progress ?? 0);
+  sky.follow({ width, height, visible: () => ({ width: start.w + (end.w - start.w) * eased(), height: start.h + (end.h - start.h) * eased() }) });
+  sky.setStill(false);
+  sky.landOn([]);
+
+  const moves: Animation[] = [skyMove];
+  const shift = (x: number, y: number, scale = 1) => `translate(${x}px, ${y}px)${scale === 1 ? "" : ` scale(${scale})`}`;
   const fromPieces = piecesOf(a.words);
   const toPieces = piecesOf(b.words);
   for (const [name, mine] of fromPieces) {
+    const s0 = fromAtStart.get(name)!;
+    const e0 = fromAtEnd.get(name)!;
     const theirs = toPieces.get(name);
-    const s0 = fromAtStart.get(name);
-    const e0 = fromAtEnd.get(name);
-    if (!theirs || !s0 || !e0) {
+    mine.style.transformOrigin = "0 0";
+    if (!theirs) {
+      moves.push(mine.animate([{ transform: "none" }, { transform: shift(e0.x - s0.x, e0.y - s0.y) }], moving));
       moves.push(mine.animate([{ opacity: 1 }, { opacity: 0 }], { duration: timing.fade, easing: timing.fadeEasing, fill: "both" }));
       continue;
     }
     const s1 = toAtStart.get(name)!;
     const e1 = toAtEnd.get(name)!;
     const scale = s0.size / s1.size;
-    mine.style.transformOrigin = theirs.style.transformOrigin = "0 0";
-    const ride = `translate(${e1.x - e0.x}px, ${e1.y - e0.y}px) scale(${1 / scale})`;
+    theirs.style.transformOrigin = "0 0";
     // The same words in the same style are one piece: it rides alone and the other waits unseen,
     // since two copies fading across each other dim where they overlap. Unlike pieces both ride
     // one path, from this one's place and size to the other's, and cross-fade on the way.
+    const ride = shift(e1.x - s0.x, e1.y - s0.y, 1 / scale);
     if (scale === 1 && mine.textContent === theirs.textContent) {
       moves.push(mine.animate([{ transform: "none" }, { transform: ride }], moving), theirs.animate([{ opacity: 0 }, { opacity: 0 }], moving));
       continue;
     }
     moves.push(
       mine.animate([{ transform: "none", opacity: 1 }, { transform: ride, opacity: 0 }], moving),
-      theirs.animate([{ transform: `translate(${s0.x - s1.x}px, ${s0.y - s1.y}px) scale(${scale})`, opacity: 0 }, { transform: "none", opacity: 1 }], moving),
+      theirs.animate([{ transform: shift(s0.x - e1.x, s0.y - e1.y, scale), opacity: 0 }, { transform: "none", opacity: 1 }], moving),
     );
   }
   for (const [name, theirs] of toPieces) {
     if (fromPieces.has(name)) continue;
+    const s1 = toAtStart.get(name)!;
+    const e1 = toAtEnd.get(name)!;
+    moves.push(theirs.animate([{ transform: shift(s1.x - e1.x, s1.y - e1.y) }, { transform: "none" }], moving));
     moves.push(theirs.animate([{ opacity: 0 }, { opacity: 1 }], { duration: timing.fade, delay: Math.max(0, timing.duration - timing.fade), easing: timing.fadeEasing, fill: "both" }));
   }
 
@@ -430,7 +453,7 @@ export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, t
       for (const move of moves) move.cancel();
       for (const each of [...fromPieces.values(), ...toPieces.values()]) each.style.transformOrigin = "";
       carried.classList.remove("k-weather-carried");
-      for (const property of ["left", "top", "width", "height"] as const) carried.style[property] = "";
+      for (const property of ["left", "top", "width", "height", "borderRadius"] as const) carried.style[property] = "";
       carried.dataset.part = b.part;
       carried.toggleAttribute("data-pressable", b.onPress !== undefined);
       if (b.onPress) carried.addEventListener("click", b.onPress);
@@ -438,8 +461,8 @@ export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, t
       sky.content.replaceChildren(b.words);
       leaving.remove();
       coming.remove();
+      sky.follow(null);
       sky.landOn([b.words]);
-      sky.resizing(false);
       sky.setStill(b.still);
       b.element = carried;
       b.sky = sky;

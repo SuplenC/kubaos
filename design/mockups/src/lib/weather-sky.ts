@@ -19,6 +19,13 @@ import { onChange, settings } from "../site/settings.ts";
 
 export { type Hail, type Readings, TYPICAL, type Weather, WEATHERS } from "./weather-sky-data.ts";
 
+/** A move of a sky's box: its size for the move, and the part of it in view now. */
+export interface SkyMove {
+  readonly width: number;
+  readonly height: number;
+  readonly visible: () => { readonly width: number; readonly height: number };
+}
+
 export interface WeatherSkyOptions {
   /** The hour, 0 to 24, fractions for minutes. */
   readonly hour: number;
@@ -61,11 +68,14 @@ export interface WeatherSky {
    */
   setStill(still: boolean): void;
   /**
-   * While its box changes from one size to another (a card growing into a banner), it follows
-   * the box frame by frame and what falls keeps its density; `false` settles the density for the
-   * size it landed at.
+   * Its box moves from one size to another (a card growing into a banner) without its buffers
+   * changing: they are sized once to `move`'s width and height, CSS pixels, its owner clips and
+   * moves its element on the compositor, and each frame the sky is laid out on the part in view,
+   * `move.visible()` from its top left, so it follows the box and nothing stretches. Meanwhile
+   * what falls keeps its density and lands on nothing. `null` ends the move: the buffers are
+   * sized to the box it landed in, which is the part last in view, so nothing pops.
    */
-  resizing(on: boolean): void;
+  follow(move: SkyMove | null): void;
   /** Holds it still where it is, until `resume`: a popup shut. */
   pause(): void;
   resume(): void;
@@ -228,7 +238,7 @@ class Sky implements WeatherSky {
   private readonly painter: PainterHold = holdPainter();
   private readonly into: CanvasRenderingContext2D | null;
   private still: boolean;
-  private holdFall = false;
+  private move: SkyMove | null = null;
   private landing: { disconnect(): void }[] = [];
   private readonly forcedReduced: boolean | undefined;
   private hour: number;
@@ -342,9 +352,16 @@ class Sky implements WeatherSky {
     this.fitLater();
   }
 
-  resizing(on: boolean): void {
-    this.holdFall = on;
-    if (!on) this.fall();
+  follow(move: SkyMove | null): void {
+    this.move = move;
+    if (move) {
+      this.hits.replaceChildren();
+      this.buffers(move.width, move.height);
+    } else {
+      this.size();
+      this.fall();
+      this.fitLater();
+    }
   }
 
   pause(): void {
@@ -426,19 +443,36 @@ class Sky implements WeatherSky {
 
   private draw(): void {
     if (this.disposed || !this.into || this.canvas.width < 2) return;
-    this.painter.paint(this.into, this.now, this.time, this.drift, this.flash * this.now.thunder, this.canvas.width, this.canvas.height);
+    const shown = this.move?.visible();
+    const view = shown ? { width: Math.min(this.canvas.width, Math.round(shown.width * this.ratio)), height: Math.min(this.canvas.height, Math.round(shown.height * this.ratio)) } : undefined;
+    this.painter.paint(this.into, this.now, this.time, this.drift, this.flash * this.now.thunder, this.canvas.width, this.canvas.height, view);
   }
+
+  /** Device pixels to a CSS pixel of its own box, at most two: the page's box is zoomed. */
+  private ratio = 1;
 
   /** Its canvas in device pixels, at most two to a CSS pixel, drawn again at once. */
   private size(): void {
+    if (this.move) return;
     const box = this.element.getBoundingClientRect();
-    const ratio = Math.min(devicePixelRatio, 2);
-    const width = Math.max(1, Math.round(box.width * ratio));
-    const height = Math.max(1, Math.round(box.height * ratio));
-    if (width === this.canvas.width && height === this.canvas.height) return;
-    this.canvas.width = width;
-    this.canvas.height = height;
+    const zoom = box.width / Math.max(1, this.element.offsetWidth) || 1;
+    this.buffers(this.element.offsetWidth, this.element.offsetHeight, zoom);
+  }
+
+  /** Its canvas for a box `width` × `height` CSS pixels of its own, drawn again at once. */
+  private buffers(width: number, height: number, zoom = this.zoom()): void {
+    this.ratio = zoom * Math.min(devicePixelRatio, 2);
+    const w = Math.max(1, Math.round(width * this.ratio));
+    const h = Math.max(1, Math.round(height * this.ratio));
+    if (w === this.canvas.width && h === this.canvas.height) return;
+    this.canvas.width = w;
+    this.canvas.height = h;
     this.draw();
+  }
+
+  /** How far the page's box is zoomed at its element: its own pixels to the viewport's. */
+  private zoom(): number {
+    return this.element.getBoundingClientRect().width / Math.max(1, this.element.offsetWidth) || 1;
   }
 
   /** Sets what falls, creating, changing or taking down the library's atmosphere. */
@@ -460,9 +494,9 @@ class Sky implements WeatherSky {
     const key = JSON.stringify(options);
     if (this.atmos) {
       // Every change of the library's particle count rebuilds its particles, so while the box
-      // moves the density holds, its particles spreading over the room as it changes.
-      if (key !== this.atmosKey && !this.holdFall) this.atmos.update(options);
-      if (!this.holdFall) this.atmosKey = key;
+      // moves the density holds, and settles once it lands.
+      if (key !== this.atmosKey && !this.move) this.atmos.update(options);
+      if (!this.move) this.atmosKey = key;
       if (live) this.atmos.resume();
       else this.atmos.pause();
       return;
@@ -487,7 +521,7 @@ class Sky implements WeatherSky {
   }
 
   private fitLater(): void {
-    if (this.refit || this.disposed) return;
+    if (this.refit || this.disposed || this.move) return;
     this.refit = requestAnimationFrame(() => {
       this.refit = 0;
       this.fit();
