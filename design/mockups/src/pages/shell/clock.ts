@@ -3,6 +3,9 @@
 // date, home's weather, the other cities, the month and the picked day) and the weather view a
 // weather card turns it into. The clock pill's states are here too, at every step a narrow bar
 // takes.
+//
+// Its settings, and the bar clock's, are the Settings app's Date & time section
+// (`apps/settings/settings-date-time.ts`); the popup holds none.
 
 import { barStrip, EVERYDAY, EVERYTHING } from "./bar-parts.ts";
 import { type ClockOptions, clockOnScreen } from "./clock-parts.ts";

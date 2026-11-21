@@ -1,6 +1,7 @@
 // Settings › Date & time: the time zone and how the clock keeps right, how times and dates are
-// written, and the clock popup's calendar. Its own parts are Kōbō's zone list on a page of its own,
-// Kōbō's "How it reads" card, and the extra clocks' list with the field that adds one.
+// written, what the bar's clock shows, the clock popup's calendar, and the cities and their weather.
+// It is the one place the clock's settings live. Its own parts are Kōbō's zone list on a page of its
+// own, Kōbō's "How it reads" card, and the cities' list with the field that adds one.
 
 import { screen, type Variant } from "../../../site/page.ts";
 import type { DateTimeValues } from "./sections/date-time-parts.ts";
@@ -18,7 +19,8 @@ const opened = (page: string, values: Partial<DateTimeValues> = {}) => screen(()
 const lit = (id: string, values: Partial<DateTimeValues> = {}) => screen(() => settingsWindow(litOn(DATE_TIME, id, own(values))));
 
 const TOKYO = ["Asia/Tokyo"];
-const FOUR = ["Asia/Tokyo", "America/New_York", "America/Los_Angeles", "Pacific/Auckland"];
+const FOUR = ["Asia/Tokyo", "America/New_York", "Europe/London", "Atlantic/Reykjavik"];
+const EIGHT = [...FOUR, "America/Sao_Paulo", "America/Los_Angeles", "Australia/Sydney", "Africa/Cairo"];
 
 const VARIANTS: Variant[] = [
   { name: "Searching for a zone", for: "“tok”: the list narrows as it is typed", sample: opened("zone", { query: "tok" }) },
@@ -28,10 +30,12 @@ const VARIANTS: Variant[] = [
   { name: "A time it can't read", for: "the line says how to write it, in `error`", sample: lit("set-time", { autoTime: false, setTime: "tomorrow-ish" }) },
   { name: "Twelve hours, month first", for: "the card reads as the picks say", sample: lit("date-order", { timeFormat: 2, dateOrder: 2, firstWeekday: 6 }) },
   { name: "Matching Windows' clock", for: "a risky value: the warning under its well", sample: lit("match-windows", { matchWindows: true }) },
-  { name: "No extra clocks", for: "the empty well over Add a clock", sample: opened("clocks") },
-  { name: "One extra clock", for: "Tokyo: its time there and how far ahead", sample: opened("clocks", { clocks: TOKYO }) },
-  { name: "Four extra clocks", for: "the most: Add a clock dimmed, its reason its line", sample: opened("clocks", { clocks: FOUR }) },
-  { name: "A clock that isn't a zone", for: "Enter on “Atlantis”: the line says so, in `error`", sample: opened("clocks", { clocks: TOKYO, adding: "Atlantis", tried: true }) },
+  { name: "No other cities", for: "the empty well over Add a city", sample: opened("cities") },
+  { name: "One city", for: "Tokyo: its time there and how far ahead", sample: opened("cities", { cities: TOKYO }) },
+  { name: "Eight cities", for: "the most: Add a city dimmed, its reason its line", sample: opened("cities", { cities: EIGHT }) },
+  { name: "A city that isn't a zone", for: "Enter on “Atlantis”: the line says so, in `error`", sample: opened("cities", { cities: TOKYO, adding: "Atlantis", tried: true }) },
+  { name: "Weather off", for: "its rows dimmed, the reason their line", sample: lit("weather", { weather: false }) },
+  { name: "Only the time in the bar", for: "seal and date off", sample: lit("date", { seal: false, date: false }) },
 ];
 
 export default sectionPage({
@@ -39,15 +43,15 @@ export default sectionPage({
   index: DATE_TIME,
   slug: "settings-date-time",
   title: "Settings: Date & time",
-  lede: "The time zone and how the clock keeps right, how times and dates are written, and the calendar's extras.",
+  lede: "The time zone, how times and dates read, the bar's clock, the calendar, and the cities and their weather.",
   hint: "change a row; hold a reset to put it back",
-  seed: own({ timeFormat: 1, dateOrder: 1, holidays: 4, clocks: TOKYO }),
+  seed: own({ timeFormat: 1, dateOrder: 1, holidays: 4, cities: FOUR }),
   variants: VARIANTS,
   keys: [
     { keys: ["↓"], does: "in the zone search: into the zones" },
-    { keys: ["Delete"], does: "on an extra clock: removes it" },
-    { keys: ["Enter"], does: "in Add a clock: adds the city typed" },
-    { keys: ["Esc"], does: "in Add a clock: clears it, then back to its row" },
+    { keys: ["Delete"], does: "on a city: removes it" },
+    { keys: ["Enter"], does: "in Add a city: adds the city typed" },
+    { keys: ["Esc"], does: "in Add a city: clears it, then back to its row" },
   ],
   measures: [
     { part: "Zone search to its list", token: "space-s16" },

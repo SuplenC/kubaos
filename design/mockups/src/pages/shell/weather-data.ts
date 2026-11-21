@@ -52,6 +52,8 @@ export interface Warning {
 /** A city whose weather the clock shows. */
 export interface City {
   readonly name: string;
+  /** Its time zone's IANA name. */
+  readonly iana: string;
   /** Hours from home's clock. */
   readonly offset: number;
   readonly weather: Weather;
@@ -74,6 +76,7 @@ export const NOW_HOUR = 21 + 47 / 60;
 
 export const HOME: City = {
   name: "Warsaw",
+  iana: "Europe/Warsaw",
   offset: 0,
   weather: "partly",
   temperature: 12,
@@ -89,22 +92,22 @@ export const HOME: City = {
 
 const WEEK_AFTER: readonly Weather[] = ["fair", "partly", "rain", "overcast", "clear", "snow", "thunderstorm", "fog"];
 
-function city(name: string, offset: number, weather: Weather, temperature: number, extra: Partial<City> = {}): City {
+function city(name: string, iana: string, offset: number, weather: Weather, temperature: number, extra: Partial<City> = {}): City {
   const start = WEEK_AFTER.indexOf(weather);
   const week = Array.from({ length: 7 }, (_, i) => (i === 0 ? weather : WEEK_AFTER[(Math.max(0, start) + i * 3) % WEEK_AFTER.length]!)) as unknown as City["week"];
-  return { name, offset, weather, temperature, high: temperature + 3, low: temperature - 5, feels: temperature - 2, warning: "none", week, sunrise: "06:40", sunset: "17:10", ...extra };
+  return { name, iana, offset, weather, temperature, high: temperature + 3, low: temperature - 5, feels: temperature - 2, warning: "none", week, sunrise: "06:40", sunset: "17:10", ...extra };
 }
 
 /** The other cities, in the order the clock lists them; eight is the most. */
 export const CITIES: readonly City[] = [
-  city("Tokyo", 8, "fair", 18, { sunrise: "05:58", sunset: "16:52" }),
-  city("New York", -5, "rain", 9, { readings: { rain: 2.5 } }),
-  city("London", -1, "overcast", 11),
-  city("Reykjavik", -1, "snow", -2, { sunrise: "09:21", sunset: "17:02" }),
-  city("Rio de Janeiro", -4, "partly", 27),
-  city("San Francisco Bay Area", -9, "fog", 13),
-  city("Sydney", 10, "clear", 22),
-  city("Cairo", 1, "clear", 31, { warning: { noSource: "Egypt has no official weather warnings we can read." } }),
+  city("Tokyo", "Asia/Tokyo", 8, "fair", 18, { sunrise: "05:58", sunset: "16:52" }),
+  city("New York", "America/New_York", -5, "rain", 9, { readings: { rain: 2.5 } }),
+  city("London", "Europe/London", -1, "overcast", 11),
+  city("Reykjavik", "Atlantic/Reykjavik", -1, "snow", -2, { sunrise: "09:21", sunset: "17:02" }),
+  city("Rio de Janeiro", "America/Sao_Paulo", -4, "partly", 27),
+  city("San Francisco Bay Area", "America/Los_Angeles", -9, "fog", 13),
+  city("Sydney", "Australia/Sydney", 10, "clear", 22),
+  city("Cairo", "Africa/Cairo", 1, "clear", 31, { warning: { noSource: "Egypt has no official weather warnings we can read." } }),
 ];
 
 /** A city's local hour now. */

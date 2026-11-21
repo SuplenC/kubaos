@@ -13,21 +13,17 @@
 // Back mirrors it, the sky shrinking into the card it came from. Reduced motion swaps the views.
 // The clock's pages build their samples from these. This file is no page.
 //
-// The clock popup's old settings page stays below (`clockSettingsOnScreen`) for its own page,
-// until Settings takes the clock's settings.
+// The clock's settings live in the Settings app's Date & time section
+// (`apps/settings/sections/date-time.ts`); the popup holds none.
 
 import "./clock.css";
 import { banner } from "../../lib/banner.ts";
 import { button } from "../../lib/button.ts";
 import { calendar, type Day } from "../../lib/calendar.ts";
 import { card } from "../../lib/card.ts";
-import { chip } from "../../lib/chip.ts";
 import { descriptionList } from "../../lib/description.ts";
-import { field } from "../../lib/field.ts";
-import { iconButton } from "../../lib/icon-button.ts";
 import { icon } from "../../lib/icon.ts";
-import { container, fill, filling, flow, row, stack } from "../../lib/layout.ts";
-import { select } from "../../lib/select.ts";
+import { container, fill, filling, row, stack } from "../../lib/layout.ts";
 import { hang, sheet, swapViews } from "../../lib/sheet.ts";
 import { dayStrip } from "../../lib/day-strip.ts";
 import { clamped, text } from "../../lib/text.ts";
@@ -500,21 +496,7 @@ export function clockOnScreen(options: ClockOptions = {}, width = 1440, height =
   return room.element;
 }
 
-// The clock popup's old settings, for the Clock settings page until Settings takes them.
-
-/** An extra clock of the old settings: its label and its zone. */
-export interface Zone {
-  readonly label: string;
-  readonly name: string;
-}
-
-export const ZONES: readonly Zone[] = [
-  { label: "Tokyo", name: "Asia/Tokyo" },
-  { label: "New York", name: "America/New_York" },
-  { label: "Los Angeles", name: "America/Los_Angeles" },
-  { label: "Auckland", name: "Pacific/Auckland" },
-];
-
+/** The countdowns the Settings app's "Countdown in the bar" picks from, as the shots' stand-ins hold them. */
 export interface Countdown {
   readonly name: string;
   readonly left: string;
@@ -527,56 +509,3 @@ export const COUNTDOWNS: readonly Countdown[] = [
   { name: "Release", left: "6 d 2 h", at: "3 Nov" },
   { name: "Conference", left: "", at: "12 Oct", passed: true },
 ];
-
-export interface SettingsOptions {
-  readonly analog?: boolean;
-  readonly clocks?: number;
-  readonly countdowns?: number;
-  /** The pinned countdown, by name, or none. */
-  readonly pinned?: string | null;
-  /** kubaos-clock not running: the line that says so at the foot. */
-  readonly unavailable?: boolean;
-  /** The holidays select drawn open. */
-  readonly holidaysOpen?: boolean;
-}
-
-/** The settings: holidays, first weekday, time format, date order, analog face, the bar's countdown, extra clocks. */
-function settingsPage(options: SettingsOptions): HTMLElement {
-  const choice = (label: string, picked: boolean) => chip({ label, kind: picked ? "Selected" : "Neutral", press: "press", tabStop: false });
-  const setting = (title: string, note: string | null, ...choices: HTMLElement[]) =>
-    stack("s8", "start", filling(stack("s4", "start", text(title, "body_strong"), ...(note ? [text(note, "small", "on_surface_variant")] : []))), ...choices.map(filling));
-  const zones = ZONES.slice(0, options.clocks ?? 1);
-  return stack(
-    "s16",
-    "start",
-    ...[
-      setting("Holidays", "Marked in the calendar and left out of working days", select({ options: ["None", "Germany", "Japan", "Poland", "United Kingdom", "United States"], picked: 3, icon: "flag", ...(options.holidaysOpen ? { open: true } : {}) })),
-      setting("First day of the week", null, row("s4", "centre", ...["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, index) => choice(day, index === 0)))),
-      setting("Time format", "How the bar, the lock screen and this popup write the time", row("s4", "centre", choice("Locale", true), choice("24-hour", false), choice("12-hour", false))),
-      setting("Date order", null, row("s4", "centre", choice("Locale", true), choice("Day first", false), choice("Month first", false))),
-      setting("Analog face", null, row("s4", "centre", choice("Off", !options.analog), choice("On", options.analog ?? false))),
-      setting("Countdown in the bar", null, flow("s4", choice("None", options.pinned === null), ...COUNTDOWNS.slice(0, options.countdowns ?? 2).map((each) => choice(each.name, each.name === (options.pinned === undefined ? "Vacation" : options.pinned))))),
-      setting(
-        "Extra clocks",
-        "Up to four, by city or IANA name",
-        ...zones.map((each) => row(0, "centre", text(`${each.label}  ·  ${each.name}`, "body"), fill(), iconButton({ icon: "close", label: "Remove", kind: "Text", size: "Sm" }))),
-        ...(zones.length < 4 ? [field({ icon: "add_location_alt", placeholder: "Tokyo, New York, America/Chicago" })] : []),
-      ),
-      clamped("Kept in ~/.config/kubaos/desktop/clock/clock.toml", "small", "on_surface_variant"),
-      ...(options.unavailable ? [clamped("kubaos-clock isn't running: the calendar and the search need it", "small", "error")] : []),
-    ].map(filling),
-  );
-}
-
-/** The old settings in the popup's sheet, on a screen 1440 wide. */
-export function clockSettingsOnScreen(options: SettingsOptions = {}): HTMLElement {
-  const body = document.createElement("div");
-  body.className = "ck-body";
-  body.append(settingsPage(options));
-  const box = container(body);
-  box.classList.add("ck-popup");
-  const room = barScreen(1440, TALL, { content: EVERYDAY });
-  room.element.dataset.open = "";
-  hang(room, sheet({ content: box, edge: "top" }));
-  return room.element;
-}

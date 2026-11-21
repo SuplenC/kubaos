@@ -1,8 +1,8 @@
 // Date & time's organisms, built from the library's parts and kept in the Settings app because only
 // it draws them: the time zone picker (Kōbō's zone list with its search and its empty state), the "How
-// it reads" card (Kōbō's, following the format's settings), the extra clocks' list (each a row that
-// can be removed, or the empty well) and the field that adds one. The places and the moment they
-// read come from Kōbō's zones and the clock popup's.
+// it reads" card (Kōbō's, following the format's settings), the cities' list (each a row that can
+// be removed, or the empty well) and the field that adds one. The places and the moment they read
+// come from Kōbō's zones and the clock popup's cities.
 
 import { card } from "../../../../lib/card.ts";
 import { descriptionList } from "../../../../lib/description.ts";
@@ -10,8 +10,9 @@ import { emptyState } from "../../../../lib/empty-state.ts";
 import { field, setInvalid, setValue } from "../../../../lib/field.ts";
 import { filling, stack } from "../../../../lib/layout.ts";
 import { emptyList, list, listWith, type ListRowSpec, ROW_CONTROL } from "../../../../lib/list.ts";
+import { MOST_CITIES } from "../../../../lib/weather-card.ts";
 import { LANGUAGES, ZONES, zoneName } from "../../../kobo/kobo-data.ts";
-import { ZONES as CLOCK_ZONES } from "../../../shell/clock-parts.ts";
+import { CITIES, HOME } from "../../../shell/weather-data.ts";
 import type { Setting } from "../settings-parts.ts";
 
 /** Date & time's own values: its settings, and what its parts hold while a person uses them. */
@@ -29,17 +30,28 @@ export interface DateTimeValues {
   dateOrder: number;
   firstWeekday: number;
   holidays: number;
-  analog: boolean;
+  /** The month's column of week numbers; off, a line under the month names the week. */
+  weekNumbers: boolean;
   barCountdown: number;
-  /** The extra clocks, by IANA name, in the order they were added. */
-  clocks: readonly string[];
-  /** What Add a clock holds, and whether Enter was pressed on it since it last changed. */
+  /** What the bar's clock shows beside the time. */
+  seal: boolean;
+  date: boolean;
+  seconds: boolean;
+  barWeather: boolean;
+  /** The weather, in the bar's clock and the clock popup. */
+  weather: boolean;
+  /** Home's city, whose weather leads: 0 the time zone's, else a city by its index after that. */
+  homeCity: number;
+  temperature: number;
+  wind: number;
+  /** The other cities, by IANA name, in the order they were added. */
+  cities: readonly string[];
+  /** What Add a city holds, and whether Enter was pressed on it since it last changed. */
   adding: string;
   tried: boolean;
 }
 
-/** The clock file's most extra clocks (`MAX_ZONES` in `kubaos-clock`). */
-export const MOST_CLOCKS = 4;
+export { MOST_CITIES };
 
 /** The language the sample machine reads in, which Auto follows. */
 const LANGUAGE = LANGUAGES[1]!;
@@ -56,8 +68,8 @@ interface Place {
   readonly iana: string;
 }
 
-/** Every place the sample's clock engine knows: Kōbō's zones, and the popup's extra clocks. */
-const PLACES: readonly Place[] = [...ZONES.map((zone) => ({ city: zone.city, iana: zone.iana })), ...CLOCK_ZONES.map((zone) => ({ city: zone.label, iana: zone.name }))].filter(
+/** Every place the sample's clock engine knows: Kōbō's zones, and the clock popup's cities. */
+const PLACES: readonly Place[] = [...ZONES.map((zone) => ({ city: zone.city, iana: zone.iana })), ...[HOME, ...CITIES].map((place) => ({ city: place.name, iana: place.iana }))].filter(
   (place, index, all) => all.findIndex((other) => other.iana === place.iana) === index,
 );
 
@@ -81,7 +93,7 @@ function offsetOf(iana: string): number {
   return (Date.UTC(part("year"), part("month") - 1, part("day"), part("hour"), part("minute")) - MOMENT.getTime()) / 60_000;
 }
 
-/** How far `iana`'s clock is from the zone the machine is in, as a clock's line says it. */
+/** How far `iana`'s clock is from the zone the machine is in, as a city's line says it. */
 function apart(values: DateTimeValues, iana: string): string {
   const hours = (offsetOf(iana) - offsetOf(ZONES[values.zone]!.iana)) / 60;
   if (hours === 0) return `${iana} · same time`;
@@ -94,19 +106,26 @@ function placeNamed(name: string): Place | undefined {
   return PLACES.find((place) => place.city.toLowerCase() === typed || place.iana.toLowerCase() === typed);
 }
 
-/** What is wrong with adding the clock `name`, as the clock engine says it, or null. */
-export function clockProblem(values: DateTimeValues, name: string): string | null {
+/** What is wrong with adding the city `name`, as the clock engine says it, or null. */
+export function cityProblem(values: DateTimeValues, name: string): string | null {
   const place = placeNamed(name);
   if (!place) return `No time zone called “${name.trim()}”. Try a city, as Lisbon.`;
-  if (values.clocks.includes(place.iana)) return `${place.city} is one of your clocks already.`;
+  if (values.cities.includes(place.iana)) return `${place.city} is one of your cities already.`;
   return null;
 }
 
-/** The extra clocks as the row that opens their page says them. */
-export function clocksDetail(values: DateTimeValues): string {
-  if (values.clocks.length === 0) return "None";
-  if (values.clocks.length === 1) return PLACES.find((place) => place.iana === values.clocks[0])?.city ?? values.clocks[0]!;
-  return `${values.clocks.length} clocks`;
+const PLURAL = new Intl.PluralRules("en-GB");
+
+/** The cities as the row that opens their page says them. */
+export function citiesDetail(values: DateTimeValues): string {
+  if (values.cities.length === 0) return "None";
+  if (values.cities.length === 1) return PLACES.find((place) => place.iana === values.cities[0])?.city ?? values.cities[0]!;
+  return (PLURAL.select(values.cities.length) === "one" ? "{count} city" : "{count} cities").replace("{count}", String(values.cities.length));
+}
+
+/** The places home's city can be: the time zone's own city first, then the others the engine knows. */
+export function homeCities(values: DateTimeValues): string[] {
+  return [`Same as the time zone (${ZONES[values.zone]!.city})`, ...[HOME, ...CITIES].map((place) => place.name)];
 }
 
 /** Asks the Settings region to draw itself again, for a part whose change shows elsewhere on it. */
@@ -188,17 +207,17 @@ export function readsCard(values: DateTimeValues): HTMLElement {
 }
 
 /**
- * The extra clocks, each a row with its time there and how far it is from yours, and
- * the × a saved row is removed with (Delete does the same); none, the empty well.
+ * The cities, each a row with its time there and how far it is from yours, and the × a
+ * saved row is removed with (Delete does the same); none, the empty well.
  */
-export function clocksList(values: DateTimeValues): HTMLElement {
-  if (values.clocks.length === 0) return emptyList("No extra clocks yet.");
+export function citiesList(values: DateTimeValues): HTMLElement {
+  if (values.cities.length === 0) return emptyList("No other cities yet.");
   const remove = (iana: string, from: Element) => {
-    values.clocks = values.clocks.filter((each) => each !== iana);
+    values.cities = values.cities.filter((each) => each !== iana);
     redraw(from);
   };
   const box = list(
-    values.clocks.map((iana) => ({
+    values.cities.map((iana) => ({
       title: PLACES.find((place) => place.iana === iana)?.city ?? iana,
       subtitle: apart(values, iana),
       detail: timeIn(values, iana),
@@ -211,18 +230,18 @@ export function clocksList(values: DateTimeValues): HTMLElement {
     const at = rows.findIndex((each) => each.hasAttribute("data-current"));
     if (at < 0) return;
     event.preventDefault();
-    remove(values.clocks[at]!, box);
+    remove(values.cities[at]!, box);
   });
   return box;
 }
 
 /**
- * Add a clock's field, at its row's end. Enter adds the place typed, or says in the
+ * Add a city's field, at its row's end. Enter adds the place typed, or says in the
  * row's line what is wrong with it, in `error`, the field invalid until it changes. Enter on the
  * row puts the keyboard in it; Esc clears it, then goes back to the row.
  */
 function addField(values: DateTimeValues, setting: Setting): HTMLElement {
-  const full = values.clocks.length >= MOST_CLOCKS;
+  const full = values.cities.length >= MOST_CITIES;
   const made = field({
     size: ROW_CONTROL,
     icon: "add_location_alt",
@@ -247,17 +266,17 @@ function addField(values: DateTimeValues, setting: Setting): HTMLElement {
   made.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      const problem = clockProblem(values, values.adding);
+      const problem = cityProblem(values, values.adding);
       if (problem) {
         values.tried = true;
         tell(problem);
       } else {
-        values.clocks = [...values.clocks, placeNamed(values.adding)!.iana];
+        values.cities = [...values.cities, placeNamed(values.adding)!.iana];
         values.adding = "";
         values.tried = false;
         const region = made.closest(".st-region");
         redraw(made);
-        region?.querySelector<HTMLElement>("[data-setting='add-clock'] .k-field")?.focus({ preventScroll: true });
+        region?.querySelector<HTMLElement>("[data-setting='add-city'] .k-field")?.focus({ preventScroll: true });
       }
     } else if (event.key === "Escape") {
       event.preventDefault();
@@ -276,7 +295,7 @@ function addField(values: DateTimeValues, setting: Setting): HTMLElement {
     made.closest(".k-list-row")?.dispatchEvent(new PointerEvent("pointermove", { bubbles: true }));
   });
   requestAnimationFrame(() => {
-    if (values.tried) tell(clockProblem(values, values.adding));
+    if (values.tried) tell(cityProblem(values, values.adding));
     const well = made.closest<HTMLElement>(".k-list");
     well?.addEventListener("keydown", (event) => {
       const current = well.querySelector(".k-list-row[data-current]");
@@ -289,15 +308,15 @@ function addField(values: DateTimeValues, setting: Setting): HTMLElement {
   return made;
 }
 
-/** Add a clock's row: its field at the row's end, dimmed with its reason once there are four. */
-export function addClock(values: DateTimeValues): Setting {
+/** Add a city's row: its field at the row's end, dimmed with its reason once there are eight. */
+export function addCity(values: DateTimeValues): Setting {
   const setting: Setting = {
-    id: "add-clock",
-    title: "Add a clock",
+    id: "add-city",
+    title: "Add a city",
     line: "A city or a zone's IANA name: Lisbon, America/Chicago.",
     control: { kind: "part", make: () => addField(values, setting) },
   };
-  return whileDisabled(setting, () => (values.clocks.length >= MOST_CLOCKS ? "Four at most: remove one to add another." : null));
+  return whileDisabled(setting, () => (values.cities.length >= MOST_CITIES ? "Eight at most: remove one to add another." : null));
 }
 
 /**
