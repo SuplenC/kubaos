@@ -2,9 +2,8 @@
 // home, and eight other cities with the prototype's weathers. The forecast for each city and day is
 // worked out from fixed numbers, so every sample draws the same. This file is no page.
 //
-// The weather's symbols are stand-ins: the symbol set has no cloud, sun behind a cloud, rain,
-// thunder cloud, snowflake, hail, fog, drop, wind, sunrise or sunset yet, so each takes the nearest
-// symbol it has until Kuba picks the set.
+// The weather's symbols are KubaOS Symbols: the set's sun and moon, and the weather ones the
+// mockups draw in the set's way (`src/assets/symbols/`) until the libraries have them.
 
 import type { Readings, Weather } from "../../lib/weather-sky.ts";
 import { TYPICAL } from "../../lib/weather-sky.ts";
@@ -22,17 +21,17 @@ export const CONDITIONS: Record<Weather, string> = {
   hail: "Hail",
 };
 
-/** A weather's symbol by day and by night: stand-ins, see the file's head. */
+/** A weather's symbol by day and by night: the sky differs for clear, fair and partly cloudy. */
 const SYMBOLS: Record<Weather, readonly [string, string]> = {
   clear: ["light_mode", "dark_mode"],
-  fair: ["light_mode", "dark_mode"],
-  partly: ["wb_twilight", "wb_twilight"],
-  overcast: ["circle", "circle"],
-  fog: ["clear_all", "clear_all"],
-  rain: ["arrow_downward", "arrow_downward"],
-  thunderstorm: ["bolt", "bolt"],
-  snow: ["star", "star"],
-  hail: ["radio_button_unchecked", "radio_button_unchecked"],
+  fair: ["fair_day", "fair_night"],
+  partly: ["partly_cloudy_day", "partly_cloudy_night"],
+  overcast: ["cloud", "cloud"],
+  fog: ["foggy", "foggy"],
+  rain: ["rainy", "rainy"],
+  thunderstorm: ["thunderstorm", "thunderstorm"],
+  snow: ["weather_snowy", "weather_snowy"],
+  hail: ["weather_hail", "weather_hail"],
 };
 
 /** `weather`'s symbol at `hour` local time: the night's from 19:00 to 06:00. */
@@ -41,8 +40,8 @@ export function symbolOf(weather: Weather, hour = 12): string {
   return SYMBOLS[weather][night ? 1 : 0];
 }
 
-/** The tiles' symbols: stand-ins, see the file's head. */
-export const TILE_SYMBOLS = { wind: "mode_fan", humidity: "wave_sine", uv: "light_mode", air: "eco", sunrise: "wb_twilight", sunset: "wb_twilight" } as const;
+/** The tiles' symbols. */
+export const TILE_SYMBOLS = { wind: "air", humidity: "humidity", uv: "light_mode", air: "eco", sunrise: "sunrise", sunset: "sunset" } as const;
 
 /** An official warning: what, until when, and its source's words. */
 export interface Warning {
