@@ -1427,11 +1427,11 @@ on_sharing_container = { dark = { mix = "burn_sharing", white = 0.85, text_on = 
 # sharing Button's label over its hold's fill.
 on_sharing = { dark = { from = "burn_sharing", lightness = 0.25, text_on = ["sharing"] }, light = { mix = "burn_sharing", white = 1.0 } }
 
-# A tone's core, the white-hot line along the middle of a lit tube: half way
-# to white.
 # Words on a picture that changes under them (a live sky): white in both modes, held off the picture
 # by the shadows `opacity.picture_text_edge` and `picture_text_drop` give it.
 on_picture = { mix = "surface", white = 1.0 }
+# A tone's core, the white-hot line along the middle of a lit tube: half way
+# to white.
 primary_core = { mix = "primary", white = 0.5 }
 cold_core = { mix = "cold", white = 0.5 }
 error_core = { mix = "burn_error", white = 0.5 }
@@ -1544,6 +1544,10 @@ on_burn_warning = { from = "burn_warning", lightness = 0.25, text_on = ["burn_wa
 # palette, and `kubaos-design contrast` lists them all with their ratios.
 # Decoration (a divider, a well's edge, a disabled control) carries no meaning
 # and isn't held to a minimum, as WCAG exempts it.
+# Words on a live sky (`on_picture`, the weather cards') are in no pair: the
+# sky changes under them, so they hold by treatment, the two shadows of
+# `opacity.picture_text_edge` and `picture_text_drop`, not by a ratio to one
+# colour, as the lock's kicker holds on its wallpaper by its halo.
 [contrast]
 pairs = [
   { fg = "on_surface", bg = "surface", need = "text", use = "Text on a page or a panel" },
@@ -1562,22 +1566,22 @@ pairs = [
   { fg = "primary", bg = "surface", need = "text", use = "Accent text: an accent line, a detail, a Text button" },
   { fg = "primary", bg = "surface_container", need = "text", use = "A notification group's \"+N more\" over its fan's turned cards" },
   { fg = "primary", bg = "surface_container_low", need = "text", use = "Accent text in a well" },
-  { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar" },
+  { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar, the clock pill's time" },
   { fg = "on_surface", bg = "primary_tint_container", need = "text", use = "A workspace's number, with windows, on the mark of its open menu" },
   { fg = "on_surface_variant", bg = "primary_tint_container", need = "text", use = "An empty workspace's number on the mark of its open menu" },
   { fg = "on_surface", bg = "secondary_tint_container", need = "text", use = "A workspace's number, with windows, in a borrowed group's tint" },
   { fg = "on_surface_variant", bg = "secondary_tint_container", need = "text", use = "An empty workspace's number in a borrowed group's tint" },
   { fg = "on_primary", bg = "primary", need = "text", opacity = "subdued_text", use = "Secondary text on a checked tile" },
   { fg = "on_primary_container", bg = "primary_container", need = "text", use = "Text on the primary container" },
-  { fg = "on_secondary_container", bg = "secondary_container", need = "text", use = "A Tonal button, a selected row's title" },
+  { fg = "on_secondary_container", bg = "secondary_container", need = "text", use = "A Tonal button, a selected row's title, the DayStrip's picked day" },
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", opacity = "subdued_text", use = "A selected row's subtitle" },
-  { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label in iced and QML" },
+  { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label in iced and QML, the clock pill's time with recording merged in" },
   { fg = "on_primary_fill", bg = "primary_fill", need = "text", use = "A Filled button's label at rest" },
   { fg = "on_primary_fill_lit", bg = "primary_fill", need = "text", use = "A Filled button's label, lit" },
   { fg = "on_primary_fill_lit", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed" },
   { fg = "on_primary_fill", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed by the pointer: its rest label, unlit" },
   { fg = "on_secondary_container_rest", bg = "secondary_container", need = "text", use = "A Tonal button's label at rest" },
-  { fg = "on_secondary_container", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed" },
+  { fg = "on_secondary_container", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed, the DayStrip's picked day pressed" },
   { fg = "on_secondary_container_rest", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed by the pointer: its rest label, unlit" },
   { fg = "primary_rest", bg = "surface", need = "text", use = "A Text button's label at rest, on a page" },
   { fg = "primary_rest", bg = "surface_container_low", need = "text", use = "A Text button's label at rest, in a well" },
@@ -1607,7 +1611,8 @@ pairs = [
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
   { fg = "cold", bg = "surface_container", need = "text", use = "A tip's title on its compact banner" },
   { fg = "cold", bg = "surface_container_high", need = "text", use = "A tip's title on a panel's card" },
-  { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
+  { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent, the clock pill's seal" },
+  { fg = "error_container", bg = "on_error_container", need = "text", use = "The clock pill's seal with recording merged in" },
   { fg = "warning", bg = "surface", need = "text", use = "A reading close to its limit, a warning chip's label" },
   { fg = "warning", bg = "surface_container_high", need = "graphic", use = "A warning banner's symbol and hairline" },
   { fg = "primary", bg = "surface_container_high", need = "text", use = "An info banner's symbol and hairline, a Text button inside it" },
