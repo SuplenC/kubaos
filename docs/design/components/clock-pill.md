@@ -1,0 +1,16 @@
+# ClockPill
+
+Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#components) has the rules every component keeps, its variant words and the fixed measures the geometry check holds it to.
+
+## `ClockPill`
+
+Its mockup pages are the source of truth: Shell, Bar, and Shell, Clock popup, in `design/mockups/` (`src/lib/clock-pill.ts`). The bar's clock, which the Lock's bar draws too, for the rest clock to fly into ([Lock](lock.md)). Where the bar places it and what it gives way to as the bar narrows is the [Bar](bar.md)'s.
+
+A [Pill](pill.md) laid out round a capsule: the weekday's seal (its kanji on a disc of `cold`, `on_cold`), the date plain (`body`, `on_surface_variant`), the time in a flat capsule of `primary` (`on_primary`), and home's weather plain like the date (its symbol and the temperature; none with no home city). The seal and the capsule stand `space.s4` in from the pill's curves, a plain part at an end `space.s12`. The capsule is the screen's exact middle, and the rest of the pill is laid out round it.
+
+- **The time** is `body`, Geist's own proportional figures, centred in a slot as wide as the widest time the clock shows (24-hour or 12-hour), so the pill keeps its width as the minutes turn.
+- **Two press targets**, nothing between them: from the middle of the gap after the capsule to the pill's end, its full height, opens the clock popup on home's weather; the rest of the pill opens the clock. Each is lit by the pointer as the bar's pills are.
+- **Recording merged in**, on a narrow bar: the pill takes the recording's colours, `error_container` with `on_error_container`, its `error` dot leading, and the capsule `error` with `on_error`.
+- **What it shows** (the seal, the date full or short, seconds, the weather) is set in Settings › Date & time.
+
+*Not built yet: no library has it; `config/quickshell/modules/bar/Clock.qml` draws the old clock.*

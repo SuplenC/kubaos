@@ -1,11 +1,8 @@
 /* The ClockPill (`clock-pill.ts`): `space.s4` from its curves to the seal and the capsule, which fill
    its height less `space.s4` above and below; plain words at either end stand `space.s12` from the
-   curve, as a pill's words do. The capsule is the screen's middle: the side with less beside it
-   takes the difference as a margin, which its owner centres with the pill. */
-.k-clock-pill {
-  margin-inline: var(--capsule-before, 0) var(--capsule-after, 0);
-}
-
+   curve, as a pill's words do. It keeps how far its capsule's middle is off its own in
+   `--capsule-before` and `--capsule-after`, for an owner that puts the capsule on the screen's
+   middle (the bar, `bar.css`). */
 .k-clock-pill .k-clock-pill-plain:first-child {
   margin-inline-start: var(--space-s8);
 }

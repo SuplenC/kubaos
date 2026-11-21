@@ -1,7 +1,8 @@
-/* The DayStrip (`day-strip.ts`): its days sharing the row equally, `space.s4` apart. */
+/* The DayStrip (`day-strip.ts`): its days sharing the row equally in whole device pixels
+   (`--shares`, `equalShares` in `layout.ts`), `space.s4` apart. */
 .k-day-strip {
   display: grid;
-  grid-template-columns: repeat(var(--days), minmax(0, 1fr));
+  grid-template-columns: var(--shares, repeat(var(--days), minmax(0, 1fr)));
   gap: var(--space-s4);
   width: 100%;
   outline: none;

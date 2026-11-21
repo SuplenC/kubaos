@@ -360,7 +360,7 @@ export function calendar(options: CalendarOptions): HTMLElement {
     grid.inert = yearView;
     year.inert = !yearView;
     drawTitle();
-    probe(root, { role: "component", name: "Calendar", variant: variant(yearView && "year"), fixed: { width: true, height: true } });
+    probe(root, { role: "component", name: "Calendar", variant: variant(yearView && "year", !numbered && "unnumbered", options.weekLine === true && "week line"), fixed: { width: true, height: true } });
   }
 
   /** Slides the new month in from the side it lies on, `by` months from the last. */

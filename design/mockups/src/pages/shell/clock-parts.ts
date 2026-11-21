@@ -23,13 +23,12 @@ import { calendar, type Day } from "../../lib/calendar.ts";
 import { card } from "../../lib/card.ts";
 import { descriptionList } from "../../lib/description.ts";
 import { icon } from "../../lib/icon.ts";
-import { container, fill, filling, row, stack } from "../../lib/layout.ts";
+import { container, equalShares, fill, filling, grid, row, stack } from "../../lib/layout.ts";
 import { hang, sheet, swapViews } from "../../lib/sheet.ts";
 import { dayStrip } from "../../lib/day-strip.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { cubic, durationMs } from "../../lib/tokens.ts";
 import { type CardSky, carry, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
-import { TYPICAL, type Weather } from "../../lib/weather-sky.ts";
 import { settings } from "../../site/settings.ts";
 import { barScreen, EVERYDAY } from "./bar-parts.ts";
 import { TALL } from "./control-center-parts.ts";
@@ -70,12 +69,6 @@ export interface ClockOptions {
   readonly day?: number;
   /** Takes presses: the cards open the weather, Back goes back, the week and the month pick. */
   readonly live?: boolean;
-  /** Drawn this far through the turn to the weather view, 0 to 1: a picture of it moving. */
-  readonly turning?: number;
-  /** Home in another weather than its own: a sample of the turn in rain. */
-  readonly homeWeather?: Weather;
-  /** The picture of the turn is of the way back to the clock. */
-  readonly turningBack?: boolean;
 }
 
 /** A duration token in milliseconds under the speed setting; none with reduced motion. */
@@ -125,14 +118,7 @@ function workingDaysLeft(day: Day): number {
 }
 
 /** The city `whose` names. */
-/** Home as `options` show it: its own weather, or the one a sample asks for. */
-function homeOf(options: ClockOptions): City {
-  const weather = options.homeWeather;
-  if (!weather) return HOME;
-  return { ...HOME, weather, week: [weather, ...HOME.week.slice(1)] as unknown as City["week"], readings: { ...HOME.readings, ...TYPICAL[weather].readings, ...(weather === "rain" ? { rain: 7.5 } : {}) } };
-}
-
-const placeOf = (whose: Whose, options: ClockOptions): City => (whose === "home" ? homeOf(options) : CITIES[whose]!);
+const placeOf = (whose: Whose): City => (whose === "home" ? HOME : CITIES[whose]!);
 
 /** A city's sky on a day from today: now's hour today, midday on another. */
 function skyOf(place: City, day: number, seed: number): CardSky {
@@ -197,7 +183,7 @@ function clockView(options: ClockOptions, open: (whose: Whose, from: WeatherCard
   const time = stack("s4", "start", text("21:47", "hero_number"), text(DATE.format(utc(TODAY)), "body_large", "on_surface_variant"));
   time.classList.add("ck-time");
   const shown = options.home ?? "reading";
-  const home = homeWeatherCard({ home: homeState(shown, homeOf(options)), ...(options.live && shown !== "no city" ? { onPress: () => open("home", home) } : {}) });
+  const home = homeWeatherCard({ home: homeState(shown, HOME), ...(options.live && shown !== "no city" ? { onPress: () => open("home", home) } : {}) });
   cards.push(home);
   if (shown !== "no city") byWhose.set("home", home);
   const top = document.createElement("div");
@@ -259,15 +245,13 @@ function hoursRow(place: City, day: number): HTMLElement {
     cell.classList.add("ck-hour");
     box.append(cell);
   }
+  equalShares(box, 12, 0);
   return box;
 }
 
 /** The six tiles: wind, humidity, UV index, air quality, sunrise, sunset. */
 function tilesRow(place: City, day: number): HTMLElement {
-  const box = document.createElement("div");
-  box.className = "ck-tiles";
-  for (const tile of tilesOf(place, day)) box.append(card({ header: { glyph: tile.symbol, title: tile.value, subtitle: tile.name } }));
-  return box;
+  return grid(3, "s8", tilesOf(place, day).map((tile) => card({ header: { glyph: tile.symbol, title: tile.value, subtitle: tile.name } })));
 }
 
 function bannerOf(place: City, day: number): WeatherBannerOptions {
@@ -277,7 +261,7 @@ function bannerOf(place: City, day: number): WeatherBannerOptions {
 }
 
 function weatherView(options: ClockOptions, back: () => void): View & { readonly banner: WeatherCard } {
-  const place = placeOf(options.whose ?? "home", options);
+  const place = placeOf(options.whose ?? "home");
   let day = options.day ?? 0;
   const head = row("s12", "centre", button({ label: "Clock", kind: "Text", icon: "chevron_left", size: "Sm" }), text(place.name, "heading"));
   head.querySelector("button")?.addEventListener("click", () => options.live && back());
@@ -381,9 +365,9 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
 
   /**
    * Turns between `clock` and `weather`, `weather` lying over `clock` meanwhile, and settles on
-   * the weather or, `back`, on the clock. `hold` draws it held that far through, a picture of it.
+   * the weather or, `back`, on the clock.
    */
-  function play(clock: View, weather: View & { readonly banner: WeatherCard }, from: WeatherCard | null, back: boolean, hold?: number): void {
+  function play(clock: View, weather: View & { readonly banner: WeatherCard }, from: WeatherCard | null, back: boolean): void {
     busy = true;
     // Until the move starts, the view it starts from is all there is: the other is drawn unseen
     // and the panel keeps the first's height.
@@ -395,15 +379,6 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
       body.style.height = "";
       clock.element.style.opacity = "";
       weather.element.style.opacity = "";
-      if (hold !== undefined) {
-        // One moment for every part: that far through the whole turn, its last part included.
-        const whole = Math.max(...played.map((each) => Number(each.effect?.getComputedTiming().endTime ?? 0)));
-        for (const each of played) {
-          each.pause();
-          each.currentTime = hold * whole;
-        }
-        return;
-      }
       void Promise.all(played.map((each) => each.finished)).then(
         () => {
           for (const each of played) each.cancel();
@@ -445,14 +420,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     play(clock, weather, clock.cardOf(whose), true);
   }
 
-  if (options.turning !== undefined) {
-    // A picture of the turn, there or back: both views drawn, every part held that far through.
-    const clock = freshClock();
-    const weather = freshWeather(whose);
-    body.append(clock.element, weather.element);
-    shown = options.turningBack ? weather : clock;
-    play(clock, weather, clock.cardOf(whose), options.turningBack ?? false, options.turning);
-  } else if ((options.view ?? "clock") === "weather") {
+  if ((options.view ?? "clock") === "weather") {
     shown = weatherView(options, () => back());
     body.append(shown.element);
   } else {

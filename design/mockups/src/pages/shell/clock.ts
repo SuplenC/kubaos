@@ -78,7 +78,6 @@ export default page<Shown>({
     { name: "Home's weather", for: "the weather view, home's warning", sample: () => shot({ view: "weather", whose: "home" }) },
     { name: "A city's weather", for: "Cairo: no warnings source, one quiet line", sample: () => shot({ view: "weather", whose: 7 }) },
     { name: "Another day", for: "Thursday picked: its banner, hours and tiles", sample: () => shot({ view: "weather", whose: "home", day: 2 }) },
-    { name: "Mid-turn", for: "Tokyo's card early in its grow", sample: () => shot({ whose: 0, turning: 0.1 }) },
     { name: "A holiday picked", for: "1 November, All Saints' Day", sample: () => shot({ picked: { year: 2026, month: 11, day: 1 } }) },
     { name: "Long city names", for: "cut with an ellipsis, one line", sample: () => shot({ order: [5, 4, 0, 1] }) },
   ],

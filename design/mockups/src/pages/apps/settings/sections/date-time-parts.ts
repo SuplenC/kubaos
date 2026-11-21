@@ -125,7 +125,7 @@ export function citiesDetail(values: DateTimeValues): string {
 
 /** The places home's city can be: the time zone's own city first, then the others the engine knows. */
 export function homeCities(values: DateTimeValues): string[] {
-  return [`Same as the time zone (${ZONES[values.zone]!.city})`, ...[HOME, ...CITIES].map((place) => place.name)];
+  return [`Time zone's (${ZONES[values.zone]!.city})`, ...[HOME, ...CITIES].map((place) => place.name)];
 }
 
 /** Asks the Settings region to draw itself again, for a part whose change shows elsewhere on it. */

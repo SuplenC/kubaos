@@ -1,14 +1,16 @@
-// The bar's clock, the ClockPill, a DRAFT part (`docs/design/components/bar.md`): the weekday's seal
+// The bar's clock, the ClockPill, a DRAFT part (`docs/design/components/clock-pill.md`): the weekday's seal
 // (its kanji on a disc of `cold`), the date plain, the time in a flat capsule of `primary`, and the
 // weather plain like the date. The capsule is the screen's exact middle and the pill is laid out
 // round it. Recording merged in, the pill and its capsule take the recording's colours and its dot
 // leads. The bar draws it, and the Lock draws it in its bar for the rest clock to fly into.
 
 import "./clock-pill.css";
+import { centreOnPixels, forgetCentring } from "./centre.ts";
 import { type Shown, stateOptions } from "./control.ts";
 import { icon } from "./icon.ts";
 import { widestTime } from "./lock.ts";
 import { paired, pill } from "./pill.ts";
+import { probe, variant } from "./probe.ts";
 import { text } from "./text.ts";
 
 /** What the pill says: the weekday's kanji, the date full and short, the time, and the weather. */
@@ -102,6 +104,9 @@ export function clockPill(options: ClockPillOptions): ClockPill {
   });
   element.classList.add("k-clock-pill");
   element.toggleAttribute("data-recording", recording);
+  // A component of its own, not one of the bar's pills: its parts are its own, and its variants
+  // are the parts it shows.
+  probe(element, { role: "component", name: "ClockPill", variant: variant((options.seal ?? true) && "seal", date !== "none" && `date ${date}`, parts.some((part) => part.classList.contains("k-clock-pill-weather")) && "weather", recording && "recording"), fixed: { width: false, height: true } });
   centreCapsule(element);
   return { element, time };
 }
@@ -117,16 +122,23 @@ export function capsuleExtents(pill: HTMLElement): { readonly before: number; re
 }
 
 /**
- * Keeps the capsule on the screen's exact middle: its owner centres the pill's box, so the side of
- * the capsule with less beside it takes a margin of the difference, centred with the pill. A width
- * worked out from the layout, which the CSS can't read.
+ * How far the capsule's middle is off the pill's, as the margins that would put it in the middle of
+ * a box its owner centres: the side of the capsule with less beside it takes the difference. A
+ * width worked out from the layout, which the CSS can't read.
  */
 function centreCapsule(pill: HTMLElement): void {
   new ResizeObserver(() => {
     const zoom = pill.getBoundingClientRect().width / Math.max(1, pill.offsetWidth) || 1;
     const { before, after } = capsuleExtents(pill);
     const spare = Math.round((before - after) / zoom);
-    pill.style.setProperty("--capsule-before", `${Math.max(0, -spare)}px`);
-    pill.style.setProperty("--capsule-after", `${Math.max(0, spare)}px`);
+    const was = [pill.style.getPropertyValue("--capsule-before"), pill.style.getPropertyValue("--capsule-after")];
+    const now = [`${Math.max(0, -spare)}px`, `${Math.max(0, spare)}px`];
+    if (was[0] === now[0] && was[1] === now[1]) return;
+    pill.style.setProperty("--capsule-before", now[0]!);
+    pill.style.setProperty("--capsule-after", now[1]!);
+    // An owner that turns these into margins centres the pill again with them, not round the
+    // margins it had before.
+    forgetCentring(pill);
+    if (pill.parentElement) centreOnPixels(pill.parentElement);
   }).observe(pill);
 }

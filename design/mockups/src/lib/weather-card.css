@@ -121,7 +121,8 @@
   margin-left: round(nearest, calc(-1 * var(--ink-left) * var(--t-size)), 1px);
 }
 
-/* The city cards: rows of up to four, `space.s8` apart, each row's cards sharing it equally. */
+/* The city cards: rows of up to four, `space.s8` apart, each row's cards sharing it equally in
+   whole device pixels (`--shares`, `equalShares` in `layout.ts`). */
 .k-city-row {
   display: flex;
   flex-direction: column;
@@ -130,12 +131,9 @@
 }
 
 .k-city-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--shares, repeat(var(--cards), minmax(0, 1fr)));
   gap: var(--space-s8);
-}
-
-.k-city-line > .k-weather-card {
-  flex: 1 1 0;
 }
 
 /* A sky being carried from one card's place to another's (`carry`), over both, and the layers

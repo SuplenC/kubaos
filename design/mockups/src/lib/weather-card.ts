@@ -22,8 +22,9 @@
 import "./weather-card.css";
 import { type Pinned, pin } from "./control.ts";
 import { focusRing } from "./focus.ts";
-import { probe, variant } from "./probe.ts";
-import { clamped, inkLeft, text, type TypeStyle } from "./text.ts";
+import { equalShares } from "./layout.ts";
+import { declare, probe, variant } from "./probe.ts";
+import { centreFor, clamped, inkLeft, text, type TypeStyle } from "./text.ts";
 import { type Readings, type Weather, weatherSky, type WeatherSky } from "./weather-sky.ts";
 
 /** A card on the page. */
@@ -55,6 +56,16 @@ function said(words: string, style: TypeStyle, onSky: boolean, quiet = false): H
   return text(words, style, onSky ? "on_picture" : quiet ? "on_surface_variant" : "on_surface");
 }
 
+/**
+ * A temperature in `style`, set on a two-figure reading's mass rather than its own: every card's
+ * figures then keep one box and one baseline, whichever digits they read.
+ */
+function degreesSaid(words: string, style: TypeStyle, onSky: boolean): HTMLElement {
+  const element = said(words, style, onSky);
+  centreFor(element, style, "00°");
+  return element;
+}
+
 /** Marks `element` to be set in by its ink, for the CSS. */
 function inked(element: HTMLElement, style: TypeStyle, words: string): HTMLElement {
   element.style.setProperty("--ink-left", String(inkLeft(style, words)));
@@ -70,7 +81,7 @@ function piece<E extends HTMLElement>(element: E, name: string): E {
 
 /** The large temperature, and beside it the condition over one small line, the piece `lineName`. */
 function nowWords(temperature: string, condition: string, line: string, onSky: boolean, lineName: string): HTMLElement {
-  const figure = piece(inked(said(temperature, "hero_number", onSky), "hero_number", temperature), "temperature");
+  const figure = piece(inked(degreesSaid(temperature, "hero_number", onSky), "hero_number", temperature), "temperature");
   figure.classList.add("k-weather-sits");
   const lines = document.createElement("div");
   lines.className = "k-weather-lines";
@@ -89,6 +100,8 @@ interface Made {
   readonly dimmed?: boolean;
   readonly onPress?: () => void;
   readonly pinned?: Pinned;
+  /** What a plain card says instead of a reading, its variant: "no city", "no connection". */
+  readonly plain?: string;
 }
 
 /** The corner a card's part takes, by its radius token. */
@@ -169,7 +182,7 @@ function made(spec: Made): Built {
     sky.landOn([words]);
   } else element.append(words);
   const unpress = spec.onPress ? pressable(element, spec.kind, spec.onPress, spec.pinned) : () => {};
-  probe(words, { role: "component", name: spec.name, variant: variant(!sky && "plain", spec.dimmed && "dimmed"), fixed: { width: false, height: true } });
+  probe(words, { role: "component", name: spec.name, variant: variant(!sky && (spec.plain ?? "plain"), spec.dimmed && "dimmed"), fixed: { width: false, height: true } });
   const inside: Inside = { element, sky, words, part: spec.kind, still: spec.sky?.still ?? false, onPress: spec.onPress, pinned: spec.pinned, unpress };
   const card: Built = {
     get element() {
@@ -236,8 +249,8 @@ export function homeWeatherCard(options: HomeWeatherCardOptions): HomeWeatherCar
   const home = options.home;
   const press = { ...(options.onPress ? { onPress: options.onPress } : {}), ...(options.pinned ? { pinned: options.pinned } : {}) };
   let card: Built;
-  if (home.state === "no city") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("Set your city")], ...press });
-  else if (home.state === "no connection") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("No connection", home.place)], ...press });
+  if (home.state === "no city") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("Set your city")], plain: "no city", ...press });
+  else if (home.state === "no connection") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("No connection", home.place)], plain: "no connection", ...press });
   else card = made({ name: "HomeWeatherCard", kind: "home", sky: home.sky, words: [nowWords(home.temperature, home.condition, homeLine(home), true, "line")], dimmed: home.age !== undefined, ...press });
   return Object.assign(card, {
     show(next: HomeState & { readonly state: "reading" }) {
@@ -295,9 +308,10 @@ export interface CityCardOptions {
 
 /** A city's card, on a still sky. */
 export function cityCard(options: CityCardOptions): WeatherCard {
-  const temperature = piece(said(options.temperature, "heading", true), "temperature");
+  const temperature = piece(degreesSaid(options.temperature, "heading", true), "temperature");
   temperature.classList.add("k-weather-temperature");
-  const name = piece(clamped(options.name, "body", "on_picture"), "name");
+  // A place's name is content that varies, cut with an ellipsis where it runs past the card.
+  const name = piece(declare(clamped(options.name, "body", "on_picture"), { variable: true }), "name");
   name.classList.add("k-weather-name");
   const time = piece(inked(said(options.time, "headline", true), "headline", options.time), "time");
   time.classList.add("k-weather-sits");
@@ -329,6 +343,8 @@ export function cityRow(cards: readonly HTMLElement[]): HTMLElement {
     const line = document.createElement("div");
     line.className = "k-city-line";
     line.append(...part);
+    line.style.setProperty("--cards", String(part.length));
+    equalShares(line, part.length, "s8");
     box.append(line);
   }
   return probe(box, { role: "component", name: "CityRow", variant: String(shown.length), fixed: { width: false, height: false } });

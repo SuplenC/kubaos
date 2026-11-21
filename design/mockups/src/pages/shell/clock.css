@@ -54,19 +54,13 @@
   min-width: 0;
 }
 
-/* Twelve hours across, each a column of its hour, symbol, temperature and chance of rain. */
+/* Twelve hours across in whole device pixels (`equalShares`), each a column of its hour, symbol,
+   temperature and chance of rain. */
 .ck-hours {
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: var(--shares, repeat(12, minmax(0, 1fr)));
 }
 
 .ck-hour {
   align-items: center;
-}
-
-/* Six tiles, three to a row, `space.s8` apart. */
-.ck-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-s8);
 }

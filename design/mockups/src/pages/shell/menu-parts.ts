@@ -104,7 +104,7 @@ const CLOCK_ITEMS: readonly Item[] = [
   weatherItem("Weather tomorrow", "Wednesday in Warsaw", symbolOf(HOME.week[1]!), ["forecast"], `${degrees(dayRange(HOME, 1)[0])} / ${degrees(dayRange(HOME, 1)[1])}, ${CONDITIONS[HOME.week[1]!].toLowerCase()}`),
   ...CITIES.slice(0, 4).map((place): Item => ({
     title: place.name,
-    subtitle: `Weather and time there, ${offsetOf(place)} from yours`,
+    subtitle: `Weather and time, ${offsetOf(place)}`,
     extension: "clock",
     symbol: symbolOf(place.weather, hourOf(place)),
     keywords: ["weather", "time", "forecast", "clock", place.iana],

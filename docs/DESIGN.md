@@ -519,6 +519,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [PopupStack](design/components/popup-stack.md)
 - [Wallpaper picker](design/components/wallpaper-picker.md)
 - [Pill](design/components/pill.md)
+- [ClockPill](design/components/clock-pill.md)
 - [Bar](design/components/bar.md)
 
 ### Rules every component keeps

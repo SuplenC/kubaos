@@ -5,7 +5,7 @@
 // is its own box, already whole device pixels wide, so every child starts on one.
 
 import "./layout.css";
-import { centredOffset, centreOnPixels } from "./centre.ts";
+import { centredOffset, centreOnPixels, forgetCentring } from "./centre.ts";
 import { type Align, probe } from "./probe.ts";
 import { text, wrapped } from "./text.ts";
 import { length, names, raw } from "./tokens.ts";
@@ -169,6 +169,22 @@ function weighted(weights: readonly number[], gap: string, children: readonly El
   arrangements.set(box, arrange);
   arranging.observe(box);
   return probe(box, { role: "grid", columns: count, gap: length(`space-${gap}`), align: options.centred ? "centre" : "start" });
+}
+
+/**
+ * Lays `box`'s `count` columns out as equal shares of its width less `gap` (a spacing token's
+ * name, or 0) between them, in whole device pixels as `split` gives them, into its `--shares` for its
+ * `grid-template-columns`: a part whose cells share a row equally, whose CSS would otherwise put
+ * their edges between pixels. The shares follow the box's width.
+ */
+export function equalShares(box: HTMLElement, count: number, gap: Space): void {
+  arrangements.set(box, () => {
+    const apart = gap === 0 ? 0 : Math.round(length(`space-${gap}`) * scaleIn(box));
+    box.style.setProperty("--shares", split(Math.floor(box.clientWidth + 1e-3), apart, Array.from({ length: Math.max(1, count) }, () => 1)).map((each) => `${each}px`).join(" "));
+    // Each cell fills its share: a margin a pass gave it in the columns before is stale.
+    for (const cell of box.children) if (cell instanceof HTMLElement) forgetCentring(cell);
+  });
+  arranging.observe(box);
 }
 
 /** How each grid lays its columns and rows out, run as it resizes. */

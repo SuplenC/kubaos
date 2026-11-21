@@ -15,6 +15,7 @@ import "./day-strip.css";
 import { type Pinned, pin } from "./control.ts";
 import { focusRing } from "./focus.ts";
 import { icon } from "./icon.ts";
+import { equalShares } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
 import { text } from "./text.ts";
 
@@ -72,6 +73,7 @@ export function dayStrip(options: DayStripOptions): HTMLElement {
   row.style.setProperty("--days", String(options.days.length));
   const cells = options.days.map((day, index) => dayOf(day, index === picked, options.pinned?.index === index ? options.pinned.state : undefined));
   row.append(...cells);
+  equalShares(row, cells.length, "s4");
 
   function pick(index: number): void {
     if (index < 0 || index >= cells.length || index === picked) return;

@@ -76,14 +76,16 @@ function centring(parentStyle: CSSStyleDeclaration, child: HTMLElement, axis: Ax
 
 /**
  * Whether a grid's `tracks` (its resolved sizes, `1fr auto 1fr` as `612.5px 55px 612.5px`) are laid
- * out alike on both sides of the middle one, and the box `offset` into its content starts it: a bar's clock between its
- * two groups. The box is centred by the tracks, and a margin after it grows its track by that
- * much, which the tracks round it give up half each.
+ * out alike on both sides of a middle one of its own size, and the box `offset` into its content
+ * starts it: a bar's clock between its two groups. The box is centred by the tracks, and a margin
+ * after it grows its track by that much, which the tracks round it give up half each.
  */
 function symmetric(tracks: string, gap: number, offset: number): boolean {
   const sizes = tracks.split(" ").map((each) => Number.parseFloat(each));
   if (sizes.length < 3 || sizes.length % 2 === 0 || sizes.some((each) => Number.isNaN(each))) return false;
   const middle = (sizes.length - 1) / 2;
+  // Equal columns (a row of cards sharing it) place each box in its own track; none is centred.
+  if (sizes.every((each) => Math.abs(each - sizes[0]!) < EPSILON)) return false;
   const before = sizes.slice(0, middle).reduce((sum, each) => sum + each + gap, 0);
   if (Math.abs(offset - before) >= EPSILON) return false;
   return sizes.every((each, index) => Math.abs(each - sizes[sizes.length - 1 - index]!) < EPSILON);
@@ -96,6 +98,17 @@ function inFlow(parent: HTMLElement): HTMLElement[] {
     const position = getComputedStyle(child).position;
     return position !== "absolute" && position !== "fixed";
   });
+}
+
+/**
+ * Takes back the margins a pass set on `element`, for a box whose own margins change after the
+ * pass read them: the next pass reads them afresh.
+ */
+export function forgetCentring(element: HTMLElement): void {
+  const had = corrections.get(element);
+  if (!had) return;
+  for (const side of ["marginRight", "marginBottom"] as const) if (had[side]) element.style[side] = "";
+  corrections.delete(element);
 }
 
 /**
