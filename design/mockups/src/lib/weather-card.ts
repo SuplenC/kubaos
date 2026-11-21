@@ -20,6 +20,8 @@
 // the ink stands in from its left (`weather-card.css`).
 
 import "./weather-card.css";
+import { type Pinned, pin } from "./control.ts";
+import { focusRing } from "./focus.ts";
 import { probe, variant } from "./probe.ts";
 import { clamped, inkLeft, text, type TypeStyle } from "./text.ts";
 import { type Readings, type Weather, weatherSky, type WeatherSky } from "./weather-sky.ts";
@@ -86,6 +88,48 @@ interface Made {
   readonly words: readonly HTMLElement[];
   readonly dimmed?: boolean;
   readonly onPress?: () => void;
+  readonly pinned?: Pinned;
+}
+
+/** The corner a card's part takes, by its radius token. */
+const CORNERS: Record<string, string> = { home: "content", banner: "content", city: "control" };
+
+/**
+ * Makes `element`, a card of `part`, a press target in the state model (`.k-control`): hovered,
+ * a faint light veil over its sky, `on_picture` at `opacity.hover`; pressed, a step more, at
+ * `opacity.press`; on the plain surface, the state layer instead. The keyboard's card burns the
+ * accent's neon line inside its edge; Enter and Space press it. Its size never changes. Returns
+ * what takes the press away again.
+ */
+function pressable(element: HTMLElement, part: string, onPress: () => void, pinned?: Pinned): () => void {
+  element.classList.add("k-control");
+  element.dataset.pressable = "";
+  element.tabIndex = 0;
+  element.setAttribute("role", "button");
+  pin(element, pinned);
+  const veil = document.createElement("span");
+  veil.className = "k-weather-veil";
+  element.append(veil);
+  const ring = focusRing(element, CORNERS[part] ?? "content", "accent", false);
+  ring.dataset.pressable = "";
+  const key = (event: KeyboardEvent) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (!event.repeat) onPress();
+  };
+  element.addEventListener("click", onPress);
+  element.addEventListener("keydown", key);
+  return () => {
+    element.classList.remove("k-control");
+    delete element.dataset.pressable;
+    delete element.dataset.pinned;
+    element.removeAttribute("tabindex");
+    element.removeAttribute("role");
+    veil.remove();
+    ring.remove();
+    element.removeEventListener("click", onPress);
+    element.removeEventListener("keydown", key);
+  };
 }
 
 /** What a card is made of, kept so `carry` can hand its sky to another card. */
@@ -96,6 +140,9 @@ interface Inside {
   readonly part: string;
   readonly still: boolean;
   readonly onPress: (() => void) | undefined;
+  readonly pinned: Pinned | undefined;
+  /** Takes its press away again: its sky carried off, or handed to it. */
+  unpress: () => void;
 }
 
 const insides = new WeakMap<WeatherCard, Inside>();
@@ -121,12 +168,9 @@ function made(spec: Made): Built {
     sky.content.append(words);
     sky.landOn([words]);
   } else element.append(words);
-  if (spec.onPress) {
-    element.dataset.pressable = "";
-    element.addEventListener("click", spec.onPress);
-  }
+  const unpress = spec.onPress ? pressable(element, spec.kind, spec.onPress, spec.pinned) : () => {};
   probe(words, { role: "component", name: spec.name, variant: variant(!sky && "plain", spec.dimmed && "dimmed"), fixed: { width: false, height: true } });
-  const inside: Inside = { element, sky, words, part: spec.kind, still: spec.sky?.still ?? false, onPress: spec.onPress };
+  const inside: Inside = { element, sky, words, part: spec.kind, still: spec.sky?.still ?? false, onPress: spec.onPress, pinned: spec.pinned, unpress };
   const card: Built = {
     get element() {
       return inside.element;
@@ -169,6 +213,8 @@ export interface HomeWeatherCardOptions {
   readonly home: HomeState;
   /** What a press does: the popup opens home's weather. */
   readonly onPress?: () => void;
+  /** Drawn pinned in a state, as the specimens pin it: a pressable card only. */
+  readonly pinned?: Pinned;
 }
 
 /** Home's card on the page. */
@@ -188,7 +234,7 @@ function homeLine(home: HomeState & { readonly state: "reading" }): string {
 /** Home's weather card. */
 export function homeWeatherCard(options: HomeWeatherCardOptions): HomeWeatherCard {
   const home = options.home;
-  const press = options.onPress ? { onPress: options.onPress } : {};
+  const press = { ...(options.onPress ? { onPress: options.onPress } : {}), ...(options.pinned ? { pinned: options.pinned } : {}) };
   let card: Built;
   if (home.state === "no city") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("Set your city")], ...press });
   else if (home.state === "no connection") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("No connection", home.place)], ...press });
@@ -243,6 +289,8 @@ export interface CityCardOptions {
   readonly offset: string;
   /** What a press does: the popup opens that city's weather. */
   readonly onPress?: () => void;
+  /** Drawn pinned in a state, as the specimens pin it: a pressable card only. */
+  readonly pinned?: Pinned;
 }
 
 /** A city's card, on a still sky. */
@@ -261,7 +309,7 @@ export function cityCard(options: CityCardOptions): WeatherCard {
   const place = document.createElement("div");
   place.className = "k-weather-place";
   place.append(name, line);
-  return made({ name: "CityCard", kind: "city", sky: { ...options.sky, still: true }, words: [temperature, place], ...(options.onPress ? { onPress: options.onPress } : {}) });
+  return made({ name: "CityCard", kind: "city", sky: { ...options.sky, still: true }, words: [temperature, place], ...(options.onPress ? { onPress: options.onPress } : {}), ...(options.pinned ? { pinned: options.pinned } : {}) });
 }
 
 /** The most cities a row of cards holds, and the most cards in all. */
@@ -376,7 +424,7 @@ export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, t
   carried.replaceWith(room);
   b.sky.dispose();
   b.element.style.visibility = "hidden";
-  if (a.onPress) carried.removeEventListener("click", a.onPress);
+  a.unpress();
 
   // The words, each card's laid out once in its own box: measured there and at the other end.
   const leaving = carrier(a.part, a.words, start);
@@ -455,8 +503,8 @@ export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, t
       carried.classList.remove("k-weather-carried");
       for (const property of ["left", "top", "width", "height", "borderRadius"] as const) carried.style[property] = "";
       carried.dataset.part = b.part;
-      carried.toggleAttribute("data-pressable", b.onPress !== undefined);
-      if (b.onPress) carried.addEventListener("click", b.onPress);
+      b.unpress();
+      b.unpress = b.onPress ? pressable(carried, b.part, b.onPress, b.pinned) : () => {};
       b.element.replaceWith(carried);
       sky.content.replaceChildren(b.words);
       leaving.remove();

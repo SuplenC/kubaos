@@ -11,6 +11,7 @@ import { slider } from "../../lib/slider.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { type CardSky, cityCard, cityRow, type HomeState, homeWeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
 import { type Hail, type Readings, TYPICAL, type Weather, WEATHERS } from "../../lib/weather-sky.ts";
+import type { Pinned } from "../../lib/control.ts";
 import { doesntApply, nonEmpty, page, type Variant } from "../../site/page.ts";
 import { CITIES, CONDITIONS, clockOf, degrees, HOME, hourOf, offsetOf } from "../shell/weather-data.ts";
 
@@ -30,14 +31,22 @@ function sized<E extends HTMLElement>(element: E, part: "banner" | "home" | "cit
   return element;
 }
 
-const home = (sky: CardSky, age?: string) => sized(homeWeatherCard({ home: homeAt(sky, age) }).element, "home");
+/** A press for a sample: the popup's opens a view; here a card only shows it takes one. */
+const press = () => {};
+
+const home = (sky: CardSky, age?: string, pinned?: Pinned) => sized(homeWeatherCard({ home: homeAt(sky, age), onPress: press, ...(pinned ? { pinned } : {}) }).element, "home");
 const banner = (sky: CardSky) => sized(weatherBanner(bannerAt(sky)).element, "banner");
 
 /** A city's card as the popup draws it, by its index in the sample cities. */
-function city(index: number, sky?: Partial<CardSky>): HTMLElement {
+function city(index: number, sky?: Partial<CardSky>, pinned?: Pinned): HTMLElement {
   const place = CITIES[index]!;
-  return cityCard({ sky: { hour: hourOf(place), weather: place.weather, ...(place.readings ? { readings: place.readings } : {}), seed: index * 5, ...sky }, name: place.name, time: clockOf(hourOf(place)), temperature: degrees(place.temperature), offset: offsetOf(place) }).element;
+  return cityCard({ sky: { hour: hourOf(place), weather: place.weather, ...(place.readings ? { readings: place.readings } : {}), seed: index * 5, ...sky }, name: place.name, time: clockOf(hourOf(place)), temperature: degrees(place.temperature), offset: offsetOf(place), onPress: press, ...(pinned ? { pinned } : {}) }).element;
 }
+
+type CardState = "rest" | "hovered" | "pressed" | "lit";
+
+/** A card's state as the specimens pin it. */
+const PINS: Record<CardState, Pinned | undefined> = { rest: undefined, hovered: "hover", pressed: "pressed", lit: "lit" };
 
 /** A reading's control: its range, its step, and how its value reads. */
 interface Dial {
@@ -52,16 +61,15 @@ interface Dial {
 
 const unit = (unit: string, digits = 0) => new Intl.NumberFormat("en-GB", { style: "unit", unit, maximumFractionDigits: digits, minimumFractionDigits: digits });
 
-// The icons for humidity, rain and snow are stand-ins: the symbol set has no drop or flake yet.
 const DIALS: readonly Dial[] = [
-  { key: "wind", name: "Wind", icon: "mode_fan", min: 0, max: 25, step: 0.5, format: unit("meter-per-second", 1) },
+  { key: "wind", name: "Wind", icon: "air", min: 0, max: 25, step: 0.5, format: unit("meter-per-second", 1) },
   { key: "visibility", name: "Visibility", icon: "visibility", min: 0.5, max: 40, step: 0.5, format: unit("kilometer", 1) },
   { key: "uv", name: "UV index", icon: "light_mode", min: 0, max: 11, step: 1, format: new Intl.NumberFormat("en-GB") },
-  { key: "humidity", name: "Humidity", icon: "wave_sine", min: 10, max: 100, step: 1, format: unit("percent") },
+  { key: "humidity", name: "Humidity", icon: "humidity", min: 10, max: 100, step: 1, format: unit("percent") },
   { key: "air", name: "Air quality", icon: "eco", min: 0, max: 150, step: 1, format: new Intl.NumberFormat("en-GB") },
   { key: "feels", name: "Feels like", icon: "thermostat", min: -15, max: 38, step: 1, format: unit("celsius") },
-  { key: "rain", name: "Rain", icon: "arrow_downward", min: 0, max: 30, step: 0.1, format: unit("millimeter-per-hour", 1) },
-  { key: "snow", name: "Snow", icon: "arrow_downward", min: 0, max: 5, step: 0.1, format: unit("centimeter-per-hour", 1) },
+  { key: "rain", name: "Rain", icon: "rainy", min: 0, max: 30, step: 0.1, format: unit("millimeter-per-hour", 1) },
+  { key: "snow", name: "Snow", icon: "weather_snowy", min: 0, max: 5, step: 0.1, format: unit("centimeter-per-hour", 1) },
 ];
 
 const HAILS: readonly Hail[] = ["none", "slight", "heavy"];
@@ -199,6 +207,12 @@ export default page({
     { title: "At dusk, 19:00", rows: weathersAt(19) },
     { title: "By night, 22:00", rows: weathersAt(NIGHT) },
     {
+      title: "CityCard's states",
+      rows: nonEmpty(
+        (["rest", "hovered", "pressed", "lit"] as const).map((state) => ({ name: state === "lit" ? "Keyboard focus" : state[0]!.toUpperCase() + state.slice(1), for: { rest: "a still sky", hovered: "the veil over the sky", pressed: "the veil a step lighter", lit: "the neon line inside its edge" }[state], sample: () => sized(city(0, {}, PINS[state]), "city") })),
+      ),
+    },
+    {
       title: "Home's card",
       rows: nonEmpty([
         { name: "A reading", for: "live; place · high / low", sample: () => home({ hour: NIGHT, weather: "partly", seed: 2 }) },
@@ -210,18 +224,35 @@ export default page({
     },
   ],
   states: {
-    shown: ["rest", "empty", "error"],
+    shown: ["rest", "hovered", "pressed", "lit", "empty", "error"],
     absent: {
-      lit: "the popup's press target; no light of its own yet",
-      pressed: "the popup opens the weather view",
       disabled: "nothing to disable: reduced motion stills it",
       selected: "it holds no choice",
       loading: "drawn at once; the precipitation follows",
     },
-    rows: nonEmpty([{ name: "HomeWeatherCard", cell: (state: "rest" | "empty" | "error") => (state === "rest" ? home({ hour: DAY, weather: "rain", readings: { rain: 7.5 }, seed: 9 }) : sized(homeWeatherCard({ home: state === "empty" ? { state: "no city" } : { state: "no connection", place: HOME.name } }).element, "home")) }]),
-    looks: { rest: "the sky for its hour and weather", empty: "no home city: Set your city", error: "offline past a day: No connection" },
+    rows: nonEmpty([
+      {
+        name: "HomeWeatherCard",
+        cell: (state: CardState | "empty" | "error") =>
+          state === "empty" || state === "error"
+            ? sized(homeWeatherCard({ home: state === "empty" ? { state: "no city" } : { state: "no connection", place: HOME.name }, onPress: press }).element, "home")
+            : home({ hour: DAY, weather: "rain", readings: { rain: 7.5 }, seed: 9 }, undefined, PINS[state]),
+      },
+    ]),
+    looks: {
+      rest: "the sky for its hour and weather",
+      hovered: "a faint light veil over the sky",
+      pressed: "the veil a step lighter",
+      lit: "the accent's neon line inside its edge",
+      empty: "no home city: Set your city",
+      error: "offline past a day: No connection",
+    },
   },
-  focus: doesntApply("not a control: no line of its own yet."),
+  focus: {
+    tubes: [{ name: "HomeWeatherCard, CityCard", tone: "accent", filled: false, content: false }],
+    looks: { lit: "the line inside the edge; the glow cut by the card", signsOff: "the line as glass, no glow" },
+    signsOff: () => home({ hour: DAY, weather: "rain", readings: { rain: 7.5 }, seed: 9 }, undefined, "signs-off"),
+  },
   content: {
     text: doesntApply("a city's long name is cut with an ellipsis: see Counts."),
     missingPicture: doesntApply("it draws its picture itself; there is nothing to miss."),
@@ -239,7 +270,14 @@ export default page({
     leaves: doesntApply("it goes with its card."),
     between: doesntApply("a change of weather blends on the sky's own clock; try it in Live."),
   },
-  keyboard: doesntApply("it takes no keys; its owner's controls do."),
+  keyboard: {
+    keys: [
+      { keys: ["Tab", "Shift+Tab"], does: "to a pressable card and on" },
+      { keys: ["Enter", "Space"], does: "presses the card: its owner opens its weather" },
+    ],
+    order: "A pressable card is one stop, in its owner's reading order; the banner and a card without a press take none.",
+    lands: "Its owner says where the keyboard lands; the card itself never takes it unasked.",
+  },
   measures: {
     samples: nonEmpty([
       { name: "HomeWeatherCard", for: "ink insets, heights", sample: () => home({ hour: DAY, weather: "fair", seed: 1 }) },

@@ -152,3 +152,25 @@
   border-radius: 0;
   pointer-events: none;
 }
+
+/* A press target's veil over its sky, under its words: a faint light, `on_picture` at
+   `opacity.hover` hovered and `opacity.press` pressed (`--rise`, `.k-control` in `lib.css`). On
+   the plain surface it is the state layer, as any surface's. */
+.k-weather-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--veil);
+}
+
+/* The veil's colour is worked out on the card, where the state's numbers are. */
+.k-weather-card.k-control {
+  outline: none;
+  --veil: rgb(from var(--color-on_picture) r g b / calc(var(--opacity-press) * var(--rise)));
+}
+
+.k-weather-card.k-control[data-plain] {
+  --veil: var(--layer);
+}
