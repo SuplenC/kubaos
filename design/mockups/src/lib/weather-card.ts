@@ -12,6 +12,8 @@
 //   CityRow lays one to eight out: one to four share a row, five to eight take a second row of the
 //   rest, each row's cards sharing it equally.
 //
+// `carry` moves one card's live sky into another's place, its words travelling on it.
+//
 // Words on a sky are `on_picture`, white in both schemes, with the approved tight shadow and
 // nothing else over the picture. They are set in from the card's edges by their ink: the large
 // figures' ink sits on the small line's baseline, which stands as far above the card's bottom as
@@ -24,9 +26,12 @@ import { type Readings, type Weather, weatherSky, type WeatherSky } from "./weat
 
 /** A card on the page. */
 export interface WeatherCard {
-  /** Its box: its owner gives it its width; its height and corners are its own. */
+  /**
+   * Its box: its owner gives it its width; its height and corners are its own. A card that took
+   * another's sky (`carry`) has that sky's box from then on.
+   */
   readonly element: HTMLElement;
-  /** Its sky, or none on a card drawn on the plain surface. */
+  /** Its sky, or none on a card drawn on the plain surface, or one whose sky was carried off. */
   readonly sky: WeatherSky | null;
   /** Stops its sky and lets it go. */
   dispose(): void;
@@ -55,13 +60,19 @@ function inked(element: HTMLElement, style: TypeStyle, words: string): HTMLEleme
   return element;
 }
 
-/** The large temperature, and beside it the condition over one small line. */
-function nowWords(temperature: string, condition: string, line: string, onSky: boolean): HTMLElement {
-  const figure = inked(said(temperature, "hero_number", onSky), "hero_number", temperature);
+/** Names `element` as a piece of a card's words, which `carry` takes to the piece of that name. */
+function piece<E extends HTMLElement>(element: E, name: string): E {
+  element.dataset.piece = name;
+  return element;
+}
+
+/** The large temperature, and beside it the condition over one small line, the piece `lineName`. */
+function nowWords(temperature: string, condition: string, line: string, onSky: boolean, lineName: string): HTMLElement {
+  const figure = piece(inked(said(temperature, "hero_number", onSky), "hero_number", temperature), "temperature");
   figure.classList.add("k-weather-sits");
   const lines = document.createElement("div");
   lines.className = "k-weather-lines";
-  lines.append(said(condition, "subheading", onSky), said(line, "small", onSky));
+  lines.append(piece(said(condition, "subheading", onSky), "condition"), piece(said(line, "small", onSky), lineName));
   const box = document.createElement("div");
   box.className = "k-weather-now";
   box.append(figure, lines);
@@ -76,6 +87,18 @@ interface Made {
   readonly dimmed?: boolean;
   readonly onPress?: () => void;
 }
+
+/** What a card is made of, kept so `carry` can hand its sky to another card. */
+interface Inside {
+  element: HTMLElement;
+  sky: WeatherSky | null;
+  readonly words: HTMLElement;
+  readonly part: string;
+  readonly still: boolean;
+  readonly onPress: (() => void) | undefined;
+}
+
+const insides = new WeakMap<WeatherCard, Inside>();
 
 /** A card as `made` builds it, with its words' layer for a part to write again. */
 interface Built extends WeatherCard {
@@ -103,7 +126,19 @@ function made(spec: Made): Built {
     element.addEventListener("click", spec.onPress);
   }
   probe(words, { role: "component", name: spec.name, variant: variant(!sky && "plain", spec.dimmed && "dimmed"), fixed: { width: false, height: true } });
-  return { element, sky, words, dispose: () => sky?.dispose() };
+  const inside: Inside = { element, sky, words, part: spec.kind, still: spec.sky?.still ?? false, onPress: spec.onPress };
+  const card: Built = {
+    get element() {
+      return inside.element;
+    },
+    get sky() {
+      return inside.sky;
+    },
+    words,
+    dispose: () => inside.sky?.dispose(),
+  };
+  insides.set(card, inside);
+  return card;
 }
 
 /** Blends `card`'s sky to `sky` and writes its words anew. */
@@ -157,14 +192,13 @@ export function homeWeatherCard(options: HomeWeatherCardOptions): HomeWeatherCar
   let card: Built;
   if (home.state === "no city") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("Set your city")], ...press });
   else if (home.state === "no connection") card = made({ name: "HomeWeatherCard", kind: "home", words: [plain("No connection", home.place)], ...press });
-  else card = made({ name: "HomeWeatherCard", kind: "home", sky: home.sky, words: [nowWords(home.temperature, home.condition, homeLine(home), true)], dimmed: home.age !== undefined, ...press });
-  return {
-    ...card,
-    show(next) {
+  else card = made({ name: "HomeWeatherCard", kind: "home", sky: home.sky, words: [nowWords(home.temperature, home.condition, homeLine(home), true, "line")], dimmed: home.age !== undefined, ...press });
+  return Object.assign(card, {
+    show(next: HomeState & { readonly state: "reading" }) {
       if (!card.sky) return;
-      retell(card, next.sky, nowWords(next.temperature, next.condition, homeLine(next), true), next.age !== undefined);
+      retell(card, next.sky, nowWords(next.temperature, next.condition, homeLine(next), true, "line"), next.age !== undefined);
     },
-  };
+  });
 }
 
 /** Words alone on the plain surface: a title over a quiet line. */
@@ -191,13 +225,13 @@ export interface WeatherBanner extends WeatherCard {
 }
 
 function bannerWords(options: WeatherBannerOptions): HTMLElement {
-  return nowWords(options.temperature, options.condition, `Feels like ${options.feels} · ${options.high} / ${options.low}`, true);
+  return nowWords(options.temperature, options.condition, `Feels like ${options.feels} · ${options.high} / ${options.low}`, true, "feels");
 }
 
 /** The weather view's banner. */
 export function weatherBanner(options: WeatherBannerOptions): WeatherBanner {
   const card = made({ name: "WeatherBanner", kind: "banner", sky: options.sky, words: [bannerWords(options)] });
-  return { ...card, show: (next) => retell(card, next.sky, bannerWords(next)) };
+  return Object.assign(card, { show: (next: WeatherBannerOptions) => retell(card, next.sky, bannerWords(next)) });
 }
 
 export interface CityCardOptions {
@@ -213,13 +247,13 @@ export interface CityCardOptions {
 
 /** A city's card, on a still sky. */
 export function cityCard(options: CityCardOptions): WeatherCard {
-  const temperature = said(options.temperature, "heading", true);
+  const temperature = piece(said(options.temperature, "heading", true), "temperature");
   temperature.classList.add("k-weather-temperature");
-  const name = clamped(options.name, "body", "on_picture");
+  const name = piece(clamped(options.name, "body", "on_picture"), "name");
   name.classList.add("k-weather-name");
-  const time = inked(said(options.time, "headline", true), "headline", options.time);
+  const time = piece(inked(said(options.time, "headline", true), "headline", options.time), "time");
   time.classList.add("k-weather-sits");
-  const offset = said(options.offset, "small", true);
+  const offset = piece(said(options.offset, "small", true), "offset");
   offset.classList.add("k-weather-sits");
   const line = document.createElement("div");
   line.className = "k-weather-time-line";
@@ -250,4 +284,167 @@ export function cityRow(cards: readonly HTMLElement[]): HTMLElement {
     box.append(line);
   }
   return probe(box, { role: "component", name: "CityRow", variant: String(shown.length), fixed: { width: false, height: false } });
+}
+
+/** How a carry moves: the box's duration and curve, and the fade of a piece found at one end only. */
+export interface CarryTiming {
+  /** Milliseconds the box and the pieces it shares take, on `easing` (CSS). */
+  readonly duration: number;
+  readonly easing: string;
+  /** Milliseconds a piece at one end only takes to fade, on `fadeEasing` (CSS). */
+  readonly fade: number;
+  readonly fadeEasing: string;
+}
+
+/** A carry under way: its moves, and what lands it once they are done. */
+export interface Carrying {
+  readonly moves: Animation[];
+  /** Puts the carried sky in the place of the card it became, with that card's words. */
+  land(): void;
+}
+
+/** `element`'s box in `within`'s own pixels: the page is zoomed. */
+function boxIn(element: Element, within: HTMLElement): { x: number; y: number; w: number; h: number } {
+  const outer = within.getBoundingClientRect();
+  const own = element.getBoundingClientRect();
+  const zoom = outer.width / Math.max(1, within.offsetWidth) || 1;
+  return { x: (own.left - outer.left) / zoom, y: (own.top - outer.top) / zoom, w: own.width / zoom, h: own.height / zoom };
+}
+
+type Box = ReturnType<typeof boxIn>;
+
+const placed = (box: Box) => ({ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px` });
+
+/** Each named piece of `words`, by its name. */
+function piecesOf(words: HTMLElement): Map<string, HTMLElement> {
+  return new Map([...words.querySelectorAll<HTMLElement>("[data-piece]")].map((each) => [each.dataset.piece ?? "", each]));
+}
+
+/** A layer over the sky that holds a card's words as its box moves, its part's insets, nothing cut. */
+function carrier(part: string, words: HTMLElement, box: Box): HTMLElement {
+  const layer = document.createElement("div");
+  layer.className = "k-weather-card k-weather-carrier";
+  layer.dataset.part = part;
+  Object.assign(layer.style, placed(box));
+  layer.append(words);
+  return layer;
+}
+
+/**
+ * Carries `from`'s live sky into `to`'s place, inside `within`: the one sky changes box (place,
+ * size and corners) to `to`'s, drawing every frame as it goes, what falls included, and stays as
+ * `to`'s sky when it lands; `to`'s own sky is let go. The words ride on top, never cut by the box:
+ * a piece both cards have (the temperature, the condition) travels from its place and size on the
+ * one to its place and size on the other, on the box's curve; a piece only `from` has fades out as
+ * the move starts, and one only `to` has fades in as it lands. `from`'s place keeps its room,
+ * empty, until its owner takes it away. Plain cards carry nothing.
+ */
+export function carry(from: WeatherCard, to: WeatherCard, within: HTMLElement, timing: CarryTiming): Carrying {
+  const a = insides.get(from);
+  const b = insides.get(to);
+  const sky = a?.sky;
+  if (!a || !b || !sky || !b.sky) return { moves: [], land: () => {} };
+  const start = boxIn(a.element, within);
+  const end = boxIn(b.element, within);
+  const startRadius = getComputedStyle(a.element).borderTopLeftRadius;
+  const endRadius = getComputedStyle(b.element).borderTopLeftRadius;
+  const carried = a.element;
+
+  // `from`'s place keeps its room; `to`'s own sky goes, its place kept unseen until the landing.
+  const room = document.createElement("div");
+  Object.assign(room.style, { flex: "0 0 auto", width: `${start.w}px`, height: `${start.h}px` });
+  carried.replaceWith(room);
+  b.sky.dispose();
+  b.element.style.visibility = "hidden";
+  if (a.onPress) carried.removeEventListener("click", a.onPress);
+
+  carried.classList.add("k-weather-carried");
+  Object.assign(carried.style, placed(start));
+  const leaving = carrier(a.part, a.words, start);
+  const coming = carrier(b.part, b.words, start);
+  within.append(carried, leaving, coming);
+  sky.setStill(false);
+  sky.resizing(true);
+  sky.landOn([a.words, b.words]);
+
+  // Where each piece sits in its layer with the box at its start and at its end.
+  const at = (layer: HTMLElement) => {
+    const origin = layer.getBoundingClientRect();
+    const zoom = origin.width / Math.max(1, layer.offsetWidth) || 1;
+    const read = (words: HTMLElement) =>
+      new Map([...piecesOf(words)].map(([name, each]) => {
+        const own = each.getBoundingClientRect();
+        return [name, { x: (own.left - origin.left) / zoom, y: (own.top - origin.top) / zoom, size: Number(each.dataset.size ?? 1) }] as const;
+      }));
+    return read;
+  };
+  const fromAtStart = at(leaving)(a.words);
+  const toAtStart = at(coming)(b.words);
+  for (const layer of [leaving, coming]) Object.assign(layer.style, placed(end));
+  const fromAtEnd = at(leaving)(a.words);
+  const toAtEnd = at(coming)(b.words);
+  for (const layer of [leaving, coming]) Object.assign(layer.style, placed(start));
+
+  const moving = { duration: timing.duration, easing: timing.easing, fill: "both" as const };
+  const boxes = [placed(start), placed(end)];
+  const moves: Animation[] = [
+    carried.animate([{ ...boxes[0], borderRadius: startRadius }, { ...boxes[1], borderRadius: endRadius }], moving),
+    leaving.animate(boxes, moving),
+    coming.animate(boxes, moving),
+  ];
+  const fromPieces = piecesOf(a.words);
+  const toPieces = piecesOf(b.words);
+  for (const [name, mine] of fromPieces) {
+    const theirs = toPieces.get(name);
+    const s0 = fromAtStart.get(name);
+    const e0 = fromAtEnd.get(name);
+    if (!theirs || !s0 || !e0) {
+      moves.push(mine.animate([{ opacity: 1 }, { opacity: 0 }], { duration: timing.fade, easing: timing.fadeEasing, fill: "both" }));
+      continue;
+    }
+    const s1 = toAtStart.get(name)!;
+    const e1 = toAtEnd.get(name)!;
+    const scale = s0.size / s1.size;
+    mine.style.transformOrigin = theirs.style.transformOrigin = "0 0";
+    const ride = `translate(${e1.x - e0.x}px, ${e1.y - e0.y}px) scale(${1 / scale})`;
+    // The same words in the same style are one piece: it rides alone and the other waits unseen,
+    // since two copies fading across each other dim where they overlap. Unlike pieces both ride
+    // one path, from this one's place and size to the other's, and cross-fade on the way.
+    if (scale === 1 && mine.textContent === theirs.textContent) {
+      moves.push(mine.animate([{ transform: "none" }, { transform: ride }], moving), theirs.animate([{ opacity: 0 }, { opacity: 0 }], moving));
+      continue;
+    }
+    moves.push(
+      mine.animate([{ transform: "none", opacity: 1 }, { transform: ride, opacity: 0 }], moving),
+      theirs.animate([{ transform: `translate(${s0.x - s1.x}px, ${s0.y - s1.y}px) scale(${scale})`, opacity: 0 }, { transform: "none", opacity: 1 }], moving),
+    );
+  }
+  for (const [name, theirs] of toPieces) {
+    if (fromPieces.has(name)) continue;
+    moves.push(theirs.animate([{ opacity: 0 }, { opacity: 1 }], { duration: timing.fade, delay: Math.max(0, timing.duration - timing.fade), easing: timing.fadeEasing, fill: "both" }));
+  }
+
+  return {
+    moves,
+    land() {
+      for (const move of moves) move.cancel();
+      for (const each of [...fromPieces.values(), ...toPieces.values()]) each.style.transformOrigin = "";
+      carried.classList.remove("k-weather-carried");
+      for (const property of ["left", "top", "width", "height"] as const) carried.style[property] = "";
+      carried.dataset.part = b.part;
+      carried.toggleAttribute("data-pressable", b.onPress !== undefined);
+      if (b.onPress) carried.addEventListener("click", b.onPress);
+      b.element.replaceWith(carried);
+      sky.content.replaceChildren(b.words);
+      leaving.remove();
+      coming.remove();
+      sky.landOn([b.words]);
+      sky.resizing(false);
+      sky.setStill(b.still);
+      b.element = carried;
+      b.sky = sky;
+      a.sky = null;
+      a.element = room;
+    },
+  };
 }

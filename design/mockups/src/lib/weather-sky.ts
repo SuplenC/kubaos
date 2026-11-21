@@ -53,8 +53,19 @@ export interface WeatherSky {
   setWeather(weather: Weather, readings?: Partial<Readings>): void;
   /** Blends to these readings, the others kept. */
   setReadings(readings: Partial<Readings>): void;
-  /** What falls lands on these elements' text from now on. */
+  /** What falls lands on these elements' text from now on, in place of those named before. */
   landOn(elements: readonly Element[]): void;
+  /**
+   * Turns it still or live where it stands, its clock and its clouds kept: a city's still sky
+   * carried into the weather view's banner comes alive, and stills again when it lands back.
+   */
+  setStill(still: boolean): void;
+  /**
+   * While its box changes from one size to another (a card growing into a banner), it follows
+   * the box frame by frame and what falls keeps its density; `false` settles the density for the
+   * size it landed at.
+   */
+  resizing(on: boolean): void;
   /** Holds it still where it is, until `resume`: a popup shut. */
   pause(): void;
   resume(): void;
@@ -216,7 +227,9 @@ class Sky implements WeatherSky {
   private readonly hits = document.createElement("div");
   private readonly painter: PainterHold = holdPainter();
   private readonly into: CanvasRenderingContext2D | null;
-  private readonly still: boolean;
+  private still: boolean;
+  private holdFall = false;
+  private landing: { disconnect(): void }[] = [];
   private readonly forcedReduced: boolean | undefined;
   private hour: number;
   private weather: Weather;
@@ -309,15 +322,29 @@ class Sky implements WeatherSky {
 
   landOn(elements: readonly Element[]): void {
     this.targets = elements;
+    for (const each of this.landing) each.disconnect();
     const text = new MutationObserver(() => this.fitLater());
     const boxes = new ResizeObserver(() => this.fitLater());
     for (const element of elements) {
       text.observe(element, { characterData: true, childList: true, subtree: true });
       boxes.observe(element);
     }
-    this.observers.push(text, boxes);
+    this.landing = [text, boxes];
     void document.fonts.ready.then(() => this.fitLater());
     this.fitLater();
+  }
+
+  setStill(still: boolean): void {
+    if (still === this.still || this.disposed) return;
+    this.still = still;
+    probe(this.element, { role: "component", name: "WeatherSky", variant: variant(still && "still"), fixed: { width: false, height: false } });
+    this.run();
+    this.fitLater();
+  }
+
+  resizing(on: boolean): void {
+    this.holdFall = on;
+    if (!on) this.fall();
   }
 
   pause(): void {
@@ -335,7 +362,7 @@ class Sky implements WeatherSky {
     this.disposed = true;
     running.delete(this);
     cancelAnimationFrame(this.refit);
-    for (const observer of this.observers) observer.disconnect();
+    for (const observer of [...this.observers, ...this.landing]) observer.disconnect();
     this.unlisten();
     this.atmos?.destroy();
     this.atmos = null;
@@ -432,8 +459,10 @@ class Sky implements WeatherSky {
     const live = this.drawing;
     const key = JSON.stringify(options);
     if (this.atmos) {
-      if (key !== this.atmosKey) this.atmos.update(options);
-      this.atmosKey = key;
+      // Every change of the library's particle count rebuilds its particles, so while the box
+      // moves the density holds, its particles spreading over the room as it changes.
+      if (key !== this.atmosKey && !this.holdFall) this.atmos.update(options);
+      if (!this.holdFall) this.atmosKey = key;
       if (live) this.atmos.resume();
       else this.atmos.pause();
       return;

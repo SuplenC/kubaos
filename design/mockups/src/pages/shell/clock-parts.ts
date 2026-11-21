@@ -31,7 +31,8 @@ import { hang, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { clamped, text } from "../../lib/text.ts";
 import { cubic, durationMs, length } from "../../lib/tokens.ts";
-import { type CardSky, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
+import { type CardSky, carry, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
+import { TYPICAL, type Weather } from "../../lib/weather-sky.ts";
 import { settings } from "../../site/settings.ts";
 import { barScreen, EVERYDAY } from "./bar-parts.ts";
 import { TALL } from "./control-center-parts.ts";
@@ -74,6 +75,8 @@ export interface ClockOptions {
   readonly live?: boolean;
   /** Drawn this far through the turn to the weather view, 0 to 1: a picture of it moving. */
   readonly turning?: number;
+  /** Home in another weather than its own: a sample of the turn in rain. */
+  readonly homeWeather?: Weather;
   /** The picture of the turn is of the way back to the clock. */
   readonly turningBack?: boolean;
 }
@@ -117,7 +120,14 @@ function workingDaysLeft(day: Day): number {
 }
 
 /** The city `whose` names. */
-const placeOf = (whose: Whose): City => (whose === "home" ? HOME : CITIES[whose]!);
+/** Home as `options` show it: its own weather, or the one a sample asks for. */
+function homeOf(options: ClockOptions): City {
+  const weather = options.homeWeather;
+  if (!weather) return HOME;
+  return { ...HOME, weather, week: [weather, ...HOME.week.slice(1)] as unknown as City["week"], readings: { ...HOME.readings, ...TYPICAL[weather].readings, ...(weather === "rain" ? { rain: 7.5 } : {}) } };
+}
+
+const placeOf = (whose: Whose, options: ClockOptions): City => (whose === "home" ? homeOf(options) : CITIES[whose]!);
 
 /** A city's sky on a day from today: now's hour today, midday on another. */
 function skyOf(place: City, day: number, seed: number): CardSky {
@@ -125,17 +135,17 @@ function skyOf(place: City, day: number, seed: number): CardSky {
 }
 
 /** Home's card as `shown` says, or none with no home city. */
-function homeState(shown: HomeShown): HomeState {
+function homeState(shown: HomeShown, home: City): HomeState {
   if (shown === "no city") return { state: "no city" };
-  if (shown === "no connection") return { state: "no connection", place: HOME.name };
+  if (shown === "no connection") return { state: "no connection", place: home.name };
   return {
     state: "reading",
-    sky: skyOf(HOME, 0, 3),
-    place: HOME.name,
-    temperature: degrees(HOME.temperature),
-    condition: CONDITIONS[HOME.weather],
-    high: degrees(HOME.high),
-    low: degrees(HOME.low),
+    sky: skyOf(home, 0, 3),
+    place: home.name,
+    temperature: degrees(home.temperature),
+    condition: CONDITIONS[home.weather],
+    high: degrees(home.high),
+    low: degrees(home.low),
     ...(shown === "aged" ? { age: "2 h ago" } : {}),
   };
 }
@@ -168,20 +178,20 @@ interface View {
   readonly element: HTMLElement;
   readonly cards: WeatherCard[];
   /** The card each city's weather turns from and back into, by whose it is. */
-  readonly cardOf: (whose: Whose) => HTMLElement | null;
+  readonly cardOf: (whose: Whose) => WeatherCard | null;
   /** The rows that rise in one after another, top to bottom. */
   readonly rows: HTMLElement[];
 }
 
-function clockView(options: ClockOptions, open: (whose: Whose, from: HTMLElement) => void): View {
+function clockView(options: ClockOptions, open: (whose: Whose, from: WeatherCard) => void): View {
   const cards: WeatherCard[] = [];
-  const byWhose = new Map<Whose, HTMLElement>();
+  const byWhose = new Map<Whose, WeatherCard>();
   const time = stack("s4", "start", text("21:47", "hero_number"), text(DATE.format(utc(TODAY)), "body_large", "on_surface_variant"));
   time.classList.add("ck-time");
   const shown = options.home ?? "reading";
-  const home = homeWeatherCard({ home: homeState(shown), ...(options.live && shown !== "no city" ? { onPress: () => open("home", home.element) } : {}) });
+  const home = homeWeatherCard({ home: homeState(shown, homeOf(options)), ...(options.live && shown !== "no city" ? { onPress: () => open("home", home) } : {}) });
   cards.push(home);
-  if (shown !== "no city") byWhose.set("home", home.element);
+  if (shown !== "no city") byWhose.set("home", home);
   const top = document.createElement("div");
   top.className = "ck-top";
   top.append(time, home.element);
@@ -197,9 +207,9 @@ function clockView(options: ClockOptions, open: (whose: Whose, from: HTMLElement
         time: clockOf(hourOf(place)),
         temperature: degrees(place.temperature),
         offset: offsetOf(place),
-        ...(options.live ? { onPress: () => open(index, each.element) } : {}),
+        ...(options.live ? { onPress: () => open(index, each) } : {}),
       });
-      byWhose.set(index, each.element);
+      byWhose.set(index, each);
       cards.push(each);
       return each.element;
     });
@@ -258,8 +268,8 @@ function bannerOf(place: City, day: number): WeatherBannerOptions {
   return { sky: skyOf(place, day, 7), temperature: degrees(day === 0 ? place.temperature : high), condition: CONDITIONS[place.week[day]!], feels: degrees(r.feels), high: degrees(high), low: degrees(low) };
 }
 
-function weatherView(options: ClockOptions, back: () => void): View & { readonly banner: HTMLElement } {
-  const place = placeOf(options.whose ?? "home");
+function weatherView(options: ClockOptions, back: () => void): View & { readonly banner: WeatherCard } {
+  const place = placeOf(options.whose ?? "home", options);
   let day = options.day ?? 0;
   const head = row("s12", "centre", button({ label: "Clock", kind: "Text", icon: "chevron_left", size: "Sm" }), text(place.name, "heading"));
   head.querySelector("button")?.addEventListener("click", () => options.live && back());
@@ -299,7 +309,7 @@ function weatherView(options: ClockOptions, back: () => void): View & { readonly
   const element = document.createElement("div");
   element.className = "ck-view";
   element.append(head, big.element, ...rows.slice(1));
-  return { element, cards: [big], cardOf: () => null, rows, banner: big.element };
+  return { element, cards: [big], cardOf: () => null, rows, banner: big };
 }
 
 /** The popup, and how its owner turns it. */
@@ -311,91 +321,15 @@ export interface ClockPopup {
   toClock(): void;
 }
 
-/** `element`'s box in `within`'s own pixels: the page is zoomed. */
-function boxIn(element: HTMLElement, within: HTMLElement): { readonly x: number; readonly y: number; readonly w: number; readonly h: number } {
-  const outer = within.getBoundingClientRect();
-  const own = element.getBoundingClientRect();
-  const zoom = outer.width / Math.max(1, within.offsetWidth) || 1;
-  return { x: (own.left - outer.left) / zoom, y: (own.top - outer.top) / zoom, w: own.width / zoom, h: own.height / zoom };
-}
-
-/** A box in the body's pixels. */
-type Box = ReturnType<typeof boxIn>;
-
-const px = (box: Box) => ({ left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px` });
-
-/** A copy of `card`'s sky as it is now: its own pixels, laid as `cover` in whatever box holds it. */
-function skyCopy(card: HTMLElement): HTMLCanvasElement {
-  const copy = document.createElement("canvas");
-  copy.className = "ck-morph-picture";
-  const source = card.querySelector<HTMLCanvasElement>(".k-weather-sky-picture");
-  if (!source) return copy;
-  copy.width = source.width;
-  copy.height = source.height;
-  copy.getContext("2d")?.drawImage(source, 0, 0);
-  return copy;
-}
-
-/** A copy of `card`'s words, laid out in `box` as on the card, with no sky under them. */
-function wordsCopy(card: HTMLElement, box: Box): HTMLElement {
-  const holder = document.createElement("div");
-  holder.className = "k-weather-card ck-morph-words";
-  holder.dataset.part = card.dataset.part ?? "";
-  Object.assign(holder.style, px(box));
-  const words = card.querySelector(".k-weather-words");
-  if (words) holder.append(words.cloneNode(true));
-  return holder;
-}
-
-/** The card and the banner of a turn, and the layer the morph is drawn in over both views. */
-interface Morph {
-  readonly layer: HTMLElement;
-  readonly sky: HTMLElement;
-  readonly cardSky: HTMLElement;
-  readonly bannerSky: HTMLElement;
-  readonly cardWords: HTMLElement;
-  readonly bannerWords: HTMLElement;
-  readonly card: Box;
-  readonly banner: Box;
-  readonly cardRadius: string;
-  readonly bannerRadius: string;
-}
-
-/**
- * Lays the morph over both views and hides the card and the banner under it. The sky is the one
- * thing that moves: a box from the card's to the banner's, holding both skies' pixels, which
- * cross-fade as it grows. The card's words and the banner's each stay in their own box, whole, so
- * no frame cuts a glyph, and at either end the morph is the resting card or the resting banner.
- */
-function morphOf(body: HTMLElement, from: HTMLElement, banner: HTMLElement): Morph {
-  const card = boxIn(from, body);
-  const big = boxIn(banner, body);
-  const layer = document.createElement("div");
-  layer.className = "ck-morph";
-  const sky = document.createElement("div");
-  sky.className = "ck-morph-sky";
-  const cardSky = skyCopy(from);
-  const bannerSky = skyCopy(banner);
-  sky.append(cardSky, bannerSky);
-  const cardWords = wordsCopy(from, card);
-  const bannerWords = wordsCopy(banner, big);
-  layer.append(sky, cardWords, bannerWords);
-  body.append(layer);
-  from.style.visibility = "hidden";
-  banner.style.visibility = "hidden";
-  return { layer, sky, cardSky, bannerSky, cardWords, bannerWords, card, banner: big, cardRadius: getComputedStyle(from).borderTopLeftRadius, bannerRadius: getComputedStyle(banner).borderTopLeftRadius };
-}
-
-/** Takes the morph away and shows the card and the banner again. */
-function unmorph(morph: Morph, from: HTMLElement, banner: HTMLElement): void {
-  morph.layer.remove();
-  from.style.visibility = "";
-  banner.style.visibility = "";
-}
-
 /** One part's move, running forwards from its first keyframe to its last, held at both ends. */
 function moved(element: Element, frames: Keyframe[], duration: number, curve: string, delay = 0): Animation {
   return element.animate(frames, { duration, delay, easing: easing(curve), fill: "both" });
+}
+
+/** A turn's moves, and what settles it once they are done. */
+interface Turning {
+  readonly played: Animation[];
+  readonly land: () => void;
 }
 
 /**
@@ -403,17 +337,17 @@ function moved(element: Element, frames: Keyframe[], duration: number, curve: st
  * part lands softly on `emphasized_decel`, its fades on `standard`, and the two views are never
  * both to be read at once.
  *
- * To the weather: the clock view and the card's words fade over `short`; the sky grows from the
- * card's box into the banner's over `long`, its picture turning from the card's to the banner's;
- * once the clock view is gone, the weather view's rows rise `space.s16` into place one after
- * another, `micro` apart, and the banner's words fade in as the sky lands. The panel's height eases
- * from the one view's to the other's over `long`.
+ * The card's own live sky is carried into the banner's place, or the banner's back into the card's
+ * (`carry`), over `long`, still drawing, its words travelling on it.
  *
- * Back to the clock: the weather view's rows and the banner's words fade together over `short`,
- * sinking `space.s16`; the sky shrinks into the card over `long`; once the rows are gone, the clock
- * view fades in over `short`, and the card's words with it as the sky lands.
+ * To the weather: the clock view fades over `short`; as it finishes, the weather view's rows rise
+ * `space.s16` into place one after another, `micro` apart, starting half a `short` in. The panel's
+ * height eases from the one view's to the other's over `long`.
+ *
+ * Back to the clock: the weather view's rows fade together over `short`, sinking `space.s16`;
+ * once they are gone, the clock view fades in over `short`.
  */
-function turn(body: HTMLElement, clock: View, weather: View & { readonly banner: HTMLElement }, morph: Morph | null, back: boolean): Animation[] {
+function turn(body: HTMLElement, clock: View, weather: View & { readonly banner: WeatherCard }, from: WeatherCard | null, back: boolean): Turning {
   const long = ms("long");
   const short = ms("short");
   const micro = ms("micro");
@@ -422,25 +356,18 @@ function turn(body: HTMLElement, clock: View, weather: View & { readonly banner:
   const played: Animation[] = [moved(body, back ? heights.reverse() : heights, long, "emphasized_decel")];
   const shown = { opacity: 1 };
   const gone = { opacity: 0 };
-  // Without a card to grow from, the banner comes and goes as a row.
-  const rows = morph ? weather.rows : [weather.rows[0]!, weather.banner, ...weather.rows.slice(1)];
+  // Without a card to carry, the banner comes and goes as a row.
+  const rows = from ? weather.rows : [weather.rows[0]!, weather.banner.element, ...weather.rows.slice(1)];
   if (!back) {
     played.push(moved(clock.element, [shown, gone], short, "standard"));
-    rows.forEach((each, index) => played.push(moved(each, [{ opacity: 0, translate: `0 ${rise}px` }, { opacity: 1, translate: "0 0" }], long, "emphasized_decel", short + index * micro)));
+    rows.forEach((each, index) => played.push(moved(each, [{ opacity: 0, translate: `0 ${rise}px` }, { opacity: 1, translate: "0 0" }], long, "emphasized_decel", short / 2 + index * micro)));
   } else {
     for (const each of rows) played.push(moved(each, [{ opacity: 1, translate: "0 0" }, { opacity: 0, translate: `0 ${rise}px` }], short, "emphasized_decel"));
     played.push(moved(clock.element, [gone, shown], short, "standard", short));
   }
-  if (morph) {
-    const [start, end] = back ? [morph.banner, morph.card] : [morph.card, morph.banner];
-    const [startRadius, endRadius] = back ? [morph.bannerRadius, morph.cardRadius] : [morph.cardRadius, morph.bannerRadius];
-    played.push(moved(morph.sky, [{ ...px(start), borderRadius: startRadius }, { ...px(end), borderRadius: endRadius }], long, "emphasized_decel"));
-    played.push(moved(back ? morph.bannerSky : morph.cardSky, [shown, gone], long, "standard"));
-    played.push(moved(back ? morph.cardSky : morph.bannerSky, [gone, shown], long, "standard"));
-    played.push(moved(back ? morph.bannerWords : morph.cardWords, [shown, gone], short, "standard"));
-    played.push(moved(back ? morph.cardWords : morph.bannerWords, [gone, shown], short, "standard", long - short));
-  }
-  return played;
+  if (!from) return { played, land: () => {} };
+  const carried = carry(back ? weather.banner : from, back ? from : weather.banner, body, { duration: long, easing: easing("emphasized_decel"), fade: short, fadeEasing: easing("standard") });
+  return { played: [...played, ...carried.moves], land: carried.land };
 }
 
 /** Runs `then` once the views just drawn have laid out and drawn their skies. */
@@ -469,7 +396,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
    * Turns between `clock` and `weather`, `weather` lying over `clock` meanwhile, and settles on
    * the weather or, `back`, on the clock. `hold` draws it held that far through, a picture of it.
    */
-  function play(clock: View, weather: View & { readonly banner: HTMLElement }, from: HTMLElement | null, back: boolean, hold?: number): void {
+  function play(clock: View, weather: View & { readonly banner: WeatherCard }, from: WeatherCard | null, back: boolean, hold?: number): void {
     busy = true;
     // Until the move starts, the view it starts from is all there is: the other is drawn unseen
     // and the panel keeps the first's height.
@@ -477,8 +404,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     weather.element.classList.add("ck-turning");
     (back ? clock : weather).element.style.opacity = "0";
     drawn(() => {
-      const morph = from ? morphOf(body, from, weather.banner) : null;
-      const played = turn(body, clock, weather, morph, back);
+      const { played, land } = turn(body, clock, weather, from, back);
       body.style.height = "";
       clock.element.style.opacity = "";
       weather.element.style.opacity = "";
@@ -494,7 +420,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
       void Promise.all(played.map((each) => each.finished)).then(
         () => {
           for (const each of played) each.cancel();
-          if (morph && from) unmorph(morph, from, weather.banner);
+          land();
           weather.element.classList.remove("ck-turning");
           free(back ? weather : clock);
           shown = back ? clock : weather;
@@ -505,7 +431,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     });
   }
 
-  function go(to: Whose, from: HTMLElement | null): void {
+  function go(to: Whose, from: WeatherCard | null): void {
     if (busy || !shown.element.isConnected) return;
     whose = to;
     const clock = shown;
@@ -521,7 +447,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
 
   function back(): void {
     if (busy) return;
-    const weather = shown as View & { readonly banner: HTMLElement };
+    const weather = shown as View & { readonly banner: WeatherCard };
     const clock = freshClock();
     body.prepend(clock.element);
     if (settings().reduced) {

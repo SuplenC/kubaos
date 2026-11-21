@@ -137,3 +137,17 @@
 .k-city-line > .k-weather-card {
   flex: 1 1 0;
 }
+
+/* A sky being carried from one card's place to another's (`carry`), over both, and the layers
+   that hold the two cards' words over it as its box moves: their own insets, nothing cut. */
+.k-weather-card.k-weather-carried {
+  position: absolute;
+  margin: 0;
+}
+
+.k-weather-card.k-weather-carrier[data-part] {
+  position: absolute;
+  overflow: visible;
+  border-radius: 0;
+  pointer-events: none;
+}
