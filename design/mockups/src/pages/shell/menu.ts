@@ -134,6 +134,7 @@ export default page<Shown>({
     { name: "In an app", for: "its chip, its intro card, its Items", sample: () => inApp() },
     { name: "Jobs running", for: "each job under the field, its bar", sample: () => panel({ under: jobs(JOBS) }) },
     { name: "An unavailable Result", for: "dimmed, why in its subtitle's place", sample: () => panel({ query: "su" }) },
+    { name: "The clock's Items", for: "wea: the weather's, each its answer at the row's end", sample: () => panel({ query: "wea", results: results("wea") }) },
   ],
   sizes: [
     { name: "Full HD", for: "half the screen, 9 rows, the pane", sample: () => panel({ screen: "full" }) },

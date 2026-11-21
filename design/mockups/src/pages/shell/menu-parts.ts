@@ -32,6 +32,7 @@ import { clamped, text, wrapped } from "../../lib/text.ts";
 import { toast } from "../../lib/toast.ts";
 import { length } from "../../lib/tokens.ts";
 import { popover } from "../../lib/tooltip.ts";
+import { CITIES, CONDITIONS, clockOf, dayRange, degrees, HOME, hourOf, NOW_HOUR, offsetOf, symbolOf } from "./weather-data.ts";
 
 // ---------------------------------------------------------------- the Results --
 
@@ -70,7 +71,27 @@ export interface Item {
   readonly alias?: string;
   /** Why it can't run, shown in its subtitle's place, the row dimmed. */
   readonly unavailable?: string;
+  /** Its own symbol, over its Extension's. */
+  readonly symbol?: string;
+  /** Words it is found by besides its title. */
+  readonly keywords?: readonly string[];
+  /** What it answers, at the row's end where an alias would be: the weather now, a city's time. */
+  readonly answer?: string;
 }
+
+/** The clock's Items: the popup, the weather at home, tomorrow and in each city, the cities' times, and the clock's settings. */
+const CLOCK_ITEMS: readonly Item[] = [
+  { title: "Clock", subtitle: "The time, your cities and the month", extension: "clock", symbol: "schedule", keywords: ["calendar", "date", "time"], answer: "21:47" },
+  { title: "Weather", subtitle: "Warsaw now and this week", extension: "clock", symbol: symbolOf(HOME.weather, NOW_HOUR), keywords: ["forecast", "temperature"], answer: `${degrees(HOME.temperature)}, ${CONDITIONS[HOME.weather].toLowerCase()}` },
+  { title: "Weather tomorrow", subtitle: "Wednesday in Warsaw", extension: "clock", symbol: symbolOf(HOME.week[1]!), keywords: ["forecast"], answer: `${degrees(dayRange(HOME, 1)[0])} / ${degrees(dayRange(HOME, 1)[1])}, ${CONDITIONS[HOME.week[1]!].toLowerCase()}` },
+  ...CITIES.slice(0, 4).flatMap((place): Item[] => [
+    { title: `Weather in ${place.name}`, subtitle: `${place.name} now and this week`, extension: "clock", symbol: symbolOf(place.weather, hourOf(place)), keywords: ["forecast"], answer: `${degrees(place.temperature)}, ${CONDITIONS[place.weather].toLowerCase()}` },
+    { title: `Time in ${place.name}`, subtitle: `${offsetOf(place)} from yours`, extension: "clock", symbol: "schedule", keywords: ["clock", "zone"], answer: clockOf(hourOf(place)) },
+  ]),
+  { title: "Settings: Date & time", subtitle: "Zone, format, the bar's clock, cities, weather", extension: "kubaos", symbol: "schedule", keywords: ["clock", "weather", "calendar"] },
+  { title: "Settings: Cities", subtitle: "Add or remove the clock's cities", extension: "kubaos", symbol: "add_location_alt", keywords: ["clock", "weather", "time zone"] },
+  { title: "Settings: Weather", subtitle: "On or off, home city, units", extension: "kubaos", symbol: "fair_day", keywords: ["forecast", "temperature", "units"] },
+];
 
 /** The shots' Items, in the Daemon's order. */
 export const ITEMS: readonly Item[] = [
@@ -88,6 +109,7 @@ export const ITEMS: readonly Item[] = [
   { title: "Suspend", subtitle: "Sleep until a key is pressed", extension: "system", unavailable: "Inhibited by Firefox: a video is playing" },
   { title: "Workspace 3", subtitle: "Move to workspace 3", extension: "hyprland" },
   { title: "Design specimen", subtitle: "Every token and component, live", extension: "kubaos" },
+  ...CLOCK_ITEMS,
 ];
 
 /** What the Action panel lists for every shot Result: the Item's own, then two Contributed. */
@@ -136,10 +158,10 @@ export function result(item: Item, index: number, typed = ""): Result {
     title: item.title,
     ...(at >= 0 ? { matched: [{ start: at, end: at + typed.length }] } : {}),
     subtitle: item.unavailable ?? item.subtitle,
-    icon: glyph(item.extension),
+    icon: item.symbol ?? glyph(item.extension),
     ...(initial !== undefined ? { initial } : {}),
     ...(item.picture ? { picture: item.picture } : {}),
-    ...(item.alias ? { detail: item.alias } : {}),
+    ...(item.alias ? { detail: item.alias } : item.answer ? { detail: item.answer } : {}),
     ...(item.unavailable ? { disabled: true } : {}),
     tile: true,
     tall: true,
@@ -150,9 +172,10 @@ export function result(item: Item, index: number, typed = ""): Result {
   return { row, kind, actions: ACTIONS, hints: hintsOf(index) };
 }
 
-/** The Results for `typed`: the Items whose title holds it, as the stand-in matches. */
+/** The Results for `typed`: the Items whose title or a keyword holds it, as the stand-in matches. */
 export function results(typed = "", items: readonly Item[] = ITEMS): Result[] {
-  return items.filter((item) => typed === "" || item.title.toLowerCase().includes(typed.toLowerCase())).map((item, index) => result(item, index, typed));
+  const found = (words: string) => words.toLowerCase().includes(typed.toLowerCase());
+  return items.filter((item) => typed === "" || found(item.title) || (item.keywords ?? []).some(found)).map((item, index) => result(item, index, typed));
 }
 
 // ---------------------------------------------------------------- the screens --
