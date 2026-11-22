@@ -4,6 +4,8 @@ How KubaOS's code is written. The rules come from Kotodama's guide (`SuplenC/kot
 
 New code follows every rule here. Older code is brought in line where you touch it: edit the lines you change in the new style, without restyling the rest of the file in the same PR. A restyle of a whole file or crate is its own PR. The formatting and the lints below already hold for every crate: the tools enforce them.
 
+Anything external a change brings in, shipped or used to make KubaOS (a library, a vendored file, an asset, a font, a data source, a service or a development tool), is credited in `CREDITS.md` in the same PR, with its creators, its licence and a link.
+
 Tools check some of these rules: `shellcheck` (`just shellcheck`, `test/shellcheck/check`), `nix fmt`, rustfmt and clippy (`just fmt-check`, `just lint`), and the design checks (`just design-check`, below). The reviewer checks the rest.
 
 `just check` runs what a pull request must pass: `fmt-check`, `lint`, the workspace's tests (`just nextest`), the shell's logic tests (`qml-test`), the screenshot harness's tests (`shots-test`), `design-check`, `system-files-check` and `shellcheck`. Run it in `nix develop`, which pins the toolchain from `flake.lock`; CI runs the same recipes on every pull request into main (`.github/workflows/check.yml`), with `nix flake check --no-build`, the mockups' part of `design-check` only when their inputs change, and `apps-verify` on the apps a pull request changes (`docs/TESTING.md`, "CI").
@@ -202,7 +204,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **The DOM is built in TypeScript, the look is CSS.** A mock sets custom properties naming tokens (`var(--space-s8)`) and CSS draws it; a length worked out in script is one the CSS can't express (a text's advance, a glow's mask) and says so.
 - **A registered custom property (`@property`) is named for its component and means one thing.** A registration is global: the page keeps the last for the name, and every use anywhere is held to its syntax and inheritance, so a colour in a `<number>` or a second registration breaks another component without an error. `scripts/property-check.ts`, run by the build, fails a name registered two ways or a number property given a colour.
 - **No literal design values**, as "Design" below says: every length, colour, duration and curve is a token's custom property, and a length rounds to device pixels in CSS (`round()`), never by a fixed offset.
-- **No UI framework, no dependency beyond the locked dev tools.** A new npm package is a decision for the PR, with its reason.
+- **No UI framework, no dependency beyond the locked dev tools.** A new npm package is a decision for the PR, with its reason, and its line in `CREDITS.md`.
 
 ## Design
 

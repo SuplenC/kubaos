@@ -1,0 +1,41 @@
+/* The DayStrip (`day-strip.ts`): its days sharing the row equally in whole device pixels
+   (`--shares`, `equalShares` in `layout.ts`), `space.s4` apart. */
+.k-day-strip {
+  display: grid;
+  grid-template-columns: var(--shares, repeat(var(--days), minmax(0, 1fr)));
+  gap: var(--space-s4);
+  width: 100%;
+  outline: none;
+}
+
+/* A day: no surface at rest, the state layer under the pointer; picked, a Selected chip's
+   container, lifting toward its pressed fill hovered and pressed. */
+.k-strip-day {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-s8);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  --strip-ink: var(--color-on_surface);
+  --strip-quiet: var(--color-on_surface_variant);
+  background: var(--layer);
+}
+
+.k-strip-day[data-picked] {
+  --strip-ink: var(--color-on_secondary_container);
+  --strip-quiet: var(--color-on_secondary_container);
+  background: color-mix(in srgb, var(--color-secondary_container), var(--color-secondary_container_pressed) calc(var(--rise) * 100%));
+}
+
+.k-strip-words {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-s4);
+}
+
+/* The keyboard's day, while the row has the keyboard: the picked one, lit. */
+.k-day-strip:focus-visible .k-strip-day[data-picked] {
+  --lit: 1;
+}

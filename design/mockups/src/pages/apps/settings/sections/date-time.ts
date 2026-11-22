@@ -1,15 +1,16 @@
-// Date & time: the time zone and how the clock keeps right, how times and dates are written, and
-// what the clock popup's calendar shows. The format's and the calendar's settings are the clock's
-// own, `clock.toml`, which the popup's settings page and the Command menu's clock Items write too,
-// all through `kubaos-clock`, so the file stays the one truth every one of them reads. The zone and
-// the time are the system's (systemd-timedated and systemd-timesyncd), which nothing in KubaOS
-// writes yet.
+// Date & time: the time zone and how the clock keeps right, how times and dates are written, what
+// the bar's clock shows, what the clock popup's calendar shows, and the cities and their weather.
+// This section is the one place the clock's settings live; the Command menu's clock Items land on
+// its rows. The format's, the calendar's, the bar clock's and the cities' settings are the clock's
+// own, `clock.toml`, written through `kubaos-clock`, so the file stays the one truth everything
+// reads. The zone and the time are the system's (systemd-timedated and systemd-timesyncd), which
+// nothing in KubaOS writes yet.
 
 import { COUNTDOWNS } from "../../../shell/clock-parts.ts";
 import { ZONES, zoneName } from "../../../kobo/kobo-data.ts";
 import type { Setting, SettingsSection } from "../settings-parts.ts";
 import { own, type Values } from "../settings-values.ts";
-import { addClock, clocksDetail, clocksList, type DateTimeValues, readsCard, WEEKDAYS, whileDisabled, zonePicker } from "./date-time-parts.ts";
+import { addCity, citiesDetail, citiesList, type DateTimeValues, homeCities, readsCard, WEEKDAYS, whileDisabled, zonePicker } from "./date-time-parts.ts";
 import { choice, fact, opens, pick, toggle } from "./kit.ts";
 
 /** KubaOS's defaults, `clock.toml`'s with each line commented out; the zone is the one Kōbō set. */
@@ -24,9 +25,17 @@ const DEFAULTS: DateTimeValues = {
   dateOrder: 0,
   firstWeekday: 0,
   holidays: 0,
-  analog: false,
+  weekNumbers: false,
   barCountdown: 0,
-  clocks: [],
+  seal: true,
+  date: true,
+  seconds: false,
+  barWeather: true,
+  weather: true,
+  homeCity: 0,
+  temperature: 0,
+  wind: 0,
+  cities: [],
   adding: "",
   tried: false,
 };
@@ -45,6 +54,8 @@ function timeProblem(value: string): string | null {
 /** Date & time, whole. */
 export function dateTime(values: Values): SettingsSection {
   const v = own(values, "dateTime", () => ({ ...DEFAULTS }));
+  /** `setting`, dimmed with its reason while the weather is off. */
+  const weatherOnly = (setting: Setting) => whileDisabled(setting, () => (v.weather ? null : "The weather is off."));
   const zone: Setting = whileDisabled(
     opens("zone", "Time zone", "The city whose clock you live by.", "zone", () => zoneName(ZONES[v.zone]!), { unbuilt: true }),
     () => (v.autoZone ? "Set by Automatic time zone; turn it off to pick one." : null),
@@ -96,14 +107,40 @@ export function dateTime(values: Values): SettingsSection {
         ],
       },
       {
+        title: "The bar's clock",
+        body: "What it shows beside the time; a narrow bar sheds them first.",
+        wells: [
+          [
+            toggle("seal", "Day seal", "The weekday's kanji on a disc.", () => v.seal, (on) => (v.seal = on), { initial: () => DEFAULTS.seal }),
+            toggle("date", "Date", "The weekday and the date, as Tue 27 Oct.", () => v.date, (on) => (v.date = on), { initial: () => DEFAULTS.date }),
+            toggle("seconds", "Seconds", "The time to the second.", () => v.seconds, (on) => (v.seconds = on), { initial: () => DEFAULTS.seconds }),
+            weatherOnly(
+              toggle("bar-weather", "Weather", "Home's temperature and its symbol; a press opens it.", () => v.barWeather, (on) => (v.barWeather = on), { initial: () => DEFAULTS.barWeather }),
+            ),
+          ],
+        ],
+      },
+      {
         title: "Calendar",
-        body: "What the clock popup marks, and what shows beside the bar's clock.",
+        body: "What the popup's month marks, and the bar's countdown.",
         wells: [
           [
             pick("holidays", "Public holidays", "Marked in the calendar and left out of working days.", COUNTRIES, () => v.holidays, (index) => (v.holidays = index), { initial: () => DEFAULTS.holidays }),
-            toggle("analog", "Analog face", "A face with hands beside the popup's big clock.", () => v.analog, (on) => (v.analog = on), { initial: () => DEFAULTS.analog }),
-            pick("bar-countdown", "Countdown in the bar", "Time left to one of your countdowns, beside the bar's clock.", BAR_COUNTDOWNS, () => v.barCountdown, (index) => (v.barCountdown = index), { initial: () => DEFAULTS.barCountdown }),
-            opens("clocks", "Extra clocks", "Other cities' times in the calendar, up to four.", "clocks", () => clocksDetail(v), { drives: true }),
+            toggle("week-numbers", "Week numbers", "A column of them; off, a line under the month names the week.", () => v.weekNumbers, (on) => (v.weekNumbers = on), { initial: () => DEFAULTS.weekNumbers }),
+            pick("bar-countdown", "Countdown in the bar", "Time left to one of your countdowns, in the bar.", BAR_COUNTDOWNS, () => v.barCountdown, (index) => (v.barCountdown = index), { initial: () => DEFAULTS.barCountdown }),
+          ],
+        ],
+      },
+      {
+        title: "Cities & weather",
+        body: "Other cities' times, and the weather where you are.",
+        wells: [
+          [
+            opens("cities", "Cities", "Their times and weather in the clock popup, eight at most.", "cities", () => citiesDetail(v), { drives: true }),
+            toggle("weather", "Weather", "In the bar's clock and the clock popup, from Open-Meteo.", () => v.weather, (on) => (v.weather = on), { drives: true, initial: () => DEFAULTS.weather }),
+            weatherOnly(pick("home-city", "Home city", "Whose weather leads.", homeCities(v), () => v.homeCity, (index) => (v.homeCity = index), { initial: () => DEFAULTS.homeCity })),
+            weatherOnly(choice("temperature", "Temperature", "Auto follows your language.", ["Auto", "°C", "°F"], () => v.temperature, (index) => (v.temperature = index), { initial: () => DEFAULTS.temperature })),
+            weatherOnly(pick("wind", "Wind speed", "Auto follows your language.", ["Auto", "km/h", "m/s", "mph"], () => v.wind, (index) => (v.wind = index), { initial: () => DEFAULTS.wind })),
           ],
         ],
       },
@@ -118,18 +155,18 @@ export function dateTime(values: Values): SettingsSection {
         wells: [],
       },
       {
-        id: "clocks",
-        title: "Extra clocks",
-        body: "Other cities' times, in the calendar and its day line. Four at most.",
-        back: "Calendar",
-        before: () => clocksList(v),
+        id: "cities",
+        title: "Cities",
+        body: "Other cities' times and weather, in the clock popup's row of cards. Eight at most.",
+        back: "Cities & weather",
+        before: () => citiesList(v),
         wells: [
           [
-            addClock(v),
+            addCity(v),
             // The list's default, none, as a setting the resets read; it draws no row: a setting
             // holding a list has no other way into the resets.
-            choice("clocks-kept", "Extra clocks", "", ["None", "Some"], () => (v.clocks.length === 0 ? 0 : 1), (index) => {
-              if (index === 0) v.clocks = [];
+            choice("cities-kept", "Cities", "", ["None", "Some"], () => (v.cities.length === 0 ? 0 : 1), (index) => {
+              if (index === 0) v.cities = [];
             }, { shows: () => false, initial: () => 0 }),
           ],
         ],

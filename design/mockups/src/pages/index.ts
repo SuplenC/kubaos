@@ -65,6 +65,8 @@ import errorBlock from "./molecules/error-block.ts";
 import logPage from "./molecules/log.ts";
 import meter from "./molecules/meter.ts";
 import sparkline from "./molecules/sparkline.ts";
+import weatherSkyPage from "./molecules/weather-sky.ts";
+import dayStripPage from "./molecules/day-strip.ts";
 import banner from "./molecules/banner.ts";
 import step from "./molecules/step.ts";
 import scroll from "./molecules/scroll.ts";
@@ -110,7 +112,6 @@ import shellMenuFooter from "./shell/menu-footer.ts";
 import shellSysmon from "./shell/sysmon.ts";
 import shellSysmonProcesses from "./shell/sysmon-processes.ts";
 import shellClock from "./shell/clock.ts";
-import shellClockSettings from "./shell/clock-settings.ts";
 import shellWallpaper from "./shell/wallpaper.ts";
 import shellPowerMenu from "./shell/power-menu.ts";
 import shellBoot from "./shell/boot.ts";
@@ -154,7 +155,7 @@ import settingsDateTime from "./apps/settings/settings-date-time.ts";
 import settingsApps from "./apps/settings/settings-apps.ts";
 import mediaPlayer from "./apps/media-player.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, marqueePage, slider, tabs, colourPicker, select, popover, shortcutsPage, menu, prompt, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, orderListPage, table, descriptionList, scroll, progressBar, stepperPage, taskPage, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellBarAudio, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, shellAudioPanel, notificationsPanel, popupStack, notificationPeek, shellCounters, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellClockSettings, shellWallpaper, shellPowerMenu, shellBoot, shellOsd, shellPolkit, shellSharePicker, shellOnAirPills, shellOnAirMarks, shellOverview, koboWelcome, koboLanguage, koboNetwork, koboAccount, koboDisk, koboReview, koboInstalling, koboDone, setupArrival, setupYours, setupKotodama, setupGit, setupDrivers, setupFingerprint, setupYubikey, setupPhone, setupDone, settingsApp, settingsAbout, settingsAppearance, settingsPower, settingsDisplays, settingsDesktop, settingsKeyboard, settingsMouse, settingsNotifications, settingsProxy, settingsNetwork, settingsPhone, settingsDateTime, settingsApps, appDialogs, mediaPlayer];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, focus, motion, icons, layoutPage, layoutHeader, layoutStack, layoutGrid, text, icon, button, iconButton, hint, toggle, checkbox, radio, chip, field, keycap, tooltip, badge, spinner, divider, skeleton, figure, rollingNumber, marqueePage, slider, tabs, colourPicker, select, popover, shortcutsPage, menu, prompt, calendar, tile, collapsible, buttonBar, dialog, toast, card, choiceCard, notificationCard, notificationPopup, notificationGroup, media, pictureChoice, depthPicture, weatherSkyPage, dayStripPage, iconTile, badgedIcon, pill, list, scrollingList, liveList, emptyList, orderListPage, table, descriptionList, scroll, progressBar, stepperPage, taskPage, progressPanel, spinnerInContext, emptyState, errorBlock, logPage, meter, sparkline, banner, step, stepRailPage, listDetail, panelPage, backdropPage, lockPage, sidebarPage, canvasPage, shellBar, shellContents, shellBarAudio, shellWorkspaces, shellTray, shellRecording, shellFrame, controlCenter, controlCenterToggles, controlCenterCapture, controlCenterWifi, controlCenterBluetooth, controlCenterKeyboard, shellAudioPanel, notificationsPanel, popupStack, notificationPeek, shellCounters, shellMenu, shellMenuActions, shellMenuViews, shellMenuForm, shellMenuFooter, shellSysmon, shellSysmonProcesses, shellClock, shellWallpaper, shellPowerMenu, shellBoot, shellOsd, shellPolkit, shellSharePicker, shellOnAirPills, shellOnAirMarks, shellOverview, koboWelcome, koboLanguage, koboNetwork, koboAccount, koboDisk, koboReview, koboInstalling, koboDone, setupArrival, setupYours, setupKotodama, setupGit, setupDrivers, setupFingerprint, setupYubikey, setupPhone, setupDone, settingsApp, settingsAbout, settingsAppearance, settingsPower, settingsDisplays, settingsDesktop, settingsKeyboard, settingsMouse, settingsNotifications, settingsProxy, settingsNetwork, settingsPhone, settingsDateTime, settingsApps, appDialogs, mediaPlayer];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);

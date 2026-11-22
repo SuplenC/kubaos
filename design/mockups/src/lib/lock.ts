@@ -34,7 +34,7 @@ import { type NightScheme, paintNight, tintFor } from "./lock-tint.ts";
 import { field, fieldRoom } from "./field.ts";
 import { icon } from "./icon.ts";
 import { container, row } from "./layout.ts";
-import { pill } from "./pill.ts";
+import { capsuleExtents, clockPill, type ClockPillWords } from "./clock-pill.ts";
 import { probe, variant } from "./probe.ts";
 import { hang, type Screen, screen, type Sheet, sheet } from "./sheet.ts";
 import { advance, text, type TypeStyle } from "./text.ts";
@@ -159,11 +159,8 @@ export interface Kicker {
   readonly date: string;
 }
 
-/** The bar's clock pill's words: the weekday's kanji and the short date. */
-export interface BarClock {
-  readonly kanji: string;
-  readonly date: string;
-}
+/** The bar's clock pill's words, all but the time, which is the lock's. */
+export type BarClock = Omit<ClockPillWords, "time">;
 
 export interface LockOptions {
   readonly width: string;
@@ -215,7 +212,7 @@ export interface Lock {
 
 export const TIME = "21:47";
 export const KICKER: Kicker = { place: "東京・月曜日", date: "Monday, 2 November" };
-export const BAR_CLOCK: BarClock = { kanji: "月", date: "Mon 2 Nov" };
+export const BAR_CLOCK: BarClock = { kanji: "月", date: "Mon 2 Nov", day: "Mon 2", whole: "Monday, 2 November 2026", weather: { symbol: "fair_night", temperature: "18°" } };
 
 /**
  * The password's field, as `moment` shows it: lit with the keyboard in it unless it is live. Its
@@ -284,18 +281,14 @@ function kickerLine(kicker: Kicker): HTMLElement {
 }
 
 /**
- * The bar's clock, as `modules/bar/Clock.qml` draws it: a pill centred on the bar holding the
- * weekday's kanji in `accent`, `tertiary`, the short date in `body`, `on_surface_variant`, and
- * the time in `body`, `on_surface`, centred in a slot as wide as the widest time its format shows,
- * so the pill keeps its width as the minutes turn.
+ * The bar's clock: the ClockPill (`clock-pill.ts`), its time the words the rest clock lands on and
+ * flies from, the seal, the date and the weather round it coming and going on their own.
  */
 function barClock(time: string, twelve: boolean, words: BarClock): { pill: HTMLElement; time: HTMLElement } {
-  const shown = text(time, "body", "on_surface");
-  shown.classList.add("k-lock-bar-time");
-  shown.style.setProperty("--slot", String(widestTime("body", twelve)));
-  const made = pill({ content: [text(words.kanji, "accent", "tertiary"), text(words.date, "body", "on_surface_variant"), shown], lone: false });
-  made.classList.add("k-lock-bar-clock");
-  return { pill: made, time: shown };
+  const made = clockPill({ words: { ...words, time }, twelve, interactive: false });
+  made.element.classList.add("k-lock-bar-clock");
+  made.time.classList.add("k-lock-bar-time");
+  return { pill: made.element, time: made.time };
 }
 
 export function lock(options: LockOptions): Lock {
@@ -454,7 +447,10 @@ export function lock(options: LockOptions): Lock {
   function* place(): Generator<void, void, void> {
     const width = element.clientWidth;
     const height = element.clientHeight;
-    const pillWidth = bar.pill.offsetWidth;
+    // Where the capsule's middle is from the pill's left, in its own pixels: the capsule, not the
+    // pill, is the screen's middle.
+    const zoomed = bar.pill.getBoundingClientRect().width / Math.max(1, bar.pill.offsetWidth) || 1;
+    const capsuleX = capsuleExtents(bar.pill).before / zoomed;
     if (width === 0) return;
     const { seen, flat } = covers(width, height);
     clock.style.setProperty("--cap-height", String(capHeight()));
@@ -472,7 +468,7 @@ export function lock(options: LockOptions): Lock {
     if (!held) drawClock(clock, where);
     if (own) inkOn(clock, time);
     bar.time.style.setProperty("--slot", String(widestTime("body", twelve)));
-    bar.pill.style.setProperty("--pill-width", `${pillWidth}px`);
+    bar.pill.style.setProperty("--capsule-x", `${capsuleX}px`);
     const mark = document.createElement("span");
     mark.className = "k-lock-baseline";
     bar.time.append(mark);

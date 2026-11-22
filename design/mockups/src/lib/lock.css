@@ -205,11 +205,12 @@
   height: var(--size-bar);
 }
 
-/* The bar's clock, centred on the screen as `modules/bar/Bar.qml` centres it, on whole device
-   pixels. */
-.k-lock-bar-clock {
+/* The bar's clock, its time's capsule on the screen's middle as the bar places it, on whole device
+   pixels; the pill's own margins, which centre it in the bar's row, have no part here. */
+.k-lock .k-lock-bar-clock {
   position: absolute;
-  left: round(down, calc((100% - var(--pill-width, 0px)) / 2), 1px);
+  margin-inline: 0;
+  left: round(down, calc(50% - var(--capsule-x, 0px)), 1px);
 }
 
 /* The bar's time: a slot as wide as the widest time its format shows (`--slot`, measured from the
@@ -247,6 +248,10 @@
   display: block;
   --woken: calc(var(--clock-lift) * var(--scale-clock_awake));
   --flown: calc(var(--woken) + (1 - var(--woken)) * var(--dock));
+  /* How far into its landing it is: over the last `scale.clock_awake` of the flight, the share
+     waking takes at its start, the digits take the capsule's `on_primary`, so they never read
+     weakly on it. */
+  --landing: clamp(0, calc((var(--flown) - 1 + var(--scale-clock_awake)) / var(--scale-clock_awake)), 1);
   /* The rest clock's size, the screen's share (`lib/lock.ts`); `type.clock_rest` until it is placed. */
   --rest: var(--rest-size, var(--type-clock_rest-size));
   --k: calc(1 + (var(--type-body-size) / var(--rest) - 1) * var(--flown));
@@ -334,8 +339,8 @@
 }
 
 /* The digits: at rest a light tint of the picture behind them (`--digits-tint`, worked out from the
-   picture), so they read as part of it; in the bar `on_surface`, as the bar's words are. The tint
-   gives way along the flight, so awake it is still mostly the picture's. */
+   picture), so they read as part of it, toward `on_surface` along the flight, so awake it is still
+   mostly the picture's; landing in the bar clock's capsule they take its `on_primary`. */
 .k-lock .k-lock-digits {
   display: block;
   font-size: calc(var(--rest) * var(--k));
@@ -344,7 +349,11 @@
   text-box: trim-both cap alphabetic;
   /* Its box is its caps, placed by the lock: none of a line's centring above them. */
   padding-top: 0;
-  color: color-mix(in oklab, var(--color-on_surface) calc(var(--flown) * 100%), var(--digits-tint, var(--color-on_surface)));
+  color: color-mix(
+    in oklab,
+    var(--color-on_primary) calc(var(--landing) * 100%),
+    color-mix(in oklab, var(--color-on_surface) calc(var(--flown) * 100%), var(--digits-tint, var(--color-on_surface)))
+  );
 }
 
 /* What the digits are drawn through. While the clock flies above the frame it is still behind the
@@ -594,7 +603,8 @@
   visibility: hidden;
 }
 
-.k-lock[data-clockless] .k-lock-bar-time {
+.k-lock[data-clockless] .k-lock-bar-time,
+.k-lock[data-clockless] .k-lock-bar-clock .k-clock-pill-around {
   opacity: 1 !important;
 }
 

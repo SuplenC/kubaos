@@ -481,6 +481,8 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Media](design/components/media.md)
 - [PictureChoice](design/components/picture-choice.md)
 - [DepthPicture](design/components/depth-picture.md)
+- [WeatherSky, HomeWeatherCard, WeatherBanner, CityCard and CityRow](design/components/weather-sky.md)
+- [DayStrip](design/components/day-strip.md)
 
 **Feedback**
 
@@ -517,6 +519,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [PopupStack](design/components/popup-stack.md)
 - [Wallpaper picker](design/components/wallpaper-picker.md)
 - [Pill](design/components/pill.md)
+- [ClockPill](design/components/clock-pill.md)
 - [Bar](design/components/bar.md)
 
 ### Rules every component keeps
@@ -695,6 +698,8 @@ kubaos-design contrast: 36 pair(s) in 2 modes: ok
 ```
 
 A pair under its minimum fails with the ratio it has: `contrast on_secondary_container at subdued on secondary_container is 4.00:1 in light, under its 4.5:1` was the selected row's subtitle at the 0.75 it shared with the thumbnails, before it had `subdued_text`.
+
+Words on a picture that changes under them are in no pair: they hold by treatment, not by a ratio to one colour. The weather cards' `on_picture` over a live sky by its two shadows (`opacity.picture_text_edge`, `picture_text_drop`), the lock's kicker over the wallpaper by its halo.
 
 The list must also be complete. `kubaos-design contrast` reads every file the lint reads and finds each role named as a colour (`Tokens.color.<role>` in QML, `c.<role>` or `colors.<role>` in Rust); a role in no pair, as foreground or background, and not in `[contrast] decorative`, fails with where it is drawn:
 

@@ -11,6 +11,12 @@
   height: var(--size-bar);
 }
 
+/* The clock's capsule is the screen's middle: the side of the pill with less beside the capsule
+   takes the difference as a margin, centred with the pill. */
+.shell-bar-row > .k-clock-pill {
+  margin-inline: var(--capsule-before, 0) var(--capsule-after, 0);
+}
+
 .shell-bar-left {
   display: flex;
   align-items: center;
@@ -249,12 +255,4 @@
   overflow-y: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--color-outline_variant) transparent;
-}
-
-/* The clock's time, centred in a slot as wide as the widest time it shows (`clockTime`). */
-.shell-clock-time {
-  --time-width: round(up, calc(var(--natural) * var(--px) - 0.001px), 1px);
-  --slot-width: round(up, calc(var(--slot) * var(--px) - 0.001px), 1px);
-  width: var(--slot-width);
-  padding-inline-start: round(down, calc((var(--slot-width) - var(--time-width)) / 2), 1px);
 }

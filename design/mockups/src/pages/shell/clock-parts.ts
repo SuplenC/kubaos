@@ -1,48 +1,470 @@
-// The clock popup as `config/quickshell/modules/clock/` draws it, from the library's parts, with the
-// shots' stand-ins (`test/shots/fakes`): Tuesday 27 October 2026, 21:47:32, Tokyo as an extra clock,
-// Vacation pinned to the bar and Release, a timer running. The face, the extra clocks, the search
-// and its answer, the month and the picked day, countdowns, the tools, and the settings page. The
-// clock's pages build their samples from these. This file is no page.
+// The clock popup, a DRAFT, from the library's parts with the shots' stand-ins: Tuesday 27 October
+// 2026, 21:47 in Warsaw, home, and the cities of `weather-data.ts`. One panel, as tall as what it
+// holds, in two views:
+//
+// - The clock view: the time large and the date under it beside home's weather card; the other
+//   cities' cards; the month, and beside it the picked day.
+// - The weather view: Back and the city's name, its banner, its warning, twelve hours, six tiles,
+//   the week, and where the forecast comes from.
+//
+// A press on a weather card turns the panel to that city's weather: the views change as a side
+// panel's content changes view (the clock view slides and fades out to the left, the weather view
+// slides and fades in from the right) while the card's live sky grows into the banner's place;
+// Back mirrors it, the sky shrinking into the card it came from. Reduced motion swaps the views.
+// The clock's pages build their samples from these. This file is no page.
+//
+// The clock's settings live in the Settings app's Date & time section
+// (`apps/settings/sections/date-time.ts`); the popup holds none.
 
 import "./clock.css";
+import { banner } from "../../lib/banner.ts";
+import { button } from "../../lib/button.ts";
+import { calendar, type Day } from "../../lib/calendar.ts";
 import { card } from "../../lib/card.ts";
-import { calendar } from "../../lib/calendar.ts";
-import { chip } from "../../lib/chip.ts";
-import { field } from "../../lib/field.ts";
-import { figure } from "../../lib/figure.ts";
-import { iconButton } from "../../lib/icon-button.ts";
+import { descriptionList } from "../../lib/description.ts";
 import { icon } from "../../lib/icon.ts";
-import { keyHints } from "../../lib/keycap.ts";
-import { container, fill, filling, flow, row, stack } from "../../lib/layout.ts";
-import { progressBar } from "../../lib/progress.ts";
-import { select } from "../../lib/select.ts";
-import { hang, sheet } from "../../lib/sheet.ts";
-import { tabs } from "../../lib/tabs.ts";
+import { container, equalShares, fill, filling, grid, row, stack } from "../../lib/layout.ts";
+import { hang, sheet, swapViews } from "../../lib/sheet.ts";
+import { dayStrip } from "../../lib/day-strip.ts";
 import { clamped, text } from "../../lib/text.ts";
-import { barScreen, CLOCK, EVERYDAY } from "./bar-parts.ts";
+import { cubic, durationMs } from "../../lib/tokens.ts";
+import { type CardSky, carry, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
+import { settings } from "../../site/settings.ts";
+import { barScreen, EVERYDAY } from "./bar-parts.ts";
 import { TALL } from "./control-center-parts.ts";
+import { type City, CITIES, CONDITIONS, clockOf, dayName, dayRange, degrees, HOME, hourOf, hoursOf, offsetOf, readingsOf, symbolOf, tilesOf, UPDATED } from "./weather-data.ts";
 
 export { TALL };
 
-/** The shots' frozen moment. */
-const NOW = { hhmm: "21:47", ss: "32", date: "Tuesday, 27 October 2026", day: "Day 300 · Week 44" } as const;
+/** Today, at the shots' moment. */
+const TODAY: Day = { year: 2026, month: 10, day: 27 };
 
-/** An extra clock: its label, its time there, how far off, and day or night there. */
-export interface Zone {
-  readonly label: string;
-  readonly name: string;
-  readonly time: string;
-  readonly relative: string;
-  readonly daylight: "light_mode" | "wb_twilight" | "dark_mode";
+/** Poland's holidays round the shots' day: home's country's, as `kubaos-clock` reads them. */
+const HOLIDAYS: Readonly<Record<string, string>> = {
+  "2026-11-01": "All Saints' Day",
+  "2026-11-11": "Independence Day",
+  "2026-12-25": "Christmas Day",
+  "2026-12-26": "Second Day of Christmas",
+};
+
+/** Whose weather: home's, or a city's by its index in `CITIES`. */
+export type Whose = "home" | number;
+
+/** What home's card shows: a reading, offline a while, offline past a day, or no home city. */
+export type HomeShown = "reading" | "aged" | "no connection" | "no city";
+
+export interface ClockOptions {
+  /** The view open: the clock's, or a city's weather. */
+  readonly view?: "clock" | "weather";
+  /** Whose weather the weather view shows. */
+  readonly whose?: Whose;
+  /** How many other cities, of `CITIES`: none to eight. */
+  readonly cities?: number;
+  /** The cities' order to take them in, by their index in `CITIES`, for a sample of long names. */
+  readonly order?: readonly number[];
+  readonly home?: HomeShown;
+  /** The picked day in the month. */
+  readonly picked?: Day;
+  /** The weather view's day, from today. */
+  readonly day?: number;
+  /** Takes presses: the cards open the weather, Back goes back, the week and the month pick. */
+  readonly live?: boolean;
 }
 
-export const ZONES: readonly Zone[] = [
-  { label: "Tokyo", name: "Asia/Tokyo", time: "05:47", relative: "+8 h", daylight: "wb_twilight" },
-  { label: "New York", name: "America/New_York", time: "16:47", relative: "−5 h", daylight: "light_mode" },
-  { label: "Los Angeles", name: "America/Los_Angeles", time: "13:47", relative: "−8 h", daylight: "light_mode" },
-  { label: "Auckland", name: "Pacific/Auckland", time: "09:47", relative: "+12 h", daylight: "light_mode" },
-];
+/** A duration token in milliseconds under the speed setting; none with reduced motion. */
+function ms(name: string): number {
+  return settings().reduced ? 0 : durationMs(name) / settings().speed;
+}
 
+const easing = (name: string) => `cubic-bezier(${cubic(`easing-${name}`).join(", ")})`;
+
+const DATE = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const DAY_TITLE = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
+const utc = (day: Day) => Date.UTC(day.year, day.month - 1, day.day);
+const DAY_MS = 86_400_000;
+
+/** The ISO week of `day`. */
+function weekOf(day: Day): number {
+  const at = new Date(utc(day));
+  const thursday = utc(day) + (3 - ((at.getUTCDay() + 6) % 7)) * DAY_MS;
+  const year = new Date(thursday).getUTCFullYear();
+  return 1 + Math.floor((thursday - Date.UTC(year, 0, 1)) / (7 * DAY_MS));
+}
+
+/** `day`'s place in its year, from 1. */
+const dayOfYear = (day: Day) => 1 + Math.round((utc(day) - Date.UTC(day.year, 0, 1)) / DAY_MS);
+
+const holidayOf = (day: Day) => HOLIDAYS[`${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`];
+
+/** How many days `year` has. */
+const daysIn = (year: number) => Math.round((Date.UTC(year + 1, 0, 1) - Date.UTC(year, 0, 1)) / DAY_MS);
+
+const PLURAL = new Intl.PluralRules("en-GB");
+
+/** The working days left in a month, a message by the count's plural form. */
+const WORKING = { one: "{count} working day", other: "{count} working days" } as const;
+
+/** Working days after `day` to its month's end: Monday to Friday, holidays left out. */
+function workingDaysLeft(day: Day): number {
+  const last = new Date(Date.UTC(day.year, day.month, 0)).getUTCDate();
+  let count = 0;
+  for (let d = day.day + 1; d <= last; d++) {
+    const at = { ...day, day: d };
+    const weekday = new Date(utc(at)).getUTCDay();
+    if (weekday !== 0 && weekday !== 6 && !holidayOf(at)) count++;
+  }
+  return count;
+}
+
+/** The city `whose` names. */
+const placeOf = (whose: Whose): City => (whose === "home" ? HOME : CITIES[whose]!);
+
+/** A city's sky on a day from today: now's hour today, midday on another. */
+function skyOf(place: City, day: number, seed: number): CardSky {
+  return { hour: day === 0 ? hourOf(place) : 13, weather: place.week[day]!, readings: readingsOf(place, day), seed };
+}
+
+/** Home's card as `shown` says, or none with no home city. */
+function homeState(shown: HomeShown, home: City): HomeState {
+  if (shown === "no city") return { state: "no city" };
+  if (shown === "no connection") return { state: "no connection", place: home.name };
+  return {
+    state: "reading",
+    sky: skyOf(home, 0, 3),
+    place: home.name,
+    temperature: degrees(home.temperature),
+    condition: CONDITIONS[home.weather],
+    high: degrees(home.high),
+    low: degrees(home.low),
+    ...(shown === "aged" ? { age: "2 h ago" } : {}),
+  };
+}
+
+/** The picked day beside the month: its date, its week, its day of the year, the working days left, its holiday, its forecast. */
+function pickedDay(day: Day): HTMLElement {
+  const today = utc(day) === utc(TODAY);
+  const title = text(today ? `Today, ${DAY_TITLE.format(utc(day))}` : DAY_TITLE.format(utc(day)), "body_strong");
+  const holiday = holidayOf(day);
+  // Labels of one short word, so none wraps in the list's label column at the popup's width; the
+  // values carry the rest of the words.
+  const left = workingDaysLeft(day);
+  const facts = descriptionList([
+    { label: "Week", value: String(weekOf(day)) },
+    { label: "Day", value: `${dayOfYear(day)} of ${daysIn(day.year)}` },
+    { label: "Left", value: WORKING[PLURAL.select(left) === "one" ? "one" : "other"].replace("{count}", String(left)) },
+    ...(holiday ? [{ label: "Holiday", value: holiday }] : []),
+  ]);
+  const ahead = Math.round((utc(day) - utc(TODAY)) / DAY_MS);
+  const parts: HTMLElement[] = [filling(title), filling(facts)];
+  if (ahead >= 0 && ahead < 7) {
+    const weather = HOME.week[ahead]!;
+    const [high, low] = dayRange(HOME, ahead);
+    parts.push(row("s8", "centre", icon(symbolOf(weather), "var(--type-body-icon)", "var(--color-on_surface_variant)"), text(`${degrees(high)} / ${degrees(low)} · ${CONDITIONS[weather]}`, "body", "on_surface_variant")));
+  }
+  const box = stack("s12", "start", ...parts);
+  box.classList.add("ck-picked");
+  return box;
+}
+
+/** A view drawn, with the cards it holds, so it can let their skies go. */
+interface View {
+  readonly element: HTMLElement;
+  readonly cards: WeatherCard[];
+  /** The card each city's weather turns from and back into, by whose it is. */
+  readonly cardOf: (whose: Whose) => WeatherCard | null;
+  /** The view's rows, top to bottom. */
+  readonly rows: HTMLElement[];
+}
+
+function clockView(options: ClockOptions, open: (whose: Whose, from: WeatherCard) => void): View {
+  const cards: WeatherCard[] = [];
+  const byWhose = new Map<Whose, WeatherCard>();
+  const time = stack("s4", "start", text("21:47", "hero_number"), text(DATE.format(utc(TODAY)), "body_large", "on_surface_variant"));
+  time.classList.add("ck-time");
+  const shown = options.home ?? "reading";
+  const home = homeWeatherCard({ home: homeState(shown, HOME), ...(options.live && shown !== "no city" ? { onPress: () => open("home", home) } : {}) });
+  cards.push(home);
+  if (shown !== "no city") byWhose.set("home", home);
+  const top = document.createElement("div");
+  top.className = "ck-top";
+  top.append(time, home.element);
+  const rows: HTMLElement[] = [top];
+  const order = options.order ?? CITIES.map((_, i) => i);
+  const count = Math.min(MOST_CITIES, options.cities ?? 4);
+  if (count > 0) {
+    const made = order.slice(0, count).map((index) => {
+      const place = CITIES[index]!;
+      const each = cityCard({
+        sky: skyOf(place, 0, index * 5),
+        name: place.name,
+        time: clockOf(hourOf(place)),
+        temperature: degrees(place.temperature),
+        offset: offsetOf(place),
+        ...(options.live ? { onPress: () => open(index, each) } : {}),
+      });
+      byWhose.set(index, each);
+      cards.push(each);
+      return each.element;
+    });
+    rows.push(cityRow(made));
+  }
+  let picked = options.picked ?? TODAY;
+  let details = pickedDay(picked);
+  const month = calendar({
+    shown: { year: picked.year, month: picked.month },
+    today: TODAY,
+    picked,
+    firstWeekday: 1,
+    holidays: HOLIDAYS,
+    weekNumbers: false,
+    weekLine: true,
+    onPick: (day) => {
+      picked = day;
+      const fresh = pickedDay(day);
+      details.replaceWith(fresh);
+      details = fresh;
+    },
+  });
+  const lower = document.createElement("div");
+  lower.className = "ck-lower";
+  lower.append(month, details);
+  rows.push(lower);
+  const element = document.createElement("div");
+  element.className = "ck-view";
+  element.append(...rows);
+  return { element, cards, cardOf: (whose) => byWhose.get(whose) ?? null, rows };
+}
+
+/** A city's twelve hours on a day: hour, symbol, temperature, chance of rain. */
+function hoursRow(place: City, day: number): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "ck-hours";
+  for (const hour of hoursOf(place, day)) {
+    const cell = stack("s4", "centre", text(hour.label, "small", "on_surface_variant"), icon(hour.symbol, "var(--type-body-icon)", "var(--color-on_surface)"), text(hour.temperature, "body_strong"), text(hour.rain, "small", "cold"));
+    cell.classList.add("ck-hour");
+    box.append(cell);
+  }
+  equalShares(box, 12, 0);
+  return box;
+}
+
+/** The six tiles: wind, humidity, UV index, air quality, sunrise, sunset. */
+function tilesRow(place: City, day: number): HTMLElement {
+  return grid(3, "s8", tilesOf(place, day).map((tile) => card({ header: { glyph: tile.symbol, title: tile.value, subtitle: tile.name } })));
+}
+
+function bannerOf(place: City, day: number): WeatherBannerOptions {
+  const [high, low] = dayRange(place, day);
+  const r = readingsOf(place, day);
+  return { sky: skyOf(place, day, 7), temperature: degrees(day === 0 ? place.temperature : high), condition: CONDITIONS[place.week[day]!], feels: degrees(r.feels), high: degrees(high), low: degrees(low) };
+}
+
+function weatherView(options: ClockOptions, back: () => void): View & { readonly banner: WeatherCard } {
+  const place = placeOf(options.whose ?? "home");
+  let day = options.day ?? 0;
+  const head = row("s12", "centre", button({ label: "Clock", kind: "Text", icon: "chevron_left", size: "Sm" }), text(place.name, "heading"));
+  head.querySelector("button")?.addEventListener("click", () => options.live && back());
+  const big = weatherBanner(bannerOf(place, day));
+  const rows: HTMLElement[] = [head];
+  if (typeof place.warning === "object" && "title" in place.warning) rows.push(banner({ tone: "Warning", icon: "warning", title: place.warning.title, body: place.warning.body }));
+  else if (typeof place.warning === "object") rows.push(filling(clamped(place.warning.noSource, "small", "on_surface_variant")));
+  let hours = hoursRow(place, day);
+  let tiles = tilesRow(place, day);
+  const week = dayStrip({
+    days: Array.from({ length: 7 }, (_, d) => {
+      const [high, low] = dayRange(place, d);
+      return { name: dayName(d), symbol: symbolOf(place.week[d]!), high: degrees(high), low: degrees(low) };
+    }),
+    picked: day,
+    onPick: (index) => {
+      day = index;
+      big.show(bannerOf(place, day));
+      const freshHours = hoursRow(place, day);
+      hours.replaceWith(freshHours);
+      hours = freshHours;
+      const freshTiles = tilesRow(place, day);
+      tiles.replaceWith(freshTiles);
+      tiles = freshTiles;
+    },
+  });
+  const foot = row(0, "centre", text("Weather from Open-Meteo", "small", "on_surface_variant"), fill(), text(`Updated ${UPDATED}`, "small", "on_surface_variant"));
+  rows.push(hours, tiles, week, filling(foot));
+  const element = document.createElement("div");
+  element.className = "ck-view";
+  element.append(head, big.element, ...rows.slice(1));
+  return { element, cards: [big], cardOf: () => null, rows, banner: big };
+}
+
+/** The popup, and how its owner turns it. */
+export interface ClockPopup {
+  readonly element: HTMLElement;
+  /** Turns to `whose`'s weather, from its card where it has one. */
+  toWeather(whose: Whose): void;
+  /** Back to the clock view. */
+  toClock(): void;
+}
+
+/** One part's move, running forwards from its first keyframe to its last, held at both ends. */
+function moved(element: Element, frames: Keyframe[], duration: number, curve: string, delay = 0): Animation {
+  return element.animate(frames, { duration, delay, easing: easing(curve), fill: "both" });
+}
+
+/** A turn's moves, and what settles it once they are done. */
+interface Turning {
+  readonly played: Animation[];
+  readonly land: () => void;
+}
+
+/**
+ * The turn between the views, each way a move of its own that runs forwards, the two views never
+ * both to be read at once. The views change as a panel's content changes view (`swapViews`): to
+ * the weather, the clock view slides `space.s24` to the left and fades, and the weather view slides
+ * in from the right and fades in once it has gone; back to the clock, the same mirrored.
+ *
+ * The card's own live sky is the one thing that carries across: it grows into the banner's place,
+ * or the banner's shrinks back into the card's (`carry`), over `long` on `emphasized_decel`, still
+ * drawing, its words travelling on it, sliding with neither view. Its two boxes are read in the
+ * views' resting layouts, before either moves. The panel's height eases from the one view's to the
+ * other's over `long` on `emphasized_decel`.
+ */
+function turn(body: HTMLElement, clock: View, weather: View & { readonly banner: WeatherCard }, from: WeatherCard | null, back: boolean): Turning {
+  const long = ms("long");
+  const short = ms("short");
+  // The sky's two boxes first, in the resting layouts.
+  const carried = from ? carry(back ? weather.banner : from, back ? from : weather.banner, body, { duration: long, easing: easing("emphasized_decel"), fade: short, fadeEasing: easing("standard") }) : null;
+  const heights = [{ height: `${clock.element.offsetHeight}px` }, { height: `${weather.element.offsetHeight}px` }];
+  const played: Animation[] = [moved(body, back ? heights.reverse() : heights, long, "emphasized_decel")];
+  played.push(...(back ? swapViews(weather.element, clock.element, -1) : swapViews(clock.element, weather.element, 1)));
+  // Only the carried sky moves: the leaving clock view's others hold still while it goes.
+  if (!back) for (const card of clock.cards) if (card !== from) card.sky?.pause();
+  return carried ? { played: [...played, ...carried.moves], land: carried.land } : { played, land: () => {} };
+}
+
+/** Runs `then` once the views just drawn have laid out and drawn their skies. */
+function drawn(then: () => void): void {
+  requestAnimationFrame(() => requestAnimationFrame(then));
+}
+
+/** The popup's content: the container padding at its sides, `space.s20` above and below. */
+export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
+  const body = document.createElement("div");
+  body.className = "ck-body";
+  const box = container(body);
+  box.classList.add("ck-popup");
+  let busy = false;
+  let shown: View;
+  let whose: Whose = options.whose ?? "home";
+
+  const freshClock = () => clockView(options, (to, from) => go(to, from));
+  const freshWeather = (to: Whose) => weatherView({ ...options, whose: to, day: 0 }, () => back());
+  const free = (view: View) => {
+    for (const each of view.cards) each.dispose();
+    view.element.remove();
+  };
+
+  /**
+   * Turns between `clock` and `weather`, `weather` lying over `clock` meanwhile, and settles on
+   * the weather or, `back`, on the clock.
+   */
+  function play(clock: View, weather: View & { readonly banner: WeatherCard }, from: WeatherCard | null, back: boolean): void {
+    busy = true;
+    // Until the move starts, the view it starts from is all there is: the other is drawn unseen
+    // and the panel keeps the first's height.
+    body.style.height = `${(back ? weather : clock).element.offsetHeight}px`;
+    weather.element.classList.add("ck-turning");
+    (back ? clock : weather).element.style.opacity = "0";
+    drawn(() => {
+      const { played, land } = turn(body, clock, weather, from, back);
+      body.style.height = "";
+      clock.element.style.opacity = "";
+      weather.element.style.opacity = "";
+      void Promise.all(played.map((each) => each.finished)).then(
+        () => {
+          for (const each of played) each.cancel();
+          land();
+          weather.element.classList.remove("ck-turning");
+          free(back ? weather : clock);
+          shown = back ? clock : weather;
+          busy = false;
+        },
+        () => (busy = false),
+      );
+    });
+  }
+
+  function go(to: Whose, from: WeatherCard | null): void {
+    if (busy || !shown.element.isConnected) return;
+    whose = to;
+    const clock = shown;
+    const weather = freshWeather(to);
+    body.append(weather.element);
+    if (settings().reduced) {
+      free(clock);
+      shown = weather;
+      return;
+    }
+    play(clock, weather, from, false);
+  }
+
+  function back(): void {
+    if (busy) return;
+    const weather = shown as View & { readonly banner: WeatherCard };
+    const clock = freshClock();
+    body.prepend(clock.element);
+    if (settings().reduced) {
+      free(weather);
+      shown = clock;
+      return;
+    }
+    play(clock, weather, clock.cardOf(whose), true);
+  }
+
+  if ((options.view ?? "clock") === "weather") {
+    shown = weatherView(options, () => back());
+    body.append(shown.element);
+  } else {
+    shown = freshClock();
+    body.append(shown.element);
+  }
+
+  return {
+    element: box,
+    toWeather: (to) => {
+      if (shown.rows[0]?.classList.contains("ck-top")) go(to, shown.cardOf(to));
+    },
+    toClock: () => {
+      if (!shown.rows[0]?.classList.contains("ck-top")) back();
+    },
+  };
+}
+
+/** The popup's content alone. */
+export function clockPopup(options: ClockOptions = {}): HTMLElement {
+  return clockPopupOf(options).element;
+}
+
+/**
+ * A screen `width` logical pixels wide, its bar given way as that width needs, the popup open on
+ * the top edge. Live, the bar's time turns the popup to the clock and its temperature to home's
+ * weather.
+ */
+export function clockOnScreen(options: ClockOptions = {}, width = 1440, height = TALL, reveal?: number): HTMLElement {
+  const room = barScreen(width, height, { content: { ...EVERYDAY, ...(options.home === "no city" ? { noHome: true } : {}) } });
+  room.element.dataset.open = "";
+  const popup = clockPopupOf(options);
+  hang(room, sheet({ content: popup.element, edge: "top", ...(reveal !== undefined ? { reveal } : {}) }));
+  if (options.live) {
+    // The pill's weather opens home's weather; anywhere else on the pill opens the clock.
+    room.element.querySelector(".k-clock-pill")?.addEventListener("click", (event) => {
+      if ((event.target as Element).closest(".k-clock-pill-weather")) popup.toWeather("home");
+      else popup.toClock();
+    });
+  }
+  return room.element;
+}
+
+/** The countdowns the Settings app's "Countdown in the bar" picks from, as the shots' stand-ins hold them. */
 export interface Countdown {
   readonly name: string;
   readonly left: string;
@@ -55,266 +477,3 @@ export const COUNTDOWNS: readonly Countdown[] = [
   { name: "Release", left: "6 d 2 h", at: "3 Nov" },
   { name: "Conference", left: "", at: "12 Oct", passed: true },
 ];
-
-export type Tool = "timer" | "stopwatch" | "alarm";
-
-export interface ClockOptions {
-  readonly page?: "main" | "settings";
-  readonly analog?: boolean;
-  /** How many extra clocks, of `ZONES`. */
-  readonly clocks?: number;
-  /** What is typed in the search; a typed question shows its answer. */
-  readonly query?: string;
-  /** The answer copied, its line in place of the key hints. */
-  readonly copied?: boolean;
-  /** The search lit with the keyboard in it. */
-  readonly searching?: boolean;
-  readonly countdowns?: number;
-  /** The pinned countdown, by name, or none. */
-  readonly pinned?: string | null;
-  readonly countdownError?: string;
-  readonly tool?: Tool;
-  /** The timer set and running, set and paused, or not set. */
-  readonly timer?: "running" | "paused" | "none";
-  readonly laps?: number;
-  readonly alarms?: number;
-  readonly toolError?: string;
-  /** The calendar open on the year. */
-  readonly year?: boolean;
-  /** The picked day, in October 2026. */
-  readonly picked?: number;
-  /** kubaos-clock not running: the line that says so at the foot. */
-  readonly unavailable?: boolean;
-  /** The settings' holidays select drawn open. */
-  readonly holidaysOpen?: boolean;
-  /** A long day's answer and title, for the content's extremes. */
-  readonly answer?: { readonly title: string; readonly detail: string };
-  /** Answers the pointer: the gear, the tools' tabs, the search. */
-  readonly live?: boolean;
-}
-
-/** The analog face: twelve ticks, the hour in `primary`, the minute in `on_surface`, the second in `tertiary`. */
-function analogFace(): HTMLElement {
-  const face = document.createElement("span");
-  face.className = "ck-face";
-  for (let index = 0; index < 12; index++) {
-    const tick = document.createElement("span");
-    tick.className = "ck-tick";
-    tick.toggleAttribute("data-quarter", index % 3 === 0);
-    tick.style.setProperty("--turn", `${index * 30}deg`);
-    face.append(tick);
-  }
-  const hand = (name: string, turn: number) => {
-    const each = document.createElement("span");
-    each.className = `ck-hand ck-hand-${name}`;
-    each.style.setProperty("--turn", `${turn}deg`);
-    return each;
-  };
-  const pin = document.createElement("span");
-  pin.className = "ck-pin";
-  // 21:47:32.
-  face.append(hand("hour", (9 + 47 / 60) * 30), hand("minute", (47 + 32 / 60) * 6), hand("second", 32 * 6), pin);
-  return face;
-}
-
-/** The time to the second, the date with its kanji, the day and the week; the gear at the end. */
-function head(options: ClockOptions, toggle: () => void): HTMLElement {
-  // The seconds on the time's baseline: a box of its own, so the row's shared line leaves it be.
-  const hero = text(NOW.hhmm, "hero_number");
-  const seconds = figure(NOW.ss, "headline", "on_surface_variant");
-  seconds.style.setProperty("--time-mass", hero.dataset.mass ?? "0");
-  seconds.style.setProperty("--mass-seconds", (seconds.firstElementChild as HTMLElement | null)?.dataset.mass ?? "0");
-  const time = document.createElement("span");
-  time.className = "ck-time";
-  time.append(hero, seconds);
-  const date = row("s8", "centre", text(CLOCK.kanji, "accent", "tertiary"), text(NOW.date, "body_large"));
-  const words = stack("s4", "start", time, date, text(NOW.day, "small", "on_surface_variant"));
-  const left = row("s20", "centre", ...(options.analog ? [analogFace()] : []), words);
-  const settings = options.page === "settings";
-  const gear = iconButton({ icon: settings ? "close" : "settings", label: settings ? "Back" : "Calendar settings", kind: settings ? "Filled" : "Text" });
-  gear.addEventListener("click", toggle);
-  return row(0, "start", left, fill(), gear);
-}
-
-/** An extra clock: day or night there, its label over its time, how far off. */
-function zone(each: Zone): HTMLElement {
-  const words = stack(0, "start", text(each.label, "caption", "on_surface_variant"), figure(each.time, "body_strong"));
-  const box = row("s8", "centre", icon(each.daylight, "var(--icon-s20)", `var(--color-${each.daylight === "light_mode" ? "primary" : "tertiary"})`), words, text(each.relative, "small", "on_surface_variant"));
-  box.classList.add("ck-zone");
-  return box;
-}
-
-/** What the search comes to, in a card under it, opening as a log does. */
-function answer(options: ClockOptions): HTMLElement {
-  const said = options.answer ?? { title: "53 days", detail: "From today to Saturday 19 December 2026" };
-  const foot = options.copied ? text("Copied 53 days", "caption", "tertiary") : keyHints([["Enter", "copies"], ["Ctrl+Enter", "copies ISO"]]);
-  const box = document.createElement("span");
-  box.className = "ck-answer";
-  const inner = card({ body: [stack("s4", "start", filling(clamped(said.title, "heading", "primary")), filling(clamped(said.detail, "body", "on_surface_variant", 2)), foot)] });
-  box.append(inner);
-  new ResizeObserver(() => box.style.setProperty("--natural", `${inner.offsetHeight}px`)).observe(inner);
-  return box;
-}
-
-/** The picked day: its title, how far and its week, a holiday, the extra clocks' times. */
-function dayDetails(options: ClockOptions): HTMLElement {
-  const today = (options.picked ?? 27) === 27;
-  const holiday = options.picked === 1;
-  const lines = [
-    text(today ? "Today, Tuesday 27 October" : holiday ? "Sunday 1 November" : `${options.picked} October`, "body_strong"),
-    clamped(today ? "Week 44 · day 300 · 3 working days to Friday" : holiday ? "In 5 days · week 44 · day 305" : "Week 44", "small", "on_surface_variant"),
-    ...(holiday ? [text("All Saints' Day", "small", "tertiary")] : []),
-    ...((options.clocks ?? 1) > 0 ? [clamped(ZONES.slice(0, options.clocks ?? 1).map((each) => `${each.label} ${each.time}`).join("  ·  "), "small", "on_surface_variant")] : []),
-  ];
-  return stack("s4", "start", ...lines.map(filling));
-}
-
-/** A countdown: pinned or not, its name over what's left and when, Remove at its end. */
-function countdown(each: Countdown, pinned: boolean): HTMLElement {
-  const words = stack(0, "start", filling(clamped(each.name, "body_strong")), filling(clamped(each.passed ? `${each.at} · passed` : `in ${each.left} · ${each.at}`, "caption", "on_surface_variant")));
-  const remove = iconButton({ icon: "close", label: "Remove", kind: "Text", size: "Sm" });
-  return row("s8", "centre", icon(pinned ? "push_pin" : "hourglass_top", "var(--icon-s20)", "var(--color-tertiary)"), filling(words), remove);
-}
-
-function countdowns(options: ClockOptions): HTMLElement {
-  const pinned = options.pinned === undefined ? "Vacation" : options.pinned;
-  const shown = COUNTDOWNS.slice(0, options.countdowns ?? 2);
-  return stack(
-    "s8",
-    "start",
-    text("Countdowns", "body_strong"),
-    ...shown.map((each) => filling(countdown(each, each.name === pinned))),
-    filling(field({ icon: "more_time", placeholder: "Vacation: 19 dec" })),
-    ...(options.countdownError ? [filling(clamped(options.countdownError, "small", "error", 2))] : []),
-  );
-}
-
-/** A tool's page, all three one height: the alarms' field over three alarms. */
-function toolPage(tool: Tool, options: ClockOptions): HTMLElement {
-  const quiet = (name: string, label: string, kind: "Filled" | "Tonal") => iconButton({ icon: name, label, kind });
-  let content: HTMLElement;
-  if (tool === "timer") {
-    const timer = options.timer ?? "running";
-    content =
-      timer === "none"
-        ? stack(
-            "s8",
-            "start",
-            filling(field({ icon: "timer", placeholder: "25m, 1h30m, 90 seconds" })),
-            row(
-              "s8",
-              "centre",
-              ...["5m", "10m", "25m", "1h"].map((label) => chip({ label, press: "press", tabStop: false })),
-            ),
-          )
-        : stack(
-            "s8",
-            "centre",
-            figure(timer === "running" ? "12:08" : "12:08", "headline", timer === "running" ? "on_surface" : "on_surface_variant"),
-            filling(progressBar({ fraction: 0.52 })),
-            row("s8", "centre", quiet(timer === "running" ? "pause" : "play_arrow", timer === "running" ? "Pause" : "Resume", "Filled"), quiet("close", "Cancel", "Tonal")),
-          );
-  } else if (tool === "stopwatch") {
-    const laps = ["Lap 2  1:02.40", "Lap 1  0:58.12"].slice(0, options.laps ?? 2);
-    content = stack("s8", "centre", figure("2:00.52", "headline"), row("s8", "centre", quiet("pause", "Stop", "Filled"), quiet("flag", "Lap", "Tonal"), quiet("restart_alt", "Reset", "Tonal")), ...laps.map((each) => figure(each, "small", "on_surface_variant")));
-  } else {
-    const alarms = ["7:30", "Friday 17:00", "6:00 PM"].slice(0, options.alarms ?? 1);
-    const rows = alarms.map((label) => filling(row("s8", "centre", icon("alarm", "var(--icon-s20)", "var(--color-tertiary)"), text(label, "body"), fill(), iconButton({ icon: "close", label: "Remove", kind: "Text", size: "Sm" }))));
-    content = stack("s8", "start", filling(field({ icon: "alarm_add", placeholder: "7:30, 6pm, friday 17:00" })), ...(rows.length ? rows : [text("No alarms set", "small", "on_surface_variant")]));
-  }
-  content.classList.add("ck-tool");
-  return content;
-}
-
-function tools(options: ClockOptions): HTMLElement {
-  const order: Tool[] = ["timer", "stopwatch", "alarm"];
-  let current = options.tool ?? "timer";
-  const room = document.createElement("span");
-  room.className = "ck-tool-room";
-  const draw = () => room.replaceChildren(toolPage(current, options));
-  draw();
-  const bar = tabs({
-    choices: [{ label: "Timer" }, { label: "Stopwatch" }, { label: "Alarm" }],
-    picked: order.indexOf(current),
-    onPick: (index) => {
-      current = order[index]!;
-      draw();
-    },
-  });
-  return stack("s12", "start", filling(bar), filling(room), ...(options.toolError ? [filling(clamped(options.toolError, "small", "error", 2))] : []));
-}
-
-/** The settings page: holidays, first weekday, time format, date order, analog face, the bar's countdown, extra clocks. */
-function settingsPage(options: ClockOptions): HTMLElement {
-  const choice = (label: string, picked: boolean) => chip({ label, kind: picked ? "Selected" : "Neutral", press: "press", tabStop: false });
-  const setting = (title: string, note: string | null, ...choices: HTMLElement[]) =>
-    stack("s8", "start", filling(stack("s4", "start", text(title, "body_strong"), ...(note ? [text(note, "small", "on_surface_variant")] : []))), ...choices.map(filling));
-  const zones = ZONES.slice(0, options.clocks ?? 1);
-  return stack(
-    "s16",
-    "start",
-    ...[
-      setting("Holidays", "Marked in the calendar and left out of working days", select({ options: ["None", "Germany", "Japan", "Poland", "United Kingdom", "United States"], picked: 3, icon: "flag", ...(options.holidaysOpen ? { open: true } : {}) })),
-      setting("First day of the week", null, row("s4", "centre", ...["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, index) => choice(day, index === 0)))),
-      setting("Time format", "How the bar, the lock screen and this popup write the time", row("s4", "centre", choice("Locale", true), choice("24-hour", false), choice("12-hour", false))),
-      setting("Date order", null, row("s4", "centre", choice("Locale", true), choice("Day first", false), choice("Month first", false))),
-      setting("Analog face", null, row("s4", "centre", choice("Off", !options.analog), choice("On", options.analog ?? false))),
-      setting("Countdown in the bar", null, flow("s4", choice("None", options.pinned === null), ...COUNTDOWNS.slice(0, options.countdowns ?? 2).map((each) => choice(each.name, each.name === (options.pinned === undefined ? "Vacation" : options.pinned))))),
-      setting(
-        "Extra clocks",
-        "Up to four, by city or IANA name",
-        ...zones.map((each) => row(0, "centre", text(`${each.label}  ·  ${each.name}`, "body"), fill(), iconButton({ icon: "close", label: "Remove", kind: "Text", size: "Sm" }))),
-        ...(zones.length < 4 ? [field({ icon: "add_location_alt", placeholder: "Tokyo, New York, America/Chicago" })] : []),
-      ),
-      clamped("Kept in ~/.config/kubaos/desktop/clock/clock.toml", "small", "on_surface_variant"),
-    ].map(filling),
-  );
-}
-
-/** The popup's content: `space.s20` above and below, the container padding at its sides. */
-export function clockPopup(options: ClockOptions = {}): HTMLElement {
-  let page = options.page ?? "main";
-  const body = document.createElement("span");
-  body.className = "ck-body";
-  const box = container(body);
-  box.classList.add("ck-popup");
-
-  function draw(): void {
-    const shown: ClockOptions = { ...options, page };
-    const parts: HTMLElement[] = [
-      head(shown, () => {
-        if (!options.live) return;
-        page = page === "main" ? "settings" : "main";
-        draw();
-      }),
-    ];
-    if (page === "main") {
-      const clocks = ZONES.slice(0, options.clocks ?? 1);
-      if (clocks.length) parts.push(flow("s8", ...clocks.map(zone)));
-      const query = options.query ?? "";
-      const search = field({ icon: "event", placeholder: "next friday, days until christmas, 12 mar to 4 jul, 15:00 tokyo", value: query, ...(options.searching || query ? { pinned: "lit" as const } : {}) });
-      parts.push(stack("s8", "start", filling(search), ...(query ? [filling(answer(options))] : [])));
-      const month = calendar({ shown: { year: 2026, month: 10 }, today: { year: 2026, month: 10, day: 27 }, picked: { year: 2026, month: 10, day: options.picked ?? 27 }, firstWeekday: 1, holidays: { "2026-11-01": "All Saints' Day" }, ...(options.year ? { year: true } : {}) });
-      const left = stack("s12", "start", month, filling(dayDetails(options)));
-      left.classList.add("ck-month");
-      const side = stack("s16", "start", filling(countdowns(options)), filling(tools(options)));
-      side.classList.add("ck-side");
-      parts.push(row("s20", "start", left, side));
-    } else {
-      parts.push(settingsPage(options));
-    }
-    if (options.unavailable) parts.push(clamped("kubaos-clock isn't running: the calendar and the search need it", "small", "error"));
-    body.replaceChildren(...parts.map(filling));
-  }
-
-  draw();
-  return box;
-}
-
-/** A screen `width` logical pixels wide, its bar given way as that width needs, the popup open on the top edge. */
-export function clockOnScreen(options: ClockOptions = {}, width = 1440, height = TALL, reveal?: number): HTMLElement {
-  const room = barScreen(width, height, { content: { ...EVERYDAY, countdown: true } });
-  room.element.dataset.open = "";
-  hang(room, sheet({ content: clockPopup(options), edge: "top", ...(reveal !== undefined ? { reveal } : {}) }));
-  return room.element;
-}

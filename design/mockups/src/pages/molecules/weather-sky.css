@@ -1,0 +1,18 @@
+/* The WeatherSky page's samples, each as wide as the clock popup gives it: the banner and a row of
+   cities the popup's column, home's card a panel's width, a city's card a quarter of the column
+   less the row's gaps, on a whole device pixel. Their heights are the cards' own. */
+.ws-sample {
+  flex: none;
+}
+
+.ws-sample[data-sample="banner"] {
+  width: var(--size-column);
+}
+
+.ws-sample[data-sample="home"] {
+  width: var(--size-panel);
+}
+
+.ws-sample[data-sample="city"] {
+  width: round(down, calc((var(--size-column) - 3 * var(--space-s8)) / 4), 1px);
+}

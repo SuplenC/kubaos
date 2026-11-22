@@ -269,6 +269,17 @@ export function centreOnInk(element: HTMLElement, style: TypeStyle, words: strin
   element.dataset.mass = String(middle);
 }
 
+/**
+ * How far `words`' ink starts after its box's left edge in `style`, in ems: a large light figure's
+ * side bearing, which an edge measured to the ink rather than the box takes off.
+ */
+export function inkLeft(style: TypeStyle, words: string): number {
+  scale ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  if (!scale) throw new Error("no 2D canvas to weigh text with");
+  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
+  return -scale.measureText(words).actualBoundingBoxLeft / WEIGHED_AT;
+}
+
 /** The size `style` is drawn at, in logical pixels. */
 function sizeOf(style: TypeStyle): number {
   const meter = font(style);

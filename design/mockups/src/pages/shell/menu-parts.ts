@@ -32,6 +32,7 @@ import { clamped, text, wrapped } from "../../lib/text.ts";
 import { toast } from "../../lib/toast.ts";
 import { length } from "../../lib/tokens.ts";
 import { popover } from "../../lib/tooltip.ts";
+import { CITIES, CONDITIONS, clockOf, dayRange, degrees, HOME, hourOf, NOW_HOUR, offsetOf, symbolOf } from "./weather-data.ts";
 
 // ---------------------------------------------------------------- the Results --
 
@@ -70,7 +71,50 @@ export interface Item {
   readonly alias?: string;
   /** Why it can't run, shown in its subtitle's place, the row dimmed. */
   readonly unavailable?: string;
+  /** Its own symbol, over its Extension's. */
+  readonly symbol?: string;
+  /** Words it is found by besides its title. */
+  readonly keywords?: readonly string[];
+  /** What it answers, at the row's end where an alias would be: the weather now, a city's time. */
+  readonly answer?: string;
+  /** Its own Actions, in the Action panel in place of the shots' sample ones. */
+  readonly actions?: Result["actions"];
 }
+
+/** A clock Item's Actions: its own way in, the answer copied, and its settings. */
+function clockActions(open: string, answer?: string): Result["actions"] {
+  return [{ title: open, keys: "↵" }, ...(answer ? [{ title: `Copy “${answer}”`, keys: "⌃⇧C" }] : []), { title: "Open in Settings", keys: "" }];
+}
+
+/** A weather Item: its answer at the row's end, its Actions opening the weather. */
+function weatherItem(title: string, subtitle: string, symbol: string, keywords: readonly string[], answer: string): Item {
+  return { title, subtitle, extension: "clock", symbol, keywords, answer, actions: clockActions("Open weather", answer) };
+}
+
+/** The settings Items' one Action: their rows in Settings › Date & time. */
+const SETTINGS_ACTIONS: Result["actions"] = [{ title: "Open in Settings", keys: "↵" }];
+
+/** A city's answer: its time, then its weather. */
+const cityAnswer = (place: (typeof CITIES)[number]) => `${clockOf(hourOf(place))}, ${degrees(place.temperature)} ${CONDITIONS[place.weather].toLowerCase()}`;
+
+/** The clock's Items: the popup, the weather at home and tomorrow, each city, and the clock's settings. */
+const CLOCK_ITEMS: readonly Item[] = [
+  { title: "Clock", subtitle: "The time, your cities and the month", extension: "clock", symbol: "schedule", keywords: ["calendar", "date", "time"], answer: "21:47", actions: clockActions("Open clock", "21:47") },
+  weatherItem("Weather", "Warsaw now and this week", symbolOf(HOME.weather, NOW_HOUR), ["forecast", "temperature"], `${degrees(HOME.temperature)}, ${CONDITIONS[HOME.weather].toLowerCase()}`),
+  weatherItem("Weather tomorrow", "Wednesday in Warsaw", symbolOf(HOME.week[1]!), ["forecast"], `${degrees(dayRange(HOME, 1)[0])} / ${degrees(dayRange(HOME, 1)[1])}, ${CONDITIONS[HOME.week[1]!].toLowerCase()}`),
+  ...CITIES.slice(0, 4).map((place): Item => ({
+    title: place.name,
+    subtitle: `Weather and time, ${offsetOf(place)}`,
+    extension: "clock",
+    symbol: symbolOf(place.weather, hourOf(place)),
+    keywords: ["weather", "time", "forecast", "clock", place.iana],
+    answer: cityAnswer(place),
+    actions: clockActions("Open weather", cityAnswer(place)),
+  })),
+  { title: "Settings: Date & time", subtitle: "Zone, format, the bar's clock, cities, weather", extension: "kubaos", symbol: "schedule", keywords: ["clock", "weather", "calendar"], actions: SETTINGS_ACTIONS },
+  { title: "Settings: Cities", subtitle: "Add or remove the clock's cities", extension: "kubaos", symbol: "add_location_alt", keywords: ["clock", "weather", "time zone"], actions: SETTINGS_ACTIONS },
+  { title: "Settings: Weather", subtitle: "On or off, home city, units", extension: "kubaos", symbol: "fair_day", keywords: ["forecast", "temperature", "units"], actions: SETTINGS_ACTIONS },
+];
 
 /** The shots' Items, in the Daemon's order. */
 export const ITEMS: readonly Item[] = [
@@ -88,6 +132,7 @@ export const ITEMS: readonly Item[] = [
   { title: "Suspend", subtitle: "Sleep until a key is pressed", extension: "system", unavailable: "Inhibited by Firefox: a video is playing" },
   { title: "Workspace 3", subtitle: "Move to workspace 3", extension: "hyprland" },
   { title: "Design specimen", subtitle: "Every token and component, live", extension: "kubaos" },
+  ...CLOCK_ITEMS,
 ];
 
 /** What the Action panel lists for every shot Result: the Item's own, then two Contributed. */
@@ -136,10 +181,10 @@ export function result(item: Item, index: number, typed = ""): Result {
     title: item.title,
     ...(at >= 0 ? { matched: [{ start: at, end: at + typed.length }] } : {}),
     subtitle: item.unavailable ?? item.subtitle,
-    icon: glyph(item.extension),
+    icon: item.symbol ?? glyph(item.extension),
     ...(initial !== undefined ? { initial } : {}),
     ...(item.picture ? { picture: item.picture } : {}),
-    ...(item.alias ? { detail: item.alias } : {}),
+    ...(item.alias ? { detail: item.alias } : item.answer ? { detail: item.answer } : {}),
     ...(item.unavailable ? { disabled: true } : {}),
     tile: true,
     tall: true,
@@ -147,12 +192,13 @@ export function result(item: Item, index: number, typed = ""): Result {
     tight: true,
   };
   const kind = [kindLabel(item.extension), item.alias ?? ""].filter((each) => each !== "").join(" · ");
-  return { row, kind, actions: ACTIONS, hints: hintsOf(index) };
+  return { row, kind, actions: item.actions ?? ACTIONS, hints: hintsOf(index) };
 }
 
-/** The Results for `typed`: the Items whose title holds it, as the stand-in matches. */
+/** The Results for `typed`: the Items whose title or a keyword holds it, as the stand-in matches. */
 export function results(typed = "", items: readonly Item[] = ITEMS): Result[] {
-  return items.filter((item) => typed === "" || item.title.toLowerCase().includes(typed.toLowerCase())).map((item, index) => result(item, index, typed));
+  const found = (words: string) => words.toLowerCase().includes(typed.toLowerCase());
+  return items.filter((item) => typed === "" || found(item.title) || (item.keywords ?? []).some(found)).map((item, index) => result(item, index, typed));
 }
 
 // ---------------------------------------------------------------- the screens --

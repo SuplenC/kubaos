@@ -1,0 +1,35 @@
+/* The WeatherSky's layers, back to front: the sky, what falls behind the text (the library's
+   background layer, z-index 0), the owner's text and the boxes it gives what falls to land on (2),
+   then what falls in front (the library's foreground layer, 3). */
+.k-weather-sky {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.k-weather-sky-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: -1;
+}
+
+.k-weather-sky-content,
+.k-weather-sky-hits {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.k-weather-sky-hits {
+  pointer-events: none;
+}
+
+/* Unlayered, so it wins over the library's own rule for a collision surface, which would put the
+   box back in the flow. */
+.k-weather-sky-hit {
+  position: absolute;
+  pointer-events: none;
+}
