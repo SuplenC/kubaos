@@ -2,7 +2,7 @@
 
 Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#components) has the rules every component keeps, its variant words and the fixed measures the geometry check holds it to.
 
-Their mockup page is the source of truth: Molecules, WeatherSky, in `design/mockups/` (`src/lib/weather-sky.ts`, `src/lib/weather-card.ts`). The clock popup mounts the cards and lays them out.
+Their mockup page is the source of truth: Molecules, WeatherSky, in `design/mockups/` (`src/lib/weather-sky.ts`, `src/lib/weather-card.ts`). The clock popup mounts the cards and lays them out. Their readings are Open-Meteo's, whose data licence (CC-BY-4.0) asks for credit beside the data: the popup's foot says "Weather from Open-Meteo", and that line is required and stays wherever the popup shows the weather.
 
 ## `WeatherSky`
 

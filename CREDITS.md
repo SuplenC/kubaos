@@ -14,7 +14,7 @@ What KubaOS ships, draws on or is designed around.
 |---|---|---|---|---|
 | Btrfs tools (`btrfs-progs`) | The subvolumes the snapshots and the install are laid out in | Oracle, Red Hat, STRATO AG and the btrfs-progs contributors | GPL-2.0 | [git.kernel.org/…/kdave/btrfs-progs.git](https://git.kernel.org/pub/scm/linux/kernel/git/kdave/btrfs-progs.git) |
 | GRUB | The boot menu, themed by KubaOS (`system/files/grub/`) | Free Software Foundation | GPL-3.0-or-later | [gnu.org/software/grub](https://www.gnu.org/software/grub/) |
-| grub-btrfs | The snapshots in the boot menu | Antynea | See its repository | [github.com/Antynea/grub-btrfs](https://github.com/Antynea/grub-btrfs) |
+| grub-btrfs | The snapshots in the boot menu | Antynea | GPL-3.0 | [github.com/Antynea/grub-btrfs](https://github.com/Antynea/grub-btrfs) |
 | Home Manager | Builds the user's home from `home/`: programs, settings and services | Home Manager contributors | MIT | [github.com/nix-community/home-manager](https://github.com/nix-community/home-manager) |
 | inotify-tools | Lets grub-btrfs see new snapshots | John McCutchan, Rohan McGovern, Radu Voicilas and Enrico Maria Crisostomo | GPL-2.0 | [github.com/rvoicilas/inotify-tools](https://github.com/rvoicilas/inotify-tools) |
 | keyd | The accent key: holds a letter to type its accented forms | Raheman Vaiya | MIT | [github.com/rvaiya/keyd](https://github.com/rvaiya/keyd) |
@@ -31,28 +31,29 @@ What KubaOS ships, draws on or is designed around.
 | Name | What KubaOS uses it for | Creators | Licence | Link |
 |---|---|---|---|---|
 | adw-gtk3 | GTK 3 apps' theme, recoloured from the wallpaper | lassekongo83 | LGPL-2.1-only | [github.com/lassekongo83/adw-gtk3](https://github.com/lassekongo83/adw-gtk3) |
-| Caelestia | The structure the shell follows: one frame with panels growing out of its edges | caelestia-dots | See its repository | [github.com/caelestia-dots/shell](https://github.com/caelestia-dots/shell) |
+| Caelestia | The structure the shell follows: one frame with panels growing out of its edges | caelestia-dots | GPL-3.0 | [github.com/caelestia-dots/shell](https://github.com/caelestia-dots/shell) |
 | foot | The fallback terminal, for when Ghostty can't start | Daniel Eklöf | MIT | [codeberg.org/dnkl/foot](https://codeberg.org/dnkl/foot/) |
 | fuzzel | The fallback launcher | Daniel Eklöf | MIT, Zlib | [codeberg.org/dnkl/fuzzel](https://codeberg.org/dnkl/fuzzel) |
 | GNOME Keyring | Holds the VPN and app secrets (`secret-tool`) | Collabora Ltd., Nokia Corporation and the GNOME Keyring contributors | LGPL-2.1-or-later, GPL-2.0-or-later | [gitlab.gnome.org/GNOME/gnome-keyring](https://gitlab.gnome.org/GNOME/gnome-keyring) |
 | GPU Screen Recorder | Screen recording | dec05eba and contributors | GPL-3.0-only | [git.dec05eba.com/gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/about/) |
 | grim | Screenshots | Simon Ser | MIT | [gitlab.freedesktop.org/emersion/grim](https://gitlab.freedesktop.org/emersion/grim) |
-| hyprcursor | The cursor format `kubaos cursor` writes its recoloured pointer in | hyprwm | BSD-3-Clause | [github.com/hyprwm/hyprcursor](https://github.com/hyprwm/hyprcursor) |
-| hypridle | Locks, turns the screens off and suspends on idle, as `kubaos-idle` sets it | Hypr Development | BSD-3-Clause | [github.com/hyprwm/hypridle](https://github.com/hyprwm/hypridle) |
-| Hyprland | The compositor: windows, workspaces, keys and animation (`config/hypr/`) | vaxerski | BSD-3-Clause | [github.com/hyprwm/Hyprland](https://github.com/hyprwm/Hyprland) |
-| hyprland-guiutils | Hyprland's own dialogs | hyprwm | BSD-3-Clause | [github.com/hyprwm/hyprland-guiutils](https://github.com/hyprwm/hyprland-guiutils) |
-| hyprlock | The lock screen's fallback | Hypr Development | BSD-3-Clause | [github.com/hyprwm/hyprlock](https://github.com/hyprwm/hyprlock) |
-| hyprpicker | The colour picker | hyprwm | BSD-3-Clause | [github.com/hyprwm/hyprpicker](https://github.com/hyprwm/hyprpicker) |
-| hyprpolkitagent | The polkit agent behind the shell's password prompt | hyprwm | BSD-3-Clause | [github.com/hyprwm/hyprpolkitagent](https://github.com/hyprwm/hyprpolkitagent) |
+| hyprcursor | The cursor format `kubaos cursor` writes its recoloured pointer in | Vaxry (vaxerski) and the Hyprland contributors | BSD-3-Clause | [github.com/hyprwm/hyprcursor](https://github.com/hyprwm/hyprcursor) |
+| hypridle | Locks, turns the screens off and suspends on idle, as `kubaos-idle` sets it | Vaxry (vaxerski) and the Hyprland contributors | BSD-3-Clause | [github.com/hyprwm/hypridle](https://github.com/hyprwm/hypridle) |
+| Hyprland | The compositor: windows, workspaces, keys and animation (`config/hypr/`) | Vaxry (vaxerski) and the Hyprland contributors | BSD-3-Clause | [github.com/hyprwm/Hyprland](https://github.com/hyprwm/Hyprland) |
+| hyprland-guiutils | Hyprland's own dialogs | Vaxry (vaxerski) and the Hyprland contributors | BSD-3-Clause | [github.com/hyprwm/hyprland-guiutils](https://github.com/hyprwm/hyprland-guiutils) |
+| hyprlock | The lock screen's fallback | Vaxry (vaxerski) and the Hyprland contributors | BSD-3-Clause | [github.com/hyprwm/hyprlock](https://github.com/hyprwm/hyprlock) |
+| hyprpicker | The colour picker | Vaxry (vaxerski) and the Hyprland contributors | BSD-3-Clause | [github.com/hyprwm/hyprpicker](https://github.com/hyprwm/hyprpicker) |
+| hyprpolkitagent | The polkit agent behind the shell's password prompt | Vaxry (vaxerski) and the Hyprland contributors | BSD-3-Clause | [github.com/hyprwm/hyprpolkitagent](https://github.com/hyprwm/hyprpolkitagent) |
 | libnotify (`notify-send`) | Notifications sent from the scripts | Christian Hammond and John Palmieri | LGPL-2.1 | [gitlab.gnome.org/GNOME/libnotify](https://gitlab.gnome.org/GNOME/libnotify) |
 | matugen | The colour scheme drawn from the wallpaper, for the shell and every themed app | InioX | GPL-2.0-or-later | [github.com/InioX/matugen](https://github.com/InioX/matugen) |
 | playerctl | Media keys and the shell's player controls | Tony Crisci | LGPL-3.0 | [github.com/acrisci/playerctl](https://github.com/acrisci/playerctl) |
 | polkit | Lets the shell and Kōbō ask for an administrator's password | David Zeuthen | LGPL-2.0-or-later | [github.com/polkit-org/polkit](https://github.com/polkit-org/polkit) |
 | Qalculate! (`qalc`) | The fallback calculator | Hanna Knutsson | GPL-2.0-or-later | [qalculate.github.io](http://qalculate.github.io) |
 | Qt 6 | The toolkit the shell and `KubaOS.Components` run on, with Qt Multimedia, Qt 5 Compat and Qt Image Formats | The Qt Company Ltd. | LGPL-3.0-or-later, GPL-2.0-or-later | [qt.io](https://www.qt.io/) |
+| qt5ct | Qt 5 apps' theme and font settings | trialuser02 | BSD | [sourceforge.net/projects/qt5ct](https://sourceforge.net/projects/qt5ct/) |
 | qt6ct | Qt 6 apps' theme and font settings | trialuser | BSD-2-Clause | [opencode.net/trialuser/qt6ct](https://www.opencode.net/trialuser/qt6ct) |
 | Quickshell | The desktop shell's runtime: the bar, panels, lock screen and Command menu are QML on it (`config/quickshell/`) | outfoxxed | LGPL-3.0 | [quickshell.outfoxxed.me](https://quickshell.outfoxxed.me) |
-| Satty | Annotates screenshots | gabm | MPL-2.0 | [github.com/gabm/Satty](https://github.com/gabm/Satty) |
+| Satty | Annotates screenshots | Matthias Gabriel | MPL-2.0 | [github.com/gabm/Satty](https://github.com/gabm/Satty) |
 | slurp | Picks a region for screenshots and recordings | Simon Ser and Drew DeVault | MIT | [github.com/emersion/slurp](https://github.com/emersion/slurp) |
 | socat | Talks to Hyprland's socket from the scripts | Gerhard Rieger and contributors | GPL-2.0-only | [dest-unreach.org/socat](http://www.dest-unreach.org/socat/) |
 | wl-clipboard | Copies from the scripts (`wl-copy`) | Sergey Bugaev | GPL-3.0-or-later | [github.com/bugaevc/wl-clipboard](https://github.com/bugaevc/wl-clipboard) |
@@ -96,7 +97,7 @@ What KubaOS ships, draws on or is designed around.
 | Nautilus | Files, with KubaOS's extensions (`home/files/kubaos-nautilus.py`) | Eazel, Inc., Red Hat, Inc. and the Nautilus contributors | GPL-3.0-or-later | [apps.gnome.org/Nautilus](https://apps.gnome.org/Nautilus/) |
 | nautilus-python | Runs KubaOS's Files extensions | Johan Dahlin and Novell, Inc. | GPL-2.0-or-later | [download.gnome.org/sources/nautilus-python](https://download.gnome.org/sources/nautilus-python/) |
 | Papers | The document viewer | Marco Pesenti Gritti, Christian Persch, Carlos Garcia Campos and Red Hat | GPL-2.0-or-later | [gitlab.gnome.org/GNOME/papers](https://gitlab.gnome.org/GNOME/papers) |
-| ripdrag | Drags files out of yazi | nik012003 | GPL-3.0-only | [github.com/nik012003/ripdrag](https://github.com/nik012003/ripdrag) |
+| ripdrag | Drags files out of yazi | Nicola Guerrera | GPL-3.0-only | [github.com/nik012003/ripdrag](https://github.com/nik012003/ripdrag) |
 | Showtime | The video player | Laura Kramolis | GPL-3.0-or-later | [apps.gnome.org/Showtime](https://apps.gnome.org/Showtime) |
 | Sushi | Quick previews in Files | Red Hat, Inc. | GPL-2.0-or-later | [gitlab.gnome.org/GNOME/sushi](https://gitlab.gnome.org/GNOME/sushi) |
 | The Unarchiver (`unar`) | Opens RAR and other archives | MacPaw Inc. | LGPL-2.1-or-later | [github.com/MacPaw/XADMaster](https://github.com/MacPaw/XADMaster) |
@@ -106,10 +107,10 @@ What KubaOS ships, draws on or is designed around.
 
 | Name | What KubaOS uses it for | Creators | Licence | Link |
 |---|---|---|---|---|
-| Atuin | The shell's history search | atuinsh | MIT | [github.com/atuinsh/atuin](https://github.com/atuinsh/atuin) |
+| Atuin | The shell's history search | Ellie Huxtable, Atuin, Inc. | MIT | [github.com/atuinsh/atuin](https://github.com/atuinsh/atuin) |
 | bat | `cat` with highlighting, and fzf's file previews | David Peter (sharkdp) | Apache-2.0, MIT | [github.com/sharkdp/bat](https://github.com/sharkdp/bat) |
 | btop | The process monitor (`config/btop/`) | aristocratos | Apache-2.0 | [github.com/aristocratos/btop](https://github.com/aristocratos/btop) |
-| delta | Git's diffs, themed from the wallpaper | dandavison | MIT | [github.com/dandavison/delta](https://github.com/dandavison/delta) |
+| delta | Git's diffs, themed from the wallpaper | Dan Davison | MIT | [github.com/dandavison/delta](https://github.com/dandavison/delta) |
 | dust | Shows what fills a disk | bootandy | Apache-2.0 | [github.com/bootandy/dust](https://github.com/bootandy/dust) |
 | dysk | Lists disks and their space | dystroy (Denys Séguret) | MIT | [github.com/Canop/dysk](https://github.com/Canop/dysk) |
 | eza | `ls`, with icons and the wallpaper's colours | Christina Sørensen and the eza contributors | EUPL-1.2 | [github.com/eza-community/eza](https://github.com/eza-community/eza) |
@@ -118,21 +119,22 @@ What KubaOS ships, draws on or is designed around.
 | fzf | Fuzzy finding in the shell | Junegunn Choi | MIT | [github.com/junegunn/fzf](https://github.com/junegunn/fzf) |
 | Ghostty | The terminal (`config/ghostty/`) | Mitchell Hashimoto and the Ghostty contributors | MIT | [ghostty.org](https://ghostty.org/) |
 | Git | Version control, and the updates `kubaos-git` runs | Linus Torvalds and others | GPL-2.0 | [git-scm.com](https://git-scm.com/) |
-| glow | Renders markdown in the terminal | charmbracelet | MIT | [github.com/charmbracelet/glow](https://github.com/charmbracelet/glow) |
+| GitHub CLI (`gh`) | GitHub from the terminal | GitHub, Inc. | MIT | [github.com/cli/cli](https://github.com/cli/cli) |
+| glow | Renders markdown in the terminal | Charmbracelet, Inc. | MIT | [github.com/charmbracelet/glow](https://github.com/charmbracelet/glow) |
 | jq | JSON in the scripts and the shell | Stephen Dolan | MIT | [jqlang.github.io/jq](https://jqlang.github.io/jq/) |
-| lazydocker | Docker in the terminal | jesseduffield | MIT | [github.com/jesseduffield/lazydocker](https://github.com/jesseduffield/lazydocker) |
-| lazygit | Git in the terminal (`config/lazygit/`) | jesseduffield | MIT | [github.com/jesseduffield/lazygit](https://github.com/jesseduffield/lazygit) |
+| lazydocker | Docker in the terminal | Jesse Duffield | MIT | [github.com/jesseduffield/lazydocker](https://github.com/jesseduffield/lazydocker) |
+| lazygit | Git in the terminal (`config/lazygit/`) | Jesse Duffield | MIT | [github.com/jesseduffield/lazygit](https://github.com/jesseduffield/lazygit) |
 | mise | The language toolchains of the Suites | Jeff Dickey | MIT | [mise.jdx.dev](https://mise.jdx.dev) |
-| Oh My Posh | The prompt (`config/ohmyposh/`) | JanDeDobbeleer | MIT | [ohmyposh.dev](https://ohmyposh.dev) |
+| Oh My Posh | The prompt (`config/ohmyposh/`) | Jan De Dobbeleer | MIT | [ohmyposh.dev](https://ohmyposh.dev) |
 | Oh My Zsh | Zsh's git plugin and completions | Planet Argon and the Oh My Zsh contributors | MIT | [ohmyz.sh](https://ohmyz.sh/) |
 | ripgrep | `grep`, for the shell and Neovim | Andrew Gallant | Unlicense, MIT | [github.com/BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) |
-| tealdeer | `tldr` pages | tealdeer-rs | Apache-2.0, MIT | [github.com/tealdeer-rs/tealdeer](https://github.com/tealdeer-rs/tealdeer) |
+| tealdeer | `tldr` pages | Danilo Bargen and contributors | Apache-2.0, MIT | [github.com/tealdeer-rs/tealdeer](https://github.com/tealdeer-rs/tealdeer) |
 | tmux | The terminal multiplexer (`config/tmux/`) | Nicholas Marriott | BSD-3-Clause | [tmux.github.io](https://tmux.github.io/) |
 | tmux-better-mouse-mode | Scrolling in tmux with the mouse | Nathan Daly | MIT | [github.com/NHDaly/tmux-better-mouse-mode](https://github.com/NHDaly/tmux-better-mouse-mode) |
 | tmux-sensible | tmux's base settings | Bruno Sutic | MIT | [github.com/tmux-plugins/tmux-sensible](https://github.com/tmux-plugins/tmux-sensible) |
-| tmux-sessionizer (`tms`) | Opens projects as tmux sessions (`config/tms/`) | jrmoulton | MIT | [github.com/jrmoulton/tmux-sessionizer](https://github.com/jrmoulton/tmux-sessionizer) |
+| tmux-sessionizer (`tms`) | Opens projects as tmux sessions (`config/tms/`) | Jared Moulton | MIT | [github.com/jrmoulton/tmux-sessionizer](https://github.com/jrmoulton/tmux-sessionizer) |
 | vim-tmux-navigator | Moves between Neovim splits and tmux panes with the same keys | Chris Toomey | MIT | [github.com/christoomey/vim-tmux-navigator](https://github.com/christoomey/vim-tmux-navigator) |
-| xh | HTTP requests from the terminal | ducaale | MIT | [github.com/ducaale/xh](https://github.com/ducaale/xh) |
+| xh | HTTP requests from the terminal | Mohamed Daahir | MIT | [github.com/ducaale/xh](https://github.com/ducaale/xh) |
 | yq | YAML in the scripts and the shell | Mike Farah | MIT | [mikefarah.gitbook.io/yq](https://mikefarah.gitbook.io/yq/) |
 | zoxide | `cd` that learns the folders used most | Ajeet D'Souza | MIT | [github.com/ajeetdsouza/zoxide](https://github.com/ajeetdsouza/zoxide) |
 | Zsh | The shell | Paul Falstad and the Zsh Development Group | MIT-Modern-Variant | [zsh.org](https://www.zsh.org/) |
@@ -158,6 +160,7 @@ KubaOS's Neovim (`config/nvim/`) is LazyVim with these plugins (`config/nvim/laz
 | friendly-snippets | Snippets | Rafael Madriz | MIT | [github.com/rafamadriz/friendly-snippets](https://github.com/rafamadriz/friendly-snippets) |
 | gitsigns.nvim | Git changes in the gutter | Lewis Russell | MIT | [github.com/lewis6991/gitsigns.nvim](https://github.com/lewis6991/gitsigns.nvim) |
 | grug-far.nvim | Search and replace across files | Stephan Badragan | MIT | [github.com/MagicDuck/grug-far.nvim](https://github.com/MagicDuck/grug-far.nvim) |
+| hadolint | Lints Dockerfiles | Lukas Martinelli | GPL-3.0 | [github.com/hadolint/hadolint](https://github.com/hadolint/hadolint) |
 | inc-rename.nvim | Renames with a live preview | Jonas Strittmatter | MIT | [github.com/smjonas/inc-rename.nvim](https://github.com/smjonas/inc-rename.nvim) |
 | lazy.nvim | The plugin manager | Folke Lemaitre | Apache-2.0 | [github.com/folke/lazy.nvim](https://github.com/folke/lazy.nvim) |
 | lazydev.nvim | Lua completion for Neovim's own API | Folke Lemaitre | Apache-2.0 | [github.com/folke/lazydev.nvim](https://github.com/folke/lazydev.nvim) |
@@ -167,7 +170,7 @@ KubaOS's Neovim (`config/nvim/`) is LazyVim with these plugins (`config/nvim/laz
 | markdown-preview.nvim | Previews markdown in a browser | 年糕小豆汤 (iamcco) | MIT | [github.com/iamcco/markdown-preview.nvim](https://github.com/iamcco/markdown-preview.nvim) |
 | markdown-toc | Writes markdown tables of contents | Jon Schlinkert | MIT | [github.com/jonschlinkert/markdown-toc](https://github.com/jonschlinkert/markdown-toc) |
 | markdownlint-cli2 | Lints markdown | David Anson | MIT | [github.com/DavidAnson/markdownlint-cli2](https://github.com/DavidAnson/markdownlint-cli2) |
-| marksman | Markdown's language server | artempyanykh | MIT | [github.com/artempyanykh/marksman](https://github.com/artempyanykh/marksman) |
+| marksman | Markdown's language server | Artem Pyanykh | MIT | [github.com/artempyanykh/marksman](https://github.com/artempyanykh/marksman) |
 | mason-lspconfig.nvim | Connects Mason's servers to Neovim | William Boman | Apache-2.0 | [github.com/mason-org/mason-lspconfig.nvim](https://github.com/mason-org/mason-lspconfig.nvim) |
 | mason-nvim-dap.nvim | Connects Mason's debug adapters to nvim-dap | Jay Patel | AGPL-3.0 | [github.com/jay-babu/mason-nvim-dap.nvim](https://github.com/jay-babu/mason-nvim-dap.nvim) |
 | mason.nvim | Installs the language tools that aren't npm packages | William Boman | Apache-2.0 | [github.com/mason-org/mason.nvim](https://github.com/mason-org/mason.nvim) |
@@ -192,9 +195,10 @@ KubaOS's Neovim (`config/nvim/`) is LazyVim with these plugins (`config/nvim/laz
 | render-markdown.nvim | Renders markdown in the buffer | Vlad (MeanderingProgrammer) | MIT | [github.com/MeanderingProgrammer/render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim) |
 | rustaceanvim | Rust in the editor, for the Rust Suite | Marc Jakobi | GPL-2.0 | [github.com/mrcjkb/rustaceanvim](https://github.com/mrcjkb/rustaceanvim) |
 | SchemaStore.nvim | JSON and YAML schemas | b0o | Apache-2.0 | [github.com/b0o/SchemaStore.nvim](https://github.com/b0o/SchemaStore.nvim) |
-| shfmt | Formats shell scripts | mvdan | BSD-3-Clause | [github.com/mvdan/sh](https://github.com/mvdan/sh) |
+| shfmt | Formats shell scripts | Daniel Martí | BSD-3-Clause | [github.com/mvdan/sh](https://github.com/mvdan/sh) |
 | snacks.nvim | The explorer, the picker and the dashboard | Folke Lemaitre | Apache-2.0 | [github.com/folke/snacks.nvim](https://github.com/folke/snacks.nvim) |
 | stylua | Formats Lua | johnnymorganz | MPL-2.0 | [github.com/johnnymorganz/stylua](https://github.com/johnnymorganz/stylua) |
+| taplo | TOML's language server and formatter | Ferenc Tamás | MIT | [github.com/tamasfe/taplo](https://github.com/tamasfe/taplo) |
 | todo-comments.nvim | Highlights and lists TODO comments | Folke Lemaitre | Apache-2.0 | [github.com/folke/todo-comments.nvim](https://github.com/folke/todo-comments.nvim) |
 | tokyonight.nvim | A colour scheme LazyVim installs | Folke Lemaitre | Apache-2.0 | [github.com/folke/tokyonight.nvim](https://github.com/folke/tokyonight.nvim) |
 | tree-sitter (CLI) | Builds the parsers nvim-treesitter installs | tree-sitter | MIT | [github.com/tree-sitter/tree-sitter](https://github.com/tree-sitter/tree-sitter) |
@@ -214,9 +218,12 @@ What the developer Suites (`home/suites/`) add beyond the toolchains mise instal
 | Name | What KubaOS uses it for | Creators | Licence | Link |
 |---|---|---|---|---|
 | bacon | The Rust Suite's background checker (`config/bacon/`) | Canop | AGPL-3.0-only | [github.com/Canop/bacon](https://github.com/Canop/bacon) |
+| BiRefNet | Cuts a wallpaper's foreground out, for the depth Suite | Peng Zheng and co-authors | MIT | [github.com/ZhengPeng7/BiRefNet](https://github.com/ZhengPeng7/BiRefNet) |
+| Depth Anything V2 Small | The wallpapers' depth maps, in the depth Suite and the Lock mockup | Lihe Yang, Bingyi Kang, Zilong Huang and co-authors | Apache-2.0 | [github.com/DepthAnything/Depth-Anything-V2](https://github.com/DepthAnything/Depth-Anything-V2) |
 | ONNX Runtime | Runs the wallpaper depth models (`kubaos-depth`, through `ort`) | microsoft | MIT | [github.com/microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) |
 | PHP Debug (`vscode-php-debug`) | The PHP Suite's Xdebug adapter | Felix Frederick Becker | MIT | [github.com/xdebug/vscode-php-debug](https://github.com/xdebug/vscode-php-debug) |
 | Phpactor | The PHP Suite's language server | phpactor | MIT | [github.com/phpactor/phpactor](https://github.com/phpactor/phpactor) |
+| Segment Anything (SAM ViT-B) | Picks out the parts of a wallpaper in the depth Suite | Meta AI Research | Apache-2.0 | [github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything) |
 | vscode-js-debug | The Node Suite's debug adapter | Microsoft Corporation | MIT | [github.com/microsoft/vscode-js-debug](https://github.com/microsoft/vscode-js-debug) |
 
 ### Rust crates
@@ -267,7 +274,7 @@ What the mockups (`design/mockups/`) ship to the page.
 |---|---|---|---|---|
 | `atmos-fx` | Rain, snow and hail over the weather's skies (`design/mockups/src/lib/weather-sky.ts`) | Carson Ye and contributors | MIT | [github.com/Whynotmetoo/atmos-fx](https://github.com/Whynotmetoo/atmos-fx) |
 
-### Fonts, icons and cursors
+### Fonts, icons, cursors and sounds
 
 | Name | What KubaOS uses it for | Creators | Licence | Link |
 |---|---|---|---|---|
@@ -280,8 +287,10 @@ What the mockups (`design/mockups/`) ship to the page.
 | Lucide | One of the icon sets the specimen compares ([licence](crates/kubaos-specimen/assets/icons/lucide-LICENSE.txt)) | Lucide Icons and Contributors | ISC | [npmjs.com/package/lucide-static](https://www.npmjs.com/package/lucide-static) |
 | M PLUS 1 | The Japanese accents: the weekday kanji, 曜日 and 東京 ([`MPLUS1-OFL.txt`](crates/kubaos-ui/assets/fonts/MPLUS1-OFL.txt)) | The M+ FONTS Project Authors: Coji Morishita | OFL-1.1 | [github.com/coz-m/MPLUS_FONTS](https://github.com/coz-m/MPLUS_FONTS) |
 | Material Symbols | One of the icon sets the specimen compares ([licence](crates/kubaos-specimen/assets/icons/material-LICENSE.txt)) | Google | Apache-2.0 | [github.com/google/material-design-icons](https://github.com/google/material-design-icons) |
+| Nerd Fonts | Patches the terminal fonts with icons | Ryan L McIntyre | MIT for the patcher; each font keeps its own licence | [github.com/ryanoasis/nerd-fonts](https://github.com/ryanoasis/nerd-fonts) |
 | Noto | The system's fallback fonts, CJK and colour emoji included | Google | OFL-1.1 | [google.com/get/noto](https://www.google.com/get/noto/) |
 | Phosphor | One of the icon sets the specimen compares ([licence](crates/kubaos-specimen/assets/icons/phosphor-LICENSE.txt)) | Phosphor Icons | MIT | [npmjs.com/package/@phosphor-icons/web](https://www.npmjs.com/package/@phosphor-icons/web) |
+| sound-theme-freedesktop | The sound the clock's timers and alarms ring with, and the power warning's | The freedesktop.org sound theme's authors, named per sound in its CREDITS file | Mixed, per sound: CC-BY-SA, CC-BY-3.0, GPL-2.0-or-later, GPL-2.0 | [cgit.freedesktop.org/sound-theme-freedesktop](https://cgit.freedesktop.org/sound-theme-freedesktop) |
 | Tabler Icons | The KubaOS Symbols set (`crates/kubaos-ui/assets/symbols/`) and the style its weather symbols are drawn in ([`TABLER-LICENSE.txt`](crates/kubaos-ui/assets/symbols/TABLER-LICENSE.txt)) | Paweł Kuna | MIT | [github.com/tabler/tabler-icons](https://github.com/tabler/tabler-icons) |
 
 ### Services
@@ -291,7 +300,7 @@ What the mockups (`design/mockups/`) ship to the page.
 | Cachix | The `kuba-os` binary cache that CI fills and `kubaos update` reads | Cachix | Its terms of service | [kuba-os.cachix.org](https://kuba-os.cachix.org) |
 | GitHub | Hosts KubaOS and Kotodama, runs CI (Actions) and the mockup site (Pages); its releases API finds `kubaos update`'s changelog and the Bitwarden CLI's releases | GitHub, Inc. | Its terms of service | [github.com](https://github.com) |
 | Hugging Face | Serves the Depth Anything V2 Small model the depth Suite downloads | Hugging Face | Its terms of service | [huggingface.co](https://huggingface.co) |
-| Open-Meteo | The forecast source the clock's weather is designed around | Open-Meteo | See its site | [open-meteo.com](https://open-meteo.com) |
+| Open-Meteo | The forecast source the clock's weather is designed around; the clock popup's "Weather from Open-Meteo" is the attribution its data licence asks for | Open-Meteo | The API's code AGPL-3.0-or-later; the weather data CC-BY-4.0 | [open-meteo.com](https://open-meteo.com) |
 
 ### Credits kept beside the files they cover
 
@@ -314,14 +323,17 @@ The development tools KubaOS is made with.
 | actionlint | Lints the CI workflows | rhysd | MIT | [rhysd.github.io/actionlint](https://rhysd.github.io/actionlint/) |
 | bubblewrap | Sandboxes the screenshot harness's programs | containers | LGPL-2.1-or-later | [github.com/containers/bubblewrap](https://github.com/containers/bubblewrap) |
 | Cargo | Builds and tests the workspace | The Rust Project Contributors | MIT, Apache-2.0 | [crates.io](https://crates.io) |
-| cargo-nextest | Runs the workspace's tests (`just nextest`) | nextest-rs | MIT, Apache-2.0 | [github.com/nextest-rs/nextest](https://github.com/nextest-rs/nextest) |
+| cargo-nextest | Runs the workspace's tests (`just nextest`) | The nextest Contributors | MIT, Apache-2.0 | [github.com/nextest-rs/nextest](https://github.com/nextest-rs/nextest) |
+| Chromium (Chrome for Testing) | The browser Playwright drives for the mockups' shots and checks | The Chromium Authors | BSD-3-Clause | [chromium.org](https://www.chromium.org) |
 | Clippy | The Rust lints (`just lint`) | The Rust Project Contributors | MIT, Apache-2.0 | [rust-lang.github.io/rust-clippy](https://rust-lang.github.io/rust-clippy/) |
 | crane | Builds the crates with Nix (`crates/build.nix`) | Ivan Petkov | MIT | [github.com/ipetkov/crane](https://github.com/ipetkov/crane) |
 | curl | Downloads in the scripts and the dev shell | Daniel Stenberg and contributors | curl | [curl.se](https://curl.se/) |
+| Docker Engine | The end-to-end test containers (`test/run`) and the install image's build | Docker, Inc. | Apache-2.0 | [github.com/moby/moby](https://github.com/moby/moby) |
 | fontconfig | Font lookup in the screenshot harness | Keith Packard | BSD-2-Clause | [fontconfig.org](http://fontconfig.org/) |
 | GnuPG | Checks vendor keys in the dev shell and the system scripts | Free Software Foundation, Inc. | GPL-3.0-or-later | [gnupg.org](https://gnupg.org) |
 | hyperfine | Benchmarks commands | David Peter | Apache-2.0, MIT | [github.com/sharkdp/hyperfine](https://github.com/sharkdp/hyperfine) |
 | just | Runs the repo's recipes (`justfile`) | Casey Rodarmor | CC0-1.0 | [github.com/casey/just](https://github.com/casey/just) |
+| Mesa | Software rendering for the screenshot harness | The Mesa authors | MIT for the core, other licences per file | [docs.mesa3d.org/license.html](https://docs.mesa3d.org/license.html) |
 | nixfmt | Formats the `.nix` files | NixOS | MPL-2.0 | [github.com/NixOS/nixfmt](https://github.com/NixOS/nixfmt) |
 | Node.js | Runs the mockups' build and scripts | Node.js contributors | MIT | [nodejs.org](https://nodejs.org) |
 | NumPy | The neon sign's switch-on frames (`branding/switch.py`) | Travis E. Oliphant and the NumPy Developers | BSD-3-Clause | [numpy.org](https://numpy.org/) |
@@ -333,13 +345,21 @@ The development tools KubaOS is made with.
 | Rust | The language of the engine, the CLI, the services and the apps | The Rust Project Contributors | MIT, Apache-2.0 | [rust-lang.org](https://www.rust-lang.org/) |
 | rustfmt | Formats the Rust code (nightly, `just fmt-check`) | The Rust Project Developers | MIT, Apache-2.0 | [github.com/rust-lang-nursery/rustfmt](https://github.com/rust-lang-nursery/rustfmt) |
 | sccache | Caches Rust compiles in the dev shell and CI | mozilla | Apache-2.0 | [github.com/mozilla/sccache](https://github.com/mozilla/sccache) |
+| ShellCheck | Lints the shell scripts (`just shellcheck`), and Neovim's shell files through Mason | Vidar Holen and contributors | GPL-3.0 | [github.com/koalaman/shellcheck](https://github.com/koalaman/shellcheck) |
 | Sway | The headless compositor the screenshot harness renders the shell in | Simon Ser and the Sway contributors | MIT | [swaywm.org](https://swaywm.org) |
-| treefmt | Runs the formatters behind `nix fmt` | numtide | MIT | [github.com/numtide/treefmt](https://github.com/numtide/treefmt) |
+| treefmt | Runs the formatters behind `nix fmt` | Numtide and contributors | MIT | [github.com/numtide/treefmt](https://github.com/numtide/treefmt) |
 | `@types/node` | Node's types for the mockups' scripts | Microsoft Corporation and the DefinitelyTyped contributors | MIT | [github.com/DefinitelyTyped/DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) |
 | TypeScript (`typescript`) | The mockups' language and their type check | Microsoft Corporation | Apache-2.0 | [github.com/microsoft/TypeScript](https://github.com/microsoft/TypeScript) |
 | Vite (`vite`) | Serves and builds the mockups (`design/mockups/`) | Evan You, VoidZero Inc. and Vite contributors | MIT | [vite.dev](https://vite.dev) |
 | xdotool | Drives X apps in the screenshot harness | Jordan Sissel | BSD-3-Clause | [semicomplete.com/projects/xdotool](https://www.semicomplete.com/projects/xdotool/) |
+| xorriso | Builds the install ISO and the VM tests' boot media | Thomas Schmitt; libisoburn by Vreixo Formoso and Thomas Schmitt | GPL-2.0-or-later | [libburnia-project.org](http://libburnia-project.org/) |
 | Xvfb | The virtual display the boot screens render in | The X.Org contributors, from Digital Equipment Corporation's sample server | MIT and others | [x.org/wiki](https://x.org/wiki) |
+
+### Design and branding
+
+| Name | What KubaOS uses it for | Creators | Licence | Link |
+|---|---|---|---|---|
+| FLUX 3 | Generated the logo's photos (`branding/photo/`) | Black Forest Labs | Its model licence; see its site | [bfl.ai](https://bfl.ai) |
 
 ### CI
 
@@ -347,12 +367,12 @@ The actions `.github/workflows/` runs, pinned by commit.
 
 | Name | What KubaOS uses it for | Creators | Licence | Link |
 |---|---|---|---|---|
-| `actions/cache` | Restores and saves the compile caches | GitHub (`actions`) | See its repository | [github.com/actions/cache](https://github.com/actions/cache) |
-| `actions/checkout` | Checks out the repository | GitHub (`actions`) | See its repository | [github.com/actions/checkout](https://github.com/actions/checkout) |
-| `actions/deploy-pages` | Publishes the mockup site | GitHub (`actions`) | See its repository | [github.com/actions/deploy-pages](https://github.com/actions/deploy-pages) |
-| `actions/download-artifact` | Carries the screenshots between jobs | GitHub (`actions`) | See its repository | [github.com/actions/download-artifact](https://github.com/actions/download-artifact) |
-| `actions/upload-artifact` | Keeps the screenshots and the mockups' build | GitHub (`actions`) | See its repository | [github.com/actions/upload-artifact](https://github.com/actions/upload-artifact) |
-| `actions/upload-pages-artifact` | Packs the mockup site for GitHub Pages | GitHub (`actions`) | See its repository | [github.com/actions/upload-pages-artifact](https://github.com/actions/upload-pages-artifact) |
-| `cachix/cachix-action` | Reads the `kuba-os` binary cache | Cachix | See its repository | [github.com/cachix/cachix-action](https://github.com/cachix/cachix-action) |
+| `actions/cache` | Restores and saves the compile caches | GitHub, Inc. | MIT | [github.com/actions/cache](https://github.com/actions/cache) |
+| `actions/checkout` | Checks out the repository | GitHub, Inc. | MIT | [github.com/actions/checkout](https://github.com/actions/checkout) |
+| `actions/deploy-pages` | Publishes the mockup site | GitHub, Inc. | MIT | [github.com/actions/deploy-pages](https://github.com/actions/deploy-pages) |
+| `actions/download-artifact` | Carries the screenshots between jobs | GitHub, Inc. | MIT | [github.com/actions/download-artifact](https://github.com/actions/download-artifact) |
+| `actions/upload-artifact` | Keeps the screenshots and the mockups' build | GitHub, Inc. | MIT | [github.com/actions/upload-artifact](https://github.com/actions/upload-artifact) |
+| `actions/upload-pages-artifact` | Packs the mockup site for GitHub Pages | GitHub, Inc. | MIT | [github.com/actions/upload-pages-artifact](https://github.com/actions/upload-pages-artifact) |
+| `cachix/cachix-action` | Reads the `kuba-os` binary cache | Cachix | Apache-2.0 | [github.com/cachix/cachix-action](https://github.com/cachix/cachix-action) |
 | `cachix/install-nix-action` | Installs Nix on the runners | Cachix | See its repository | [github.com/cachix/install-nix-action](https://github.com/cachix/install-nix-action) |
 | `nix-community/cache-nix-action` | Restores and saves the Nix store | nix-community | See its repository | [github.com/nix-community/cache-nix-action](https://github.com/nix-community/cache-nix-action) |
