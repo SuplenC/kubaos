@@ -4,11 +4,11 @@ How KubaOS's code is written. The rules come from Kotodama's guide (`SuplenC/kot
 
 New code follows every rule here. Older code is brought in line where you touch it: edit the lines you change in the new style, without restyling the rest of the file in the same PR. A restyle of a whole file or crate is its own PR. The formatting and the lints below already hold for every crate: the tools enforce them.
 
-Anything external a change brings in, shipped or used to make KubaOS (a library, a vendored file, an asset, a font, a data source, a service or a development tool), is credited in `CREDITS.md` in the same PR, with its creators, its licence and a link.
+Anything external a change brings in, shipped or used to make KubaOS (a library, a vendored file, an asset, a font, a data source, a service or a development tool), is credited in `CREDITS.md` in the same PR, with its creators, its licence and a link. `just credits-check` fails a crate a `Cargo.toml` names, or a package `design/mockups/package.json` names, that has no line there.
 
 Tools check some of these rules: `shellcheck` (`just shellcheck`, `test/shellcheck/check`), `nix fmt`, rustfmt and clippy (`just fmt-check`, `just lint`), and the design checks (`just design-check`, below). The reviewer checks the rest.
 
-`just check` runs what a pull request must pass: `fmt-check`, `lint`, the workspace's tests (`just nextest`), the shell's logic tests (`qml-test`), the screenshot harness's tests (`shots-test`), `design-check`, `system-files-check` and `shellcheck`. Run it in `nix develop`, which pins the toolchain from `flake.lock`; CI runs the same recipes on every pull request into main (`.github/workflows/check.yml`), with `nix flake check --no-build`, the mockups' part of `design-check` only when their inputs change, and `apps-verify` on the apps a pull request changes (`docs/TESTING.md`, "CI").
+`just check` runs what a pull request must pass: `fmt-check`, `lint`, the workspace's tests (`just nextest`), the shell's logic tests (`qml-test`), the screenshot harness's tests (`shots-test`), `design-check`, `system-files-check`, `credits-check` and `shellcheck`. Run it in `nix develop`, which pins the toolchain from `flake.lock`; CI runs the same recipes on every pull request into main (`.github/workflows/check.yml`), with `nix flake check --no-build`, the mockups' part of `design-check` only when their inputs change, and `apps-verify` on the apps a pull request changes (`docs/TESTING.md`, "CI").
 
 ## Comments, in every language
 

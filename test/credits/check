@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# test/credits/check: fails when a crate a Cargo.toml names, or a package
+# design/mockups/package.json names, has no line in CREDITS.md. A line is the
+# name in backticks, as the Rust crates and npm packages tables write it.
+#
+#   test/credits/check REPO
+#
+# Reads the manifests through `cargo metadata --offline --no-deps`, so every
+# kind of dependency counts, the workspace's own crates don't, and nothing is
+# fetched. Needs cargo and jq.
+set -euo pipefail
+
+case "${1:-}" in
+  -h | --help) sed -n '2,10p' "$0" | cut -c3-; exit 0 ;;
+  "") echo "usage: test/credits/check REPO" >&2; exit 2 ;;
+esac
+REPO="$(cd "$1" && pwd)"
+CREDITS="$REPO/CREDITS.md"
+
+mapfile -t crates < <(
+  cargo metadata --offline --no-deps --format-version 1 --manifest-path "$REPO/Cargo.toml" |
+    jq -r '.packages[].dependencies[] | select(.path == null) | .name' | sort -u
+)
+mapfile -t packages < <(
+  jq -r '(.dependencies // {}), (.devDependencies // {}) | keys[]' "$REPO/design/mockups/package.json" | sort -u
+)
+
+missing=()
+for name in "${crates[@]}" "${packages[@]}"; do
+  grep -qF -- "\`$name\`" "$CREDITS" || missing+=("$name")
+done
+
+if ((${#missing[@]})); then
+  printf 'credits: %s has no line in CREDITS.md\n' "${missing[@]}" >&2
+  exit 1
+fi
+echo "credits: ${#crates[@]} crates and ${#packages[@]} npm packages credited"

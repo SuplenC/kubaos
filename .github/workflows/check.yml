@@ -23,9 +23,10 @@
 #   (their folders, or their vendor repositories' pins), against the vendors'
 #   servers; every app when the check itself changes. Not on a push to main.
 # - shellcheck: `just shellcheck`.
-# - system files: `just system-files-check`'s two scripts, run straight on the
-#   runner: they need only bash and git, so the job sets up no Nix. It checks
-#   out the whole history, for the merge base with main.
+# - system files: `just system-files-check`'s two scripts and `just
+#   credits-check`'s, run straight on the runner: they need only bash, git,
+#   and the runner's cargo and jq, so the job sets up no Nix. It checks out
+#   the whole history, for the merge base with main.
 # A gated job a change doesn't need still runs, skipping its steps, so it
 # reports success under its own name. `check (x86_64-linux)` needs them all
 # and fails unless every one passed. It is the one check branch protection
@@ -428,6 +429,9 @@ jobs:
 
       - name: System files
         run: test/system-files/check --base origin/main .
+
+      - name: Credits
+        run: test/credits/check .
 
   # Always runs: a required check that is skipped counts as passed, so this
   # one runs on the others' failure or cancellation too, and fails.
