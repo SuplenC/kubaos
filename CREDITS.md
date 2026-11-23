@@ -226,6 +226,28 @@ What the developer Suites (`home/suites/`) add beyond the toolchains mise instal
 | Segment Anything (SAM ViT-B) | Picks out the parts of a wallpaper in the depth Suite | Meta AI Research | Apache-2.0 | [github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything) |
 | vscode-js-debug | The Node Suite's debug adapter | Microsoft Corporation | MIT | [github.com/microsoft/vscode-js-debug](https://github.com/microsoft/vscode-js-debug) |
 
+### Cloud, container and CI apps of the catalog
+
+The Apps catalog's cloud CLIs, container and CI tools (`apps/`), and the marks their icons carry.
+
+| Name | What KubaOS uses it for | Creators | Licence | Link |
+|---|---|---|---|---|
+| AWS CLI | The catalog's AWS CLI (`apps/aws-cli/`) | Amazon.com, Inc. | Apache-2.0 | [github.com/aws/aws-cli](https://github.com/aws/aws-cli) |
+| Google Cloud CLI | The catalog's Google Cloud CLI (`apps/google-cloud-cli/`) | Google LLC | Apache-2.0 | [cloud.google.com/sdk](https://cloud.google.com/sdk) |
+| Azure CLI | The catalog's Azure CLI (`apps/azure-cli/`) | Microsoft Corporation | MIT | [github.com/Azure/azure-cli](https://github.com/Azure/azure-cli) |
+| doctl | The catalog's doctl (`apps/doctl/`) | DigitalOcean, LLC | Apache-2.0 | [github.com/digitalocean/doctl](https://github.com/digitalocean/doctl) |
+| hcloud | The catalog's hcloud (`apps/hcloud/`) | Hetzner Cloud GmbH | MIT | [github.com/hetznercloud/cli](https://github.com/hetznercloud/cli) |
+| flyctl | The catalog's flyctl (`apps/flyctl/`) | Fly.io, Inc. | Apache-2.0 | [github.com/superfly/flyctl](https://github.com/superfly/flyctl) |
+| dive | The catalog's dive (`apps/dive/`) | Alex Goodman | MIT | [github.com/wagoodman/dive](https://github.com/wagoodman/dive) |
+| act | The catalog's act (`apps/act/`), and its logo as act's icon | The act authors | MIT | [github.com/nektos/act](https://github.com/nektos/act) |
+| GitLab CLI | The catalog's GitLab CLI (`apps/glab/`) | GitLab Inc. | MIT | [gitlab.com/gitlab-org/cli](https://gitlab.com/gitlab-org/cli) |
+| The Amazon Web Services logo | AWS CLI's icon (`apps/aws-cli/aws.svg`) | Amazon.com, Inc. | Amazon's trademark, used to identify the app | [aws.amazon.com/trademark-guidelines](https://aws.amazon.com/trademark-guidelines/) |
+| The Google Cloud icon | Google Cloud CLI's icon (`apps/google-cloud-cli/google-cloud.png`) | Google LLC | Google's trademark, used to identify the app | [cloud.google.com](https://cloud.google.com/) |
+| The Microsoft Azure icon | Azure CLI's icon (`apps/azure-cli/azure.svg`) | Microsoft Corporation | Microsoft's trademark, used to identify the app | [azure.microsoft.com](https://azure.microsoft.com/) |
+| DigitalOcean's mark | doctl's icon (`apps/doctl/digitalocean.svg`) | DigitalOcean, LLC | DigitalOcean's trademark, used to identify the app | [digitalocean.com](https://www.digitalocean.com/) |
+| Hetzner's logo | hcloud's icon (`apps/hcloud/hetzner.png`) | Hetzner Online GmbH | Hetzner's trademark, used to identify the app | [hetzner.com](https://www.hetzner.com/) |
+| GitLab's tanuki | GitLab CLI's icon (`apps/glab/gitlab.svg`) | GitLab Inc. | GitLab's trademark, used to identify the app | [gitlab.com/gitlab-org/gitlab](https://gitlab.com/gitlab-org/gitlab) |
+
 ### Rust crates
 
 What the workspace's crates depend on directly.

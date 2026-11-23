@@ -1,0 +1,23 @@
+# GitLab CLI from nixpkgs, through the User flake. Ubuntu's glab trails GitLab's releases by
+# more than forty versions, and GitLab keeps no apt repository.
+# https://gitlab.com/gitlab-org/cli#installation
+name = "GitLab CLI"
+category = "devops"
+tags = ["gitlab", "glab", "git", "cli", "mr", "ci", "pipelines"]
+summary = "glab: merge requests, issues and pipelines, without the browser tab."
+# The opening of its README, MIT, GitLab Inc. (gitlab.com/gitlab-org/cli).
+description = """\
+GLab is an open source GitLab CLI tool. It brings GitLab to your terminal, next to where you are \
+already working with git and your code, without switching between windows and browser tabs."""
+description_from = "https://gitlab.com/gitlab-org/cli/-/blob/main/README.md"
+# GitLab's tanuki, GitLab's trademark, used to identify the app, on a tile (gitlab.svg's header
+# names its source): no icon theme has GitLab CLI.
+icon = "gitlab.svg"
+keeps = """\
+Your GitLab sign-ins, hosts and aliases stay in ~/.config/glab-cli: install GitLab CLI again and \
+it signs in as before."""
+
+[[action]]
+name = "Install GitLab CLI"
+kind = "nix"
+packages = ["glab"]

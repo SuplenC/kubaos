@@ -1,0 +1,27 @@
+# The Azure CLI from Microsoft's signed apt repository, whose key system/packages.toml pins
+# ([repo.azure-cli]). Ubuntu doesn't package it, and nixpkgs' trails Microsoft's releases. The
+# repository has a suite for each Ubuntu release, amd64 and arm64. Its package writes no source of
+# its own.
+# https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt
+name = "Azure CLI"
+category = "devops"
+tags = ["azure", "microsoft", "cloud", "cli", "az"]
+summary = "az, for Azure from your terminal. Every resource group you forgot about, listed."
+# Microsoft Learn's documentation, CC-BY-4.0, Microsoft Corporation (github.com/MicrosoftDocs/azure-docs-cli).
+description = """\
+The Azure Command-Line Interface (CLI) is a cross-platform command-line tool to connect to Azure \
+and execute administrative commands on Azure resources. It allows the execution of commands \
+through a terminal using interactive command-line prompts or a script."""
+description_from = "https://learn.microsoft.com/en-us/cli/azure/what-is-azure-cli"
+# The Microsoft Azure icon, Microsoft's trademark, used to identify the app, on a tile (azure.svg's
+# header names its source): no icon theme has the Azure CLI.
+icon = "azure.svg"
+keeps = """\
+Your sign-ins, subscriptions, settings and extensions stay in ~/.azure: install the Azure CLI \
+again and it's all there."""
+
+[[action]]
+name = "Install the Azure CLI"
+kind = "apt"
+repo = "azure-cli"
+packages = ["azure-cli"]

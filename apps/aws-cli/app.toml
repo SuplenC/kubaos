@@ -1,0 +1,24 @@
+# AWS CLI v2 from nixpkgs, through the User flake. Ubuntu's awscli trails AWS's releases by a
+# year, and a cloud's CLI that old lacks its newer services' commands. AWS keeps no apt
+# repository: its own installer is a zip whose script copies the program into /usr/local as root,
+# and the catalog's downloads unpack no zip.
+# https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+name = "AWS CLI"
+category = "devops"
+tags = ["aws", "amazon", "cloud", "cli", "s3", "ec2", "iam"]
+summary = "Every AWS service from your terminal. The bill still arrives by email."
+# The opening of its README, Apache-2.0 (github.com/aws/aws-cli).
+description = """\
+This package provides a unified command line interface to Amazon Web Services."""
+description_from = "https://github.com/aws/aws-cli/blob/v2/README.rst"
+# The Amazon Web Services logo, Amazon's trademark, used to identify the app, on a tile (aws.svg's
+# header names its source): no icon theme has the AWS CLI.
+icon = "aws.svg"
+keeps = """\
+Your profiles, credentials and settings stay in ~/.aws, and its SSO and CLI caches in \
+~/.aws/sso and ~/.aws/cli: install the AWS CLI again and it signs in as before."""
+
+[[action]]
+name = "Install the AWS CLI"
+kind = "nix"
+packages = ["awscli2"]

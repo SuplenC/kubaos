@@ -1,0 +1,23 @@
+# hcloud from nixpkgs, through the User flake. Ubuntu's hcloud-cli trails Hetzner's releases by
+# thirty versions, which miss the cloud's newer resources; Hetzner keeps no apt repository.
+# https://github.com/hetznercloud/cli#installation
+name = "hcloud"
+category = "devops"
+tags = ["hetzner", "cloud", "cli", "servers", "vps"]
+summary = "Hetzner Cloud from your terminal. A server in a minute, for the price of a coffee."
+# The opening of its README, MIT (github.com/hetznercloud/cli).
+description = """\
+hcloud is a command-line interface for interacting with Hetzner Cloud."""
+description_from = "https://github.com/hetznercloud/cli/blob/v1.70.2/README.md"
+# Hetzner's logo, Hetzner Online's trademark, used to identify the app, on a tile (hetzner.png's
+# comment names its source): Hetzner publishes its square mark only as a raster, and no icon theme
+# has hcloud.
+icon = "hetzner.png"
+keeps = """\
+Your contexts and their API tokens stay in ~/.config/hcloud: install hcloud again and it signs \
+in as before."""
+
+[[action]]
+name = "Install hcloud"
+kind = "nix"
+packages = ["hcloud"]

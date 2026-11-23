@@ -222,6 +222,23 @@ key_url = "https://pkgs.k8s.io/core:/stable:/v1.37/deb/Release.key"
 fingerprint = "DE15B14486CD377B9E876E1A234654DA9A296436"
 keyring = "/etc/apt/keyrings/kubernetes.gpg"
 
+# Google's repository of the Google Cloud CLI, for the app of the catalog
+# (apps/google-cloud-cli/), amd64 and arm64, signed by Google's Artifact
+# Registry key, not Chrome's. Its packages write no source of their own.
+[repo.google-cloud]
+key_url = "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+fingerprint = "35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3"
+keyring = "/etc/apt/keyrings/google-cloud.gpg"
+
+# Microsoft's repository of the Azure CLI, for the app of the catalog
+# (apps/azure-cli/), a suite for each Ubuntu release, amd64 and arm64, signed
+# by the key VS Code's and Edge's are. Its package writes no source of its
+# own.
+[repo.azure-cli]
+key_url = "https://packages.microsoft.com/keys/microsoft.asc"
+fingerprint = "BC528686B50D79E339D3721CEB3E94ADBE1229CF"
+keyring = "/etc/apt/keyrings/azure-cli.gpg"
+
 # WineHQ's repository, for the app of the catalog (apps/wine/). Its build for
 # Ubuntu 26.04 has amd64 only, in Wine's WoW64 mode, so it needs no i386 in
 # dpkg. Its packages write no source of their own.

@@ -1,0 +1,21 @@
+# flyctl from nixpkgs, through the User flake. Fly.io keeps no apt repository and Ubuntu doesn't
+# package it; Fly.io's own installer is a script that drops it in ~/.fly and updates it itself.
+# https://fly.io/docs/flyctl/install/
+name = "flyctl"
+category = "devops"
+tags = ["fly", "flyio", "cloud", "cli", "deploy", "hosting"]
+summary = "Fly.io from your terminal. fly deploy, and your app runs near your users."
+# The opening of its README, Apache-2.0 (github.com/superfly/flyctl).
+description = """\
+flyctl is a command-line interface for fly.io."""
+description_from = "https://github.com/superfly/flyctl/blob/master/README.md"
+# KubaOS's generated icon (flyctl.svg's header): Fly.io's brand terms allow its marks only with
+# its written permission, and no icon theme has flyctl.
+icon = "flyctl.svg"
+keeps = """\
+Your Fly.io sign-in and settings stay in ~/.fly: install flyctl again and it signs in as before."""
+
+[[action]]
+name = "Install flyctl"
+kind = "nix"
+packages = ["flyctl"]

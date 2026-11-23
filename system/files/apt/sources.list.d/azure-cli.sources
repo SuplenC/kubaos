@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://packages.microsoft.com/repos/azure-cli/
+Suites: resolute
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/azure-cli.gpg

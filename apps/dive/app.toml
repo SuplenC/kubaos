@@ -1,0 +1,22 @@
+# dive from nixpkgs, through the User flake, at upstream's latest release. Its author keeps no apt
+# repository and Ubuntu doesn't package it. It reads images from the Docker or Podman the machine
+# has, so it requires neither.
+# https://github.com/wagoodman/dive#installation
+name = "dive"
+category = "devops"
+tags = ["docker", "containers", "images", "layers", "oci", "tui"]
+summary = "Every layer of a container image, file by file. Find out where those 2 GB came from."
+# The opening of its README, MIT (github.com/wagoodman/dive).
+description = """\
+A tool for exploring a Docker image, layer contents, and discovering ways to shrink the size of \
+your Docker/OCI image."""
+description_from = "https://github.com/wagoodman/dive/blob/v0.13.1/README.md"
+# KubaOS's generated icon (dive.svg's header): dive has no logo, and no icon theme has it.
+icon = "dive.svg"
+keeps = """\
+Your dive settings stay in ~/.config/dive or ~/.dive.yaml, wherever you put them."""
+
+[[action]]
+name = "Install dive"
+kind = "nix"
+packages = ["dive"]
