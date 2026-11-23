@@ -1,0 +1,8 @@
+<!-- Terraform's logo, HashiCorp's: HashiCorp's trademark, used to identify the app. From hashicorp/design-system @hashicorp/flight-icons 5.3.0 (packages/flight-icons/svg/terraform-color-24.svg, https://github.com/hashicorp/design-system/blob/%40hashicorp/flight-icons%405.3.0/packages/flight-icons/svg/terraform-color-24.svg), MPL-2.0, Copyright (c) 2021 HashiCorp, Inc, unchanged, on KubaOS's white rounded tile, so it matches the catalog's other icons and reads on a dark menu and a light one. -->
+<svg height="500" viewBox="0 0 500 500" width="500" xmlns="http://www.w3.org/2000/svg">
+<defs><clipPath id="kubaos-tile"><rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625"/></clipPath></defs>
+<g clip-path="url(#kubaos-tile)">
+<rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625" fill="#fff"/>
+<svg x="105" y="105" width="290" height="290" viewBox="0 0 24 24"><g fill="#7b42bc" fill-rule="evenodd" clip-rule="evenodd"><path d="m8.893 4.618 6.214 3.597v7.2l-6.214-3.6zM15.788 8.215v7.2l6.212-3.6V4.618zM2 .6v7.197l6.212 3.6V4.199zM8.893 19.8l6.212 3.6v-7.197l-6.212-3.6z"/></g></svg>
+</g>
+</svg>

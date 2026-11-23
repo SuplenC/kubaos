@@ -1,0 +1,22 @@
+# SOPS from nixpkgs, through the User flake, at upstream's latest release. Ubuntu doesn't package
+# it and its authors keep no apt repository.
+# https://getsops.io/docs/#download
+name = "SOPS"
+category = "devops"
+tags = ["secrets", "encryption", "yaml", "json", "age", "gpg", "kms", "gitops", "cli"]
+summary = "Encrypts the values in your YAML and leaves the keys readable, so secrets can live in Git."
+# The opening of its README, MPL-2.0 (github.com/getsops/sops).
+description = """\
+SOPS is an editor of encrypted files that supports YAML, JSON, ENV, INI and BINARY formats and \
+encrypts with AWS KMS, GCP KMS, Azure Key Vault, HuaweiCloud KMS, age, and PGP."""
+description_from = "https://github.com/getsops/sops/blob/v3.13.3/README.rst"
+# SOPS's logo, CC-BY-4.0, on its own black tile (sops.svg's header): Colloid has none.
+icon = "sops.svg"
+keeps = """\
+Your age keys stay in ~/.config/sops/age, and your encrypted files wherever you keep them: \
+install SOPS again and it opens them all."""
+
+[[action]]
+name = "Install SOPS"
+kind = "nix"
+packages = ["sops"]

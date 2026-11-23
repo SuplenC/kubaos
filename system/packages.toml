@@ -247,6 +247,33 @@ key_url = "https://dl.winehq.org/wine-builds/winehq.key"
 fingerprint = "D43F640145369C51D786DDEA76F1A20FF987672F"
 keyring = "/etc/apt/keyrings/winehq.gpg"
 
+# HashiCorp's repository, for the three apps of the catalog that share it
+# (apps/terraform/, apps/packer/, apps/vault/): the first of them installed sets
+# it up. Its packages write no source of their own.
+[repo.hashicorp]
+key_url = "https://apt.releases.hashicorp.com/gpg"
+fingerprint = "D55C0D1AC78A8D8126CB631CFC9CA96ACA026560"
+keyring = "/etc/apt/keyrings/hashicorp.gpg"
+
+# The OpenTofu project's repository, for the app of the catalog
+# (apps/opentofu/), one suite, any, for every distribution, served by
+# Packagecloud and signed with its key for the project. OpenTofu's instructions
+# name a second keyring, the key its packages are signed with, which apt never
+# checks; the repository's key alone is pinned. Its package writes no source of
+# its own.
+[repo.opentofu]
+key_url = "https://packages.opentofu.org/opentofu/tofu/gpgkey"
+fingerprint = "F4AF70F66EAC4337EEECC97407D3DFCD4C61499F"
+keyring = "/etc/apt/keyrings/opentofu.gpg"
+
+# Aqua Security's repository of Trivy, for the app of the catalog
+# (apps/trivy/), one suite, generic, for every distribution. Its package writes
+# no source of its own.
+[repo.trivy]
+key_url = "https://aquasecurity.github.io/trivy-repo/deb/public.key"
+fingerprint = "825AD9036F7C850E6A6FED4935B8ACA44FD9CA9F"
+keyring = "/etc/apt/keyrings/trivy.gpg"
+
 # Valve's repository of the Steam client, for the app of the catalog
 # (apps/steam/). It has amd64 and i386 packages, and its sources file names
 # both, as Steam's client needs 32-bit libraries. Its Release is signed by

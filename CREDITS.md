@@ -248,6 +248,27 @@ The Apps catalog's cloud CLIs, container and CI tools (`apps/`), and the marks t
 | Hetzner's logo | hcloud's icon (`apps/hcloud/hetzner.png`) | Hetzner Online GmbH | Hetzner's trademark, used to identify the app | [hetzner.com](https://www.hetzner.com/) |
 | GitLab's tanuki | GitLab CLI's icon (`apps/glab/gitlab.svg`) | GitLab Inc. | GitLab's trademark, used to identify the app | [gitlab.com/gitlab-org/gitlab](https://gitlab.com/gitlab-org/gitlab) |
 
+### Infrastructure-as-code, secrets and security apps of the catalog
+
+The Apps catalog's infrastructure-as-code, secrets and security tools (`apps/`), and the marks their icons carry.
+
+| Name | What KubaOS uses it for | Creators | Licence | Link |
+|---|---|---|---|---|
+| OpenTofu | The catalog's OpenTofu, from its project's apt repository | The OpenTofu Authors, a Linux Foundation project | MPL-2.0 | [github.com/opentofu/opentofu](https://github.com/opentofu/opentofu) |
+| OpenTofu's brand artifacts | OpenTofu's catalog icon, its logo mark | The OpenTofu Authors | MPL-2.0; the trademark under the Linux Foundation's trademark policy | [github.com/opentofu/brand-artifacts](https://github.com/opentofu/brand-artifacts) |
+| Terraform | The catalog's Terraform, from HashiCorp's apt repository | HashiCorp, an IBM company | BUSL-1.1 | [github.com/hashicorp/terraform](https://github.com/hashicorp/terraform) |
+| Packer | The catalog's Packer, from HashiCorp's apt repository | HashiCorp, an IBM company | BUSL-1.1 | [github.com/hashicorp/packer](https://github.com/hashicorp/packer) |
+| Vault | The catalog's Vault CLI, from HashiCorp's apt repository | HashiCorp, an IBM company | BUSL-1.1 | [github.com/hashicorp/vault](https://github.com/hashicorp/vault) |
+| Flight Icons | Terraform's, Packer's and Vault's catalog icons, their logos; HashiCorp's trademarks | HashiCorp, Inc | MPL-2.0 | [github.com/hashicorp/design-system](https://github.com/hashicorp/design-system/tree/main/packages/flight-icons) |
+| Pulumi | The catalog's Pulumi, its release's archive | Pulumi Corporation | Apache-2.0 | [github.com/pulumi/pulumi](https://github.com/pulumi/pulumi) |
+| Pulumi's docs | Pulumi's catalog icon, its mark; Pulumi's trademark | Pulumi Corporation | Apache-2.0 | [github.com/pulumi/docs](https://github.com/pulumi/docs) |
+| Ansible | The catalog's Ansible, from Ubuntu's archive | Red Hat and the Ansible community | GPL-3.0-or-later | [github.com/ansible/ansible](https://github.com/ansible/ansible) |
+| The Ansible mark | Ansible's catalog icon; Red Hat's trademark | Red Hat, Inc. | Trademark, used to identify the app | [docs.ansible.com](https://docs.ansible.com/images/community_logo_black.svg) |
+| SOPS | The catalog's SOPS, from nixpkgs | The SOPS Authors, a CNCF project | MPL-2.0 | [github.com/getsops/sops](https://github.com/getsops/sops) |
+| SOPS's docs | SOPS's catalog icon, its logo | The SOPS Authors | CC-BY-4.0 | [github.com/getsops/docs](https://github.com/getsops/docs) |
+| age | The catalog's age, from nixpkgs | Filippo Valsorda and Ben Cartwright-Cox, the age Authors | BSD-3-Clause | [github.com/FiloSottile/age](https://github.com/FiloSottile/age) |
+| Trivy | The catalog's Trivy, from Aqua Security's apt repository; its catalog icon, its logo mark | Aqua Security Software Ltd. | Apache-2.0; its logo CC-BY-4.0 | [github.com/aquasecurity/trivy](https://github.com/aquasecurity/trivy) |
+
 ### Rust crates
 
 What the workspace's crates depend on directly.

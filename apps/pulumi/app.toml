@@ -1,0 +1,40 @@
+# Pulumi from the archive of its GitHub release, pinned to the sha256 the release's checksums file
+# publishes (and GitHub's own digest of the asset). Ubuntu doesn't package it and Pulumi keeps no
+# apt repository. nixpkgs' pulumi, built from source, is a year behind, and its pulumi-bin bundles
+# every cloud's provider, gigabytes the binary cache doesn't hold. The archive holds the CLI and
+# its language hosts, which the CLI looks for beside its own program, the link resolved, so only
+# pulumi goes on PATH; each version lands in a folder of its own. Pulumi fetches the providers a
+# program uses itself, into ~/.pulumi/plugins.
+# https://github.com/pulumi/pulumi/releases/tag/v3.277.0
+name = "Pulumi"
+category = "devops"
+tags = ["infrastructure as code", "iac", "provisioning", "cloud", "typescript", "python", "go", "cli"]
+summary = "Infrastructure as code in a real language. Loops instead of YAML, and new ways to break prod."
+# The opening of its README, Apache-2.0 (github.com/pulumi/pulumi).
+description = """\
+Pulumi Infrastructure as Code is the easiest way to build and deploy infrastructure, of any \
+architecture and on any cloud, using programming languages that you already know and love. Code \
+and ship infrastructure faster with your favorite languages and tools, and embed IaC anywhere \
+with Automation API."""
+description_from = "https://github.com/pulumi/pulumi/blob/v3.277.0/README.md"
+# Pulumi's mark, Pulumi's trademark, on a tile (pulumi.svg's header): Colloid has none.
+icon = "pulumi.svg"
+keeps = """\
+Your sign-in, stacks' local state and the providers Pulumi fetched stay in ~/.pulumi: install \
+Pulumi again and it's all there."""
+
+[[action]]
+name = "Download Pulumi"
+kind = "download"
+to = "/opt/pulumi/@VERSION@"
+version = "3.277.0"
+unpack = "tar-gz"
+strip = 1
+amd64 = { url = "https://github.com/pulumi/pulumi/releases/download/v3.277.0/pulumi-v3.277.0-linux-x64.tar.gz", sha256 = "1e38f0fb69a14a326cf3acfaf975770e8de5d0771042f26292f0013d237b8393" }
+arm64 = { url = "https://github.com/pulumi/pulumi/releases/download/v3.277.0/pulumi-v3.277.0-linux-arm64.tar.gz", sha256 = "b9c2708bd13ffdcba79f555a0532893a9b5a44efca8e225d171b8f7b605b16ce" }
+
+[[action]]
+name = "Put pulumi on your PATH"
+kind = "symlink"
+to = "/usr/local/bin/pulumi"
+target = "/opt/pulumi/@VERSION@/pulumi"

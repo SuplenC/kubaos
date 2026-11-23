@@ -2530,6 +2530,7 @@ mod dkms;
 mod editors;
 mod games;
 mod graphics;
+mod iac;
 mod keys;
 mod media;
 mod office;
