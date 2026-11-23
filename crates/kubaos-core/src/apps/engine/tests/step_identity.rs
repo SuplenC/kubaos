@@ -1599,3 +1599,82 @@ fn a_step_merged_in_part_killed_after_its_undo_hands_over_what_apt_pulled_in_on_
         assert!(!state.dpkg.contains_key(package), "{package} stays: {:?}", state.dpkg);
     }
 }
+
+#[test]
+fn a_setup_switch_with_a_shared_step_renamed_hands_its_package_to_the_new_name() {
+    let a = file_step("A", "~/.config/sr/a", "a");
+    let b = file_step("B", "~/.config/sr/b", "b");
+    let world = World::new(&[("sr", &two_setups(&apt_step("Install it", "\"sr-p\""), &a, &b))]);
+    install(&world, "sr", "a");
+    world.write_app("sr", &two_setups(&apt_step("Install the app", "\"sr-p\""), &a, &b));
+    let from = world.host.state.borrow().log.len();
+
+    install(&world, "sr", "b");
+
+    let log = world.log_since(from);
+    assert!(!log.iter().any(|l| l.starts_with("apt")), "{log:#?}");
+    assert!(!world.host_home().join(".config/sr/a").exists());
+    world.remove("sr").0.unwrap();
+    assert!(!world.host.state.borrow().dpkg.contains_key("sr-p"));
+}
+
+#[test]
+fn a_setup_switch_with_shared_steps_merged_hands_the_merged_package_over() {
+    let a = file_step("A", "~/.config/sm/a", "a");
+    let b = file_step("B", "~/.config/sm/b", "b");
+    let two = format!(
+        "{}{}",
+        apt_step("Install the tool", "\"sm-tool\""),
+        apt_step("Install its plugin", "\"sm-plugin\"")
+    );
+    let world = World::new(&[("sm", &two_setups(&two, &a, &b))]);
+    install(&world, "sm", "a");
+    world.write_app(
+        "sm",
+        &two_setups(&apt_step("Install the tool", "\"sm-tool\", \"sm-plugin\""), &a, &b),
+    );
+    let from = world.host.state.borrow().log.len();
+
+    install(&world, "sm", "b");
+
+    let log = world.log_since(from);
+    assert!(!log.iter().any(|l| l.starts_with("apt")), "{log:#?}");
+    world.remove("sm").0.unwrap();
+    let state = world.host.state.borrow();
+    assert!(!state.dpkg.contains_key("sm-tool") && !state.dpkg.contains_key("sm-plugin"));
+}
+
+#[test]
+fn a_pending_change_of_a_step_moved_to_the_other_side_is_finished_and_later_updates_ask_for_no_root() {
+    let text = |write: &str, other: &str| {
+        super::app(&format!(
+            "{}{}{}",
+            apt_step("Install", "\"mv-e\""),
+            file_step("Write it", write, "x"),
+            apt_step("Other", other)
+        ))
+    };
+    let world = World::new(&[("mv", &text("/etc/mv/a", "\"mv-z\""))]);
+    world.install("mv", true).0.unwrap();
+    world.write_app("mv", &text("/etc/mv/b", "\"mv-z\", \"mv-y\""));
+    world.host.state.borrow_mut().fail.insert("apt:mv-y".to_owned());
+    assert!(world.install("mv", true).0.is_err());
+    world.host.state.borrow_mut().fail.clear();
+    world.write_app("mv", &text("~/.config/mv/c", "\"mv-z\""));
+
+    world.install("mv", true).0.unwrap();
+
+    assert!(!world.system_path("/etc/mv/a").exists(), "the pending part stands");
+    assert!(world.host_home().join(".config/mv/c").is_file());
+    let (_, root) = world.journals("mv");
+    assert!(root.unwrap().entries.iter().all(|e| e.replaced.is_none()));
+    for _ in 0..2 {
+        let mut root = world.root();
+        world
+            .run(&mut root, &mut Events::default(), true, |e| e.install("mv", None))
+            .unwrap();
+        assert!(!root.started, "a plain update asked for root");
+    }
+    world.remove("mv").0.unwrap();
+    assert!(!world.system_path("/etc/mv/b").exists());
+}
