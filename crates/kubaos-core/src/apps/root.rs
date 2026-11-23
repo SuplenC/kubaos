@@ -60,6 +60,11 @@ pub enum Request {
     },
     /// One step of root's journal of the app, undone.
     Undo { app: String, step: usize },
+    /// What a release took out of root's half of the app's install, once its steps stand: an
+    /// entry of a step the install no longer has, or what a changed step replaced; what another
+    /// of its entries holds passes to it. Root checks the folder itself, and refuses a step the
+    /// install still has.
+    TakeOut { app: String, step: usize },
     /// A root step this run undid, done again for a removal rolled back, from root's own record
     /// of the undo.
     Redo {
@@ -260,7 +265,7 @@ impl<'h> Server<'h> {
             | Request::Step { app, setup, .. }
             | Request::Adopt { app, setup, .. }
             | Request::Redo { app, setup, .. } => (app, setup.as_deref()),
-            Request::Undo { app, .. } | Request::Refresh { app, .. } => (app, None),
+            Request::Undo { app, .. } | Request::TakeOut { app, .. } | Request::Refresh { app, .. } => (app, None),
         };
         if !is_app_id(app) {
             return refuse(format!("{app:?} is not an app id"));
@@ -302,6 +307,13 @@ impl<'h> Server<'h> {
                 Err(e) => answer(&e),
             },
             Request::Undo { app, step } => match self.keeper.undo(&app, step) {
+                Ok(outcome) => Reply::Step {
+                    outcome,
+                    notes: self.keeper.take_notes(),
+                },
+                Err(e) => answer(&e),
+            },
+            Request::TakeOut { app, step } => match self.keeper.take_out(&app, step) {
                 Ok(outcome) => Reply::Step {
                     outcome,
                     notes: self.keeper.take_notes(),
@@ -412,7 +424,10 @@ fn owned_by(path: &Path, owner: u32) -> Result<(), String> {
 /// The reply to a step that didn't go through: a refusal for a request the helper doesn't take.
 fn answer(e: &StepError) -> Reply {
     match e {
-        StepError::WrongSide { .. } | StepError::NoStep { .. } | StepError::Folder(_) => Reply::Refused {
+        StepError::WrongSide { .. }
+        | StepError::NoStep { .. }
+        | StepError::StillAStep { .. }
+        | StepError::Folder(_) => Reply::Refused {
             why: vec![chain(e)],
             yours: false,
         },

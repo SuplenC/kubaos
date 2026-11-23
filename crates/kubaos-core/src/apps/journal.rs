@@ -129,7 +129,9 @@ impl Adoption {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Entry {
-    /// Its place in the install's list of actions, from 1.
+    /// Its place in the install's list of actions, from 1: the step's number when it was last
+    /// written, which a reader brings to the folder's own with [`Journal::align`]. One after the
+    /// last step is a step a release took out.
     pub step: usize,
     pub state: State,
     /// What each thing it changes or found is, and whether it changed it.
@@ -386,6 +388,51 @@ impl Journal {
     /// Takes out the entry of `step`.
     pub fn drop_step(&mut self, step: usize) {
         self.entries.retain(|e| e.step != step);
+    }
+
+    /// Numbers each entry as the install now numbers the step of its name, so a release that
+    /// puts a step in, takes one out or moves one leaves every other entry with its own step. A
+    /// step's name is unique in its install, and an entry is the step of its name, whatever else
+    /// a release changed of it: `steps` are this side's steps of the install, each with its
+    /// number and its name, and `total` is how many steps the install has, both sides'.
+    ///
+    /// An entry whose name no step of this side has (taken out, renamed, or moved to the other
+    /// side), or one whose name an entry numbered before it took, is numbered after the last
+    /// step: the number it has when that is after the last step and no other entry's, else the
+    /// next after every such number, in order. Each entry's number depends on its name and its
+    /// own number alone, so taking one out never moves another.
+    pub fn align(&mut self, steps: &[(usize, &str)], total: usize) {
+        self.entries.sort_by_key(|e| e.step);
+        let mut taken = vec![false; steps.len()];
+        let mut numbers: Vec<Option<usize>> = Vec::with_capacity(self.entries.len());
+        for entry in &self.entries {
+            let found = steps
+                .iter()
+                .zip(&mut taken)
+                .find(|((_, name), taken)| !**taken && *name == entry.action.name);
+            numbers.push(found.map(|((number, _), taken)| {
+                *taken = true;
+                *number
+            }));
+        }
+        let mut kept = std::collections::BTreeSet::new();
+        for (entry, number) in self.entries.iter().zip(&mut numbers) {
+            if number.is_none() && entry.step > total && kept.insert(entry.step) {
+                *number = Some(entry.step);
+            }
+        }
+        let mut after = kept.last().copied().unwrap_or(total).max(total);
+        for (entry, number) in self.entries.iter_mut().zip(numbers) {
+            let number = number.unwrap_or_else(|| {
+                after += 1;
+                after
+            });
+            entry.step = number;
+            if let Some(replaced) = &mut entry.replaced {
+                replaced.step = number;
+            }
+        }
+        self.entries.sort_by_key(|e| e.step);
     }
 }
 
