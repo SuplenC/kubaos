@@ -618,7 +618,7 @@ export function room(options: RoomOptions = {}): HTMLElement {
       tile.dataset.on = "";
       pin(tile, options.pinned);
       if (options.played !== false) settle(element, previewing(at, situation));
-      if (at === RESTART && options.played !== false) settle(element, [0, 2, 4].map((i) => cycling()[i]!));
+      if (at === RESTART && options.played !== false) settle(element, [0, 2].map((i) => cycling()[i]!));
       if (options.held !== undefined) {
         tile.dataset.keyed = "";
         tile.style.setProperty("--power-held", String(options.held));

@@ -358,7 +358,7 @@ export function lock(options: LockOptions): Lock {
     entry.dataset.live = "";
     entry.toggleAttribute("data-shown", options.phase === "awake");
   } else entry.style.setProperty("--reveal", options.phase === "awake" ? "1" : "0");
-  if (options.entry !== false) shown.over.append(entry);
+  shown.over.append(entry);
 
   // The rest clock stands in the screen's place, the same on every wallpaper, in front of the sky
   // and behind the city; the city's cut-out clips the digits wherever it happens to cross them.
