@@ -6,6 +6,7 @@ import { button } from "../../lib/button.ts";
 import { card as libraryCard } from "../../lib/card.ts";
 import { raise, type Step } from "../../lib/elevation.ts";
 import { focusRing, windowRing } from "../../lib/focus.ts";
+import { glass } from "../../lib/glass.ts";
 import { icon } from "../../lib/icon.ts";
 import { stack } from "../../lib/layout.ts";
 import { menu } from "../../lib/menu.ts";
@@ -104,8 +105,8 @@ function appWindow(which: "front" | "back", title: string, active: boolean, ...c
 
 /**
  * The desktop: two windows on the wallpaper, the front one active with a card, an open menu and a
- * tooltip over a button inside it; the shell's bar along the top and a panel growing out of it over
- * the window, the same card in it. It takes the mode of the surface it is drawn on.
+ * tooltip over a button inside it; the shell's bar along the top and a card under it over the
+ * window, both on the shell's glass, the same card in it. It takes the mode of the surface it is drawn on.
  */
 function desktop(): HTMLElement {
   const tip = tooltip("Sort by name", "Folders first, then files.");
@@ -116,8 +117,8 @@ function desktop(): HTMLElement {
   open.classList.add("f-elev-menu");
   const front = appWindow("front", "Files", true, card(), open, tip, sort);
   const back = appWindow("back", "Terminal", false, text("~/Projects/kubaos", "small", "on_surface_variant"));
-  const bar = el("div", "f-elev-bar", text("14:05", "label", "on_surface"));
-  const panel = el("div", "f-elev-panel", text("Recent", "subheading", "on_surface"), card());
+  const bar = glass(el("div", "f-elev-bar", text("14:05", "label", "on_surface")), true);
+  const panel = glass(el("div", "f-elev-panel", text("Recent", "subheading", "on_surface"), card()));
   return el("div", "f-elev-desktop", back, front, bar, panel);
 }
 
@@ -144,7 +145,7 @@ function planes(): HTMLElement {
       plane("Lock screen", "Casts nothing.", slab("lock", "lock screen")),
       plane(
         "Shell",
-        `\`shadow.panel\`, ${length("shadow-panel-y")} down, ${length("shadow-panel-blur")} blur, over anything.`,
+        `The glass's \`shadow.glass\`, ${length("shadow-glass-y")} down, ${length("shadow-glass-blur")} blur, over anything.`,
         slab("bar", "bar"),
         slab("panel", "panel"),
         slab("osd", "OSD"),
