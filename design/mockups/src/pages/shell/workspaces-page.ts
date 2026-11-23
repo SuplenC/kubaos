@@ -1,15 +1,29 @@
 // The Workspaces page: `config/quickshell/modules/bar/Workspaces.qml`. This screen's workspaces in
-// groups, the shown one on a stretching indicator, each group's ghost after its last; a workspace
-// carried to another place, and the right-click menu.
+// groups, flat on the bar's glass, each a mark in a fixed cell (the marks a setting), the shown
+// one's lit; each group's `+` and a borrowed group's name while the pointer is on them or the
+// Overview is up; a workspace carried to another place, and the right-click menu.
 
 import type { Words } from "../../lib/content.ts";
 import { rollingMidway } from "../../lib/rolling-number.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
-import { type Group, SHOTS_GROUPS, workspaces } from "./workspaces.ts";
+import { onGlass } from "./bar-parts.ts";
+import { type Group, type Marks, SHOTS_GROUPS, workspaces as part, type WorkspacesOptions } from "./workspaces.ts";
+
+/** The workspaces on a piece of the bar's glass, as the bar holds them. */
+const workspaces = (options: WorkspacesOptions = {}) => onGlass(part(options));
+
+/** The marks' choices, as the setting names them, and what each draws. */
+const FORMS: readonly { readonly name: string; readonly options: WorkspacesOptions }[] = [
+  { name: "Dot and dash", options: { marks: "dotdash" } },
+  { name: "Numbers", options: { marks: "numbers" } },
+  { name: "Numbers, kanji", options: { marks: "numbers", kanji: true } },
+  { name: "Only the current one", options: { marks: "numbers", kanji: true, onlyCurrent: true } },
+  { name: "Dots", options: { marks: "dots" } },
+  { name: "Dashes", options: { marks: "dashes" } },
+];
 
 type State = "rest" | "hovered";
 
-const ONE: readonly Group[] = [{ block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: true }] }];
 const GROWN: readonly Group[] = [{ block: 0, spaces: [{ id: 1, occupied: true }, { id: 2, occupied: true }, { id: 3, occupied: true }, { id: 4, occupied: false }] }];
 const TEN: readonly Group[] = [{ block: 0, spaces: Array.from({ length: 10 }, (_, index) => ({ id: index + 1, occupied: index < 9 })) }];
 const UNNAMED: readonly Group[] = [SHOTS_GROUPS[0]!, { block: 1, borrowed: true, spaces: [{ id: 11, occupied: true }, { id: 12, occupied: false }] }];
@@ -28,7 +42,6 @@ const LIVE: readonly Group[] = [
 /** The live sample's, Desk full: ten workspaces, so it has no room for another. */
 const FULL: readonly Group[] = [LIVE[0]!, { block: 1, borrowed: true, name: "Desk", spaces: Array.from({ length: 10 }, (_, index) => ({ id: 11 + index, occupied: true })) }];
 
-const INDICATOR = ".shell-ws-indicator";
 const DISC = ".shell-ws-disc";
 
 /** A move's tracks: on a token's curve, one at least. */
@@ -82,27 +95,39 @@ const ROLLS: Move = {
   sample: () => rollingMidway(3, 4, "0", "button_small"),
 };
 
-const LEAVING: Tracks = [
-  { part: "its start", on: "the shown workspace", target: INDICATOR, property: "--ws-start", from: 1, to: 1.5, duration: "medium", curve: "standard_decel" },
-  { part: "its end", on: "the shown workspace", target: INDICATOR, property: "--ws-end", from: 2, to: 1.5, duration: "medium", curve: "standard_decel" },
+/** Showing another workspace: the leaving mark turns off as the arriving one turns on, a `swap_lag` later. */
+function switching(marks: Marks): Move {
+  const leaving = '.shell-ws-cell[data-space="w2"]';
+  const arriving = '.shell-ws-cell[data-space="w1"]';
+  const tracks: Track<Easing>[] = [
+    { part: "the leaving mark's light", on: "workspace 2", target: leaving, property: "--ws-lit", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the arriving mark's light", on: "workspace 1", target: arriving, property: "--ws-lit", from: 0, to: 1, duration: "short", cue: "swap_lag", curve: "standard" },
+  ];
+  if (marks !== "dots" && marks !== "numbers") {
+    tracks.push(
+      { part: "the leaving dash narrowing", on: "workspace 2", target: leaving, property: "--ws-shape", from: 1, to: 0, duration: "short", curve: "standard" },
+      { part: "the arriving dash widening", on: "workspace 1", target: arriving, property: "--ws-shape", from: 0, to: 1, duration: "medium", cue: "swap_lag", curve: "emphasized_decel" },
+    );
+  }
+  return {
+    name: `Switching, ${FORMS.find((form) => form.options.marks === marks)!.name}`,
+    what: "The leaving mark turns off over `short`; the arriving one turns on a `swap_lag` later, a dash widening over `medium`.",
+    tracks: nonEmpty(tracks),
+    reduced: atOnce(nonEmpty(tracks)),
+    back: "plays",
+    sample: () => workspaces({ marks, active: 1 }),
+  };
+}
+
+const EXTRA: Tracks = [
+  { part: "their room", on: "each `+`, Desk's name", target: ".shell-ws", property: "--ws-extras", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+  { part: "their opacity", on: "each `+`, Desk's name", target: ".shell-ws", property: "--ws-extras-shown", from: 0, to: 1, duration: "long", curve: "standard" },
 ];
-const ARRIVING: Tracks = [
-  { part: "its start", on: "the shown workspace", target: INDICATOR, property: "--ws-start", from: 1.5, to: 1, duration: "medium", curve: "standard_decel" },
-  { part: "its end", on: "the shown workspace", target: INDICATOR, property: "--ws-end", from: 1.5, to: 2, duration: "medium", curve: "standard_decel" },
-];
-const LEAVES: Move = {
-  name: "The indicator leaving a group",
-  what: "The shown one carried, or its group gone: a circle shrinking into its middle over `medium`, crossing nothing.",
-  tracks: LEAVING,
-  reduced: atOnce(LEAVING),
-  back: "plays",
-  sample: () => workspaces({ groups: LIVE }),
-};
-const ARRIVES: Move = {
-  name: "The indicator arriving in one",
-  what: "Landed, or shown in place of a gone group: a circle growing from its middle over `medium` on `standard_decel`.",
-  tracks: ARRIVING,
-  reduced: atOnce(ARRIVING),
+const EXTRAS: Move = {
+  name: "The pointer onto them",
+  what: "Each group's `+` and Desk's name open their room over `long` on `emphasized_decel`, fading in on `standard`.",
+  tracks: EXTRA,
+  reduced: atOnce(EXTRA),
   back: "plays",
   sample: () => workspaces({ groups: LIVE }),
 };
@@ -119,34 +144,16 @@ const MARKS: Move = {
 
 const GONE: Tracks = [
   { part: "its width", on: "Desk, all of it", target: '.shell-ws-slot[data-block="1"]', property: "--present", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
-  { part: "its opacity, its tint's too", on: "Desk, all of it", target: '.shell-ws-slot[data-block="1"]', property: "--ws-shown", from: 1, to: 0, duration: "long", curve: "standard" },
+  { part: "its opacity", on: "Desk, all of it", target: '.shell-ws-slot[data-block="1"]', property: "--ws-shown", from: 1, to: 0, duration: "long", curve: "standard" },
 ];
 const GROUP_GOES: Move = {
   name: "A borrowed group deleted",
-  what: "Its rule, name and workspaces shrink out over `long` on `emphasized_decel`, its tint fading with them.",
+  what: "Its hairlines, name and workspaces shrink out over `long` on `emphasized_decel`, fading with them.",
   tracks: GONE,
   reduced: atOnce(GONE),
   back: "plays",
   sample: () => workspaces(),
 };
-
-function stretch(name: string, what: string, from: number, to: number): Move {
-  const right = to > from;
-  return {
-    name,
-    what,
-    tracks: [
-      { part: "the indicator's leading edge", on: "the shown workspace", target: INDICATOR, property: right ? "--ws-end" : "--ws-start", from: right ? from + 1 : from, to: right ? to + 1 : to, duration: "medium", curve: "emphasized_decel" },
-      { part: "the indicator's trailing edge", on: "the shown workspace", target: INDICATOR, property: right ? "--ws-start" : "--ws-end", from: right ? from : from + 1, to: right ? to : to + 1, duration: "long", curve: "emphasized_decel" },
-    ],
-    reduced: [
-      { part: "the indicator's leading edge", on: "the shown workspace", target: INDICATOR, property: right ? "--ws-end" : "--ws-start", from: right ? from + 1 : from, to: right ? to + 1 : to, duration: "instant", curve: "emphasized_decel" },
-      { part: "the indicator's trailing edge", on: "the shown workspace", target: INDICATOR, property: right ? "--ws-start" : "--ws-end", from: right ? from : from + 1, to: right ? to : to + 1, duration: "instant", curve: "emphasized_decel" },
-    ],
-    back: "plays",
-    sample: () => workspaces({ groups: ONE, active: from + 1 }),
-  };
-}
 
 const GROWS: Move = {
   name: "A workspace grows in",
@@ -167,17 +174,31 @@ export default page<State>({
   level: "shell",
   slug: "workspaces",
   title: "Workspaces",
-  lede: "This screen's workspaces in groups: the shown one on the indicator, a ghost after each group's last.",
+  lede: "This screen's workspaces in groups, a mark each, the shown one lit; `+` and names under the pointer.",
   code: { qml: "Workspaces" },
-  stage: { live: () => workspaces({ groups: LIVE, live: true }), hint: "click or scroll; drag a number; right-click one", daylight: true },
+  stage: {
+    live: () => workspaces({ groups: LIVE, live: true }),
+    switches: {
+      each: [
+        { label: "Marks", choices: ["Dot and dash", "Numbers", "Kanji", "Only current", "Dots", "Dashes"] },
+        { label: "Overview", choices: ["Down", "Up"] },
+      ],
+      live: ([form, overview]) => workspaces({ groups: LIVE, live: true, urgent: 3, ...FORMS[form ?? 0]!.options, overview: overview === 1 }),
+    },
+    hint: "click or scroll; drag one; right-click one",
+    daylight: true,
+  },
   variants: [
-    { name: "Numbers", for: "1–10, as SUPER + 1–0 reach them", sample: () => workspaces() },
-    { name: "Kanji", for: "the setting: 一 to 十 in `accent`", sample: () => workspaces({ kanji: true }) },
-    { name: "One group", for: "the screen's own, its ghost last", sample: () => workspaces({ groups: SHOTS_GROUPS.slice(0, 1) }) },
-    { name: "Borrowed, unnamed", for: "the tint alone", sample: () => workspaces({ groups: UNNAMED }) },
-    { name: "Borrowed, named", for: "its name first, `secondary`", sample: () => workspaces() },
+    ...FORMS.map(({ name, options }) => ({ name, for: name === "Dot and dash" ? "the default: the shown one a dash" : "a setting", sample: () => workspaces({ groups: LIVE, ...options }) })),
+    { name: "Urgent, Dot and dash", for: "a lit dot in `error`", sample: () => workspaces({ groups: LIVE, urgent: 3 }) },
+    { name: "Urgent, Dashes", for: "a lit dash in `error`", sample: () => workspaces({ groups: LIVE, marks: "dashes", urgent: 3 }) },
+    { name: "Urgent, Numbers", for: "its number lit in `error`", sample: () => workspaces({ groups: LIVE, marks: "numbers", urgent: 3 }) },
+    { name: "One group", for: "the screen's own", sample: () => workspaces({ groups: SHOTS_GROUPS.slice(0, 1) }) },
+    { name: "Borrowed, at rest", for: "a stronger hairline before and after it", sample: () => workspaces() },
+    { name: "Borrowed, unnamed", for: "the hairlines alone, even under the pointer", sample: () => workspaces({ groups: UNNAMED, pinned: "hover" }) },
+    { name: "The Overview up", for: "every `+` and the name, as under the pointer", sample: () => workspaces({ groups: LIVE, overview: true }) },
   ],
-  sizes: doesntApply("one height, `size.control_sm`; as wide as its entries."),
+  sizes: doesntApply("one row, `size.bar_row`; fixed cells, `size.ws_cell`."),
   groups: [
     {
       title: "Carried",
@@ -206,36 +227,36 @@ export default page<State>({
       lit: "no keyboard focus: the bar is never a Tab stop",
       pressed: "a click shows the workspace; nothing stays pressed",
       disabled: "always there",
-      selected: "the shown workspace: the indicator, in every row",
+      selected: "the shown workspace: its mark lit, in every row",
       loading: "drawn once Hyprland answers",
       empty: "a screen always has its first workspace",
       error: "nothing it can fail at",
     },
-    rows: nonEmpty([
-      { name: "Numbers", cell: (state: State) => workspaces(state === "hovered" ? { pinned: "hover" } : {}) },
-      { name: "Kanji", cell: (state: State) => workspaces({ kanji: true, ...(state === "hovered" ? { pinned: "hover" as const } : {}) }) },
-    ]),
+    rows: nonEmpty(FORMS.map(({ name, options }) => ({ name, cell: (state: State) => workspaces({ ...options, ...(state === "hovered" ? { pinned: "hover" as const } : {}) }) }))),
     looks: {
-      rest: "`surface_container`; shown `on_primary` on `primary`; with windows `on_surface`",
-      hovered: "the cell under the pointer: a `surface_container_high` circle",
+      rest: "flat; shown lit in `primary`; with windows `on_surface_variant`; empty `outline`",
+      hovered: "`+` and names in; a `surface_container_high` circle under the cell",
     },
   },
-  focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
+  focus: doesntApply("the bar takes no keyboard focus; no edge light under the workspaces."),
   content: {
     text: [{ name: "A group's name", words: NAME, sample: (words: string) => workspaces({ groups: [SHOTS_GROUPS[0]!, { ...SHOTS_GROUPS[1]!, name: words }] }) }],
-    missingPicture: doesntApply("numbers and one symbol, `add`, always there."),
+    missingPicture: doesntApply("marks and one symbol, `add`, always there."),
     counts: [
       { name: "One", for: "the screen's first workspace, shown", sample: () => workspaces({ groups: [{ block: 0, spaces: [{ id: 1, occupied: false }] }], active: 1 }) },
-      { name: "Ten", for: "a full group: no ghost", sample: () => workspaces({ groups: TEN, active: 4 }) },
-      { name: "Three groups", for: "a rule in each gap", sample: () => workspaces({ groups: THREE }) },
+      { name: "Ten", for: "a full group: no `+`", sample: () => workspaces({ groups: TEN, active: 4 }) },
+      { name: "Three groups", for: "a hairline in each gap", sample: () => workspaces({ groups: THREE }) },
     ],
   },
   motion: {
     arrives: [GROWS],
     leaves: doesntApply("a deleted workspace, or a deleted borrowed group with its rule and name, shrinks out: Arriving's move, played back."),
     between: [
-      stretch("To the right", "The leading edge over `medium`, the trailing one over `long`, both `emphasized_decel`.", 0, 2),
-      stretch("To the left", "The same stretch, mirrored: the left edge leads.", 2, 0),
+      switching("dotdash"),
+      switching("dashes"),
+      switching("dots"),
+      switching("numbers"),
+      EXTRAS,
       { name: "Hovered", what: "The pointer onto a cell: its circle fades in over `short`.", tracks: [{ part: "the circle", on: "the cell under the pointer", target: ".shell-ws-cell[data-pointer]", property: "--cell-hover", from: 0, to: 1, duration: "short", curve: "standard" }], reduced: "same", back: "plays", sample: () => workspaces() },
       LIFTS,
       SNAPS,
@@ -243,8 +264,6 @@ export default page<State>({
       CROSSES,
       DROPS,
       ROLLS,
-      LEAVES,
-      ARRIVES,
       MARKS,
       GROUP_GOES,
     ],
@@ -261,15 +280,21 @@ export default page<State>({
   },
   measures: {
     samples: nonEmpty([
-      { name: "Two groups", for: "cells, the rule, the tint, the name", sample: () => workspaces() },
-      { name: "Kanji", for: "the same cells", sample: () => workspaces({ kanji: true }) },
+      { name: "Two groups", for: "cells, the hairlines, the name", sample: () => workspaces({ pinned: "hover" }) },
+      { name: "Kanji", for: "the same cells", sample: () => workspaces({ marks: "numbers", kanji: true }) },
+      { name: "Dashes", for: "a dash and the shown one's", sample: () => workspaces({ marks: "dashes" }) },
     ]),
     measures: [
-      { part: "Height", token: "size-control_sm" },
-      { part: "Inset round the cells", token: "space-s4" },
-      { part: "Cell, indicator", token: "size-chip" },
-      { part: "Gap between groups", token: "space-s12" },
-      { part: "Rule", token: "stroke-hairline_device_px" },
+      { part: "Row", token: "size-bar_row" },
+      { part: "Cell", token: "size-ws_cell" },
+      { part: "A dot", token: "size-ws_dot" },
+      { part: "A dash", token: "size-ws_dash" },
+      { part: "The shown dash", token: "size-ws_dash_lit" },
+      { part: "A dash's thickness", token: "size-ws_dash_thick" },
+      { part: "Dot and dash's thickness", token: "size-ws_dotdash_thick" },
+      { part: "An empty ring", token: "stroke-thin" },
+      { part: "Gap between groups", token: "space-s20" },
+      { part: "Hairline's height", token: "size-bar_divider" },
       { part: "A name, at most", token: "space-s48" },
       { part: "Ghost", token: "icon-s16" },
       { part: "Number's line", token: "type-button_small-line" },

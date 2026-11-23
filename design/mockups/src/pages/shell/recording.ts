@@ -7,7 +7,7 @@ import { makePill, pillChanging } from "../../lib/pill.ts";
 import { ALL } from "../../site/settings.ts";
 import { hovers, press, pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
-import { idleContent, idleOptions, idlePill, recordingContent, recordingPill } from "./bar-parts.ts";
+import { idleContent, idleOptions, idlePill, onGlass, recordingContent, recordingPill } from "./bar-parts.ts";
 
 type State = "rest" | "hovered" | "pressed";
 
@@ -86,11 +86,11 @@ export default page<State>({
       empty: "nothing running: gone",
       error: "a failed recording's notification says so",
     },
-    rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => make(state) }))),
+    rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => onGlass(make(state)) }))),
     looks: {
-      rest: "recording on `error_container`; the rest on `surface_container`",
-      hovered: "the state layer over its tone's fill, its hint",
-      pressed: "fill a step past hover; a click stops or cancels it",
+      rest: "recording in a capsule of `error_container`; the rest flat",
+      hovered: "a capsule's state layer a step on; its hint",
+      pressed: "its content dips; a click stops or cancels it",
     },
   },
   focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
@@ -110,8 +110,8 @@ export default page<State>({
         back: "plays",
         sample: () => pillChanging({ lone: false, tone: "recording" }, recordingContent({ elapsed: "9:59" }), recordingContent({ elapsed: "10:00" })),
       },
-      { name: "Hovered", what: "The pointer onto it: its fill a step on over `short`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => row("s8", "centre", recordingPill(), idlePill()) },
-      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered, with no glow.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => row("s8", "centre", recordingPill({ state: "hovered" }), idlePill({ state: "hovered" })) },
+      { name: "Hovered", what: "The pointer onto it: the capsule a step on over `short`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => onGlass(recordingPill(), idlePill()) },
+      { name: "Pressed", what: "Over `micro` its content dips, a capsule a step past hovered, with no glow.", tracks: [...press(".k-pill", "every pill"), { part: "the content", on: "every pill", target: ".k-bar-dip", property: "scale", from: 1, to: { scale: "press_dip" }, duration: "micro", curve: "standard" }], reduced: "same", back: "plays", sample: () => onGlass(recordingPill({ state: "hovered" }), idlePill({ state: "hovered" })) },
     ],
   },
   keyboard: {

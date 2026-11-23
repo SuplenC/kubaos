@@ -93,6 +93,8 @@ export interface ClockOptions {
   readonly weather?: boolean;
   readonly recording?: boolean;
   readonly state?: Shown;
+  /** Its card open on the calendar or the weather: its capsule filled. */
+  readonly open?: "clock" | "weather";
 }
 
 /** The bar's clock pill (`lib/clock-pill.ts`) with the shots' words. */
@@ -738,10 +740,12 @@ function measure(width: number, content: BarContent, state: BarState, layout: Ba
   host.append(strip);
   (document.getElementById("page") ?? document.body).append(host);
   const scale = Number(getComputedStyle(host).getPropertyValue("--scale")) || 1;
-  // An item's width and the margins round it: a hairline's are the room either side of it.
+  // An item's width and the margins round it: a hairline's are the room either side of it. Now
+  // playing's auto margin is the room it is pushed across, not room it needs.
   const outer = (element: Element) => {
     const style = getComputedStyle(element);
-    return (element.getBoundingClientRect().width + Number.parseFloat(style.marginLeft) + Number.parseFloat(style.marginRight)) / scale;
+    const margins = element.classList.contains("shell-playing-pill") ? 0 : Number.parseFloat(style.marginLeft) + Number.parseFloat(style.marginRight);
+    return (element.getBoundingClientRect().width + margins) / scale;
   };
   // Each side's own items: its grid column shrinks with the bar, its items don't.
   const need = (side: HTMLElement) => [...side.children].reduce((sum, each) => sum + outer(each), 0);

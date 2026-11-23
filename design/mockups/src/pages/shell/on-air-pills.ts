@@ -5,12 +5,12 @@
 
 import type { Shown as ControlShown } from "../../lib/control.ts";
 import { hint } from "../../lib/hint.ts";
-import { row, stack } from "../../lib/layout.ts";
+import { stack } from "../../lib/layout.ts";
 import { pillChanging } from "../../lib/pill.ts";
 import { hovers, pillSwap, press } from "../../site/moves.ts";
 import { doesntApply, type Easing, type Move, type NonEmpty, nonEmpty, page, screen, type Strike, type Track } from "../../site/page.ts";
 import { mutePill } from "./bar-audio-parts.ts";
-import { barStrip, bellPill, type CameraUse, cameraPill, EVERYDAY, ON_AIR_WORDS, onAirOptions, type Share, sharingContent, sharingPill, statusPill } from "./bar-parts.ts";
+import { barStrip, bellPill, onGlass, type CameraUse, cameraPill, EVERYDAY, ON_AIR_WORDS, onAirOptions, type Share, sharingContent, sharingPill, statusPill } from "./bar-parts.ts";
 import { SCREEN_WIDTH } from "./screen-parts.ts";
 import { CAMERAS, cameraPanel, cameraShot, LONG_VIEW, NO_ICON, onCorner, shareFor, SHARES, type ShareView, sharingPanel, sharingShot, VIEWS } from "./sharing-parts.ts";
 
@@ -24,7 +24,7 @@ const TWO_CAMERAS: readonly CameraUse[] = [CAMERAS.first.use, CAMERAS.second.use
 
 /** The bar's right end from the on-air pills on: the pills, the mute pill, the bell, status. */
 function end(sharing: Share | readonly Share[] | null = SHARES.screen, camera: CameraUse | readonly CameraUse[] | null = CAMERA, state: ControlShown = "rest"): HTMLElement {
-  return row("s8", "centre", ...(sharing ? [sharingPill(sharing, state)] : []), ...(camera ? [cameraPill(camera, state)] : []), mutePill({ input: { recording: true } }), bellPill(), statusPill());
+  return onGlass(...(sharing ? [sharingPill(sharing, state)] : []), ...(camera ? [cameraPill(camera, state)] : []), mutePill({ input: { recording: true } }), bellPill(), statusPill());
 }
 
 /** A pill lit, over a room as tall as its Hint and the gap to it, so the bubble stays in the sample. */
@@ -90,7 +90,7 @@ const PILL = ".shell-on-air";
 
 /** A pill beside the bar's right end, as it stands while it arrives or leaves. */
 function besideEnd(make: () => HTMLElement): () => HTMLElement {
-  return () => row("s8", "centre", make(), mutePill({ input: { recording: true } }), bellPill(), statusPill());
+  return () => onGlass(make(), mutePill({ input: { recording: true } }), bellPill(), statusPill());
 }
 
 /**
@@ -157,21 +157,21 @@ export default page<State>({
   from: ["pill", "panel-page", "card", "tabs", "media", "list", "button"],
   stage: { live, hint: "click a pill: its panel; Stop sharing ends one share", daylight: true },
   variants: [
-    { name: "Sharing a screen", for: "the screen's symbol on `sharing_container`", sample: () => sharingPill(SHARES.screen) },
-    { name: "Sharing a window", for: "the window's symbol", sample: () => sharingPill(SHARES.window) },
-    { name: "Sharing a region", for: "the region's symbol", sample: () => sharingPill(SHARES.region) },
-    { name: "A camera in use", for: "the camera on `error_container`, as a recording", sample: () => cameraPill(CAMERA) },
-    { name: "Two shares", for: "the symbol and the count", sample: () => sharingPill(TWO_SHARES) },
-    { name: "Two cameras", for: "the camera and the count", sample: () => cameraPill(TWO_CAMERAS) },
+    { name: "Sharing a screen", for: "the screen's symbol on `sharing_container`", sample: () => onGlass(sharingPill(SHARES.screen)) },
+    { name: "Sharing a window", for: "the window's symbol", sample: () => onGlass(sharingPill(SHARES.window)) },
+    { name: "Sharing a region", for: "the region's symbol", sample: () => onGlass(sharingPill(SHARES.region)) },
+    { name: "A camera in use", for: "the camera on `error_container`, as a recording", sample: () => onGlass(cameraPill(CAMERA)) },
+    { name: "Two shares", for: "the symbol and the count", sample: () => onGlass(sharingPill(TWO_SHARES)) },
+    { name: "Two cameras", for: "the camera and the count", sample: () => onGlass(cameraPill(TWO_CAMERAS)) },
     { name: "Both, in order", for: "sharing first, then the camera", sample: () => end() },
-    { name: "The sharing pill's hint", for: "what and with whom", sample: () => hinted(sharingPill(SHARES.screen, "hovered"), ON_AIR_WORDS.sharing(SHARES.screen.what, SHARES.screen.who)) },
-    { name: "The camera pill's hint", for: "the app that has it", sample: () => hinted(cameraPill(CAMERA, "hovered"), ON_AIR_WORDS.camera(CAMERA.who)) },
+    { name: "The sharing pill's hint", for: "what and with whom", sample: () => hinted(onGlass(sharingPill(SHARES.screen, "hovered")), ON_AIR_WORDS.sharing(SHARES.screen.what, SHARES.screen.who)) },
+    { name: "The camera pill's hint", for: "the app that has it", sample: () => hinted(onGlass(cameraPill(CAMERA, "hovered")), ON_AIR_WORDS.camera(CAMERA.who)) },
     { name: "On the bar", for: "first on the right, nearest the clock", sample: screen(() => onTheBar()) },
     { name: "On the bar, counted", for: "two shares and two cameras", sample: screen(() => onTheBar(TWO_SHARES, TWO_CAMERAS)) },
   ],
   sizes: [
-    { name: "A pill, one", for: "a circle a pill tall", sample: () => sharingPill(SHARES.screen) },
-    { name: "A pill, counted", for: "symbol and count, `space.s8` at the ends still", sample: () => sharingPill(TWO_SHARES) },
+    { name: "A pill, one", for: "a circle a pill tall", sample: () => onGlass(sharingPill(SHARES.screen)) },
+    { name: "A pill, counted", for: "symbol and count, `space.s8` at the ends still", sample: () => onGlass(sharingPill(TWO_SHARES)) },
     { name: "A panel", for: "`size.panel` wide, as every panel", sample: screen(() => sharingShot()) },
   ],
   groups: [
@@ -207,13 +207,13 @@ export default page<State>({
       error: "a share that fails ends; its notification says so",
     },
     rows: [
-      { name: "Sharing pill", cell: (state: State) => (state === "open" ? sharingShot() : sharingPill(SHARES.screen, state)) },
-      { name: "Camera pill", cell: (state: State) => (state === "open" ? cameraShot() : cameraPill(CAMERA, state)) },
+      { name: "Sharing pill", cell: (state: State) => (state === "open" ? sharingShot() : onGlass(sharingPill(SHARES.screen, state))) },
+      { name: "Camera pill", cell: (state: State) => (state === "open" ? cameraShot() : onGlass(cameraPill(CAMERA, state))) },
     ],
     looks: {
-      rest: "its symbol in its ink on its container",
-      hovered: "the state layer over its container, its hint",
-      pressed: "the fill a step past hover; no glow",
+      rest: "its symbol in a small capsule on its container",
+      hovered: "the capsule a step on; the edge light; its hint",
+      pressed: "it dips, the capsule a step past hover; the light full",
       open: "its panel under it; the pill rests, its hint off the title",
     },
   },
@@ -223,7 +223,7 @@ export default page<State>({
       {
         name: "What is shared, in the hint",
         words: { short: SHARES.screen.what, long: LONG_WINDOW.what },
-        sample: (words: string) => hinted(sharingPill({ ...SHARES.screen, what: words }, "hovered"), ON_AIR_WORDS.sharing(words, SHARES.screen.who)),
+        sample: (words: string) => hinted(onGlass(sharingPill({ ...SHARES.screen, what: words }, "hovered")), ON_AIR_WORDS.sharing(words, SHARES.screen.who)),
       },
     ],
     missingPicture: [
@@ -245,8 +245,8 @@ export default page<State>({
     leaves: [leaves("The sharing pill leaves", () => sharingPill(SHARES.screen)), leaves("The camera pill leaves", () => cameraPill(CAMERA))],
     between: [
       COUNTED,
-      { name: "Hovered", what: "The pointer onto it: its fill a step on over `short`.", tracks: hovers(PILL, "both pills", 0, 1), reduced: "same", back: "cuts", sample: () => end() },
-      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered; its panel opens.", tracks: press(PILL, "both pills"), reduced: "same", back: "plays", sample: () => end(SHARES.screen, CAMERA, "hovered") },
+      { name: "Hovered", what: "The pointer onto it: its capsule a step on, the edge light in under it, over `short`.", tracks: [...hovers(PILL, "both pills", 0, 1), { part: "the edge light", on: "the pill", target: ".k-edge-hover", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }], reduced: "same", back: "cuts", sample: () => end(SHARES.screen, CAMERA, "hovered") },
+      { name: "Pressed", what: "Over `micro` its capsule dips, the edge light goes full; its panel opens.", tracks: [...press(PILL, "both pills"), { part: "the content", on: "the pill", target: `${PILL} > .k-bar-dip`, property: "scale", from: 1, to: { scale: "press_dip" }, duration: "micro", curve: "standard" }, { part: "the edge light", on: "the pill", target: ".k-edge-hover", property: "--rail-lit", from: 0, to: 1, duration: "micro", curve: "standard" }], reduced: "same", back: "plays", sample: () => end(SHARES.screen, CAMERA, "hovered") },
     ],
   },
   keyboard: {

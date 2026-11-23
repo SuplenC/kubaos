@@ -1,18 +1,21 @@
-// The Bar page: the frame's top edge as it is designed now. What you're doing on the left (the
-// workspaces, the preview, recording, Keep awake, Proxy, the layout, the update, the title, and now
-// playing at its end beside the clock), the clock always centred, and on the right what opens a
-// panel (the tray or its ⋯, the system monitor, the mute pill, the bell and status, which end it).
-// As the bar narrows its parts give way in one order (`RUNGS`), now playing's words first.
+// The Bar page: the bar along the screen's top, its items flat on the glass in groups parted by
+// hairlines. At the start the Command menu button, the workspaces, what you're doing (the preview,
+// recording, Keep awake, Proxy, the layout, the update), the title, and now playing beside the
+// clock; the clock always centred; at the end what opens a card (what is on air, the counters, the
+// tray or its ⋯, the system monitor, the mute pill, the bell and status, which end it). An item
+// that opens a card answers the pointer with the edge light. As the bar narrows its parts give way
+// in one order (`RUNGS`), the quiet pills folding into ⋯ first.
 
 import type { Shown } from "../../lib/control.ts";
+import { type BarLayout, BAR_LAYOUTS } from "../../lib/sheet.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { slider } from "../../lib/slider.ts";
 import { text } from "../../lib/text.ts";
-import { hovers, press } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { WINDOWS } from "../../site/settings.ts";
 import { LONG_SONG } from "./bar-audio-parts.ts";
-import { barStrip, type BarContent, EVERYDAY, EVERYTHING, fitBar, logicalWidth, RUNGS, TITLE } from "./bar-parts.ts";
+import { barScreen, barStrip, type BarContent, EVERYDAY, EVERYTHING, fitBar, logicalWidth, RUNGS, TITLE } from "./bar-parts.ts";
+import { setCommandOpen } from "./bar-command.ts";
 
 /** The widths the bar is designed at, logical pixels: a 4K screen down to a portrait one at 2. */
 export const STEPS = [3840, 2560, 1920, 1440, 1280, 1024, 640, 540] as const;
@@ -80,6 +83,56 @@ const TITLE_SWAP: Move = {
 
 const QUIET: BarContent = { ...EVERYDAY, tray: false, title: "" };
 
+const LAYOUT_NAMES = ["Bar", "Floating", "Islands"] as const;
+
+/** The bar on a screen's top in `layout`, a strip of desktop under it, at 1600. */
+function onScreen(layout: BarLayout, content: BarContent = EVERYDAY): HTMLElement {
+  return barScreen(WIDE, "calc(var(--size-bar) + var(--size-control_md))", { layout, content }).element;
+}
+
+/**
+ * The bar in the layout picked, everything on; the Command menu opened lights its button's sign
+ * stroke by stroke as it is picked, and a press on the button lights or puts it out.
+ */
+function switched(picked: readonly number[]): HTMLElement {
+  const layout = BAR_LAYOUTS[picked[0] ?? 0]!;
+  const room = onScreen(layout, EVERYTHING);
+  const button = room.querySelector<HTMLElement>(".shell-cmd");
+  if (button && picked[1] === 1) requestAnimationFrame(() => requestAnimationFrame(() => setCommandOpen(button, true)));
+  return room;
+}
+
+/** The Command menu button's strokes lighting in writing order, each a `duration.swap_lag` after the one before. */
+const SIGN_LIGHTS: Move = {
+  name: "The Command menu opens",
+  what: "By a click or its key: the button's strokes light in writing order, a `swap_lag` apart.",
+  tracks: nonEmpty(
+    ["ク, first", "ク, second", "バ, first", "バ, second", "the dakuten, first", "the dakuten, second"].map((part, order) => ({
+      part,
+      on: "the Command menu button",
+      target: `.shell-cmd-stroke:nth-child(${order + 1})`,
+      property: "--stroke-lit",
+      from: 0,
+      to: 1,
+      duration: "short" as const,
+      ...(order > 0 ? { cue: nonEmpty(Array.from({ length: order }, () => "swap_lag" as const)) } : {}),
+      curve: "standard" as const,
+    })),
+  ),
+  reduced: "same",
+  back: "plays",
+  sample: () => strip(1440),
+};
+
+const SIGN_OFF: Move = {
+  name: "The Command menu closes",
+  what: "Its sign goes out, every stroke at once, over `short`.",
+  tracks: [{ part: "every stroke", on: "the Command menu button", target: ".shell-cmd-stroke", property: "--stroke-lit", from: 1, to: 0, duration: "short", curve: "standard" }],
+  reduced: "same",
+  back: "plays",
+  sample: () => barStrip({ width: 1440, command: "open" }),
+};
+
 /** Music on an ordinary day, the focused window's title short: now playing wide. */
 const PLAYING: BarContent = { ...EVERYDAY, playing: true, title: "Firefox" };
 /** The same with a song that runs past its room. */
@@ -91,11 +144,25 @@ export default page<"rest" | "hovered" | "pressed">({
   level: "shell",
   slug: "bar",
   title: "Bar",
-  lede: "The frame's top edge: what you're doing on the left, the clock centred, what opens a panel on the right.",
+  lede: "Flat on the glass: what you're doing at the start, the clock centred, what opens a card at the end.",
   code: { qml: "Bar", unbuilt: "QML: steps not built yet" },
-  stage: { live, hint: "drag the slider: 540 to 3840", daylight: true, stacked: true },
+  stage: {
+    live,
+    switches: {
+      each: [
+        { label: "Bar layout", choices: ["Bar", "Floating", "Islands"] },
+        { label: "Command menu", choices: ["Closed", "Open"] },
+      ],
+      live: switched,
+    },
+    hint: "drag the slider; point at the end; pick Open",
+    daylight: true,
+    stacked: true,
+  },
   variants: [
+    ...BAR_LAYOUTS.map((layout, index) => ({ name: LAYOUT_NAMES[index]!, for: "the same items, flat on the glass", sample: () => onScreen(layout, EVERYTHING) })),
     { name: "Everyday", for: "tray, system monitor, mute, bell, status", sample: () => strip(WIDE) },
+    { name: "Command menu open", for: "its sign lit", sample: () => barStrip({ width: WIDE, command: "open" }) },
     { name: "Everything on", for: "every pill at once, on its own side", sample: () => strip(WIDE, EVERYTHING) },
     { name: "No window", for: "an empty workspace: no title", sample: () => strip(WIDE, { ...EVERYDAY, title: "" }) },
     { name: "Playing, 1440", for: "now playing wide, beside the clock", sample: () => strip(1440, PLAYING) },
@@ -121,9 +188,9 @@ export default page<"rest" | "hovered" | "pressed">({
       { name: "Everything on", cell: (state: "rest" | "hovered" | "pressed") => strip(WIDE, EVERYTHING, state) },
     ]),
     looks: {
-      rest: "the frame's glass, each pill on `surface_container`",
-      hovered: "the pill under the pointer a step on, its hint",
-      pressed: "that pill's fill a step past hover",
+      rest: "flat on the glass; recording, sharing, camera in a capsule",
+      hovered: "an opener's edge light, `opacity.track_lit`; its hint",
+      pressed: "its content dips; the edge light full",
     },
   },
   focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
@@ -138,13 +205,25 @@ export default page<"rest" | "hovered" | "pressed">({
     ],
   },
   motion: {
-    arrives: doesntApply("it comes with the frame: the Frame page's reveal."),
-    leaves: doesntApply("it goes with the frame: the Frame page's reveal."),
+    arrives: doesntApply("it comes with the desktop: the Desktop page."),
+    leaves: doesntApply("it goes with the desktop: the Desktop page."),
     between: [
       TITLE_SWAP,
-      { name: "Hovered", what: "The pointer onto a pill: its fill a step on over `short`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width)) },
-      { name: "Back to rest", what: "The pointer off: back to rest over `short`.", tracks: hovers(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "hovered") },
-      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered, with no line and no glow.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "hovered") },
+      SIGN_LIGHTS,
+      SIGN_OFF,
+      { name: "Hovered", what: "The pointer onto an opener: the edge light comes in under it over `short`.", tracks: [{ part: "the edge light", on: "the item under the pointer", target: ".k-edge-hover", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }], reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "hovered") },
+      { name: "Back to rest", what: "The pointer off: the light goes over `short`.", tracks: [{ part: "the edge light", on: "the item it leaves", target: ".k-edge-hover", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }], reduced: "same", back: "cuts", sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "hovered") },
+      {
+        name: "Pressed",
+        what: "Over `micro` the content dips and the edge light goes to full.",
+        tracks: [
+          { part: "the content", on: "the item pressed", target: ".k-bar-dip", property: "scale", from: 1, to: { scale: "press_dip" }, duration: "micro", curve: "standard" },
+          { part: "the edge light", on: "the item pressed", target: ".k-edge-hover", property: "--rail-lit", from: 0, to: 1, duration: "micro", curve: "standard" },
+        ],
+        reduced: "same",
+        back: "plays",
+        sample: () => strip(logicalWidth(LAPTOP.width), EVERYDAY, "hovered"),
+      },
     ],
   },
   keyboard: doesntApply("never a stop for Tab; its actions are Items in the Command menu."),
@@ -155,10 +234,17 @@ export default page<"rest" | "hovered" | "pressed">({
       { name: "The narrowest", for: "540, everything on", sample: () => strip(540, EVERYTHING) },
     ]),
     measures: [
-      { part: "Bar's height", token: "size-bar" },
-      { part: "Pills' height", token: "size-control_sm" },
-      { part: "Ends, between pills", token: "space-s8" },
-      { part: "Pills to the title", token: "space-s12" },
+      { part: "Band's height", token: "size-bar" },
+      { part: "A strip's height", token: "size-bar_strip" },
+      { part: "Items' row", token: "size-bar_row" },
+      { part: "Glass end to the mark", token: "size-bar_start" },
+      { part: "Mark to its hairline", token: "size-bar_mark_air" },
+      { part: "Hairline to the workspaces", token: "size-bar_start" },
+      { part: "Ink to a hairline", token: "space-s12" },
+      { part: "A hairline's height", token: "size-bar_divider" },
+      { part: "Command menu mark", token: "size-bar_mark" },
+      { part: "A capsule's height", token: "size-bar_capsule" },
+      { part: "Between items", token: "space-s8" },
       { part: "Clear of the clock", token: "space-s40" },
       { part: "Now playing to the clock", token: "space-s8" },
       { part: "Title, at least", token: "space-s48" },

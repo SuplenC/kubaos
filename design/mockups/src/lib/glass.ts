@@ -93,7 +93,7 @@ function place(light: HTMLElement, at: Stretch): void {
  * the bar's glass: one light, which comes in under the item the pointer is on, travels to the next
  * one, goes to full brightness while the item is pressed, and goes when the pointer leaves. An
  * item whose card is open (`data-card-open`) already has its light and takes none. A pinned item
- * (`data-pinned` hover or pressed) shows its light still, once it is laid out.
+ * (`data-pinned` hover or pressed, on it or a part of it) shows its light still, once it is laid out.
  */
 export function edgeRail(host: HTMLElement): HTMLElement {
   const light = edgeLight();
@@ -145,7 +145,7 @@ export function edgeRail(host: HTMLElement): HTMLElement {
 
   // A pinned item shows its light as a still once it is on the page and laid out.
   const settle = (tries: number) => {
-    const pinned = host.querySelector<HTMLElement>('[data-opens]:is([data-pinned="hover"], [data-pinned="pressed"])');
+    const pinned = host.querySelector<HTMLElement>('[data-opens]:is([data-pinned="hover"], [data-pinned="pressed"], :has([data-pinned="hover"], [data-pinned="pressed"]))');
     if (!pinned) return;
     if (!host.isConnected || host.offsetWidth === 0) {
       if (tries > 0) requestAnimationFrame(() => settle(tries - 1));
@@ -153,7 +153,7 @@ export function edgeRail(host: HTMLElement): HTMLElement {
     }
     show(pinned);
     light.removeAttribute("data-travel");
-    light.toggleAttribute("data-pressed", pinned.dataset.pinned === "pressed");
+    light.toggleAttribute("data-pressed", pinned.matches('[data-pinned="pressed"], :has([data-pinned="pressed"])'));
   };
   requestAnimationFrame(() => settle(300));
   // The bar's layout moves as it settles (fonts, a card's swap): the light keeps to its item.

@@ -64,7 +64,8 @@ function withWindow(room: HTMLElement, shown: Shown, peek: boolean, live: boolea
 function desktop(options: DesktopOptions = {}): HTMLElement {
   const room = barScreen(logicalWidth(options.width ?? LAPTOP.width), options.height ?? LAPTOP.height, options.layout ? { layout: options.layout } : {});
   const right = room.element.querySelector(".shell-bar-right");
-  const items = right ? [...right.children].slice(-4) : [];
+  // The end's last four items, past the hairlines between its groups.
+  const items = right ? [...right.children].filter((child) => !child.classList.contains("shell-bar-divider")).slice(-4) : [];
   const audio = audioPanel();
   const contents = [system().element, audio.element, notifications().element, controlCenter().element];
   const set = twins(
