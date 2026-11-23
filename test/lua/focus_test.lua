@@ -8,7 +8,7 @@
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
 local repo = assert(arg[1], "usage: lua5.5 test/lua/focus_test.lua REPO [TOKENS]")
-package.path = repo .. "/config/hypr/?.lua;" .. package.path
+package.path = repo .. "/config/hypr/?.lua;" .. repo .. "/test/lua/?.lua;" .. package.path
 
 -- focus.lua's require("tokens") gets this one, whichever directory it is in.
 local tokens = dofile((arg[2] or (repo .. "/config/hypr")) .. "/tokens.lua")
@@ -34,9 +34,7 @@ local function same(actual, expected, what)
 end
 
 local real_getenv = os.getenv
-local scratch = os.tmpname()
-os.remove(scratch)
-local homes = 0
+local scratch <close> = require("scratch").new()
 
 -- Hyprland's focus reasons, as `window.active` passes them.
 local FFM, KEYBIND, WORKSPACE_CHANGE, TOGGLE_SPECIAL, NEW_WINDOW = 1, 2, 11, 12, 16
@@ -57,8 +55,7 @@ local SPECS = {
 -- nil); through looks.lua when `looks` is true, with no generated palette.
 -- The world records the config Hyprland holds and each call made.
 local function world(settings, looks)
-  homes = homes + 1
-  local home = scratch .. "/" .. homes
+  local home = scratch:path()
   os.execute("mkdir -p '" .. home .. "/kubaos/desktop/quickshell'")
   if settings then
     local f = assert(io.open(home .. "/kubaos/desktop/quickshell/settings.json", "w"))
@@ -506,5 +503,4 @@ test("reloading the colours mid-strike keeps the step, and the strike still ends
 end)
 
 os.getenv = real_getenv
-os.execute("rm -rf '" .. scratch .. "'")
-os.exit(failed == 0 and 0 or 1)
+os.exit(failed == 0 and 0 or 1, true)

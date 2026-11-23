@@ -76,13 +76,13 @@ sudo_run() { if [[ $1 == apt-mark ]]; then "$@"; else run "$@" >/dev/null; fi; }
 /// A folder with the fixture manifest, the fakes' state, and the choices and record files, and
 /// the sandbox the scripts run in.
 struct Machine {
-    dir: tempfile::TempDir,
+    dir: sandbox::TempDir,
     sandbox: Sandbox,
 }
 
 impl Machine {
     fn new(installed: &[&str]) -> Self {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = sandbox::tempdir().unwrap();
         fs::write(dir.path().join("packages.toml"), MANIFEST).unwrap();
         fs::write(
             dir.path().join("installed"),
@@ -366,7 +366,7 @@ fn a_vendors_own_source_of_the_same_repository_is_turned_off_for_ours() {
 
 #[test]
 fn a_repository_whose_setup_fails_after_its_sources_file_changed_still_gets_apt_updated() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = sandbox::tempdir().unwrap();
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), dir.path(), "kuba");
     let sources = dir.path().join("sources.list.d");
     fs::create_dir(&sources).unwrap();

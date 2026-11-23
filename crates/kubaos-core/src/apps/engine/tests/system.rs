@@ -575,7 +575,7 @@ fn a_reload_that_failed_on_an_update_is_tried_again_on_the_next() {
 
 #[test]
 fn sshd_counts_as_started_by_something_by_the_states_of_systemctl_is_enabled_that_say_so() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = crate::sandbox::tempdir().unwrap();
     let home = tmp.path().join("home");
     fs::create_dir_all(&home).unwrap();
     let sandbox = crate::sandbox::Sandbox::new(&tmp.path().join("sandbox"), &home, "tester");

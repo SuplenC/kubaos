@@ -3,48 +3,34 @@
 //! change runs with `--no-switch`.
 
 use std::fs;
-use std::os::unix::fs::symlink;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
-use std::sync::OnceLock;
 
 use kubaos_core::sandbox;
 use kubaos_core::sandbox::Sandbox;
-use tempfile::TempDir;
 
-/// The one fake `nix` every test runs, made before the first `kubaos` starts. It answers with
-/// what the home it runs in (`HOME`) wrote for it, and records there that it ran. Written as
-/// [`sandbox::program`] writes one, so a test forking meanwhile can't leave it busy.
-fn fake_nix() -> &'static Path {
-    static BIN: OnceLock<TempDir> = OnceLock::new();
-    BIN.get_or_init(|| {
-        let bin = tempfile::tempdir().expect("a folder for the fake nix");
-        sandbox::program(
-            &bin.path().join("nix"),
-            "#!/bin/sh\ntouch \"$HOME/nix-ran\"\ncat \"$HOME/nix-stdout\"\nexit \"$(cat \"$HOME/nix-code\")\"\n",
-        );
-        bin
-    })
-    .path()
-}
+/// The fake `nix` every test runs. It answers with what the home it runs in (`HOME`) wrote for
+/// it, and records there that it ran.
+const FAKE_NIX: &str =
+    "#!/bin/sh\ntouch \"$HOME/nix-ran\"\ncat \"$HOME/nix-stdout\"\nexit \"$(cat \"$HOME/nix-code\")\"\n";
 
 /// A home with a user flake wired to its state directory, and a sandbox to run `kubaos` in, with
 /// the fake `nix`.
 struct Home {
-    dir: TempDir,
+    dir: sandbox::TempDir,
     sandbox: Sandbox,
 }
 
 impl Home {
     fn new() -> Self {
-        let dir = tempfile::tempdir().expect("a temporary home");
+        let dir = sandbox::tempdir().expect("a temporary home");
         let home = dir.path().join("home");
         fs::create_dir_all(&home).expect("make the home");
         let sandbox = Sandbox::new(&dir.path().join("sandbox"), &home, "tester");
         sandbox.without("nix");
-        symlink(fake_nix().join("nix"), sandbox.bin().join("nix")).expect("put the fake nix in");
+        sandbox::program(&sandbox.bin().join("nix"), FAKE_NIX);
         let home = Home { dir, sandbox };
         home.write(
             ".config/kubaos/home/home.nix",

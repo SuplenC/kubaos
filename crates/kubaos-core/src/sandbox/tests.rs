@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use super::*;
 
-fn sandbox() -> (tempfile::TempDir, Sandbox) {
-    let dir = tempfile::tempdir().unwrap();
+fn sandbox() -> (TempDir, Sandbox) {
+    let dir = tempdir().unwrap();
     let home = dir.path().join("home");
     fs::create_dir_all(&home).unwrap();
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), &home, "kuba");

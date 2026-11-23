@@ -385,7 +385,7 @@ fn the_machines_own_architecture_is_never_taken_away() {
     use crate::apps::host::fake::FakeHost;
     use crate::apps::journal::Claim;
 
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::sandbox::tempdir().unwrap();
     let mut host = FakeHost::new(dir.path());
     let table: toml::Table =
         toml::from_str("name = \"X\"\nkind = \"architecture\"\narchitecture = \"amd64\"\n").unwrap();

@@ -901,7 +901,7 @@ fn penpot_script(name: &str, into: &Path, dir: &Path) -> PathBuf {
 
 #[test]
 fn penpots_removal_takes_the_images_its_install_pulled_and_keeps_the_ones_the_machine_had() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = sandbox::tempdir().unwrap();
     let (home, dir, images) = (
         tmp.path().join("home"),
         tmp.path().join("penpot"),
@@ -993,7 +993,7 @@ exit 1"#
 
 #[test]
 fn penpots_up_lists_no_image_while_docker_cant_say_whether_it_has_it() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = sandbox::tempdir().unwrap();
     let dir = tmp.path().join("penpot");
     let (sandbox, up) = penpot_up_against(
         tmp.path(),
@@ -1019,7 +1019,7 @@ fn penpots_up_lists_no_image_while_docker_cant_say_whether_it_has_it() {
 
 #[test]
 fn penpots_up_lists_an_image_docker_lacks_once_however_many_starts_fail() {
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = sandbox::tempdir().unwrap();
     let dir = tmp.path().join("penpot");
     let (sandbox, up) = penpot_up_against(
         tmp.path(),

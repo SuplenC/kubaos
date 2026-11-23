@@ -35,7 +35,7 @@ const LATE: u64 = 1_867_017_600;
 const EXTENDED: &str = "1868266800";
 
 struct Machine {
-    dir: tempfile::TempDir,
+    dir: crate::sandbox::TempDir,
     sandbox: Sandbox,
 }
 
@@ -43,7 +43,7 @@ impl Machine {
     /// A sandbox whose `date +%s` is `now`, with the real gpg, and `stored` at the keyring when
     /// given.
     fn new(now: u64, stored: Option<&str>) -> Self {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::sandbox::tempdir().unwrap();
         let home = dir.path().join("home");
         fs::create_dir_all(home.join(".gnupg")).unwrap();
         let sandbox = Sandbox::new(&dir.path().join("sandbox"), &home, "kuba");
