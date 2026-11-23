@@ -7,11 +7,10 @@ import type { Duration, Easing, Track } from "../../site/page.ts";
 
 type Eased = Track<Easing>;
 
-export const FRAME = "the frame";
 export const BLUR = "the picture's blur";
 export const DIM = "the dim";
 export const CLOCK = "the clock";
-export const SHEET = "the sheet";
+export const SHEET = "the field";
 export const KICKER_PART = "the kicker";
 export const WINDOWS = "the windows";
 export const BAR = "the bar's pills";
@@ -19,8 +18,7 @@ export const BAR_TIME = "the bar's time";
 /** The seal, the date and the weather round the bar clock's capsule: they come once the digits are in it. */
 export const AROUND = "the bar clock's seal, date and weather";
 const AROUND_TARGET = ".k-lock-bar-clock .k-clock-pill-around";
-export const TOP = "the frame's top edge";
-export const GLASS = "the frame's glass";
+export const TOP = "the bar";
 export const PUSH = "the push";
 export const ON = "the lock on Shinjuku";
 export const BLURRED = ".k-lock-blur, .k-lock-cutout";
@@ -31,36 +29,31 @@ export function within(scope: string, target: string): string {
   return scope === "" ? target : target.split(",").map((each) => `${scope} ${each.trim()}`).join(", ");
 }
 
-/** Waking from rest: the frame slides in, the picture blurs and dims, the clock lifts and the sheet rises. */
+/** Waking from rest: the picture blurs and dims, the clock lifts and the field rises. */
 export function waking(on: string = ON, scope = ""): [Eased, ...Eased[]] {
   return [
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: BLUR, on, target: within(scope, BLURRED), property: "--wake", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: DIM, on, target: within(scope, DIMMED), property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
     { part: CLOCK, on, target: within(scope, ".k-lock-clock"), property: "--clock-lift", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: SHEET, on, target: within(scope, ".k-sheet-part"), property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
+    { part: SHEET, on, target: within(scope, ".k-lock-entry"), property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
   ];
 }
 
 /** Waking with reduce motion: the awake lock fades in over `short`. */
 export function wakingReduced(on: string = ON, scope = ""): [Eased, ...Eased[]] {
   return [
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 0, to: 1, duration: "instant", curve: "standard" },
-    { part: "the glass", on, target: within(scope, ".k-screen-glass"), property: "opacity", from: 0, to: { opacity: "frame" }, duration: "short", curve: "standard" },
     { part: BLUR, on, target: within(scope, BLURRED), property: "--wake", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: DIM, on, target: within(scope, DIMMED), property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: CLOCK, on, target: within(scope, ".k-lock-clock"), property: "--clock-lift", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: SHEET, on, target: within(scope, ".k-sheet-part"), property: "--reveal", from: 0, to: 1, duration: "instant", curve: "standard" },
-    { part: "the sheet's fade", on, target: within(scope, ".k-sheet-part"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: SHEET, on, target: within(scope, ".k-lock-entry"), property: "--reveal", from: 0, to: 1, duration: "instant", curve: "standard" },
+    { part: "the field's fade", on, target: within(scope, ".k-lock-entry"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ];
 }
 
 export function reducedRest(on: string = ON, scope = ""): [Eased, ...Eased[]] {
   return [
-    { part: "the sheet's fade", on, target: within(scope, ".k-sheet-part"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the glass", on, target: within(scope, ".k-screen-glass"), property: "opacity", from: { opacity: "frame" }, to: 0, duration: "short", curve: "standard" },
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
+    { part: "the field's fade", on, target: within(scope, ".k-lock-entry"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: DIM, on, target: within(scope, DIMMED), property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BLUR, on, target: within(scope, BLURRED), property: "--wake", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
@@ -70,7 +63,7 @@ export function reducedRest(on: string = ON, scope = ""): [Eased, ...Eased[]] {
 }
 
 /**
- * Super+L: the desktop's still leaves, its frame sliding off the screen with the bar's pills, and the
+ * Super+L: the desktop's still leaves, the bar sliding up off the screen with its items, and the
  * bar's time hands over to the lock's clock where it stands, leaving the bar clock's capsule empty
  * as the seal, the date and the weather round it go, and the clock grows out of the bar to the rest
  * clock behind the city, as the picture and its city push in.
@@ -83,7 +76,6 @@ export function locking(on: string, scope = ""): [Eased, ...Eased[]] {
   return [
     { part: WINDOWS, on, target: within(scope, ".k-lock-windows"), property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the windows' size", on, target: within(scope, ".k-lock-windows"), property: "scale", from: 1, to: { scale: "behind" }, duration: "medium", curve: "emphasized_accel" },
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: TOP, on, target: within(scope, ".k-lock"), property: "--barred", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: BAR_TIME, on, target: within(scope, ".k-lock-bar-time"), property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
@@ -99,12 +91,10 @@ export function lockingReduced(on: string, scope = ""): [Eased, ...Eased[]] {
   return [
     { part: WINDOWS, on, target: within(scope, ".k-lock-windows"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BAR, on, target: within(scope, ".k-bar"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: GLASS, on, target: within(scope, ".k-screen-glass"), property: "opacity", from: { opacity: "frame" }, to: 0, duration: "short", curve: "standard" },
     { part: CLOCK, on, target: within(scope, ".k-lock-clock"), property: "--dock", from: 1, to: 0, duration: "instant", curve: "standard" },
     { part: "the clock's depth", on, target: within(scope, ".k-lock-clock"), property: "--clock-above", from: 1, to: 0, duration: "instant", curve: "standard" },
     { part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: KICKER_PART, on, target: within(scope, ".k-lock-kicker"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
     { part: TOP, on, target: within(scope, ".k-lock"), property: "--barred", from: 1, to: 0, duration: "instant", cue: "short", curve: "standard" },
   ];
 }
@@ -132,12 +122,12 @@ export function intoTheBar(on: string, cue: Eased["cue"], scope = ""): Eased[] {
 }
 
 /**
- * Unlocking from awake once the field has opened, over its first `short`: the sheet sinks, the clock
+ * Unlocking from awake once the field has opened, over its first `short`: the field sinks, the clock
  * flies into the bar as the bar slides in, and the picture eases back to the desktop's.
  */
 export function fromAwake(on: string = ON, scope = ""): Eased[] {
   return [
-    { part: SHEET, on, target: within(scope, ".k-sheet-part"), property: "--reveal", from: 1, to: 0, duration: "medium", cue: "short", curve: "emphasized_accel" },
+    { part: SHEET, on, target: within(scope, ".k-lock-entry"), property: "--reveal", from: 1, to: 0, duration: "medium", cue: "short", curve: "emphasized_accel" },
     { part: KICKER_PART, on, target: within(scope, ".k-lock-kicker"), property: "opacity", from: 1, to: 0, duration: "short", cue: "short", curve: "standard" },
     ...intoTheBar(on, "short", scope),
     { part: BLUR, on, target: within(scope, BLURRED), property: "--wake", from: 1, to: 0, duration: "long", cue: "medium", curve: "standard" },
@@ -151,7 +141,7 @@ export function fromAwake(on: string = ON, scope = ""): Eased[] {
 /** Unlocking from awake with reduce motion: the awake lock fades to the desktop over `short`. */
 export function fromAwakeReduced(on: string = ON, scope = ""): [Eased, ...Eased[]] {
   return [
-    { part: "the sheet's fade", on, target: within(scope, ".k-sheet-part"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the field's fade", on, target: within(scope, ".k-lock-entry"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: BLUR, on, target: within(scope, BLURRED), property: "--wake", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: DIM, on, target: within(scope, DIMMED), property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
@@ -166,7 +156,6 @@ export function fromAwakeReduced(on: string = ON, scope = ""): [Eased, ...Eased[
 export function touching(on: string, scope = ""): [Eased, ...Eased[]] {
   return [
     { part: KICKER_PART, on, target: within(scope, ".k-lock-kicker"), property: "opacity", from: 1, to: 0, duration: "micro", curve: "standard" },
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     ...intoTheBar(on, undefined, scope),
     { part: WINDOWS, on, target: within(scope, ".k-lock-windows"), property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
     { part: "the windows' size", on, target: within(scope, ".k-lock-windows"), property: "scale", from: { scale: "behind" }, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
@@ -178,9 +167,7 @@ export function touching(on: string, scope = ""): [Eased, ...Eased[]] {
 export function touchingReduced(on: string, scope = ""): [Eased, ...Eased[]] {
   return [
     { part: "the clock's fade", on, target: within(scope, ".k-lock-clock"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 0, to: 1, duration: "instant", curve: "standard" },
     { part: TOP, on, target: within(scope, ".k-lock"), property: "--barred", from: 0, to: 1, duration: "instant", curve: "standard" },
-    { part: GLASS, on, target: within(scope, ".k-screen-glass"), property: "opacity", from: 0, to: { opacity: "frame" }, duration: "short", curve: "standard" },
     { part: BAR, on, target: within(scope, ".k-bar"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the windows' size", on, target: within(scope, ".k-lock-windows"), property: "scale", from: { scale: "behind" }, to: 1, duration: "instant", curve: "standard" },
     { part: WINDOWS, on, target: within(scope, ".k-lock-windows"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -188,11 +175,10 @@ export function touchingReduced(on: string, scope = ""): [Eased, ...Eased[]] {
 }
 
 
-/** Going back to rest from awake: the sheet sinks, the frame slides out, the clock flies home. */
+/** Going back to rest from awake: the field sinks, the clock flies home. */
 export function resting(on: string, scope = ""): [Eased, ...Eased[]] {
   return [
-    { part: SHEET, on, target: within(scope, ".k-sheet-part"), property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: FRAME, on, target: within(scope, ".k-lock"), property: "--framed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+    { part: SHEET, on, target: within(scope, ".k-lock-entry"), property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: DIM, on, target: within(scope, DIMMED), property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
     { part: BLUR, on, target: within(scope, BLURRED), property: "--wake", from: 1, to: 0, duration: "long", curve: "standard" },
     { part: CLOCK, on, target: within(scope, ".k-lock-clock"), property: "--clock-lift", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },

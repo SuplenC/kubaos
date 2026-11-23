@@ -1,19 +1,11 @@
-/* The lock (`lib/lock.ts`): a screen with its frame, the wallpaper and its plate, its clock and its
-   city at rest; the frame closed in, the picture and its city blurred and dimmed, the clock a
-   short way along its flight to the bar and the password's sheet up when awake; and the desktop's still, its windows and its
-   bar, which locking leaves and unlocking comes back to. Numbers move it, each 0 at rest but the
-   push. */
+/* The lock (`lib/lock.ts`): a screen with no frame, the wallpaper and its plate, its clock and its
+   city at rest; the picture and its city blurred and dimmed, the clock a short way along its
+   flight to the bar and the password's field up when awake; and the desktop's still, its windows
+   and its bar, which locking leaves and unlocking comes back to. Numbers move it, each 0 at rest
+   but the push. */
 
-/* The frame, from out past the screen's edges (0) to where the shell draws it (1): each edge slides
-   in at its own thickness, its inner corners at `radius.surface` throughout. */
-@property --framed {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-
-/* The bar, from out above the screen (0) to the frame's top edge (1): a band `size.bar` tall
-   carrying the bar's pills, sliding in over the frame's thin top edge. */
+/* The bar, from out above the screen (0) to its place along the top edge (1): the Bar layout's
+   band, `size.bar` tall, carrying the bar's items. */
 @property --barred {
   syntax: "<number>";
   inherits: true;
@@ -50,7 +42,7 @@
   initial-value: 0;
 }
 
-/* Whether the clock flies above the frame (1) or stands behind the cut-out (0). */
+/* Whether the clock flies above everything (1) or stands behind the cut-out (0). */
 @property --clock-above {
   syntax: "<integer>";
   inherits: false;
@@ -78,12 +70,9 @@
   /* The city's scale: the picture's, and `scale.near`'s lead over it as far as depth is on
      (`--depth`, `lib/depth-picture.css`), so turning depth off settles the city onto the sky. */
   --neared: calc(var(--pushed) + (var(--scale-near) - var(--scale-push)) * var(--push) * var(--depth));
-  /* Out, an edge is past the screen's edge by its own thickness and the fillet its inner corners
-     curve through, so neither the edge nor its corners leave a pixel on the screen. The top edge is
-     the thin edge or the bar, whichever reaches further in. */
-  --frame-side: round(nearest, calc(var(--space-s8) - (var(--space-s8) + var(--radius-surface)) * (1 - var(--framed))), 1px);
-  --bar-shift: round(nearest, calc(-1 * (var(--size-bar) + var(--radius-surface)) * (1 - var(--barred))), 1px);
-  --frame-top: max(var(--frame-side), var(--bar-shift) + var(--size-bar));
+  /* Out, the band is above the screen by its height and its shadow's drop and blur, so neither it
+     nor its shadow leaves a pixel on the screen. */
+  --bar-shift: round(nearest, calc(-1 * (var(--size-bar) + var(--shadow-glass-y) + var(--shadow-glass-blur)) * (1 - var(--barred))), 1px);
   /* The screen's middle across, which the picture and its city are pushed in round. */
   --screen-middle: calc(var(--screen-width) / 2);
   /* How much of each layer set in front of the clock cuts it: all, or none with depth off. */
@@ -91,19 +80,17 @@
 }
 
 .k-lock[data-phase="awake"] {
-  --framed: 1;
   --wake: 1;
   --clock-lift: 1;
 }
 
 .k-lock[data-phase="desktop"] {
-  --framed: 1;
   --barred: 1;
   --dock: 1;
   --push: 0;
 }
 
-/* The picture alone, as the wallpaper picker's wall hangs it: no frame, no bar and no clock, the
+/* The picture alone, as the wallpaper picker's wall hangs it: no bar and no clock, the
    picture pushed in and its city off the sky, as at rest. */
 .k-lock[data-phase="picture"] .k-lock-clock {
   opacity: 0;
@@ -146,11 +133,14 @@
   opacity: calc(var(--push) * var(--depth));
 }
 
-/* The frame's shadow goes with it, as strong as the frame is in. `shadow.panel` falls far past the
-   fillet: with the frame out by its thickness and fillet, a shadow at full strength still darkens
-   the screen's top rows by a fifth, and by a thirtieth with its drop and blur added to the slide. */
-.k-lock .k-screen-glass {
-  filter: drop-shadow(0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-panel-opacity) * var(--framed))));
+/* Awake, the picture dims as far as a panel's desktop once did, `scrim` at `opacity.panel_scrim`,
+   so the clock and the field read on any picture; the city in front of the clock dims with it. */
+.k-lock > .k-screen-dim {
+  background: rgb(from var(--color-scrim) r g b / calc(var(--opacity-panel_scrim) * var(--panel-dim)));
+}
+
+.k-lock[data-open] > .k-screen-dim {
+  --panel-dim: 1;
 }
 
 /* The picture's blur: what is under it, its edges held rather than faded, so the blurred picture
@@ -162,14 +152,14 @@
   backdrop-filter: blur(calc(var(--size-lock_blur) * var(--wake)));
 }
 
-/* The desktop's windows, as the still shows them: tiled `space.s8` inside the frame as Hyprland's
-   `gaps_out` puts them, `space.s8` apart, the bar's height at the top. Locking shrinks them to
-   `scale.behind` round the middle of the screen as they fade; at rest and awake they are gone. */
+/* The desktop's windows, as the still shows them: tiled `size.gap` from the band and the screen's
+   edges as Hyprland's gaps put them, `size.gap` apart. Locking shrinks them to `scale.behind`
+   round the middle of the screen as they fade; at rest and awake they are gone. */
 .k-lock-windows {
   position: absolute;
-  inset: calc(var(--size-bar) + var(--space-s8)) var(--space-s16) var(--space-s16);
+  inset: var(--desk-top) var(--gap) var(--gap);
   display: flex;
-  gap: var(--space-s8);
+  gap: var(--gap);
   opacity: 0;
   scale: var(--scale-behind);
 }
@@ -179,8 +169,8 @@
   scale: 1;
 }
 
-/* A window of the still: the desktop plane's, as the Elevation page draws one, its corner the
-   frame's surface radius less the gap inside it. */
+/* A window of the still: the desktop plane's, as the Elevation page draws one, its corner a
+   window's (`--corner`, `radius.surface`). */
 .k-lock-window {
   display: flex;
   flex: 1 1 0;
@@ -196,13 +186,9 @@
     0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
 }
 
-/* The bar's pills ride on the bar's band, which slides straight up out of the screen and back:
-   they keep their place along it as the side edges slide out. */
-.k-lock .k-bar {
+/* The bar's band slides straight up out of the screen and back, its items riding on it. */
+.k-screen.k-lock[data-layout] .k-bar {
   top: var(--bar-shift);
-  left: var(--space-s8);
-  right: var(--space-s8);
-  height: var(--size-bar);
 }
 
 /* The bar's clock, its time's capsule on the screen's middle as the bar places it, on whole device
@@ -270,7 +256,9 @@
   --place-width: round(up, calc(var(--place-natural, 0) * var(--kicker-k) * var(--px) - 0.001px), 1px);
   --date-width: round(up, calc(var(--date-natural, 0) * var(--kicker-k) * var(--px) - 0.001px), 1px);
   --kicker-width: calc(var(--place-width) + var(--date-width));
-  --bar-top: calc(var(--bar-shift) + (var(--size-bar) - var(--size-control_sm)) / 2 + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
+  /* The bar's time's cap top: its baseline, read under the band's top (`lib/lock.ts`), less its cap
+     height, wherever the band has slid to. */
+  --bar-top: calc(var(--bar-shift) + var(--bar-base, 0px) - var(--cap-height) * var(--type-body-size));
   /* The rest place is the screen's, not the picture's: the middle, the digits' cap top where
      `lib/lock.ts` puts it from `scale.lock_clock_base`; it holds still as the picture pushes in. */
   --rest-top: var(--rest-top-at, 0px);
@@ -356,7 +344,7 @@
   );
 }
 
-/* What the digits are drawn through. While the clock flies above the frame it is still behind the
+/* What the digits are drawn through. While the clock flies above everything it is still behind the
    city: the city's alpha, laid where the city stands on the screen as it pushes in, is taken out
    of the digits, so they are cut wherever the city stands in front of them, as they are when the
    clock stands behind it. Behind the city it is nothing: the layer is no size. `--city` is unset
@@ -390,7 +378,7 @@
 
 /* The city: the picture through the cut-out's alpha, in front of the clock, pushed in to
    `scale.near`. It blurs and dims with the picture under it: its blur is drawn before its push, so
-   it is divided by it, to blur as far as the picture under the frame's blur does, and the dim is
+   it is divided by it, to blur as far as the picture under it does, and the dim is
    `scrim`, which is black in every scheme, so the dim over it is its brightness lowered by as
    much. */
 .k-lock-cutout {
@@ -439,19 +427,48 @@
   --lock-reader-missed: 1;
 }
 
-/* The sheet's content: `size.panel` wide, `space.s16` inside at its top and its foot, the
-   container's padding at its sides, as a PanelPage is. */
-.k-lock-sheet {
+/* The password's field at the bottom of the screen, alone: no card under it. Its room is a card's
+   content's, `size.panel` wide, `space.s16` inside at its top and its foot and the container's
+   padding at its sides, as a PanelPage is, standing `size.gap` above the screen's bottom and
+   centred across it, so the field stands where a card would hold it. Rising, `--reveal` goes 0 to
+   1: it fades in as it rises `space.s8` into place. */
+.k-lock-entry {
+  position: absolute;
+  bottom: var(--gap);
+  left: round(down, calc((var(--screen-width) - var(--size-panel)) / 2), 1px);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   width: var(--size-panel);
   padding: var(--space-s16) 0;
+  opacity: var(--reveal);
+  translate: 0 round(nearest, calc((1 - var(--reveal)) * var(--space-s8)), 1px);
 }
 
+/* A live field: down until shown, rising over `long` on `emphasized_decel` and sinking over
+   `medium` on `emphasized_accel`. */
+.k-lock-entry[data-live] {
+  --reveal: 0;
+  transition: --reveal var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-lock-entry[data-live][data-shown] {
+  --reveal: 1;
+  transition: --reveal var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-lock-entry[data-live]:not([data-shown]) {
+  pointer-events: none;
+}
+
+/* With no card under it, the glass's soft shadow lifts the field off any picture: its drop and
+   its contact, following the field's own shape and its glow. */
 .k-lock-field {
   align-self: stretch;
   translate: round(nearest, calc(var(--jolt) * var(--space-s4)), 1px) 0;
+  filter:
+    drop-shadow(0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass-opacity)))
+    drop-shadow(0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass_contact-opacity)));
 }
 
 /* Measures the digits in the rest clock's style, and Geist Light's cap height:
@@ -471,43 +488,39 @@
   text-box: trim-both cap alphabetic;
 }
 
-/* A live lock eases between rest and awake: waking on the sheet's opening, the clock moving along
-   its flight over `long` on `emphasized_decel`; going back to rest, the frame and the sheet leaving over `medium`
+/* A live lock eases between rest and awake: waking as the field rises, the clock moving along
+   its flight over `long` on `emphasized_decel`; going back to rest, the field sinking over `medium`
    on `emphasized_accel` and the blur clearing over `long`. The city dims as the dim under it
    does. */
 .k-lock[data-live] {
   transition:
-    --framed var(--motion-medium) var(--easing-emphasized_accel),
     --wake var(--motion-long) var(--easing-standard),
     --clock-lift var(--motion-long) var(--easing-emphasized_decel);
 }
 
 .k-lock[data-live][data-phase="awake"] {
   transition:
-    --framed var(--motion-long) var(--easing-emphasized_decel),
     --wake var(--motion-long) var(--easing-emphasized_decel),
     --clock-lift var(--motion-long) var(--easing-emphasized_decel);
 }
 
-.k-lock[data-live] .k-lock-cutout {
+.k-lock[data-live] :is(.k-screen-dim, .k-lock-cutout) {
   transition: --panel-dim var(--motion-medium) var(--easing-standard);
 }
 
 /* With reduce motion the live lock slides and flies nothing, as the Lock page's reduced players
-   play it: the frame stands in place while its glass fades, the blur and the dim ease over `short`,
-   and the sheet fades in place. Waking, the clock stands awake at once and fades in; going back to
-   rest, everything fades out over `short`, then the frame, the sheet and the clock go to rest at once
-   and the clock fades back in (its fades are `liveLock`'s, in `pages/templates/locks.ts`). */
+   play it: the blur and the dim ease over `short`, and the field fades in place. Waking, the clock
+   stands awake at once and fades in; going back to rest, everything fades out over `short`, then
+   the field and the clock go to rest at once and the clock fades back in (its fades are
+   `liveLock`'s, in `pages/templates/locks.ts`). */
 [data-reduced] .k-lock[data-live] {
   transition:
-    --framed 0s var(--motion-short),
     --wake var(--motion-short) var(--easing-standard),
     --clock-lift 0s var(--motion-short);
 }
 
 [data-reduced] .k-lock[data-live][data-phase="awake"] {
   transition:
-    --framed 0s,
     --wake var(--motion-short) var(--easing-standard),
     --clock-lift 0s;
 }
@@ -516,27 +529,18 @@
   transition: --panel-dim var(--motion-short) var(--easing-standard);
 }
 
-[data-reduced] .k-lock[data-live] .k-sheet-part[data-live] {
+[data-reduced] .k-lock[data-live] .k-lock-entry[data-live] {
   opacity: 0;
   transition:
     --reveal 0s var(--motion-short),
     opacity var(--motion-short) var(--easing-standard);
 }
 
-[data-reduced] .k-lock[data-live] .k-sheet-part[data-live][data-shown] {
+[data-reduced] .k-lock[data-live] .k-lock-entry[data-live][data-shown] {
   opacity: 1;
   transition:
     --reveal 0s,
     opacity var(--motion-short) var(--easing-standard);
-}
-
-[data-reduced] .k-lock[data-live] .k-screen-glass {
-  opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
-}
-
-[data-reduced] .k-lock[data-live][data-phase="awake"] .k-screen-glass {
-  opacity: var(--opacity-frame);
 }
 
 /* A clock set for its picture (`LockClock`): its kicker stands on the digits' ink, its left edge on

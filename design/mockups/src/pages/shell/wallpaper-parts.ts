@@ -323,7 +323,7 @@ function stills(): HTMLElement {
 function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: string; readonly height: string }, wakes: boolean, look: ClockLook): Desk {
   // A picture of a desktop: its bar's pills still; only the lock in front can wake, so only it holds
   // the password's sheet until another comes to the front. Its clock is as set for the picture.
-  const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(false), windows: [stills()], sheet: wakes, clock: lockClock(look, hung.wallpaper, "wide") });
+  const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(false), windows: [stills()], entry: wakes, clock: lockClock(look, hung.wallpaper, "wide") });
   const element = made.element;
   // A picture of a lock and a desktop, not one to use: its field and pills take no focus, no
   // pointer and are not read out, as the site's other pictures of a part are.

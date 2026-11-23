@@ -1,5 +1,5 @@
 // The lock screen: QML's `Lock` (`docs/design/components/lock.md`), a template of the shell's
-// alone, drawn on a screen with its frame (`lib/sheet.ts`).
+// alone, drawn on a screen with no frame (`lib/sheet.ts`), its bar hidden while it is locked.
 //
 // At rest it is the wallpaper and its clock: the digits in `type.clock_rest` under a kicker line
 // (where and which day, then the date), centred on the screen with their baseline `scale.lock_clock_base`
@@ -7,24 +7,24 @@
 // of the clock. The digits and the kicker are a light tint of the picture behind the digits, so
 // they read as part of it, the kicker lifted off it by a halo of `surface` round each letter.
 //
-// Awake, the frame slides in round the picture, `space.s8` all round, the picture blurs
-// `size.lock_blur` and dims as a panel's desktop does, the clock goes `scale.clock_awake` of the
-// way along its flight to the bar's clock, still behind the cut-out, and a Sheet rises from the
-// middle of the bottom edge holding the password's Field alone, the reader's mark at its end.
+// Awake, the picture blurs `size.lock_blur` and dims by `opacity.panel_scrim`, the clock goes
+// `scale.clock_awake` of the way along its flight to the bar's clock, still behind the cut-out,
+// and the password's Field rises alone at the middle of the bottom edge, with no card under it and
+// the glass's soft shadow round it, the reader's mark at its end.
 //
 // The lock and the desktop are one surface: locking and unlocking play on a still of the desktop
-// the lock captured as it locked, drawn inside the lock (its windows, and the bar's pills on the
-// frame), and the clock flies between the bar's clock and its own place. As the lock comes up the
+// the lock captured as it locked, drawn inside the lock (its windows, and the bar with its pills),
+// and the clock flies between the bar's clock, in the bar's row, and its own place. As the lock comes up the
 // picture pushes in from the desktop's 1:1 to `scale.push` and its cut-out further, to
 // `scale.near`, so the city comes off the sky; the plate, the picture with the city painted out,
 // fills in what the city uncovers. As the lock goes they ease back to 1:1.
 //
 // Numbers move it, each a property a move animates, so a frame held on its plot is exactly what
-// plays: `--framed` (the frame sliding in), `--barred` (the bar sliding in over its top edge),
-// `--wake` (the blur), `--clock-lift` (waking: the clock's first step along its flight to the bar),
-// `--dock` (the rest of its flight, into the bar), `--push` (the picture and its city pushing in),
-// `--clock-above` (the clock above the frame or behind the city), the sheet's own `--reveal` and
-// the dim's `--panel-dim`.
+// plays: `--barred` (the bar sliding in from above the screen), `--wake` (the blur),
+// `--clock-lift` (waking: the clock's first step along its flight to the bar), `--dock` (the rest
+// of its flight, into the bar), `--push` (the picture and its city pushing in), `--clock-above`
+// (the clock above everything or behind the city), the field's `--reveal` and the dim's
+// `--panel-dim`.
 //
 // It always draws in the night scheme matugen derives from its wallpaper, whatever the mode.
 
@@ -36,7 +36,7 @@ import { icon } from "./icon.ts";
 import { container, row } from "./layout.ts";
 import { capsuleExtents, clockPill, type ClockPillWords } from "./clock-pill.ts";
 import { probe, variant } from "./probe.ts";
-import { hang, type Screen, screen, type Sheet, sheet } from "./sheet.ts";
+import { type Screen, screen } from "./sheet.ts";
 import { advance, text, type TypeStyle } from "./text.ts";
 import { length, number } from "./tokens.ts";
 
@@ -141,14 +141,14 @@ export interface ClockAt {
 }
 
 /**
- * At rest, awake with the password's sheet up, or the desktop: the still of it the lock plays its
- * locking and unlocking on, the frame and the bar as the shell draws them and the clock in the bar.
+ * At rest, awake with the password's field up, or the desktop: the still of it the lock plays its
+ * locking and unlocking on, the bar as the shell draws it and the clock in the bar.
  * Or the picture alone, pushed in with its city off the sky: the wallpaper picker's wall.
  */
 export type Phase = "rest" | "awake" | "desktop" | "picture";
 
 /**
- * What the sheet shows: waiting for a password or a finger, checking one, after a wrong password,
+ * What the field shows: waiting for a password or a finger, checking one, after a wrong password,
  * or after a finger the reader doesn't know.
  */
 export type Moment = "rest" | "loading" | "error" | "unknown";
@@ -180,10 +180,10 @@ export interface LockOptions {
   readonly live?: boolean;
   /** The pills on the bar's right, as the desktop's bar draws them. */
   readonly bar?: readonly Element[];
-  /** The desktop's windows, tiled in the frame. */
+  /** The desktop's windows, tiled under the bar. */
   readonly windows?: readonly Element[];
-  /** The password's sheet; false for a lock that is only ever at rest: a picture of one. */
-  readonly sheet?: boolean;
+  /** The password's field; false for a lock that is only ever at rest: a picture of one. */
+  readonly entry?: boolean;
   /**
    * The rest clock as set for this picture: with one, the kicker stands on the digits' ink and
    * the clock in front of the city, cut by each layer in front of it.
@@ -194,9 +194,8 @@ export interface LockOptions {
 export interface Lock {
   readonly element: HTMLElement;
   readonly screen: Screen;
-  readonly sheet: Sheet;
-  /** The sheet's content, whose field a live lock swaps. */
-  readonly content: HTMLElement;
+  /** The password's field at the bottom of the screen, its room round it, which a live lock swaps. */
+  readonly entry: HTMLElement;
   /** Sets the rest clock, and places it again. */
   setClock(clock: LockClock): void;
   /**
@@ -254,12 +253,15 @@ export function lockField(moment: Moment, live = false, error = "", reader = tru
   return made;
 }
 
-/** The sheet's content: the field alone, PanelPage's padding round it. */
-function sheetContent(moment: Moment, error: string, live: boolean, reader: boolean): HTMLElement {
+/**
+ * The field at the bottom of the screen: alone, with no card under it, standing where a card's
+ * content would, a PanelPage's padding inside `size.gap` from the screen's bottom.
+ */
+function entryOf(moment: Moment, error: string, live: boolean, reader: boolean): HTMLElement {
   const room = fieldRoom("100%", lockField(moment, live, error, reader));
   room.classList.add("k-lock-field");
   const box = document.createElement("span");
-  box.className = "k-lock-sheet";
+  box.className = "k-lock-entry";
   box.append(container(room));
   return box;
 }
@@ -350,15 +352,13 @@ export function lock(options: LockOptions): Lock {
   // The desktop's windows stand in front of the city: they are the still's top layer.
   (element.querySelector(".k-lock-cutout") ?? clock).after(windows);
 
-  const content = options.sheet === false ? document.createElement("span") : sheetContent(moment, options.error ?? "", options.live ?? false, options.reader ?? true);
-  const rising = sheet({ content, edge: "bottom", ...(options.live ? {} : { reveal: options.phase === "awake" ? 1 : 0 }) });
+  const entry = options.entry === false ? document.createElement("span") : entryOf(moment, options.error ?? "", options.live ?? false, options.reader ?? true);
+  entry.classList.add("k-lock-entry");
   if (options.live) {
-    for (const part of rising.parts) {
-      part.dataset.live = "";
-      part.toggleAttribute("data-shown", options.phase === "awake");
-    }
-  }
-  hang(shown, rising);
+    entry.dataset.live = "";
+    entry.toggleAttribute("data-shown", options.phase === "awake");
+  } else entry.style.setProperty("--reveal", options.phase === "awake" ? "1" : "0");
+  shown.over.append(entry);
 
   // The rest clock stands in the screen's place, the same on every wallpaper, in front of the sky
   // and behind the city; the city's cut-out clips the digits wherever it happens to cross them.
@@ -510,8 +510,7 @@ export function lock(options: LockOptions): Lock {
   return {
     element,
     screen: shown,
-    sheet: rising,
-    content,
+    entry,
     setClock(set: LockClock): void {
       own = set;
       clockOn(element, clock, set);
@@ -631,8 +630,8 @@ export function inkEdges(time: string): { left: number; right: number } {
 
 /**
  * Where the bar's time is, for the clock to land on: its middle across the screen, and its
- * baseline (`mark`'s bottom) under the pill's top, read off the pill's layout. The pill is centred
- * on the bar's band, so CSS places it from `--bar-shift` as the band slides.
+ * baseline (`mark`'s bottom) under the bar's top, read off the bar's layout, its row in the middle
+ * of the band, so CSS places it from `--bar-shift` as the band slides.
  */
 function measureBarTime(element: HTMLElement, bar: { pill: HTMLElement; time: HTMLElement }, mark: HTMLElement): { cx: string; base: string } | null {
   const screenBox = element.getBoundingClientRect();
@@ -640,9 +639,10 @@ function measureBarTime(element: HTMLElement, bar: { pill: HTMLElement; time: HT
   // The screen may be drawn zoomed to fit a stage: its layout's pixels, not the viewport's.
   const zoom = element.offsetWidth / screenBox.width;
   const timeBox = bar.time.getBoundingClientRect();
-  const pillBox = bar.pill.getBoundingClientRect();
+  const band = bar.pill.closest(".k-bar") ?? bar.pill;
+  const bandBox = band.getBoundingClientRect();
   const baseline = mark.getBoundingClientRect().bottom;
-  return { cx: `${((timeBox.left + timeBox.width / 2 - screenBox.left) * zoom).toFixed(3)}px`, base: `${((baseline - pillBox.top) * zoom).toFixed(3)}px` };
+  return { cx: `${((timeBox.left + timeBox.width / 2 - screenBox.left) * zoom).toFixed(3)}px`, base: `${((baseline - bandBox.top) * zoom).toFixed(3)}px` };
 }
 
 /** Each lock's placing, by the elements whose size moves it. */

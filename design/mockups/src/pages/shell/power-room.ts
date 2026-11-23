@@ -494,7 +494,7 @@ function tileOfAction(action: Action, name: string): HTMLButtonElement {
 function build(options: RoomOptions): Built {
   const situation = options.situation ?? CALM;
   const names = options.names ?? ACTIONS.map((each) => each.name);
-  const made = lock({ ...SCREEN, wallpaper: PURPLE_HOUR, phase: "desktop", bar: barButtons(false), windows: WINDOWS.map(windowOf), sheet: false });
+  const made = lock({ ...SCREEN, wallpaper: PURPLE_HOUR, phase: "desktop", bar: barButtons(false), windows: WINDOWS.map(windowOf), entry: false });
   const element = made.element;
   element.classList.add("power-room");
   element.style.setProperty("--splash-scale", String(SPLASH_SCALE));
