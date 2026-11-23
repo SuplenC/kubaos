@@ -7,13 +7,12 @@ name = "Packer"
 category = "devops"
 tags = ["machine images", "images", "hashicorp", "hcl", "vm", "ami", "cli"]
 summary = "Bakes the same machine image for every cloud from one file. Snowflake servers can fuck off."
-# The opening of its README, under the Business Source License 1.1, which allows copying it
-# (github.com/hashicorp/packer).
+# Ours: its README is under the Business Source License 1.1, which asks for the licence shown
+# with every copy.
 description = """\
-Packer is a tool for building identical machine images for multiple platforms from a single \
-source configuration. Packer is lightweight, runs on every major operating system, and is highly \
-performant, creating machine images for multiple platforms in parallel."""
-description_from = "https://github.com/hashicorp/packer/blob/v1.16.2/README.md"
+Packer builds machine images (AMIs, VM disks, container images) from one HCL template, for \
+several platforms at once, so every environment starts from the same image."""
+description_from = "kubaos"
 # Packer's logo, HashiCorp's trademark, on a tile (packer.svg's header): Colloid has none.
 icon = "packer.svg"
 keeps = """\

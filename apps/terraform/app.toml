@@ -7,13 +7,13 @@ name = "Terraform"
 category = "devops"
 tags = ["infrastructure as code", "iac", "hashicorp", "hcl", "provisioning", "cloud", "cli"]
 summary = "HashiCorp's infrastructure as code. Write HCL, run plan, pray, run apply."
-# The opening of its README, under the Business Source License 1.1, which allows copying it
-# (github.com/hashicorp/terraform).
+# Ours: its README is under the Business Source License 1.1, which asks for the licence shown
+# with every copy.
 description = """\
-Terraform is a tool for building, changing, and versioning infrastructure safely and \
-efficiently. Terraform can manage existing and popular service providers as well as custom \
-in-house solutions."""
-description_from = "https://github.com/hashicorp/terraform/blob/v1.17.2/README.md"
+Terraform describes infrastructure (networks, machines, DNS, whole cloud accounts) in HCL files, \
+shows the plan of what a change would do, and applies it, keeping a state of what it manages. \
+Providers reach every major cloud and hundreds of other services."""
+description_from = "kubaos"
 # Terraform's logo, HashiCorp's trademark, on a tile (terraform.svg's header): Colloid has none.
 icon = "terraform.svg"
 keeps = """\

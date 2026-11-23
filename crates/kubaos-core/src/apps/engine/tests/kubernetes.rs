@@ -15,8 +15,8 @@ use crate::apps::host::fake::Unit;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 
-/// Every Kubernetes tool of this piece. kubectl, k9s and Lens came before, with the developer
-/// tools.
+/// The Kubernetes tools of the DevOps category but kubectl, k9s and Lens, which the developer
+/// tools' tests cover.
 const APPS: [&str; 12] = [
     "argocd",
     "flux",

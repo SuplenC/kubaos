@@ -7,8 +7,7 @@ name = "k3d"
 category = "devops"
 tags = ["kubernetes", "k8s", "k3s", "cluster", "local", "docker"]
 summary = "k3s in Docker: a Kubernetes cluster up in seconds. Faster than reading this sentence. Almost."
-# k3d's README is under the MIT licence, which asks for its notice with every copy, so this is
-# ours.
+# Ours, a plain factual description.
 description = """\
 k3d runs k3s, Rancher's small Kubernetes distribution, in Docker containers: a cluster of one \
 or more nodes in seconds, with its own image registry and load balancer if you want them, for \
