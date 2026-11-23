@@ -46,8 +46,9 @@ scales = [1.0, 1.25, 1.5, 2.0]
 #
 # And the gap between the desktop's floating parts, `size.gap`: the compositor's own gap, which it
 # rounds to device pixels at every scale, as the mockups do where they draw it. And the glass's
-# shadow, `shadow.glass` and `shadow.glass_contact`: soft through and through, with no edge to land.
-off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo", "size.gap", "shadow.glass", "shadow.glass_contact"]
+# shadow, `shadow.glass` and `shadow.glass_contact`, and its blur, `size.glass_blur`: soft through
+# and through, with no edge to land.
+off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo", "size.gap", "size.glass_blur", "shadow.glass", "shadow.glass_contact"]
 
 # Lines thinner than the grid. Neither is a multiple of 4, so neither is a
 # length: each is drawn as whole device pixels at the scale it shows at.
@@ -294,6 +295,9 @@ bar_row = 28
 # its strips to the screen's edges, a window to the screen's edges, to the bar
 # and to the next window, a card under the bar and above the screen's bottom.
 gap = 6
+# How far the glass blurs what shows through it, a blur's radius: the mockups' stand-in for the
+# compositor's blur behind every glass surface.
+glass_blur = 30
 # The widest a name the bar shows grows (a live preview's branch): past it, it
 # ends in an ellipsis, so the bar's right side never runs into the clock.
 bar_label = 160
@@ -967,6 +971,9 @@ window_shadow = 0.33
 # the lock comes up, shrinking to it as they fade, and growing from it as the
 # lock gives way.
 behind = 0.96
+# How much more colourful what shows through the glass is drawn, its saturation: the mockups'
+# stand-in for the compositor's vibrancy behind every glass surface.
+glass_saturate = 1.4
 # A window carried in the Overview, away from any place it could take: drawn this share of the size
 # it has on its workspace's miniature, a lone window's shape, so it never hides what it is over.
 carried = 0.5
