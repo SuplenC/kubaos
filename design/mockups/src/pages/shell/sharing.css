@@ -20,7 +20,7 @@
   max-width: calc(var(--screen-width) - 2 * var(--gap));
 }
 
-/* Drawing a region, the frame and the bar's Sheet stay over the drawing's dim, Region held pressed. */
+/* Drawing a region, the bar and the bar's card stay over the drawing's dim, Region held pressed. */
 .k-screen.share-screen[data-drawing] > :is(.k-screen-glass, .k-screen-over) {
   z-index: 4;
 }

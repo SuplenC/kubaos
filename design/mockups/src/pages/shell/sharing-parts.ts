@@ -4,8 +4,8 @@
 // sees, never the stream.
 //
 // Picking is on the live desktop, no dialog and no dim: while a request waits the desktop works as
-// usual, each screen's frame holds a bar in the middle of its bottom edge (who asked, Share this
-// screen, Region, Cancel), and the window under the pointer offers a violet Share pill riding its
+// usual, each screen holds a bar on a glass card over the middle of its bottom edge (who asked,
+// Share this screen, Region, Cancel), and the window under the pointer offers a violet Share pill riding its
 // top border. Pointing at a way to share previews the very mark it keeps on air. Only drawing a
 // region dims the screen. The bar is Buttons, an IconTile, an IconButton and Tooltips from the
 // library. The desktop's windows, the window's Share pill, the on-air marks and the region's
@@ -32,7 +32,7 @@ import { list } from "../../lib/list.ts";
 import { media } from "../../lib/media.ts";
 import { panelPage } from "../../lib/panel-page.ts";
 import { declare } from "../../lib/probe.ts";
-import { nested, role } from "../../lib/radius.ts";
+import { role } from "../../lib/radius.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { length } from "../../lib/tokens.ts";
@@ -85,7 +85,7 @@ export interface Rect {
 
 /**
  * A window where it is tiled on its screen: its grid lines in the screen's tiling, as Hyprland
- * splits the room inside the frame, so it fills that room at any size of the screen with the same
+ * splits the desktop under the bar, so it fills that room at any size of the screen with the same
  * gaps ("1", or "1 / 3" to span two).
  */
 export interface Placed {
@@ -360,8 +360,9 @@ function place(element: HTMLElement, rect: Rect, room: Room): void {
 }
 
 /**
- * Makes `desk` the screen's tiling: a grid of `columns` by `rows` equal tracks in the room inside
- * the frame, `space.s8` apart and in from it, as Hyprland's gaps; each window names its lines.
+ * Makes `desk` the screen's tiling: a grid of `columns` by `rows` equal tracks on the desktop under
+ * the bar, `size.gap` apart and in from the screen's edges and the bar, as Hyprland's gaps; each
+ * window names its lines.
  */
 export function tiling(desk: HTMLElement, columns: number, rows: number): HTMLElement {
   desk.className = "share-desk";
@@ -388,12 +389,12 @@ export interface DeskWindowOptions extends Placed {
 
 /**
  * Draft part, proposed: an app's window on the desktop, as Hyprland draws it: `surface`, its corner
- * the frame's less its gap, its app's tile and title, its border and the tube of the window that
+ * `radius.surface`, its app's tile and title, its border and the tube of the window that
  * has the keyboard (`windowRing`), the window border the thin stroke wide. The Focus page draws
  * one of its own; this would be the library's, for every desktop scene.
  */
-/** A window's corner on the desktop: the frame's, the surface radius, less the gap round it. */
-const windowCorner = () => nested(role("surface"), "s8");
+/** A window's corner on the desktop: the surface radius. */
+const windowCorner = () => role("surface");
 
 export function deskWindow(options: DeskWindowOptions): HTMLElement {
   const corner = windowCorner();
@@ -569,8 +570,8 @@ export interface MapShare {
 /**
  * Draft part, proposed: a map of the desk for a share's card. Every screen a rectangle in its real
  * place and proportions, the whole as wide as the card and no taller than `size.row_three_line`,
- * centred where it is narrower. Its corners are the real ones scaled with the map: a screen's the
- * frame's (the surface radius), a window's and a region's a window's, none under `radius.small`. A screen shared wears `sharing_line` with a faint `sharing` fill;
+ * centred where it is narrower. Its corners are the real ones scaled with the map: a screen's and a
+ * window's and a region's the surface radius, none under `radius.small`. A screen shared wears `sharing_line` with a faint `sharing` fill;
  * a window or a region is a solid `sharing` box at its real place and size, its screen outlined
  * quietly, and a window's screen carries the window's workspace in its top left corner, where the
  * bar shows it. Nothing else: no picture, no other window.
@@ -813,7 +814,8 @@ export interface PickingOptions {
 export type BarPinned = "screen" | "region" | "drawing" | "cancel";
 
 /**
- * The bar on one screen, which hangs on a Sheet in the middle of the frame's bottom edge, one row:
+ * The bar on one screen, on a detached glass card `size.gap` above the middle of its bottom edge,
+ * one row:
  * the asking app's icon, which names it in its Tooltip, then Share this screen and Region, Buttons
  * in the sharing colour, and Cancel, neutral, named in its Tooltip. Share this screen and Region
  * say what they do on their faces, so they take no Tooltip. It takes no keys: while a request
@@ -853,7 +855,7 @@ export function pickBar(
     region,
     floatingTooltip(cancel, tooltip(WORDS.cancel, ""), { side: "above" }),
   );
-  // What hangs on the bottom edge's Sheet: `space.s16` inside on every side, as the OSD's strip.
+  // What the bottom card holds: `space.s16` inside on every side, as the OSD's strip.
   const bar = inset(line, "s16", "s16");
   bar.classList.add("share-pick-bar");
   return bar;
@@ -983,8 +985,9 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     onRegion: () => handlers.onLight?.({ kind: "region", screen: index }),
     onCancel: () => handlers.onCancel?.(),
   });
-  // The bar is part of the frame: its Sheet hangs in the middle of the bottom edge, on this screen's own frame.
-  const barSheet = sheet({ content: bar, edge: "bottom" });
+  // The bar's card stands over the middle of this screen's bottom edge, its corner concentric with
+  // its buttons': theirs and its padding.
+  const barSheet = sheet({ content: bar, edge: "bottom", rounding: "calc(var(--radius-control) + var(--space-s16))" });
   hang(made, barSheet);
   const shut = options.arrive ? liven(barSheet, false) : undefined;
   const screenButton = bar.querySelector<HTMLElement>(".share-pick-screen")!;
