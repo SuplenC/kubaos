@@ -5,7 +5,7 @@
 # need for their network and their users.
 # https://podman-desktop.io/docs/installation/linux-install
 name = "Podman Desktop"
-category = "development"
+category = "devops"
 tags = ["containers", "podman", "kubernetes", "images", "docker"]
 summary = "Containers and Kubernetes in a window, on Podman. Docker Desktop minus the licence lawyers."
 # From its AppStream metainfo, CC0-1.0 (github.com/podman-desktop/podman-desktop), its first

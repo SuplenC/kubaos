@@ -155,6 +155,7 @@ pub enum FolderError {
 pub enum Category {
     Browsers,
     Development,
+    Devops,
     Ai,
     Communication,
     Media,
@@ -171,6 +172,7 @@ impl Category {
         match self {
             Self::Browsers => "browsers",
             Self::Development => "development",
+            Self::Devops => "devops",
             Self::Ai => "ai",
             Self::Communication => "communication",
             Self::Media => "media",
@@ -187,6 +189,7 @@ impl Category {
         match self {
             Self::Browsers => "Browsers",
             Self::Development => "Development",
+            Self::Devops => "DevOps",
             Self::Ai => "AI",
             Self::Communication => "Communication",
             Self::Media => "Media",

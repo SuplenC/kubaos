@@ -4,7 +4,7 @@
 # of KubaOS moves it on as Kubernetes does. Its package writes no source of its own.
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 name = "kubectl"
-category = "development"
+category = "devops"
 tags = ["kubernetes", "k8s", "cluster", "cli", "containers"]
 summary = "The Kubernetes command line. YAML goes in, and with any luck prod stays up."
 # The Kubernetes documentation, CC-BY-4.0, The Kubernetes Authors (github.com/kubernetes/website).
