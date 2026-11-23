@@ -50,7 +50,7 @@ dofile(repo .. "/config/hypr/keybinds.lua")
 local scratch <close> = require("scratch").new()
 local dir = scratch:path()
 local bin, log = dir .. "/bin", dir .. "/log"
-os.execute("mkdir -p " .. bin)
+os.execute("mkdir -p '" .. bin .. "'")
 
 local function stub(name)
   local file = assert(io.open(bin .. "/" .. name, "w"))

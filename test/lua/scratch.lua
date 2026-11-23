@@ -11,9 +11,16 @@
 local Scratch = {}
 Scratch.__index = Scratch
 
--- Write permission comes back first: `rm -rf` can't empty a folder made read-only.
+-- `path` single-quoted for the shell, a quote in it closed, escaped and reopened.
+local function quoted(path)
+  return "'" .. path:gsub("'", "'\\''") .. "'"
+end
+
+-- Write permission comes back first: `rm -rf` can't empty a folder made read-only. The removal
+-- runs whatever the chmod says, so one entry it can't change doesn't keep the rest.
 function Scratch:__close()
-  os.execute("chmod -R u+w '" .. self.root .. "' && rm -rf '" .. self.root .. "'")
+  local root = quoted(self.root)
+  os.execute("chmod -R u+w " .. root .. "; rm -rf " .. root)
 end
 
 function Scratch.new()
