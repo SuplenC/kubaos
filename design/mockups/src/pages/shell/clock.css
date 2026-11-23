@@ -2,9 +2,9 @@
    they turn, the clock view's top and month rows, and the weather view's hours and tiles. The
    cards, the month, the day strip and the banner are the library's. */
 
-/* `space.s20` above and below; the container's padding at the sides; the column's width. */
+/* `space.s16` above and below, as the container's padding is at the sides; the column's width. */
 .ck-popup {
-  padding-block: var(--space-s20);
+  padding-block: var(--space-s16);
 }
 
 .ck-body {

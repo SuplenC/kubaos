@@ -7,8 +7,10 @@
 // under it; the body, `space.s16` under those, the only part that scrolls, in a `Scroll` with a
 // `HeaderFade` over the gap above it; and the footer band, if it has one, `space.s16` under the body,
 // its action at the end. The panel is `space.s16` inside at its top and its foot, and its bands and
-// its body take the container's padding at their sides. The subtitle line is always there and
-// always has a pun in it, so nothing under it ever moves.
+// its body take the container's padding at their sides. The body keeps no gutter for the scroll's
+// thumb, which floats in the container's padding at the panel's end, so the content is as far in
+// at both sides. The subtitle line is always there and always has a pun in it, so nothing under it
+// ever moves.
 //
 // It is as tall as its content, up to the room the screen has inside the frame (`--sheet-room`);
 // past that only the body scrolls, and the bands stay. It is `size.panel` wide, or as wide as its
@@ -86,6 +88,7 @@ export function panelPage(options: PanelPageOptions): PanelPage {
     height: "var(--natural)",
     above: "s16",
     below: "s16",
+    noGutter: true,
     fade: "s16",
     ...(options.down !== undefined ? { down: options.down } : {}),
     ...(options.fadePinned ? { fadePinned: true } : {}),
