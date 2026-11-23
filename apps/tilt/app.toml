@@ -1,0 +1,23 @@
+# Tilt from nixpkgs, through the User flake. Ubuntu doesn't package it and Tilt keeps no apt
+# repository.
+# https://docs.tilt.dev/install.html
+name = "Tilt"
+category = "devops"
+tags = ["kubernetes", "k8s", "dev", "microservices", "live reload", "docker", "cli"]
+summary = "Save a file, your services rebuild in the cluster. The inner loop, minus the swearing."
+# The opening of its README, Apache-2.0 (github.com/tilt-dev/tilt).
+description = """\
+Kubernetes for Prod, Tilt for Dev. Modern apps are made of too many services. They're \
+everywhere and in constant communication. Run tilt up to work in a complete dev environment \
+configured for your team. Tilt automates all the steps from a code change to a new process: \
+watching files, building container images, and bringing your environment up-to-date. Think \
+docker build && kubectl apply or docker-compose up."""
+description_from = "https://github.com/tilt-dev/tilt/blob/v0.37.9/README.md"
+# Tilt's logo, Apache-2.0, on a tile (tilt.svg's header): no icon theme has Tilt.
+icon = "tilt"
+keeps = "Tilt's settings and state stay in ~/.tilt-dev: install Tilt again and they're there."
+
+[[action]]
+name = "Install Tilt"
+kind = "nix"
+packages = ["tilt"]

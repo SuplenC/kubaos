@@ -1,0 +1,28 @@
+# minikube from its GitHub release's .deb, pinned to GitHub's digest of each. Ubuntu doesn't
+# package it, and nixpkgs' (1.38) starts Kubernetes 1.35 at the newest, too old for the
+# catalog's kubectl, which talks to clusters one minor version either side of its own; each
+# minikube release runs the Kubernetes of its day. Its package writes no source of its own.
+# https://minikube.sigs.k8s.io/docs/start/
+name = "minikube"
+category = "devops"
+tags = ["kubernetes", "k8s", "cluster", "local", "docker", "vm", "addons"]
+summary = "A local Kubernetes cluster with add-ons. Prod's little sibling, just as moody."
+# The opening of its README, Apache-2.0 (github.com/kubernetes/minikube).
+description = """\
+minikube implements a local Kubernetes cluster on macOS, Linux, and Windows. minikube's \
+primary goals are to be the best tool for local Kubernetes application development and to \
+support all Kubernetes features that fit."""
+description_from = "https://github.com/kubernetes/minikube/blob/v1.39.0/README.md"
+# minikube's logo, Apache-2.0, on a tile (minikube.svg's header): no icon theme has minikube.
+icon = "minikube"
+keeps = """\
+Your clusters, their images and minikube's settings stay in ~/.minikube until `minikube delete \
+--all --purge` takes them away; their entries stay in your kubeconfig."""
+
+[[action]]
+name = "Install minikube"
+kind = "deb"
+package = "minikube"
+version = "1.39.0-0"
+amd64 = { url = "https://github.com/kubernetes/minikube/releases/download/v1.39.0/minikube_1.39.0-0_amd64.deb", sha256 = "ca84012944925a841497b29c0cd5d5c00e414a7b7b74cf176a3075767daa3c51" }
+arm64 = { url = "https://github.com/kubernetes/minikube/releases/download/v1.39.0/minikube_1.39.0-0_arm64.deb", sha256 = "3c78c311e39065662b2510a79922cbd12c1b769e14ac1cde6aaa1a3c9f732d27" }

@@ -1,0 +1,23 @@
+# Headlamp from nixpkgs, through the User flake, built from source on nixpkgs' Electron, which
+# picks Wayland itself. Ubuntu doesn't package it and Headlamp keeps no apt repository.
+# https://headlamp.dev/docs/latest/installation/desktop/linux-installation
+name = "Headlamp"
+category = "devops"
+tags = ["kubernetes", "k8s", "cluster", "dashboard", "pods", "ui"]
+summary = "Your Kubernetes clusters in a window. No account, no paywall, just the pods on fire."
+# The opening of its README, Apache-2.0 (github.com/kubernetes-sigs/headlamp).
+description = """\
+Headlamp is an easy-to-use and extensible Kubernetes web UI. Headlamp was created to blend the \
+traditional feature set of other web UIs/dashboards (i.e., to list and view resources) with \
+added functionality."""
+description_from = "https://github.com/kubernetes-sigs/headlamp/blob/v0.46.0/README.md"
+# Headlamp's icon, Apache-2.0, on a tile (headlamp.svg's header): no icon theme has Headlamp.
+icon = "headlamp"
+keeps = """\
+Your Headlamp settings and plugins stay in ~/.config/Headlamp, and your clusters in your own \
+kubeconfig: install Headlamp again and it's all there."""
+
+[[action]]
+name = "Install Headlamp"
+kind = "nix"
+packages = ["headlamp"]

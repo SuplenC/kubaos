@@ -2532,6 +2532,7 @@ mod games;
 mod graphics;
 mod iac;
 mod keys;
+mod kubernetes;
 mod media;
 mod office;
 mod requires;
