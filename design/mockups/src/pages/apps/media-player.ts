@@ -7,6 +7,7 @@ import { label } from "../../site/dom.ts";
 import { stageControls } from "../../site/parts/stage.ts";
 import { doesntApply, type Move, nonEmpty, page, screen } from "../../site/page.ts";
 import { CHROME, settings } from "../../site/settings.ts";
+import { glassWindow } from "../../lib/glass.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { durationMs, raw } from "../../lib/tokens.ts";
@@ -36,6 +37,7 @@ import {
   type Colours,
 } from "./media-player-parts.ts";
 import { CHOICES, type VizChoice, vizName } from "./media-player-viz.ts";
+import { bareWindow } from "./settings/settings-window.ts";
 import { song as analysedSong } from "./media-player-song.ts";
 
 // The states, as data.
@@ -47,7 +49,7 @@ const IN_LIST: PlayerState = { ...SHOWN, index: 1, count: PLAYLIST.length };
 const SONG_PLAYING: PlayerState = { ...PLAYING, file: SONG, position: 0.4 };
 const BARE_PLAYING: PlayerState = { ...PLAYING, file: BARE_SONG, position: 0.12 };
 
-/** The player tiled alone in the frame's hole, as Hyprland tiles it. A whole screen. */
+/** The player tiled alone on the desktop, as Hyprland tiles it. A whole screen. */
 const desk = screen((state: PlayerState): HTMLElement => {
   const room = barScreen(SCREEN_WIDTH, TALL);
   const slot = document.createElement("span");
@@ -60,7 +62,25 @@ const desk = screen((state: PlayerState): HTMLElement => {
   return room.element;
 });
 
-/** The player covering the whole screen, the frame and the bar under it. */
+/**
+ * The player tiled beside Settings, `size.gap` apart and from the bar and the screen's edges:
+ * Settings is the active window, its tube lit; the player keeps only the glass's ring.
+ */
+const beside = screen((state: PlayerState): HTMLElement => {
+  const room = barScreen(SCREEN_WIDTH, TALL);
+  const tiles = document.createElement("span");
+  tiles.className = "mp-tiles";
+  const active = glassWindow(document.createElement("span"), true);
+  active.append(bareWindow());
+  const shown = player(state).element;
+  shown.removeAttribute("data-active");
+  tiles.append(active, shown);
+  room.element.querySelector(".k-screen-dim")!.before(tiles);
+  room.element.querySelector<HTMLImageElement>(".k-screen-wallpaper")!.src = DESKTOP;
+  return room.element;
+});
+
+/** The player covering the whole screen, the bar under it. */
 const whole = screen((state: PlayerState): HTMLElement => {
   const room = document.createElement("span");
   room.className = "mp-whole";
@@ -827,8 +847,9 @@ export default page<Shown>({
   variants: [
     { name: "Film", for: "the picture alone, its colours lighting the letterbox", sample: () => desk(PLAYING) },
     { name: "Controller shown", for: "the pointer moved: the glass, the lit bar, the buttons", sample: () => desk(SHOWN) },
-    { name: "Full screen, hidden", for: "over the frame and the bar: the picture alone", sample: () => whole(PLAYING) },
+    { name: "Full screen, hidden", for: "over the bar: the picture alone", sample: () => whole(PLAYING) },
     { name: "Full screen, shown", for: "the same controller, square corners; Esc leaves", sample: () => whole(SHOWN) },
+    { name: "Beside Settings", for: "inactive: the ring alone; tiles `size.gap` apart", sample: () => beside(PLAYING) },
     { name: "Paused", for: "the controller stays while paused; Play's symbol", sample: () => desk(PAUSED) },
     { name: "Seeking, over the bar", for: "the tube grows, its head lit; time and chapter over it", sample: () => desk({ ...SHOWN, hover: 0.62 }) },
     { name: "Seeking, dragging", for: "held: the head brightens and follows the pointer", sample: () => desk({ ...SHOWN, dragging: true, hover: 0.47, position: 0.47 }) },

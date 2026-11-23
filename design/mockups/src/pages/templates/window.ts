@@ -1,8 +1,10 @@
-// The window a template page shows its template in: an app's window, which the page's reader
+// The window a template page shows its template in: an app's window on the shell's glass, active,
+// which the page's reader
 // resizes by its corner from the app's minimum up to a full 1080p screen, its size in logical
 // pixels under it; and a still window of a fixed size for the samples.
 
 import "./templates.css";
+import { glassWindow } from "../../lib/glass.ts";
 import { el, label } from "../../site/dom.ts";
 import { settings, windowSize } from "../../site/settings.ts";
 
@@ -12,7 +14,7 @@ import { settings, windowSize } from "../../site/settings.ts";
  */
 export function resizable(content: HTMLElement): HTMLElement {
   const size = windowSize();
-  const frame = el("div", "t-window", content);
+  const frame = glassWindow(el("div", "t-window", content), true);
   frame.dataset.resizes = "";
   frame.style.width = size.width;
   frame.style.height = size.height;
@@ -26,7 +28,7 @@ export function resizable(content: HTMLElement): HTMLElement {
 
 /** `content` in a still window `width` × `height` (lengths' CSS): a state's sample. */
 export function still(content: HTMLElement, width = "var(--size-app_min_width)", height = "var(--size-app_min_height)"): HTMLElement {
-  const frame = el("div", "t-window", content);
+  const frame = glassWindow(el("div", "t-window", content), true);
   frame.style.width = width;
   frame.style.height = height;
   return frame;

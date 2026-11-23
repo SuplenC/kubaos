@@ -12,6 +12,17 @@ export function glass<T extends HTMLElement>(element: T, flush = false): T {
 }
 
 /**
+ * Makes `element` an app's window on the glass, at the surface radius with the glass's own edge;
+ * `active`, the window the keyboard is in, its lit tube on that edge.
+ */
+export function glassWindow<T extends HTMLElement>(element: T, active: boolean): T {
+  glass(element);
+  element.classList.add("k-glass-window");
+  element.toggleAttribute("data-active", active);
+  return element;
+}
+
+/**
  * Makes `element` a part that turns to glass as it opens out of a control, a select's list: its CSS
  * names how far open it is as `--glass-rise` and its shut fill as `--glass-from`.
  */

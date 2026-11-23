@@ -1,23 +1,20 @@
 /* Kōbō's first boot (`setup-room.ts`): what its room adds to the installer's (`kobo.css`), the
    window a card opened alone is, and the card pages' own parts. */
 
-/* A card opened alone: Kōbō's glass panel at the window's size and corner, its active tube round it
-   (outside the glass, which cuts what lies on it to its corner), its rail on the glass. */
+/* A card opened alone: the shell's glass window (`glassWindow`), active, its rail on the glass. */
 .setup-window {
-  position: relative;
   display: block;
   box-sizing: border-box;
   flex: none;
   width: var(--setup-window-width);
   height: var(--setup-window-height);
-  border-radius: var(--corner);
   outline: none;
-  isolation: isolate;
 }
 
-.setup-window > .k-glass-panel {
+.setup-window-body {
   position: absolute;
   inset: 0;
+  display: flex;
   border-radius: inherit;
 }
 

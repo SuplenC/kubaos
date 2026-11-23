@@ -57,9 +57,10 @@
   initial-value: 1;
 }
 
-/* The window: Hyprland's, its outer edge at `radius.content` and the active window's tube,
-   `stroke.thin`, round what mpv draws. Its background is mpv's: the scrim's black. The glass's
-   inset from its edges, and its padding, are `space.s16`, `space.s8` and `space.s12` narrow. */
+/* The window: the shell's glass window (`glassWindow` in `lib/glass.ts`), its edge and the active
+   window's tube round what mpv draws, whose picture lies on the scrim's black over the glass. The
+   controller's inset from its edges, and its padding, are `space.s16`, `space.s8` and `space.s12`
+   narrow. */
 .mp-window {
   position: relative;
   box-sizing: border-box;
@@ -68,9 +69,6 @@
   width: 100%;
   height: 100%;
   overflow: clip;
-  border: var(--stroke-thin) solid var(--color-primary);
-  border-radius: var(--radius-content);
-  background: var(--color-scrim);
   color: var(--color-on_surface);
   outline: none;
   --mp-inset: var(--space-s16);
@@ -114,8 +112,12 @@
 }
 
 .mp-window[data-full] {
-  border: none;
   border-radius: 0;
+  box-shadow: none;
+}
+
+.mp-window[data-full]::after {
+  display: none;
 }
 
 .mp-screen {
@@ -123,6 +125,7 @@
   display: block;
   flex: 1 1 0;
   min-height: 0;
+  background: var(--color-scrim);
   /* Clipped, never scrolled: a menu keeping its item in view must not move the picture. */
   overflow: clip;
 }
@@ -245,9 +248,8 @@
   -webkit-text-stroke: calc(var(--stroke-thin) * 2) var(--color-scrim);
 }
 
-/* The controller: the library's glass, `surface` at `opacity.glass` over the picture blurred by
-   `size.lock_blur`, at the surface radius, raised to step 2 (its rim and shadow), inset from the
-   window's edges. It rises `space.s16` as it fades in. */
+/* The controller: the shell's glass (`lib/glass.ts`) over the picture, at the surface radius, inset
+   from the window's edges. It rises `space.s16` as it fades in. */
 .mp-controller {
   position: absolute;
   left: var(--mp-inset);
@@ -267,19 +269,6 @@
    its inset, fading, and rises back the same way: the song's corner rides on its top. */
 .mp-window:not([data-visual="off"]) .mp-controller {
   translate: 0 calc((1 - var(--mp-shown)) * (var(--mp-controller, 0px) + var(--mp-inset)));
-}
-
-/* Glass: the controller, the top corner's pill, the playlist's panel and the bloom. */
-.mp-controller,
-.mp-corner::before,
-.mp-sidebar,
-.mp-bloom {
-  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
-  backdrop-filter: blur(var(--size-lock_blur));
-  box-shadow:
-    inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-on_surface) r g b / var(--elevation-rim)),
-    0 var(--elevation-2-contact-y) var(--elevation-2-contact-blur) rgb(from var(--color-shadow) r g b / var(--elevation-contact-opacity)),
-    0 var(--elevation-2-ambient-y) var(--elevation-2-ambient-blur) rgb(from var(--color-shadow) r g b / var(--elevation-ambient-opacity));
 }
 
 .mp-window:not([data-shown]) :is(.mp-controller, .mp-corner) {
@@ -548,8 +537,8 @@
   translate: 0 calc((var(--mp-shown) - 1) * var(--space-s8));
 }
 
-.mp-corner::before {
-  content: "";
+/* The pill's glass, under the button: fading as the panel's slides under it. */
+.mp-corner-glass {
   position: absolute;
   inset: 0;
   z-index: -1;
@@ -581,7 +570,7 @@
   gap: var(--space-s12);
   width: min(var(--size-panel), 100%);
   padding: var(--mp-inset) var(--space-s16) var(--mp-inset);
-  border-radius: 0 calc(var(--radius-content) - var(--stroke-thin)) calc(var(--radius-content) - var(--stroke-thin)) 0;
+  border-radius: 0 var(--radius-surface) var(--radius-surface) 0;
   translate: calc((1 - var(--mp-side)) * 100%) 0;
   visibility: hidden;
 }
@@ -799,12 +788,20 @@
   animation-name: mp-fade-in;
 }
 
-/* Where a sample puts the window: tiled in the frame's hole, as Hyprland tiles it alone, or
-   covering the screen. */
+/* Where a sample puts the window: tiled alone on the desktop, as Hyprland tiles it, `size.gap`
+   from the bar and the screen's edges (`lib/sheet.css`), or covering the screen. */
 .mp-tiled {
   position: absolute;
-  inset: calc(var(--size-bar) + var(--space-s8)) var(--space-s16) var(--space-s16);
+  inset: var(--desk-top) var(--gap) var(--gap);
   display: flex;
+}
+
+.mp-tiles {
+  position: absolute;
+  inset: var(--desk-top) var(--gap) var(--gap);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
 }
 
 .mp-whole {

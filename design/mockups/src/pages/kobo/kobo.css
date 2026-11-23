@@ -398,9 +398,15 @@
 }
 
 /* What a move between the room's places lifts and fades, each on a layer of its own, so the
-   browser moves it rather than drawing it again every frame. */
-.kobo-room > .k-backdrop > :is(.k-backdrop-thing, .k-backdrop-layers) {
+   browser moves it rather than drawing it again every frame.
+   HAZARD: the thing is promoted for its move alone, never for its opacity: a promised opacity
+   makes it what a glass window inside it blurs, and the window shows the wallpaper sharp. */
+.kobo-room > .k-backdrop > .k-backdrop-layers {
   will-change: translate, opacity;
+}
+
+.kobo-room > .k-backdrop > .k-backdrop-thing {
+  will-change: translate;
 }
 
 /* A line of key hints keeps a keycap's height with none in it, so what is under it never moves. */

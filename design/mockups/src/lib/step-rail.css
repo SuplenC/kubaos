@@ -182,6 +182,6 @@
 }
 
 /* A window drawn as glass (first boot) shows its glass, not a surface of the template's own. */
-.k-glass-body .k-step-rail-page[data-host="window"] {
+.k-glass-window .k-step-rail-page[data-host="window"] {
   background: none;
 }
