@@ -384,23 +384,30 @@ fn steps_of_the_same_thing_a_release_changes_keep_their_entries_by_name_when_ano
 }
 
 #[test]
-fn steps_of_the_same_thing_a_release_renames_and_changes_keep_their_entries_in_their_order() {
+fn steps_of_the_same_thing_a_release_renames_and_changes_keep_their_entries_by_their_undo_when_another_comes_in_front() {
     let world = twins();
     world.install("twins", true).0.unwrap();
     let from = world.host.state.borrow().log.len();
+    // Neither name nor action is the one recorded: each run goes by what it undoes.
     let renamed = TWO_RUNS
         .replace("Start the first", "Start one")
         .replace("Start the second", "Start two")
         .replace("[\"./up-a\"]", "[\"./up-a\", \"again\"]")
         .replace("[\"./up-b\"]", "[\"./up-b\", \"again\"]");
-    world.write_app("twins", &renamed);
+    world.write_app("twins", &put_in_front(&renamed, THIRD_RUN));
 
     let (installed, events) = world.install("twins", true);
 
     installed.unwrap();
     assert!(!undid_anything(&events), "{:?}", events.0);
+    let log = world.log_since(from);
+    assert!(log.contains(&"run ./up-c".to_owned()), "{log:#?}");
+    assert!(!log.iter().any(|l| l.starts_with("run ./down")), "{log:#?}");
     let done = |step, name: &str| (step, name.to_owned(), State::Done, true);
-    assert_eq!(root_entries(&world), [done(2, "Start one"), done(3, "Start two")]);
+    assert_eq!(
+        root_entries(&world),
+        [done(1, "Start the third"), done(3, "Start one"), done(4, "Start two")]
+    );
     let (_, root) = world.journals("twins");
     let undoes: Vec<Vec<String>> = root
         .unwrap()
@@ -411,8 +418,206 @@ fn steps_of_the_same_thing_a_release_renames_and_changes_keep_their_entries_in_t
             _ => None,
         })
         .collect();
-    assert_eq!(undoes, [vec!["./down-a".to_owned()], vec!["./down-b".to_owned()]]);
-    assert!(!world.log_since(from).iter().any(|l| l.starts_with("run ./down")));
+    assert_eq!(
+        undoes,
+        [
+            vec!["./down-c".to_owned()],
+            vec!["./down-a".to_owned()],
+            vec!["./down-b".to_owned()]
+        ]
+    );
+
+    world.remove("twins").0.unwrap();
+    let log = world.log_since(from);
+    for down in ["run ./down-a", "run ./down-b", "run ./down-c"] {
+        assert_eq!(log.iter().filter(|l| *l == down).count(), 1, "{down}: {log:#?}");
+    }
+}
+
+/// A root `run` of `name` that starts `up` and undoes with `down`, as a journal records it.
+fn run_entry(step: usize, name: &str, up: &str, down: &str) -> Entry {
+    let action: Action = toml::from_str(&format!(
+        "name = \"{name}\"\nkind = \"run\"\nroot = true\ndo = [\"{up}\"]\ncheck = [\"{up}-check\"]\nundo = [\"{down}\"]\n"
+    ))
+    .unwrap();
+    Entry {
+        step,
+        state: State::Done,
+        claims: Vec::new(),
+        prior: crate::apps::journal::Prior::default(),
+        action,
+        replaced: None,
+    }
+}
+
+#[test]
+fn steps_of_the_same_thing_with_nothing_else_in_common_go_with_their_entries_in_order() {
+    let mut journal = Journal::new("twins", None);
+    journal.entries = vec![run_entry(1, "a", "./a", "./down-a"), run_entry(2, "b", "./b", "./down-b")];
+    let steps: Vec<(usize, Option<Action>)> = [("c", "./c", "./down-c"), ("d", "./d", "./down-d"), ("e", "./e", "./down-e")]
+        .iter()
+        .enumerate()
+        .map(|(i, (name, up, down))| (i + 1, Some(run_entry(0, name, up, down).action)))
+        .collect();
+
+    journal.align(&steps, 3);
+
+    let names: Vec<(usize, &str)> = journal.entries.iter().map(|e| (e.step, e.action.name.as_str())).collect();
+    assert_eq!(names, [(1, "a"), (2, "b")]);
+}
+
+/// A package, then two root runs: the images pulled, then the stack started, each undone apart.
+const PULLED: &str = r#"
+name = "Pulled"
+summary = "An app whose stack is pulled, then started"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
+icon = "fixture"
+
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["pulled-engine"]
+
+[[action]]
+name = "Pull the images"
+kind = "run"
+root = true
+do = ["./up-a"]
+check = ["./up-to-date-a"]
+undo = ["./down-a"]
+
+[[action]]
+name = "Start the stack"
+kind = "run"
+root = true
+do = ["./up-b"]
+check = ["./up-to-date-b"]
+undo = ["./down-b"]
+"#;
+
+#[test]
+fn a_removal_before_the_update_undoes_a_step_the_release_changed_to_another_kind() {
+    let world = World::new(&[("pulled", PULLED)]);
+    for suffix in ["-a", "-b"] {
+        stack_scripts(&world, "pulled", suffix);
+    }
+    world.install("pulled", true).0.unwrap();
+    let from = world.host.state.borrow().log.len();
+    let changed = PULLED.replace(
+        "name = \"Pull the images\"\nkind = \"run\"\nroot = true\ndo = [\"./up-a\"]\ncheck = [\"./up-to-date-a\"]\nundo = [\"./down-a\"]",
+        "name = \"Put the stack in place\"\nkind = \"file\"\nto = \"/etc/pulled/stack.yaml\"\ntext = \"stack\\n\"",
+    );
+    assert_ne!(changed, PULLED);
+    world.write_app("pulled", &changed);
+
+    world.remove("pulled").0.unwrap();
+
+    let log = world.log_since(from);
+    for down in ["run ./down-a", "run ./down-b", "apt remove pulled-engine"] {
+        assert_eq!(log.iter().filter(|l| *l == down).count(), 1, "{down}: {log:#?}");
+    }
+    assert_eq!(world.journals("pulled"), (None, None));
+}
+
+/// Two packages, each a step, which a release makes one step.
+const TWO_PACKAGES: &str = r#"
+name = "Merged"
+summary = "An app of two packages"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
+icon = "fixture"
+
+[[action]]
+name = "Install the tool"
+kind = "apt"
+packages = ["merged-tool"]
+
+[[action]]
+name = "Install its plugin"
+kind = "apt"
+packages = ["merged-plugin"]
+"#;
+
+#[test]
+fn two_steps_a_release_makes_one_are_neither_undone_nor_done_again() {
+    let world = World::new(&[("merged", TWO_PACKAGES)]);
+    world.install("merged", true).0.unwrap();
+    let from = world.host.state.borrow().log.len();
+    let one = TWO_PACKAGES.replace(
+        "packages = [\"merged-tool\"]\n\n[[action]]\nname = \"Install its plugin\"\nkind = \"apt\"\npackages = [\"merged-plugin\"]",
+        "packages = [\"merged-tool\", \"merged-plugin\"]",
+    );
+    assert_ne!(one, TWO_PACKAGES);
+    world.write_app("merged", &one);
+
+    let (installed, events) = world.install("merged", true);
+
+    installed.unwrap();
+    let log = world.log_since(from);
+    assert!(!log.iter().any(|l| l.starts_with("apt")), "{log:#?}");
+    assert!(!undid_anything(&events), "{:?}", events.0);
+    let (_, root) = world.journals("merged");
+    let root = root.unwrap();
+    assert_eq!(root.entries.len(), 1, "{root:?}");
+    let owned: Vec<&str> = root.entries[0]
+        .claims
+        .iter()
+        .filter(|c| c.owned)
+        .map(|c| c.claim.as_str())
+        .collect();
+    assert_eq!(owned, ["package:merged-tool", "package:merged-plugin"]);
+
+    world.remove("merged").0.unwrap();
+    let state = world.host.state.borrow();
+    assert!(!state.dpkg.contains_key("merged-tool") && !state.dpkg.contains_key("merged-plugin"));
+}
+
+#[test]
+fn a_rolled_back_removal_puts_back_a_step_a_release_took_out_and_the_next_update_takes_it_out() {
+    let world = layered();
+    install(&world, "layered", "local");
+    let stack = world.system_path("/etc/layered/stack.yaml");
+    let without = LAYERED.replace(
+        "[[setup.local.action]]\nname = \"Put the stack in place\"\nkind = \"file\"\nto = \"/etc/layered/stack.yaml\"\ntext = \"stack\\n\"\n\n",
+        "",
+    );
+    world.write_app("layered", &without);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:layered-engine".to_owned());
+
+    let (removed, events) = world.remove("layered");
+
+    assert!(
+        matches!(removed, Err(super::EngineError::RemovalRolledBack { .. })),
+        "{removed:?}"
+    );
+    let warned: Vec<_> = events
+        .0
+        .iter()
+        .filter(|e| matches!(e, crate::update::event::UpdateEvent::Warning { .. }))
+        .collect();
+    assert!(warned.is_empty(), "{warned:?}");
+    let (user, root) = world.journals("layered");
+    assert!(user.unwrap().complete);
+    assert!(
+        root.unwrap().entries.iter().any(|e| e.action.name == "Put the stack in place"),
+        "the step taken out wasn't put back"
+    );
+
+    world.host.state.borrow_mut().fail.clear();
+    install(&world, "layered", "local");
+    assert!(!stack.exists());
+    let names: Vec<String> = recorded(&world, "layered").into_iter().map(|r| r.1.name).collect();
+    assert_eq!(names, ["Write its config", "Install the engine", "Start the stack"]);
 }
 
 #[test]

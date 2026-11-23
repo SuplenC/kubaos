@@ -281,6 +281,28 @@ fn an_update_that_fails_after_adding_a_run_that_only_undoes_keeps_it_and_runs_no
 }
 
 #[test]
+fn a_run_that_only_undoes_a_release_takes_out_needs_no_root_and_still_runs_its_undo_at_the_removal() {
+    let world = guard();
+    world.install("guard", true).0.unwrap();
+    let before_it = GUARD[..GUARD.find("[[action]]\nname = \"Turn").unwrap()].to_owned();
+    world.write_app("guard", &before_it);
+    let mut root = world.root();
+    let mut events = Events::default();
+
+    world
+        .run(&mut root, &mut events, true, |e| e.install("guard", None))
+        .unwrap();
+
+    assert!(!root.started, "root was asked for");
+    assert!(!turned_off(&world));
+
+    world.remove("guard").0.unwrap();
+
+    assert_eq!(offs(&world), 1);
+    assert_eq!(world.journals("guard"), (None, None));
+}
+
+#[test]
 fn a_run_with_do_but_no_check_or_with_no_undo_is_refused() {
     let half = GUARD.replace(r#"undo = ["./off"]"#, "do = [\"./off\"]\nundo = [\"./off\"]");
     let none = GUARD.replace("undo = [\"./off\"]\n", "");
