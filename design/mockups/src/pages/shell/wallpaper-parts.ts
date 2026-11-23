@@ -1,7 +1,7 @@
 // The wallpaper picker, a gallery (`config/quickshell/modules/wallpaper/`, not built yet): every
 // picture of a folder hung on a wall, a floor per folder, a neon lamp over each, the one in front of
 // you lit. Each picture is drawn as what it would be: the picture alone, your desktop on it with
-// its bar, frame and windows, or your lock with its clock between the plate and the city, each the
+// its bar and windows, or your lock with its clock between the plate and the city, each the
 // Lock template at the screen's size scaled into its frame, in its own colours. The one in front of
 // you steps out to fill the screen, and the live desktop is that picture stepped out: opening steps
 // back into the wall, applying and cancelling step out again.
@@ -20,7 +20,7 @@ import { iconButton } from "../../lib/icon-button.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
 import { type Lock, lock, type Wallpaper } from "../../lib/lock.ts";
-import { nested, role } from "../../lib/radius.ts";
+import { role } from "../../lib/radius.ts";
 import { type ShortcutGroup } from "../../lib/shortcuts.ts";
 import { shortcutsButton, takeShortcutKeys } from "../../lib/shortcuts-button.ts";
 import { switchControl } from "../../lib/switch.ts";
@@ -203,10 +203,9 @@ const OTHERS = "the pictures either side";
 /** `target` in `scope`. */
 const at = (scope: string, target: string) => (scope === "" ? target : target.split(",").map((each) => `${scope} ${each.trim()}`).join(", "));
 
-/** Picture to desktop: the frame and the bar slide in, the picture eases back to 1:1, the windows settle in. */
+/** Picture to desktop: the bar slides in, the picture eases back to 1:1, the windows settle in. */
 export function toDesktop(on: string, scope = "", pushed = true): Track<Easing>[] {
   return [
-    { part: "the frame", on, target: at(scope, ".k-lock"), property: "--framed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "the bar", on, target: at(scope, ".k-lock"), property: "--barred", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     ...(pushed ? [{ part: "the push", on, target: at(scope, ".k-lock"), property: "--push", from: 1, to: 0, duration: "long", curve: "emphasized_decel" } as Track<Easing>] : []),
     { part: "the windows", on, target: at(scope, ".k-lock-windows"), property: "opacity", from: 0, to: 1, duration: "long", cue: "short", curve: "emphasized_decel" },
@@ -214,24 +213,21 @@ export function toDesktop(on: string, scope = "", pushed = true): Track<Easing>[
   ];
 }
 
-/** The same with reduce motion: the frame's glass, the bar and the windows fade in over `short`. */
+/** The same with reduce motion: the bar and the windows fade in over `short`. */
 export function toDesktopReduced(on: string, scope = ""): Track<Easing>[] {
   return [
-    { part: "the frame", on, target: at(scope, ".k-lock"), property: "--framed", from: 1, to: 1, duration: "instant", curve: "standard" },
     { part: "the bar", on, target: at(scope, ".k-lock"), property: "--barred", from: 1, to: 1, duration: "instant", curve: "standard" },
-    { part: "the frame's glass", on, target: at(scope, ".k-screen-glass"), property: "opacity", from: 0, to: { opacity: "frame" }, duration: "short", curve: "standard" },
-    { part: "the bar's pills", on, target: at(scope, ".k-bar"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the bar", on, target: at(scope, ".k-bar"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the windows' size", on, target: at(scope, ".k-lock-windows"), property: "scale", from: 1, to: 1, duration: "instant", curve: "standard" },
     { part: "the windows", on, target: at(scope, ".k-lock-windows"), property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
   ];
 }
 
-/** Desktop to picture: the windows step back, the frame and the bar slide out, the picture pushes in. */
+/** Desktop to picture: the windows step back, the bar slides out, the picture pushes in. */
 export function toPicture(on: string, scope = "", pushed = true): Track<Easing>[] {
   return [
     { part: "the windows", on, target: at(scope, ".k-lock-windows"), property: "opacity", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the windows' size", on, target: at(scope, ".k-lock-windows"), property: "scale", from: 1, to: { scale: "behind" }, duration: "medium", curve: "emphasized_accel" },
-    { part: "the frame", on, target: at(scope, ".k-lock"), property: "--framed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the bar", on, target: at(scope, ".k-lock"), property: "--barred", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     ...(pushed ? [{ part: "the push", on, target: at(scope, ".k-lock"), property: "--push", from: 0, to: 1, duration: "long", curve: "emphasized_decel" } as Track<Easing>] : []),
   ];
@@ -240,9 +236,7 @@ export function toPicture(on: string, scope = "", pushed = true): Track<Easing>[
 export function toPictureReduced(on: string, scope = ""): Track<Easing>[] {
   return [
     { part: "the windows", on, target: at(scope, ".k-lock-windows"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the frame's glass", on, target: at(scope, ".k-screen-glass"), property: "opacity", from: { opacity: "frame" }, to: 0, duration: "short", curve: "standard" },
-    { part: "the bar's pills", on, target: at(scope, ".k-bar"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the frame", on, target: at(scope, ".k-lock"), property: "--framed", from: 0, to: 0, duration: "instant", cue: "short", curve: "standard" },
+    { part: "the bar", on, target: at(scope, ".k-bar"), property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the bar", on, target: at(scope, ".k-lock"), property: "--barred", from: 0, to: 0, duration: "instant", cue: "short", curve: "standard" },
   ];
 }
@@ -263,12 +257,12 @@ export function lockToPicture(on: string, scope = "", pushed = true, reduced = f
   ];
 }
 
-/** The neighbours from desktop to lock: the frame and the bar slide out, the clock fades in. */
+/** The neighbours from desktop to lock: the bar slides out, the clock fades in. */
 export function sideToLock(on: string, scope = "", reduced = false): Track<Easing>[] {
   return [...(reduced ? toPictureReduced(on, scope) : toPicture(on, scope)), ...pictureToLock(on, scope, true, reduced)];
 }
 
-/** The neighbours from lock to desktop: the clock fades out, the frame and the bar slide in. */
+/** The neighbours from lock to desktop: the clock fades out, the bar slides in. */
 export function sideToDesktop(on: string, scope = "", reduced = false): Track<Easing>[] {
   return [...lockToPicture(on, scope, true, reduced), ...(reduced ? toDesktopReduced(on, scope) : toDesktop(on, scope))];
 }
@@ -303,7 +297,7 @@ interface Desk {
 function stills(): HTMLElement {
   const room = document.createElement("span");
   room.className = "gl-stills";
-  const corner = nested(role("surface"), "s8");
+  const corner = role("surface");
   // Where the user's windows happen to be: stand-ins, the terminal left, the files lower right.
   const places = [
     { title: "Terminal", line: "just mockups", left: "0%", top: "4%", width: "46%", height: "62%" },
@@ -322,7 +316,7 @@ function stills(): HTMLElement {
 
 function makeDesk(hung: Hung, view: View, mode: Mode, size: { readonly width: string; readonly height: string }, wakes: boolean, look: ClockLook): Desk {
   // A picture of a desktop: its bar's pills still; only the lock in front can wake, so only it holds
-  // the password's sheet until another comes to the front. Its clock is as set for the picture.
+  // the password's field until another comes to the front. Its clock is as set for the picture.
   const made = lock({ width: size.width, height: size.height, wallpaper: hung.wallpaper, phase: PHASES[view], bar: barButtons(false), windows: [stills()], entry: wakes, clock: lockClock(look, hung.wallpaper, "wide") });
   const element = made.element;
   // A picture of a lock and a desktop, not one to use: its field and pills take no focus, no
@@ -501,7 +495,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
         if (!S.open || S.busy || editor?.editing()) return;
         // The password's sheet, up on an awake lock, keeps its own clicks. The lock takes no
         // pointer, so the click is found on the sheet by where it lands.
-        const sheet = desks.get(art)?.element.dataset.phase === "awake" ? desks.get(art)!.element.querySelectorAll(".k-sheet-part") : [];
+        const sheet = desks.get(art)?.element.dataset.phase === "awake" ? desks.get(art)!.element.querySelectorAll(".k-lock-entry") : [];
         const on = (part: Element) => {
           const box = part.getBoundingClientRect();
           return event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
@@ -808,7 +802,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
       desk.view = S.view;
       desk.element.dataset.phase = main && S.view === "lock" && S.awake ? "awake" : PHASES[S.view];
       desk.element.toggleAttribute("data-open", main && S.view === "lock" && S.awake);
-      for (const part of desk.element.querySelectorAll<HTMLElement>(".k-sheet-part")) part.style.setProperty("--reveal", main && S.view === "lock" && S.awake ? "1" : "0");
+      for (const part of desk.element.querySelectorAll<HTMLElement>(".k-lock-entry")) part.style.setProperty("--reveal", main && S.view === "lock" && S.awake ? "1" : "0");
       if (S.view === "picture") desk.element.style.setProperty("--push", main && !reducedFor(screen) ? "1" : "0");
       else desk.element.style.removeProperty("--push");
       paintDesk(desk, mode, false);
@@ -860,7 +854,7 @@ export function gallery(options: GalleryOptions = {}): HTMLElement {
     desk.element.dataset.phase = on ? "awake" : "rest";
     desk.element.toggleAttribute("data-open", on);
     const tracks = on ? (reduced ? wakingReduced(MAIN) : waking(MAIN)) : reduced ? reducedRest(MAIN) : resting(MAIN);
-    for (const part of desk.element.querySelectorAll<HTMLElement>(".k-sheet-part")) part.style.setProperty("--reveal", on ? "1" : "0");
+    for (const part of desk.element.querySelectorAll<HTMLElement>(".k-lock-entry")) part.style.setProperty("--reveal", on ? "1" : "0");
     drawBar();
     await play(desk.element, tracks);
     S.busy = false;
