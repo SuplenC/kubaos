@@ -257,7 +257,10 @@ mod tests {
 
     /// A payload folder of the test's own, removed when the returned guard drops.
     fn payload() -> tempfile::TempDir {
-        let dir = tempfile::Builder::new().prefix("kubaos-engine-test-").tempdir().unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("kubaos-engine-test-")
+            .tempdir()
+            .unwrap();
         let m = serde_json::json!({
             "version": "1", "arch": "x86_64", "built_at": "2026-10-16T10:00:00Z",
             "commit": "abc", "username": "kuba", "hostname": "vm",
