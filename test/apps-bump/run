@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# test/apps-bump/run: the daily Apps bump. Moves each app's pinned downloads on to their vendors'
+# newest releases, one pull request an app, and files an issue for an app whose newest release
+# can't be pinned.
+#
+#   test/apps-bump/run [--dry-run] [ID...]   those apps, or every app with a deb or download pin
+#
+# It runs on a clean checkout of main, with gh signed in (GH_TOKEN) and git able to push; the
+# `Apps bump` workflow (.github/workflows/apps-bump.yml) runs it once a day. For each app,
+# `kubaos-apps-verify --bump ID` rewrites its app.toml, then:
+#   - moved: the change is committed on chore/bump-ID, made from main, and pushed when the branch
+#     doesn't already hold that app.toml; a pull request opens unless one is open, and its title
+#     and text follow the newest move. The pull request's `apps verify` check downloads each file
+#     and holds it to the vendor's digest.
+#   - failed (a vendor renamed its file, an unversioned URL serves a new file): the issue titled
+#     "Apps bump: ID needs a hand" opens, or its text follows the newest failure.
+#   - current: an open issue of the app closes, with a comment.
+# An app that needs a hand is its issue, not a failed run: the run fails only when a step of its own
+# does. --dry-run prints each step and pushes, opens and closes nothing.
+set -euo pipefail
+
+DRY_RUN=0
+ids=()
+usage() {
+  sed -n '2,/^set -euo/{/^set -euo/d;s/^# \{0,1\}//;p}' "$0"
+}
+while (($#)); do
+  case "$1" in
+    -n | --dry-run) DRY_RUN=1 ;;
+    -h | --help) usage; exit 0 ;;
+    -*) echo "test/apps-bump/run: unknown flag $1" >&2; exit 2 ;;
+    *) ids+=("$1") ;;
+  esac
+  shift
+done
+
+cd "$(dirname "$0")/../.."
+# Each app's change is read from the tree, so a change already in it would pass for a bump.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "test/apps-bump/run: the checkout has changes; run it on a clean one" >&2
+  exit 1
+fi
+if ((${#ids[@]} == 0)); then
+  while IFS= read -r file; do
+    ids+=("$(basename "$(dirname "$file")")")
+  done < <(grep -lE '^kind = "(deb|download)"' apps/*/app.toml)
+fi
+
+run() {
+  if ((DRY_RUN)); then
+    printf 'would run:'
+    printf ' %q' "$@"
+    printf '\n'
+  else
+    "$@"
+  fi
+}
+
+# The open issue or pull request number for a search, empty when there is none.
+open_issue() {
+  gh issue list --state open --search "in:title \"$1\"" --json number,title |
+    jq -r --arg t "$1" '[.[] | select(.title == $t)][0].number // empty'
+}
+
+# A comment's text: INTRO, the bump's TABLE in a code block, OUTRO.
+report() {
+  local fence='```'
+  printf '%s\n\n%s\n%s\n%s\n\n%s\n' "$1" "$fence" "$2" "$fence" "$3"
+}
+
+# The first value `key = "…"` takes in a TOML text on stdin.
+first_value() {
+  sed -n "s/^$1 = \"\(.*\)\"\$/\1/p" | head -n 1
+}
+
+verify=(cargo run -q -p kubaos-apps-verify --)
+cargo build -q -p kubaos-apps-verify
+start="$(git rev-parse HEAD)"
+for id in "${ids[@]}"; do
+  echo "== $id"
+  file="apps/$id/app.toml"
+  issue_title="Apps bump: $id needs a hand"
+  status=0
+  table="$("${verify[@]}" --bump "$id" 2>&1)" || status=$?
+  printf '%s\n' "$table"
+
+  if ((status != 0)); then
+    git checkout -q -- "$file"
+    body="$(report \
+      "The daily Apps bump couldn't move \`$id\`'s pins on to the newest release:" \
+      "$table" \
+      "Pin it by hand in \`$file\`; this issue closes on the first run that finds the pins current or moves them.")"
+    number="$(open_issue "$issue_title")"
+    if [[ -n $number ]]; then
+      run gh issue edit "$number" --body "$body"
+    else
+      run gh issue create --title "$issue_title" --body "$body"
+    fi
+    continue
+  fi
+
+  number="$(open_issue "$issue_title")"
+  if [[ -n $number ]]; then
+    run gh issue close "$number" --comment "The Apps bump finds \`$id\`'s pins current or moved on now."
+  fi
+  if git diff --quiet -- "$file"; then
+    continue
+  fi
+
+  name="$(first_value name <"$file")"
+  version="$(git diff -U0 -- "$file" | sed -n 's/^+version = "\(.*\)"$/\1/p' | head -n 1)"
+  branch="chore/bump-$id"
+  title="chore(apps): bump $name to $version"
+  if git ls-remote --exit-code --heads origin "$branch" >/dev/null &&
+    git fetch -q origin "$branch" &&
+    git show "FETCH_HEAD:$file" 2>/dev/null | cmp -s - "$file"; then
+    echo "   $branch already holds $name $version"
+    git checkout -q -- "$file"
+    continue
+  fi
+  body="$(report \
+    "The daily Apps bump moves $name's pins on to its vendor's newest release:" \
+    "$table" \
+    "The \`apps verify\` check downloads each file and holds it to its pinned sha256 and the vendor's digest. Read the release notes before merging.")"
+  run git switch -q -C "$branch" "$start"
+  run git add -- "$file"
+  run git -c user.name="KubaOS Apps bump" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+    commit -q -m "$title" -m "$table"
+  run git push -q --force origin "HEAD:refs/heads/$branch"
+  pr="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
+  if [[ -n $pr ]]; then
+    run gh pr edit "$pr" --title "$title" --body "$body"
+  else
+    run gh pr create --base main --head "$branch" --title "$title" --body "$body"
+  fi
+  run git switch -q --detach "$start"
+  ((DRY_RUN)) && git checkout -q -- "$file"
+done

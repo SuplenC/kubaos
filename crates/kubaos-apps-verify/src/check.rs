@@ -44,6 +44,8 @@ pub enum Outcome {
     Ok,
     /// Nothing to hold the pin to, said in the detail; not a failure.
     Note,
+    /// `--bump` moved the pin on to a newer release.
+    Moved,
     /// The pin and upstream disagree.
     Mismatch,
     /// The check couldn't run: upstream unreachable, a signature that doesn't verify.
@@ -55,6 +57,7 @@ impl Outcome {
         match self {
             Self::Ok => "ok",
             Self::Note => "note",
+            Self::Moved => "moved",
             Self::Mismatch => "MISMATCH",
             Self::Error => "ERROR",
         }
@@ -454,7 +457,7 @@ fn published(url: &str) -> Result<Option<(String, String)>, String> {
 }
 
 /// The sha256 a checksum file gives `file`: on the line naming it, or its only line.
-fn digest_for(text: &str, file: &str) -> Option<String> {
+pub fn digest_for(text: &str, file: &str) -> Option<String> {
     let lines: Vec<&str> = text.lines().filter(|line| !line.trim().is_empty()).collect();
     let line = lines
         .iter()

@@ -1,11 +1,12 @@
-# Proton Mail Bridge from the .deb Proton publishes, pinned to its sha256, which matched the
-# package after its detached signature (protonmail-bridge_<version>_amd64.deb.sig) checked out
-# against Proton's Bridge key, D51E64D3E63EDC3EEF7864CEE2C75D68E6234B07. Proton keeps no apt
-# repository and builds no arm64 .deb; nixpkgs' Bridge is releases behind, with its updater off,
-# and Proton refuses a Bridge that's too old. Bridge updates itself: it downloads each release into
+# Proton Mail Bridge from the .deb Proton publishes on its GitHub releases (the same file as on
+# proton.me), pinned to its sha256, which matched the package after its detached signature
+# (protonmail-bridge_<version>_amd64.deb.sig) checked out against Proton's Bridge key,
+# D51E64D3E63EDC3EEF7864CEE2C75D68E6234B07. Proton keeps no apt repository and builds no arm64 .deb;
+# nixpkgs' Bridge is releases behind, with its updater off, and Proton refuses a Bridge that's too
+# old. Bridge updates itself: it downloads each release into
 # ~/.local/share/protonmail/bridge-v3/updates and its launcher starts the newest, so the pin is
 # where an install starts.
-# https://proton.me/download/current_version_linux.json
+# https://github.com/ProtonMail/proton-bridge/releases
 name = "Proton Mail Bridge"
 category = "communication"
 tags = ["email", "proton", "imap", "smtp", "encrypted"]
@@ -31,4 +32,4 @@ kind = "deb"
 package = "protonmail-bridge"
 version = "3.27.2-1"
 self_updates = true
-amd64 = { url = "https://proton.me/download/bridge/protonmail-bridge_3.27.2-1_amd64.deb", sha256 = "cf08332dcc4a332c3592476855e2007e6daadbcdac11fab6af83470a3255a8dc" }
+amd64 = { url = "https://github.com/ProtonMail/proton-bridge/releases/download/v3.27.2/protonmail-bridge_3.27.2-1_amd64.deb", sha256 = "cf08332dcc4a332c3592476855e2007e6daadbcdac11fab6af83470a3255a8dc" }

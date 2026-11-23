@@ -297,10 +297,14 @@ What the mockups (`design/mockups/`) ship to the page.
 
 | Name | What KubaOS uses it for | Creators | Licence | Link |
 |---|---|---|---|---|
+| Android Studio's release list | Where the Apps bump finds Android Studio's newest stable release | JetBrains s.r.o. | Its terms of service | [jb.gg/android-studio-releases-list.json](https://jb.gg/android-studio-releases-list.json) |
+| Blender's download server | Where the Apps bump finds Blender's newest release, from its folder listing | Blender Foundation | Its terms of service | [download.blender.org/release](https://download.blender.org/release/) |
 | Cachix | The `kuba-os` binary cache that CI fills and `kubaos update` reads | Cachix | Its terms of service | [kuba-os.cachix.org](https://kuba-os.cachix.org) |
-| GitHub | Hosts KubaOS and Kotodama, runs CI (Actions) and the mockup site (Pages); its releases API finds `kubaos update`'s changelog and the Bitwarden CLI's releases | GitHub, Inc. | Its terms of service | [github.com](https://github.com) |
+| GitHub | Hosts KubaOS and Kotodama, runs CI (Actions) and the mockup site (Pages); its releases API finds `kubaos update`'s changelog, the Bitwarden CLI's releases and the Apps bump's newest releases | GitHub, Inc. | Its terms of service | [github.com](https://github.com) |
 | Hugging Face | Serves the Depth Anything V2 Small model the depth Suite downloads | Hugging Face | Its terms of service | [huggingface.co](https://huggingface.co) |
+| JetBrains' release API | Where the Apps bump finds JetBrains Toolbox's newest release | JetBrains s.r.o. | Its terms of service | [data.services.jetbrains.com](https://data.services.jetbrains.com/products/releases?code=TBA&latest=true&type=release) |
 | Open-Meteo | The forecast source the clock's weather is designed around; the clock popup's "Weather from Open-Meteo" is the attribution its data licence asks for | Open-Meteo | The API's code AGPL-3.0-or-later; the weather data CC-BY-4.0 | [open-meteo.com](https://open-meteo.com) |
+| Proton Pass's release feed | Where the Apps bump finds Proton Pass's newest release out to everyone | Proton AG | Its terms of service | [proton.me/download/PassDesktop/linux/x64/version.json](https://proton.me/download/PassDesktop/linux/x64/version.json) |
 
 ### Credits kept beside the files they cover
 
