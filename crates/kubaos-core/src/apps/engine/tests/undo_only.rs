@@ -332,6 +332,50 @@ fn a_setup_switch_keeps_a_run_that_only_undoes_a_release_took_out_for_the_remova
 }
 
 #[test]
+fn a_run_that_only_undoes_changed_under_its_name_to_another_kind_still_runs_its_undo_at_the_removal() {
+    let write = "[[action]]\nname = \"Write\"\nkind = \"file\"\nto = \"~/.config/ks/x\"\ntext = \"x\\n\"\n\n";
+    let off = "[[action]]\nname = \"Kill switch\"\nkind = \"run\"\nundo = [\"./off\"]\n\n";
+    let on = "[[action]]\nname = \"Kill switch\"\nkind = \"file\"\nto = \"~/.config/ks/ks\"\ntext = \"on\\n\"\n";
+    let world = World::new(&[("ks", &super::app(&format!("{write}{off}")))]);
+    world.script("ks", "off", "systemctl stop killswitch.service");
+    world.install("ks", true).0.unwrap();
+    world.write_app("ks", &super::app(&format!("{write}{on}")));
+
+    world.install("ks", true).0.unwrap();
+
+    let stops = || {
+        world
+            .host
+            .sandbox()
+            .calls()
+            .iter()
+            .filter(|c| *c == "systemctl stop killswitch.service")
+            .count()
+    };
+    assert_eq!(stops(), 0, "the update ran the removal's undo");
+    world.remove("ks").0.unwrap();
+    assert_eq!(stops(), 1);
+}
+
+#[test]
+fn a_run_that_only_undoes_a_release_took_out_with_its_script_still_runs_its_undo_at_the_removal() {
+    let write = "[[action]]\nname = \"Write\"\nkind = \"file\"\nto = \"~/.config/lg/x\"\ntext = \"x\\n\"\n\n";
+    let off = "[[action]]\nname = \"Turn A off\"\nkind = \"run\"\nundo = [\"./off-a\"]\n\n";
+    let world = World::new(&[("lg", &super::app(&format!("{write}{off}")))]);
+    world.script("lg", "off-a", "systemctl stop a.service");
+    world.install("lg", true).0.unwrap();
+    world.write_app("lg", &super::app(write));
+    std::fs::remove_file(world.catalog.join("lg").join("off-a")).unwrap();
+    world.install("lg", true).0.unwrap();
+
+    world.remove("lg").0.unwrap();
+
+    let calls = world.host.sandbox().calls();
+    assert!(calls.contains(&"systemctl stop a.service".to_owned()), "{calls:?}");
+    assert_eq!(world.journals("lg"), (None, None));
+}
+
+#[test]
 fn a_run_with_do_but_no_check_or_with_no_undo_is_refused() {
     let half = GUARD.replace(r#"undo = ["./off"]"#, "do = [\"./off\"]\nundo = [\"./off\"]");
     let none = GUARD.replace("undo = [\"./off\"]\n", "");

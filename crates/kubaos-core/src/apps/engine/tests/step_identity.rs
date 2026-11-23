@@ -1146,3 +1146,282 @@ fn a_step_a_release_merges_in_part_keeps_what_apt_pulled_in_for_its_undo() {
         state.dpkg
     );
 }
+
+/// A `file` step of `name` that writes `text` to `to`, as TOML.
+fn file_step(name: &str, to: &str, text: &str) -> String {
+    format!("[[action]]\nname = \"{name}\"\nkind = \"file\"\nto = \"{to}\"\ntext = \"{text}\\n\"\n\n")
+}
+
+/// An app of `shared` steps and the setups `a` and `b` of their own steps.
+fn two_setups(shared: &str, a: &str, b: &str) -> String {
+    let own = |id: &str, steps: &str| {
+        format!(
+            "[setup.{id}]\nname = \"{id}\"\nsummary = \"{id}\"\n\n{}",
+            steps.replace("[[action]]", &format!("[[setup.{id}.action]]"))
+        )
+    };
+    super::app(&format!("{shared}{}{}", own("a", a), own("b", b)))
+}
+
+#[test]
+fn a_step_changed_to_another_path_whose_old_one_a_new_step_before_it_writes_keeps_that_file() {
+    let world = World::new(&[("pp", &super::app(&file_step("Write config", "~/.config/pp/a", "a")))]);
+    world.install("pp", true).0.unwrap();
+    let a = world.host_home().join(".config/pp/a");
+    world.write_app(
+        "pp",
+        &super::app(&format!(
+            "{}{}",
+            file_step("Write a", "~/.config/pp/a", "a"),
+            file_step("Write config", "~/.config/pp/b", "b")
+        )),
+    );
+
+    world.install("pp", true).0.unwrap();
+
+    assert!(a.is_file(), "the file the new step writes is gone");
+    assert!(world.host_home().join(".config/pp/b").is_file());
+    world.remove("pp").0.unwrap();
+    assert!(!a.exists() && !world.host_home().join(".config/pp").exists());
+}
+
+#[test]
+fn a_step_changed_to_another_kind_whose_package_a_new_step_before_it_installs_keeps_that_package() {
+    let world = World::new(&[("kc", &super::app(&apt_step("Install it", "\"kc-a\", \"kc-b\"")))]);
+    world.install("kc", true).0.unwrap();
+    let from = world.host.state.borrow().log.len();
+    world.write_app(
+        "kc",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install a", "\"kc-a\""),
+            file_step("Install it", "/etc/kc/conf", "x")
+        )),
+    );
+
+    world.install("kc", true).0.unwrap();
+
+    let log = world.log_since(from);
+    assert!(log.contains(&"apt remove kc-b".to_owned()), "{log:#?}");
+    {
+        let state = world.host.state.borrow();
+        assert!(state.dpkg.contains_key("kc-a"), "the new step's package was removed");
+        assert!(!state.dpkg.contains_key("kc-b"));
+    }
+    world.remove("kc").0.unwrap();
+    assert!(!world.host.state.borrow().dpkg.contains_key("kc-a"));
+}
+
+#[test]
+fn a_step_a_release_merges_in_part_hands_over_what_apt_pulled_in_for_the_package_it_hands_over() {
+    let world = World::new(&[(
+        "pm",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install the tool", "\"pm-tool\""),
+            apt_step("Install its plugins", "\"pm-plugin\", \"pm-extra\"")
+        )),
+    )]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .depends
+        .insert("pm-plugin".to_owned(), ["libplugin".to_owned()].into());
+    world.install("pm", true).0.unwrap();
+    world.write_app(
+        "pm",
+        &super::app(&apt_step("Install the tool", "\"pm-tool\", \"pm-plugin\"")),
+    );
+
+    world.install("pm", true).0.unwrap();
+
+    assert!(world.host.state.borrow().dpkg.contains_key("libplugin"));
+    world.remove("pm").0.unwrap();
+    let state = world.host.state.borrow();
+    assert!(
+        !state.dpkg.contains_key("libplugin"),
+        "left with no owner: {:?}",
+        state.dpkg
+    );
+}
+
+#[test]
+fn a_change_a_failed_update_left_pending_and_a_second_change_both_go_with_the_app() {
+    let world = World::new(&[(
+        "rr",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install", "\"rr-p\", \"rr-q\", \"rr-r\""),
+            apt_step("Other", "\"rr-z\"")
+        )),
+    )]);
+    world.install("rr", true).0.unwrap();
+    world.write_app(
+        "rr",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install", "\"rr-p\", \"rr-q\""),
+            apt_step("Other", "\"rr-z\", \"rr-y\"")
+        )),
+    );
+    world.host.state.borrow_mut().fail.insert("apt:rr-y".to_owned());
+    assert!(world.install("rr", true).0.is_err());
+    world.host.state.borrow_mut().fail.clear();
+    world.write_app(
+        "rr",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install", "\"rr-p\""),
+            apt_step("Other", "\"rr-z\"")
+        )),
+    );
+
+    world.install("rr", true).0.unwrap();
+
+    world.remove("rr").0.unwrap();
+    let state = world.host.state.borrow();
+    for package in ["rr-p", "rr-q", "rr-r", "rr-z"] {
+        assert!(!state.dpkg.contains_key(package), "{package} stays: {:?}", state.dpkg);
+    }
+}
+
+#[test]
+fn a_file_step_renamed_with_new_text_goes_whole_with_the_app() {
+    let world = World::new(&[("rn", &super::app(&file_step("Write it", "~/.config/rn/x", "old")))]);
+    world.install("rn", true).0.unwrap();
+    let x = world.host_home().join(".config/rn/x");
+    world.write_app(
+        "rn",
+        &super::app(&file_step("Write the config", "~/.config/rn/x", "new")),
+    );
+
+    world.install("rn", true).0.unwrap();
+
+    assert_eq!(fs::read_to_string(&x).unwrap(), "new\n");
+    world.remove("rn").0.unwrap();
+    assert!(!x.exists() && !world.host_home().join(".config/rn").exists());
+}
+
+#[test]
+fn an_apt_step_renamed_alone_runs_no_apt_and_its_package_goes_with_the_app() {
+    let world = World::new(&[("ra", &super::app(&apt_step("Install it", "\"ra-p\"")))]);
+    world.install("ra", true).0.unwrap();
+    let from = world.host.state.borrow().log.len();
+    world.write_app("ra", &super::app(&apt_step("Install the app", "\"ra-p\"")));
+
+    world.install("ra", true).0.unwrap();
+
+    assert!(!world.log_since(from).iter().any(|l| l.starts_with("apt")));
+    world.remove("ra").0.unwrap();
+    assert!(!world.host.state.borrow().dpkg.contains_key("ra-p"));
+}
+
+#[test]
+fn a_file_step_renamed_then_changed_writes_the_new_text_and_goes_with_the_app() {
+    let world = World::new(&[("rs", &super::app(&file_step("Write it", "~/.config/rs/x", "old")))]);
+    world.install("rs", true).0.unwrap();
+    let x = world.host_home().join(".config/rs/x");
+    world.write_app(
+        "rs",
+        &super::app(&file_step("Write the config", "~/.config/rs/x", "old")),
+    );
+    world.install("rs", true).0.unwrap();
+    world.write_app(
+        "rs",
+        &super::app(&file_step("Write the config", "~/.config/rs/x", "new")),
+    );
+
+    world.install("rs", true).0.unwrap();
+
+    assert_eq!(fs::read_to_string(&x).unwrap(), "new\n");
+    world.remove("rs").0.unwrap();
+    assert!(!x.exists());
+}
+
+#[test]
+fn a_run_renamed_alone_is_undone_and_done_again() {
+    let run = |name: &str| {
+        format!(
+            "[[action]]\nname = \"{name}\"\nkind = \"run\"\nroot = true\ndo = [\"./up\"]\n\
+             check = [\"./up-to-date\"]\nundo = [\"./down\"]\n\n"
+        )
+    };
+    let engine = apt_step("Install", "\"rr2-e\"");
+    let world = World::new(&[("rr2", &super::app(&format!("{engine}{}", run("Start the stack"))))]);
+    stack_scripts(&world, "rr2", "");
+    world.install("rr2", true).0.unwrap();
+    let from = world.host.state.borrow().log.len();
+    world.write_app("rr2", &super::app(&format!("{engine}{}", run("Start the service"))));
+
+    world.install("rr2", true).0.unwrap();
+
+    let log = world.log_since(from);
+    for line in ["run ./down", "run ./up"] {
+        assert_eq!(log.iter().filter(|l| *l == line).count(), 1, "{line}: {log:#?}");
+    }
+    assert!(mark(&world, "rr2").exists(), "the stack isn't back");
+}
+
+#[test]
+fn a_shared_root_step_a_release_takes_out_after_a_setup_switch_is_taken_out() {
+    let shared = format!(
+        "{}{}",
+        apt_step("Install", "\"st-e\""),
+        file_step("Extra", "/etc/st/extra", "x")
+    );
+    let a = file_step("A", "~/.config/st/a", "a");
+    let b = format!(
+        "{}{}{}",
+        file_step("B1", "~/.config/st/b1", "b"),
+        file_step("B2", "~/.config/st/b2", "b"),
+        file_step("B3", "~/.config/st/b3", "b")
+    );
+    let world = World::new(&[("st", &two_setups(&shared, &a, &b))]);
+    install(&world, "st", "a");
+    install(&world, "st", "b");
+    assert_eq!(world.journals("st").1.unwrap().setup.as_deref(), Some("b"));
+    world.write_app("st", &two_setups(&apt_step("Install", "\"st-e\""), &a, &b));
+
+    install(&world, "st", "b");
+
+    assert!(
+        !world.system_path("/etc/st/extra").exists(),
+        "the step taken out stands"
+    );
+}
+
+#[test]
+fn a_switch_to_a_longer_setup_keeps_a_run_that_only_undoes_a_release_took_out_for_the_removal() {
+    let shared = apt_step("Install", "\"sw-e\"");
+    let off = "[[action]]\nname = \"Turn it off\"\nkind = \"run\"\nundo = [\"./off\"]\n\n";
+    let b = format!(
+        "{}{}{}",
+        file_step("B1", "~/.config/sw/b1", "b"),
+        file_step("B2", "~/.config/sw/b2", "b"),
+        file_step("B3", "~/.config/sw/b3", "b")
+    );
+    let world = World::new(&[(
+        "sw",
+        &two_setups(&shared, &format!("{}{off}", file_step("A", "~/.config/sw/a", "a")), &b),
+    )]);
+    world.script("sw", "off", "systemctl stop sw.service");
+    install(&world, "sw", "a");
+    world.write_app("sw", &two_setups(&shared, &file_step("A", "~/.config/sw/a", "a"), &b));
+    install(&world, "sw", "a");
+
+    install(&world, "sw", "b");
+
+    let stops = || {
+        world
+            .host
+            .sandbox()
+            .calls()
+            .iter()
+            .filter(|c| *c == "systemctl stop sw.service")
+            .count()
+    };
+    assert_eq!(stops(), 0, "the switch ran the removal's undo");
+    world.remove("sw").0.unwrap();
+    assert_eq!(stops(), 1, "the removal forgot it");
+}
