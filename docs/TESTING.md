@@ -284,6 +284,21 @@ The other actions (`file`, `symlink`, `setting`, `unit`, `group`, `linger`, `arc
 
 It reads the network only: it never installs anything and reads no apt, dpkg or gpg state of the machine's (keys are checked in a gpg home of their own, in a temporary folder). `GITHUB_TOKEN`, when set, lifts GitHub's limit of 60 release lookups an hour; it goes to curl on its stdin. The dev shell has the gpg and curl it runs. Over the whole catalog it takes several minutes, most of it downloading the pinned `.deb`s and downloads.
 
+### Moving pins on: the Apps bump
+
+`just apps-verify --bump [ID…]` checks nothing: it moves each pinned `deb` and `download` of the apps named, or of every app, on to its vendor's newest release, and writes the new `version`, URLs and sha256s into the app's `app.toml` in place, its comments kept. It prints a table with a row an action, `ok` (current), `moved` (old → new), `note` (no feed knows its newest release) or `ERROR`, and exits 1 on an error. An app is written only when none of its pins failed, and an action's architectures move to one version or not at all.
+
+| Pin | Newest release from |
+|---|---|
+| a GitHub release asset | the repository's releases, drafts and pre-releases left out, whose tag has the pin's prefix (`desktop-v`, `core@`, `v`); the file is the pin's name with the version swapped, and its sha256 is GitHub's asset digest. A release with no file of that name (a vendor renaming its downloads) is an error |
+| JetBrains Toolbox | JetBrains' release API, with its `.sha256` file |
+| Android Studio | JetBrains' list of Android Studio releases, its `Release` and `Patch` channels, with its checksum |
+| Proton Pass | Proton's `version.json`, the newest `Stable` release out to everyone (a release still rolling out to a share of users waits) |
+| Blender | the newest series folder of `download.blender.org/release/` and the newest file of the pin's shape in it |
+| a URL with no version in it (Minecraft, Navicat) | none: it is an error when the URL serves another file than the pinned one, since only a person can name its version |
+
+Where the vendor gives no sha256, the download is hashed. The **`Apps bump`** workflow (`.github/workflows/apps-bump.yml`) runs `test/apps-bump/run` daily at 05:17 UTC, and from the Actions tab for the apps named: each app that moved gets a branch `chore/bump-<id>` and a pull request, updated as newer releases come; each app that failed gets an issue "Apps bump: `<id>` needs a hand", which the first run that finds it current or moves it closes. The pull requests' `apps verify` check downloads each file and holds it to the vendor's digest; they merge after a review. It pushes with the `APPS_BUMP_TOKEN` secret, a fine-grained token for this repository with read and write access to contents, issues and pull requests: GitHub starts no checks for a pull request the workflow's own token opens.
+
 ## shellcheck
 
 `just shellcheck` (`test/shellcheck/check`) lints every shell script git tracks under `apps/`, `scripts/`, `system/`, `migrations/`, `test/`, `config/`, `home/suites/`, `crates/self-imports` and `.claude/hooks/` (a `.sh`, or a file with a bash or sh shebang), with `-x`. A warning or an error fails it; info and style notes are listed. The dev shell has shellcheck; `just check`, CI's `shellcheck` job and the e2e harness's `shellcheck` check run it.

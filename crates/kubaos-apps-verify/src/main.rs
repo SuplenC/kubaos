@@ -3,6 +3,7 @@
 //! ```text
 //! kubaos-apps-verify [--root DIR] [--release CODENAME] [ID…]   those apps, or every app
 //! kubaos-apps-verify [--root DIR] --changed BASE               the apps a branch changed
+//! kubaos-apps-verify [--root DIR] --bump [ID…]                 move those apps' pins on
 //! ```
 //!
 //! For each app, in its own actions and every setup's: a vendor repository's key against its
@@ -21,15 +22,23 @@
 //! `--changed BASE` checks the apps whose folder changed since the merge base with BASE, and the
 //! apps whose vendor repository changed (`system/packages.toml`, a sources file).
 //!
+//! `--bump` checks nothing: it moves each pinned `.deb` and download of the apps named, or of every
+//! app, on to its vendor's newest release, writing the new version, URL and sha256 into the app's
+//! `app.toml`. It exits 1 when a pin's newest release can't be found or has no file for it, as when
+//! a vendor renames its downloads. The daily `Apps bump` workflow runs it and opens a pull request
+//! for each app it moved, whose checks run this check on the app.
+//!
 //! # Owns
 //!
 //! - The command line, picking the apps, running them side by side, the table and the exit code.
 //!
 //! # Not here
 //!
-//! - The checks: `check.rs`. Repositories: `apt.rs`. Fetching: `fetch.rs`.
+//! - The checks: `check.rs`. Moving pins on: `bump.rs`. Repositories: `apt.rs`. Fetching:
+//!   `fetch.rs`.
 
 mod apt;
+mod bump;
 mod check;
 mod fetch;
 
@@ -56,14 +65,17 @@ const DEFAULT_RELEASE: &str = "resolute";
 const USAGE: &str = "\
 usage: kubaos-apps-verify [--root DIR] [--release CODENAME] [ID...]
        kubaos-apps-verify [--root DIR] [--release CODENAME] --changed BASE
+       kubaos-apps-verify [--root DIR] --bump [ID...]
 
 Holds the Apps catalog's pins to their upstreams: vendor keys and InRelease signatures, package
-candidates, pinned downloads' sha256, nixpkgs versions and web app URLs. Every app with no ID.";
+candidates, pinned downloads' sha256, nixpkgs versions and web app URLs. Every app with no ID.
+--bump moves the apps' pinned downloads on to their newest releases instead, in app.toml.";
 
 struct Args {
     root: PathBuf,
     release: String,
     changed: Option<String>,
+    bump: bool,
     ids: Vec<String>,
 }
 
@@ -72,6 +84,7 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Option<Args>, String>
         root: PathBuf::from("."),
         release: DEFAULT_RELEASE.to_owned(),
         changed: None,
+        bump: false,
         ids: Vec::new(),
     };
     while let Some(arg) = args.next() {
@@ -81,12 +94,16 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Option<Args>, String>
             "--root" => parsed.root = PathBuf::from(value("--root")?),
             "--release" => parsed.release = value("--release")?,
             "--changed" => parsed.changed = Some(value("--changed")?),
+            "--bump" => parsed.bump = true,
             flag if flag.starts_with('-') => return Err(format!("unknown flag {flag}")),
             _ => parsed.ids.push(arg),
         }
     }
     if parsed.changed.is_some() && !parsed.ids.is_empty() {
         return Err("--changed takes no IDs".to_owned());
+    }
+    if parsed.changed.is_some() && parsed.bump {
+        return Err("--bump and --changed don't go together".to_owned());
     }
     Ok(Some(parsed))
 }
@@ -151,19 +168,24 @@ fn run(args: &Args) -> Result<Vec<Row>, Usage> {
         .root
         .canonicalize()
         .map_err(|e| Usage(format!("{}: {e}", args.root.display())))?;
+    if args.bump {
+        let catalog = root.join(CATALOG);
+        return Ok(side_by_side(&apps, |app| bump::app(&catalog, &app.id)));
+    }
     let context = Context::new(root, manifest, args.release.clone());
-    // Each app's checks wait on the network, so the apps run side by side.
-    let rows = thread::scope(|scope| {
-        let running: Vec<_> = apps
-            .iter()
-            .map(|app| scope.spawn(|| check::app(&context, app)))
-            .collect();
+    Ok(side_by_side(&apps, |app| check::app(&context, app)))
+}
+
+/// `each` app's rows, in the apps' order. Each app waits on the network, so the apps run side by
+/// side.
+fn side_by_side(apps: &[&Folder], each: impl Fn(&Folder) -> Vec<Row> + Sync) -> Vec<Row> {
+    thread::scope(|scope| {
+        let running: Vec<_> = apps.iter().map(|app| scope.spawn(|| each(app))).collect();
         running
             .into_iter()
-            .flat_map(|each| each.join().expect("an app's checks panicked"))
+            .flat_map(|rows| rows.join().expect("an app's checks panicked"))
             .collect()
-    });
-    Ok(rows)
+    })
 }
 
 /// The apps whose folder changed since the merge base with `base`, and those taking packages from

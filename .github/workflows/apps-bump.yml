@@ -1,0 +1,64 @@
+# The daily Apps bump: moves the Apps catalog's pinned .debs and downloads on to their vendors'
+# newest releases, one pull request an app, as Dependabot does for dependencies.
+# test/apps-bump/run does the work: `kubaos-apps-verify --bump` per app, a branch chore/bump-<id>
+# and a pull request for each app that moved, and an issue "Apps bump: <id> needs a hand" for each
+# app whose newest release can't be pinned (a renamed file, an unversioned URL serving a new file).
+# The pull request's own checks (check.yml's `apps verify`) download each file and hold it to the
+# vendor's digest; nothing merges without a review.
+#
+# It pushes and opens pull requests with APPS_BUMP_TOKEN, a fine-grained token for this repository
+# alone with read and write access to contents, issues and pull requests. GitHub starts no workflow
+# for a push or a pull request made with the workflow's own GITHUB_TOKEN, so with that token the
+# pull requests would never get the checks branch protection requires.
+#
+# Daily at 05:17 UTC, off the hour when GitHub's scheduled runs queue, and from the Actions tab
+# ("Run workflow"), for one app or every app.
+#
+# Actions are pinned to a commit, with the release in the comment beside it.
+name: Apps bump
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: The app IDs to bump, space-separated; every app when empty.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: bump
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          token: ${{ secrets.APPS_BUMP_TOKEN }}
+
+      # The apps verify job's compile cache, which check.yml saves on each push to main.
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          name: apps-verify
+          store: devshell
+          cargo: true
+
+      - name: Bump the apps
+        env:
+          GH_TOKEN: ${{ secrets.APPS_BUMP_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.APPS_BUMP_TOKEN }}
+          APPS: ${{ inputs.apps }}
+        run: |
+          read -ra ids <<<"$APPS"
+          nix develop --command test/apps-bump/run "${ids[@]}"

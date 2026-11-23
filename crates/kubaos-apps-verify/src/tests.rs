@@ -76,3 +76,12 @@ fn a_change_reaches_the_apps_whose_folder_or_vendor_repository_it_touches() {
         .is_empty()
     );
 }
+
+#[test]
+fn bump_takes_ids_but_not_changed() {
+    let parsed = args(&["--bump", "t3-code"]).unwrap().unwrap();
+
+    assert!(parsed.bump);
+    assert_eq!(parsed.ids, ["t3-code"]);
+    assert!(args(&["--bump", "--changed", "origin/main"]).is_err());
+}
