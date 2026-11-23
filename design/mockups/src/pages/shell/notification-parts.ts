@@ -316,7 +316,10 @@ function toastColumn(on: Screen, bell: Element | undefined): HTMLElement {
       const [start, end] = edgesIn(bell, screenElement);
       column.style.setProperty("--toast-centre", `${(start + end) / 2}px`);
     }
-    const open = [...on.over.querySelectorAll<HTMLElement>(":scope > .k-sheet")].find(
+    const cards = [...on.over.querySelectorAll<HTMLElement>(":scope > .k-sheet")];
+    // A card takes its width from its content once that is laid out, after the column first looks.
+    for (const card of cards) sizes.observe(card);
+    const open = cards.find(
       (each) => !each.hasAttribute("data-taking") && (!each.hasAttribute("data-live") || each.hasAttribute("data-shown")),
     );
     const width = column.offsetWidth;
@@ -327,7 +330,8 @@ function toastColumn(on: Screen, bell: Element | undefined): HTMLElement {
       column.setAttribute("data-beside", "");
     } else column.removeAttribute("data-beside");
   };
-  new ResizeObserver(place).observe(on.element);
+  const sizes = new ResizeObserver(() => place());
+  sizes.observe(on.element);
   new MutationObserver(place).observe(on.over, { attributes: true, attributeFilter: ["data-shown"], subtree: true, childList: true });
   requestAnimationFrame(place);
   return column;
