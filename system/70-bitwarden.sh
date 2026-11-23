@@ -126,7 +126,7 @@ if ((CHECK_ONLY)); then
   else
     warn "Bitwarden desktop $desk is out (pinned: $pinned). New pins for apps/bitwarden/app.toml:"
     info "version = \"$desk\""
-    info "amd64 = { url = \"$RELEASES/desktop-v$desk/Bitwarden-$desk-amd64.deb\", sha256 = \"$(asset_sha256 "desktop-v$desk" "Bitwarden-$desk-amd64.deb")\" }"
+    info "amd64 = { url = \"$RELEASES/desktop-v$desk/oss-Bitwarden-$desk-amd64.deb\", sha256 = \"$(asset_sha256 "desktop-v$desk" "oss-Bitwarden-$desk-amd64.deb")\" }"
   fi
   info "Release notes: https://github.com/bitwarden/clients/releases"
   exit 0

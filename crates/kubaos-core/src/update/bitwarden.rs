@@ -33,26 +33,27 @@ const SHA256_PREFIX: &str = "sha256:";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Release {
     pub version: Version,
+    /// The open-source build's `.deb`, `oss-Bitwarden-2026.11.0-amd64.deb`. Bitwarden publishes
+    /// none for another architecture.
+    pub asset: String,
     /// The digest GitHub publishes for the release's `.deb`, `sha256:<hex>`; none when it has no
     /// such asset or publishes no digest for it.
     pub digest: Option<String>,
 }
 
 impl Release {
-    /// The `.deb`'s file name, `Bitwarden-2026.10.1-amd64.deb`. Bitwarden publishes none for
-    /// another architecture.
-    pub fn asset(&self) -> String {
-        asset_name(&self.version)
-    }
-
     /// Where the `.deb` downloads from, as `apps/bitwarden/app.toml` pins it.
     pub fn url(&self) -> String {
-        format!("{DOWNLOADS}/{TAG_PREFIX}{}/{}", self.version, self.asset())
+        format!("{DOWNLOADS}/{TAG_PREFIX}{}/{}", self.version, self.asset)
     }
 }
 
-fn asset_name(version: &Version) -> String {
-    format!("Bitwarden-{version}-amd64.deb")
+/// The open-source build's `.deb` names, the current one first. From 2026.11.0 every file carries
+/// its licence, `oss-` or `bit-` (the commercial build); before, the open-source build had no
+/// prefix, and older releases keep their names.
+fn deb_names(version: &Version) -> [String; 2] {
+    let deb = format!("Bitwarden-{version}-amd64.deb");
+    [format!("oss-{deb}"), deb]
 }
 
 /// What an update does with Bitwarden.
@@ -103,13 +104,13 @@ pub fn parse_releases(json: &str) -> Result<Vec<Release>, ReleasesError> {
             if version.is_pre() {
                 return None;
             }
-            let name = asset_name(&version);
-            let digest = release
-                .assets
+            let [current, unprefixed] = deb_names(&version);
+            let deb = [&current, &unprefixed]
                 .into_iter()
-                .find(|asset| asset.name == name)
-                .and_then(|asset| asset.digest);
-            Some(Release { version, digest })
+                .find_map(|name| release.assets.iter().find(|asset| asset.name == *name));
+            let digest = deb.and_then(|asset| asset.digest.clone());
+            let asset = deb.map_or(current, |asset| asset.name.clone());
+            Some(Release { version, asset, digest })
         })
         .collect())
 }

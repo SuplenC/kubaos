@@ -76,7 +76,7 @@ impl<M: Machine> Updater<'_, M> {
     fn install_bitwarden(&mut self, release: &Release) -> Result<(), ProgramError> {
         let dir = self.user.update_downloads();
         fs::create_dir_all(&dir).map_err(ProgramError::io(&dir))?;
-        let deb = dir.join(release.asset());
+        let deb = dir.join(&release.asset);
         let installed = self.download_and_install(release, &deb);
         if let Err(e) = fs::remove_file(&deb)
             && e.kind() != io::ErrorKind::NotFound
