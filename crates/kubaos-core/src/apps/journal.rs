@@ -397,10 +397,11 @@ impl Journal {
     ///
     /// An entry goes with the first step left, in order, whose action is the one it recorded,
     /// word for word; then with the first step left that acts on the same thing
-    /// ([`Action::same_thing`]) under the same name, then with the first that acts on the same
-    /// thing under any name: a step the release changed, which updates it in place. Entries of
-    /// one kind that a release changed are told apart by their names, else by their order: the
-    /// first numbered goes with the first such step. An entry still without one takes the next
+    /// ([`Action::same_thing`]) under the same name; then, for a `run`, with the first whose
+    /// `undo` is the one it recorded; then with the first that acts on the same thing at all: a
+    /// step the release changed, which updates it in place. Entries of one kind that a release
+    /// changed are told apart by their names, a run's by what it undoes, else by their order:
+    /// the first numbered goes with the first such step. An entry still without one takes the next
     /// step left, in order, whose run undoes it as a changed step, but for a `run` with `undo`
     /// alone, never another step's; one left after that, a step the release took out, is
     /// numbered after the last step, in order.
@@ -408,9 +409,10 @@ impl Journal {
         self.entries.sort_by_key(|e| e.step);
         let mut numbers: Vec<Option<usize>> = vec![None; self.entries.len()];
         let mut taken = vec![false; steps.len()];
-        let passes: [fn(&Action, &Action) -> bool; 3] = [
+        let passes: [fn(&Action, &Action) -> bool; 4] = [
             |a, b| a == b,
             |a, b| a.name == b.name && a.same_thing(b),
+            |a, b| undoes_alike(a, b) && a.same_thing(b),
             Action::same_thing,
         ];
         for matches in passes {
@@ -528,6 +530,13 @@ impl Owners {
             .filter(move |(id, _)| id.as_str() != app)
             .flat_map(|(id, claims)| claims.iter().map(move |c| (id.as_str(), c)))
     }
+}
+
+/// Whether `a` and `b` are runs with the same `undo`: what a run recorded undoes is what it
+/// is, whatever else a release changed of it.
+fn undoes_alike(a: &Action, b: &Action) -> bool {
+    use super::action::Kind;
+    matches!((&a.kind, &b.kind), (Kind::Run { undo: x, .. }, Kind::Run { undo: y, .. }) if x == y)
 }
 
 /// Writes `bytes` to the new file `path`: whatever was at `path` (a link someone left there
