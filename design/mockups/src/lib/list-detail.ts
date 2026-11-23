@@ -98,11 +98,19 @@ export function menuMeasures(screenWidth: number, screenHeight: number, fit = fa
 }
 
 /**
- * The pane's mark: the Result's symbol, or for an app shown by its initial, the lg IconTile with
- * that initial, its row's tile at the pane's size.
+ * The pane's mark, in the row's order: the app's own picture, bare at `icon.s48` as the shell draws
+ * it, else the Result's symbol, or for an app shown by its initial, the lg IconTile with that
+ * initial, its row's tile at the pane's size.
  */
 function paneMark(row: ListRowSpec): Element {
-  if (row.initial !== undefined && !row.picture) return iconTile({ name: row.initial, size: "Lg" });
+  if (row.picture) {
+    const picture = document.createElement("img");
+    picture.className = "k-menu-pane-picture";
+    picture.alt = "";
+    picture.src = row.picture;
+    return picture;
+  }
+  if (row.initial !== undefined) return iconTile({ name: row.initial, size: "Lg" });
   return icon(row.icon ?? "search", "var(--icon-s48)", "var(--color-primary)");
 }
 
