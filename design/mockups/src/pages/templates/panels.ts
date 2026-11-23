@@ -235,13 +235,16 @@ export function desk(width: string, height: string): { screen: Screen; buttons: 
 /** The room a panel sample is drawn in: the screen's corner, a panel wide and room beside it. */
 export const CORNER_WIDTH = "calc(var(--size-panel) + var(--space-s64) + var(--space-s8))";
 
-/** `page` open on `edge` of a screen `width` by `height`, drawn still, `reveal` of the way open. */
-export function onScreen(page: PanelPage | HTMLElement, edge: Edge = "right", width = CORNER_WIDTH, height = "var(--size-app_min_height)", reveal?: number): HTMLElement {
+/**
+ * `page` open on `edge` of a screen `width` by `height`, drawn still, `reveal` of the way open. Under
+ * the bar at the right, it stands under the twins' button `opener`, or the one that opens its page.
+ */
+export function onScreen(page: PanelPage | HTMLElement, edge: Edge = "right", width = CORNER_WIDTH, height = "var(--size-app_min_height)", reveal?: number, opener?: number): HTMLElement {
   const { screen: room, buttons } = desk(width, height);
   room.element.dataset.open = "";
   const element = page instanceof HTMLElement ? page : page.element;
-  const opener = edge === "right" ? buttons[OPENED_BY.get(element) ?? 0] : undefined;
-  hang(room, sheet({ content: element, edge, ...(opener ? { under: opener } : {}), ...(reveal !== undefined ? { reveal } : {}) }));
+  const under = edge === "right" ? buttons[opener ?? OPENED_BY.get(element) ?? 0] : undefined;
+  hang(room, sheet({ content: element, edge, ...(under ? { under } : {}), ...(reveal !== undefined ? { reveal } : {}) }));
   return room.element;
 }
 

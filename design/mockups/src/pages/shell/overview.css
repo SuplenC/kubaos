@@ -80,20 +80,9 @@
   transition: --ov-veil var(--ov-vt, 0s) var(--ov-ve, linear);
 }
 
-/* The frame steps aside: its hole grows past the screen's edges, and the bar slides up out. */
-.ov-screen .k-frame {
-  inset: calc(var(--frame-top) - var(--ov-aside) * (var(--frame-top) + var(--radius-surface)))
-    calc(var(--frame-side) - var(--ov-aside) * (var(--frame-side) + var(--radius-surface)));
-  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
-}
-
-.ov-screen .k-screen-glass {
-  opacity: calc(var(--opacity-frame) * (1 - var(--ov-aside)));
-  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
-}
-
+/* The bar steps aside: it slides up out of the screen and fades. */
 .ov-screen .k-bar {
-  translate: 0 calc(-1 * var(--ov-aside) * var(--frame-top));
+  translate: 0 calc(-1 * var(--ov-aside) * var(--bar-reach));
   opacity: calc(1 - var(--ov-aside));
   transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
 }

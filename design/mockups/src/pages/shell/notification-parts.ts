@@ -260,7 +260,7 @@ export function panel(options: PanelOptions = {}): HTMLElement {
 
 /** The panel on its screen: the right edge from the bar to the frame's foot. */
 export function panelOnScreen(options: PanelOptions = {}, height = "var(--size-app_min_height)"): HTMLElement {
-  return onScreen(panel(options), "right", undefined, height);
+  return onScreen(panel(options), "right", undefined, height, undefined, 1);
 }
 
 /** The popups' or the peek's stack: its groups, `space.s8` apart, `space.s8` inside. */

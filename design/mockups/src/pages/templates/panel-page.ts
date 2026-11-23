@@ -1,5 +1,5 @@
 // The Sheet and PanelPage page: `docs/design/components/sheet.md` and `panel-page.md`. A shell panel
-// growing out of the screen frame, its twins taking the surface over from one another, and the
+// as a card on the glass under its bar item, its twins taking the card over from one another, and the
 // template inside it: the header band with its pun, the tabs, the body that alone scrolls under its
 // fade, and the footer band a panel may have, though none does today.
 
@@ -21,20 +21,17 @@ import {
 type Shown = "rest" | "empty" | "loading" | "error";
 
 const SHEET = "the sheet";
-const SCRIM = "the desktop's dim";
 const LEAVING = ".k-sheet-rider > [data-leaving]";
 const ARRIVING = ".k-sheet-rider > :not([data-leaving])";
 
 const OPENING: Move = {
   name: "Opening",
-  what: "A pill or its key: the sheet grows out of the frame's edge, its content riding on it, and the desktop dims.",
+  what: "A pill or its key: the card comes down `space.s8` into place under it as it fades in.",
   tracks: [
     { part: SHEET, on: "the system monitor", target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: SCRIM, on: "the system monitor", target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: SHEET, on: "the system monitor", target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: SCRIM, on: "the system monitor", target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => onScreen(system()),
@@ -42,14 +39,12 @@ const OPENING: Move = {
 
 const CLOSING: Move = {
   name: "Closing",
-  what: "Esc, a press outside, or its pill: the sheet goes back into the edge and the dim lifts.",
+  what: "Esc, a press outside, or its pill: the card rises as it fades out.",
   tracks: [
     { part: SHEET, on: "the system monitor", target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: SCRIM, on: "the system monitor", target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: SHEET, on: "the system monitor", target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-    { part: SCRIM, on: "the system monitor", target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => onScreen(system()),
@@ -57,7 +52,7 @@ const CLOSING: Move = {
 
 const SWAP: Move = {
   name: "A twin takes over",
-  what: "Another pill while one is open: the surface stays, and only the content slides over, the two never drawn together.",
+  what: "Another pill while one is open: the one card moves and resizes under it, and the content slides over.",
   tracks: [
     { part: "the leaving content's slide", on: "the system monitor", target: LEAVING, property: "--swap-shift", from: 0, to: -1, duration: "micro", curve: "emphasized_accel" },
     { part: "the leaving content's fade", on: "the system monitor", target: LEAVING, property: "--swap-presence", from: 1, to: 0, duration: "micro", curve: "standard_accel" },
@@ -119,7 +114,7 @@ export default page({
   level: "templates",
   slug: "panel-page",
   title: "Sheet and PanelPage",
-  lede: "A shell panel growing out of the screen frame, and the template inside it: header, tabs, body.",
+  lede: "A shell panel's card under its bar item, and the template inside it: header, tabs, body.",
   code: { rust: "sheet::sheet", qml: "Sheet", unbuilt: "QML PanelPage: not built yet" },
   stage: {
     live,
@@ -130,11 +125,11 @@ export default page({
     { name: "No tabs", for: "a header over one body: the system monitor", sample: () => onScreen(system()) },
     { name: "A status for a pun", for: "the notifications: their count, never shifting", sample: () => onScreen(notifications()) },
     { name: "With tabs", for: "views under the header: the control center", sample: () => onScreen(controlCenter()) },
-    { name: "Sized to its content", for: "hangs from the top edge's middle: the clock", sample: clockOnScreen },
+    { name: "Sized to its content", for: "centred under its item: the clock", sample: clockOnScreen },
   ],
   sizes: [
-    { name: "As tall as its content", for: "ends in a fillet into the right edge", sample: () => onScreen(system({ count: 2 })) },
-    { name: "Up to the room", for: "meets the frame's bottom edge; the body scrolls", sample: () => onScreen(notifications({ count: 8 })) },
+    { name: "As tall as its content", for: "its content's height", sample: () => onScreen(system({ count: 2 })) },
+    { name: "Up to the room", for: "stops `size.gap` above the foot; the body scrolls", sample: () => onScreen(notifications({ count: 8 })) },
     { name: "Up to the room, scrolled", for: "the header fade on; the bands stay", sample: () => onScreen(notifications({ count: 8, down: 0.5, fadePinned: true })) },
   ],
   states: {
@@ -147,13 +142,13 @@ export default page({
     },
     rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: Shown) => make(state) }))),
     looks: {
-      rest: "`surface` at the frame's glass, the pun `on_surface_variant`",
+      rest: "the glass, the pun `on_surface_variant`",
       empty: "an `EmptyState`; the header keeps its pun",
       loading: "the rows as skeletons; nothing shifts",
       error: "an `ErrorBlock` in the body; the pun stays",
     },
   },
-  focus: doesntApply("no line of its own; the panel's edge cuts its controls' glow."),
+  focus: doesntApply("no line of its own; the card's edge cuts its controls' glow."),
   content: {
     text: [
       { name: "The title", words: TITLES.notifications, sample: (words: string) => onScreen(notifications({ title: words })) },
@@ -195,13 +190,13 @@ export default page({
       { part: "Title's line", token: "type-heading-line" },
       { part: "Pun's line", token: "type-small-line" },
       { part: "Header's buttons, tabs", token: "size-control_sm" },
-      { part: "Between buttons; frame's sides, foot", token: "space-s8" },
+      { part: "Between buttons", token: "space-s8" },
       { part: "Scroll's reach past its sides", token: "focus-far" },
       { part: "Body's thumb", token: "size-scrollbar" },
-      { part: "Bar, the frame's top", token: "size-bar" },
-      { part: "Fillets, far corners", token: "radius-surface" },
-      { part: "Shadow's drop", token: "shadow-panel-y" },
-      { part: "Shadow's blur", token: "shadow-panel-blur" },
+      { part: "Card to bar, edges", token: "size-gap" },
+      { part: "The card's corners", token: "radius-card" },
+      { part: "Shadow's drop", token: "shadow-glass-y" },
+      { part: "Shadow's blur", token: "shadow-glass-blur" },
       { part: "A twin's slide", token: "space-s24" },
     ],
     reflow: {

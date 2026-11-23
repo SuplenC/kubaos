@@ -96,19 +96,16 @@ function live(): HTMLElement {
 }
 
 const SHEET = "the sheet";
-const SCRIM = "the desktop's dim";
 const ON = "the Audio panel";
 
 const OPENING: Move = {
   name: "Opening",
-  what: "A right-click on the mute pill, its hotkey or the Command menu: the sheet grows from the right edge.",
+  what: "A right-click on the mute pill, its hotkey or the Command menu: the card comes down under it.",
   tracks: [
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: SCRIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: SCRIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(CALLS),
@@ -116,14 +113,12 @@ const OPENING: Move = {
 
 const CLOSING: Move = {
   name: "Closing",
-  what: "Esc, a press outside, or the mute pill's right-click again: the sheet goes back into the edge.",
+  what: "Esc, a press outside, or the mute pill's right-click again: the card rises as it fades.",
   tracks: [
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: SCRIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: SHEET, on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-    { part: SCRIM, on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(CALLS),
@@ -239,14 +234,14 @@ export default page<Shown>({
     },
     rows: nonEmpty(ROWS.map(({ name, options }) => ({ name, cell: cell(options) }))),
     looks: {
-      rest: "the sheet at the frame's glass; nothing lit",
+      rest: "the card on the glass; nothing lit",
       lit: "opened from the keyboard: the output's slider lit",
       selected: "Input picked: its cards in place",
       disabled: "Music mode: Input dimmed, the mic disabled",
       empty: "nothing playing: the Apps card's line",
     },
   },
-  focus: doesntApply("no line of its own; each control lights on its page, the sheet's edge cutting no glow."),
+  focus: doesntApply("no line of its own; each control lights on its page, the card's edge cutting no glow."),
   content: {
     text: [
       { name: "An app's name", words: { short: "mpv", long: LONG_APP.name }, sample: (words: string) => shot({ playing: [{ ...PLAYING[0]!, name: words }] }) },

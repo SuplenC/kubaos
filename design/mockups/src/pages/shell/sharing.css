@@ -13,11 +13,11 @@
   pointer-events: none;
 }
 
-/* The picking bar, on its Sheet in the middle of the frame's bottom edge: one row, as wide as its
-   content, never wider than the screen less the frame and the Sheet's fillets on both sides. */
+/* The picking bar, on its card above the screen's bottom edge: one row, as wide as its content,
+   never wider than the screen less `size.gap` on both sides. */
 .share-pick-bar {
   box-sizing: border-box;
-  max-width: calc(var(--screen-width) - 2 * (var(--frame-side) + var(--radius-surface)));
+  max-width: calc(var(--screen-width) - 2 * var(--gap));
 }
 
 /* Drawing a region, the frame and the bar's Sheet stay over the drawing's dim, Region held pressed. */
@@ -54,15 +54,16 @@
 }
 
 /* A window on the desktop: draft part, proposed. */
-/* The screen's tiling: the room inside the frame, `space.s8` in from it and between the windows,
-   as Hyprland's gaps, split into equal tracks; it fills whatever size the screen is drawn at. */
+/* The screen's tiling: the desktop under the bar, `size.gap` in from the screen's edges and the
+   bar and between the windows, as Hyprland's gaps, split into equal tracks; it fills whatever size
+   the screen is drawn at. */
 .share-desk {
   position: absolute;
-  inset: calc(var(--frame-top) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8));
+  inset: var(--desk-top) var(--gap) var(--gap);
   display: grid;
   grid-template-columns: repeat(var(--desk-columns, 1), minmax(0, 1fr));
   grid-template-rows: repeat(var(--desk-rows, 1), minmax(0, 1fr));
-  gap: var(--space-s8);
+  gap: var(--gap);
 }
 
 .share-window {

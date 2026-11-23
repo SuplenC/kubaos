@@ -553,7 +553,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (!open && event.target instanceof Element && event.target.closest(".shell-ws")) setOpen(true);
     });
     const veiled = [element.querySelector<HTMLElement>(".k-screen-wallpaper")!];
-    const aside = [element.querySelector<HTMLElement>(".k-screen-glass")!, element.querySelector<HTMLElement>(".k-frame")!, bar];
+    const aside = [bar];
     return { screen, size: { w, h }, at: { x: 0, y: 0 }, element, layer, bar, veiled, aside, layout: arrange(w, h, []) };
   }
 

@@ -24,18 +24,15 @@ function live(): HTMLElement {
 }
 
 const SHEET = "the sheet";
-const SCRIM = "the desktop's dim";
 
 const OPENING: Move = {
   name: "Opening",
-  what: "Its pill, Super+A or the Command menu: the sheet grows from the right edge, content riding on it.",
+  what: "Its pill, Super+A or the Command menu: the card comes down under it.",
   tracks: [
     { part: SHEET, on: "the control center", target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: SCRIM, on: "the control center", target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: SHEET, on: "the control center", target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: SCRIM, on: "the control center", target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(),
@@ -43,14 +40,12 @@ const OPENING: Move = {
 
 const CLOSING: Move = {
   name: "Closing",
-  what: "Esc, a press outside, its pill, or a capture button: the sheet goes back into the edge.",
+  what: "Esc, a press outside, its pill, or a capture button: the card rises as it fades.",
   tracks: [
     { part: SHEET, on: "the control center", target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: SCRIM, on: "the control center", target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: SHEET, on: "the control center", target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-    { part: SCRIM, on: "the control center", target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(),
@@ -105,7 +100,7 @@ export default page<Shown>({
   level: "shell",
   slug: "control-center",
   title: "Control center",
-  lede: "The right-edge sheet of quick settings: header, toggles, capture, sliders, then four tabs over a well.",
+  lede: "The card of quick settings: header, toggles, capture, sliders, then four tabs over a well.",
   code: { qml: "ControlCenter" },
   stage: { live, hint: "click a tab; 1–4 jump; Esc closes", daylight: true },
   variants: [
