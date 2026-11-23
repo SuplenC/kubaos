@@ -1,5 +1,6 @@
 // The bell's peek: `config/quickshell/modules/notifications/Peek.qml`. The most recent unread
-// notifications in the popup stack's place while the bar asks for it, with one-click actions on them.
+// notifications on a glass card under the bell while the bar asks for it, placed as the toasts are,
+// with one-click actions on them.
 
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
@@ -12,7 +13,7 @@ type Shown = "rest" | "lit" | "open";
 
 const GROUPS: readonly (readonly Note[])[] = [SLACK, [BUILD], SIGNAL.map((each) => ({ ...each, unread: true }))];
 
-/** The peek on its corner: its groups, then its footer. */
+/** The peek under the bell: its groups, then its footer. */
 function peek(options: { groups?: readonly (readonly Note[])[]; more?: number; fan?: boolean; open?: boolean; live?: boolean } = {}): HTMLElement {
   const groups = options.groups ?? GROUPS;
   const made = groups.map((notes, index) => group(notes, { live: options.live ?? false, fan: index === 0 && options.fan ? 1 : 0, open: index === 0 && (options.open ?? false) }));
@@ -23,7 +24,7 @@ const ON = "the peek";
 
 const OPENS: Move = {
   name: "Opens",
-  what: "The bar asks for it: it grows down from the corner as the popup stack's sheet does.",
+  what: "The bar asks for it: the card fades in under the bell as it comes down `space.s8`.",
   tracks: [{ part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }],
   reduced: [{ part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
@@ -43,7 +44,7 @@ export default page<Shown>({
   level: "shell",
   slug: "notification-peek",
   title: "Notification peek",
-  lede: "The bell's peek: the latest unread, in the popup stack's place, with Mark all read and Clear.",
+  lede: "The bell's peek: the latest unread on a card under the bell, with Mark all read and Clear.",
   code: { qml: "Peek" },
   stage: {
     live: () => peek({ live: true }),
@@ -91,10 +92,11 @@ export default page<Shown>({
     samples: nonEmpty([{ name: "The peek", for: "padding, gaps, the footer", sample: () => peek() }]),
     measures: [
       { part: "Width", token: "size-panel" },
-      { part: "Inside, between groups", token: "space-s8" },
+      { part: "Inside", token: "space-s16" },
+      { part: "Between groups", token: "space-s8" },
       { part: "Between footer buttons", token: "space-s4" },
       { part: "Footer buttons", token: "size-control_sm" },
     ],
-    reflow: doesntApply("it keeps its corner and `size.panel` on every screen."),
+    reflow: doesntApply("under the bell, `size.panel` wide, on every screen."),
   },
 });

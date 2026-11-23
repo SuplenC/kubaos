@@ -1,5 +1,5 @@
 // A notification popup: `KubaOS.Components`' `NotificationPopup` (`docs/design/components/notification-card.md`).
-// A new notification in the popup stack, two lines and quiet: the app's symbol on a small icon tile (or,
+// A new notification in the popup stack, two lines and quiet, on the shell's glass (`lib/glass.ts`): the app's symbol on a small icon tile (or,
 // for several from one app, their count in the symbol's place), the title, one line of the body, and
 // the app and the time at its end. It has no unread dot: a popup is new by being one.
 //
@@ -10,6 +10,7 @@
 
 import "./notification.css";
 import { focusRing } from "./focus.ts";
+import { glass } from "./glass.ts";
 import { iconButton } from "./icon-button.ts";
 import { iconTile } from "./icon-tile.ts";
 import { card, CORNER, type Note } from "./notification-card.ts";
@@ -66,8 +67,8 @@ function face(note: PopupNote, dismiss: HTMLElement): HTMLElement {
 }
 
 export function notificationPopup(note: PopupNote, options: PopupOptions = {}): PopupElement {
-  const element = document.createElement("span") as unknown as PopupElement;
-  element.className = "k-notif-pop";
+  const element = glass(document.createElement("span")) as unknown as PopupElement;
+  element.classList.add("k-notif-pop");
   element.style.setProperty("--notif-corner", CORNER.css);
   element.style.setProperty("--remaining", String(options.remaining ?? 1));
   if (options.pinned === "pointed") element.dataset.pointed = "";

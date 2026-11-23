@@ -12,12 +12,12 @@ import { card, type Note } from "../../lib/notification-card.ts";
 import { notificationPopup, type PopupElement, type PopupNote, type PopupPinned } from "../../lib/notification-popup.ts";
 import { type GroupElement, group } from "../../lib/notification-group.ts";
 import { panelPage } from "../../lib/panel-page.ts";
-import { hang, sheet } from "../../lib/sheet.ts";
+import { hang, type Screen, sheet } from "../../lib/sheet.ts";
 import { advance, centreFor, text } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { BUILD, clearButton, dndButton, KUBAOS, keysButton, SIGNAL, SLACK, status } from "../notifications.ts";
 import { ALL, CHROME } from "../../site/settings.ts";
-import { CORNER_WIDTH, desk, onScreen, system } from "../templates/panels.ts";
+import { CORNER_WIDTH, controlCenter, desk, notifications, onScreen } from "../templates/panels.ts";
 
 /** `shown` in a room as wide as the popups hold a card. */
 export function room(shown: HTMLElement, tall = false): HTMLElement {
@@ -286,36 +286,68 @@ export function peekFooter(more: number): HTMLElement {
   return box;
 }
 
-/** A stack on its screen's corner sheet: the top edge, flush with the right, under the bar. */
+/** The peek on its screen: a card under the bell, as every card stands under its item. */
 export function cornerOnScreen(content: HTMLElement, height = "var(--size-app_height)"): HTMLElement {
-  const { screen: room } = desk(CORNER_WIDTH, height);
-  hang(room, sheet({ content, edge: "top", corner: true }));
+  const { screen: room, buttons } = desk(CORNER_WIDTH, height);
+  hang(room, sheet({ content, edge: "right", ...(buttons[1] ? { under: buttons[1] } : {}) }));
   return room.element;
 }
 
+/** `element`'s left and right edges in `on`'s own pixels, whatever zoom the page is drawn at. */
+function edgesIn(element: Element, on: HTMLElement): [number, number] {
+  const outer = on.getBoundingClientRect();
+  const inner = element.getBoundingClientRect();
+  const zoom = on.offsetWidth ? outer.width / on.offsetWidth : 1;
+  return [(inner.left - outer.left) / zoom, (inner.right - outer.left) / zoom];
+}
+
 /**
- * Critical popups while an open panel covers the corner: the system monitor open from its pill, and
- * under it, at the right `size.gap` below it, a stack of the critical ones
- * alone. Live, the pill opens and closes the panel; the stack comes and goes with it, and keeps its
- * place as the panel goes, so it retracts where it is.
+ * The toasts' column on `on`, placed under `bell`; while a card stands open where the column would
+ * meet it, beside that card toward the middle. Only layout knows either place.
  */
-export function belowOnScreen(critical: readonly (readonly Note[])[], live = false, height = "calc(var(--size-app_height) + var(--space-s64) * 2)"): HTMLElement {
-  const { screen: room, buttons } = desk(CORNER_WIDTH, height);
-  const cover = sheet({ content: system({ count: 1 }).element, edge: "right", under: buttons[0]! });
-  hang(room, cover);
-  const stack = stackOf(...critical.map((notes) => group(notes, { popup: true, live })));
-  const below = sheet({ content: stack, edge: "right", start: "0px" });
-  hang(room, below);
-  room.element.dataset.open = "";
-  // The stack starts where the panel ends, which only layout knows.
+function toastColumn(on: Screen, bell: Element | undefined): HTMLElement {
+  const column = document.createElement("span");
+  column.className = "k-toasts";
+  on.over.append(column);
   const place = () => {
-    for (const part of below.parts) part.style.setProperty("--sheet-start", `calc(${cover.box.offsetHeight}px + var(--gap))`);
+    const screenElement = on.element;
+    if (bell) {
+      const [start, end] = edgesIn(bell, screenElement);
+      column.style.setProperty("--toast-centre", `${(start + end) / 2}px`);
+    }
+    const open = [...on.over.querySelectorAll<HTMLElement>(":scope > .k-sheet")].find(
+      (each) => !each.hasAttribute("data-taking") && (!each.hasAttribute("data-live") || each.hasAttribute("data-shown")),
+    );
+    const width = column.offsetWidth;
+    const left = column.offsetLeft;
+    const meets = open && open.offsetLeft < left + width && open.offsetLeft + open.offsetWidth > left;
+    if (open && (meets || column.hasAttribute("data-beside"))) {
+      column.style.setProperty("--beside-x", `${open.offsetLeft}px`);
+      column.setAttribute("data-beside", "");
+    } else column.removeAttribute("data-beside");
   };
-  new ResizeObserver(place).observe(cover.box);
+  new ResizeObserver(place).observe(on.element);
+  new MutationObserver(place).observe(on.over, { attributes: true, attributeFilter: ["data-shown"], subtree: true, childList: true });
+  requestAnimationFrame(place);
+  return column;
+}
+
+/**
+ * Toasts beside a card open at their end: the control center open under its pill, and the popups
+ * `size.gap` beside it toward the middle. Live, the pill opens and closes the card, and the popups
+ * move with it, under the bell again once it is gone.
+ */
+export function besideOnScreen(notes: readonly PopupNote[], live = false, height = "var(--size-app_height)"): HTMLElement {
+  const { screen: room, buttons } = desk(BESIDE_WIDTH, height);
+  const cover = sheet({ content: controlCenter().element, edge: "right", ...(buttons[2] ? { under: buttons[2] } : {}) });
+  hang(room, cover);
+  room.element.dataset.open = "";
+  const column = toastColumn(room, buttons[1]);
+  column.append(...notes.map((note) => slotOf(notificationPopup(note, { remaining: 0.7 }))));
   if (live) {
-    for (const part of [...cover.parts, ...below.parts]) part.dataset.live = "";
+    for (const part of cover.parts) part.dataset.live = "";
     const show = (on: boolean) => {
-      for (const part of [...cover.parts, ...below.parts]) {
+      for (const part of cover.parts) {
         part.toggleAttribute("data-shown", on);
         part.toggleAttribute("data-settled", on);
       }
@@ -323,9 +355,24 @@ export function belowOnScreen(critical: readonly (readonly Note[])[], live = fal
     };
     let open = true;
     requestAnimationFrame(() => show(true));
-    buttons[0]?.addEventListener("click", () => show((open = !open)));
+    buttons[2]?.addEventListener("click", () => show((open = !open)));
   }
   return room.element;
+}
+
+/** A screen wide enough for a card and a toast beside it. */
+const BESIDE_WIDTH = "calc(var(--size-panel) * 2 + var(--space-s64) * 3)";
+
+/** `shown` in a toast's slot, settled. */
+function slotOf(shown: HTMLElement): HTMLElement {
+  const inner = document.createElement("span");
+  inner.className = "k-popup-inner";
+  inner.append(shown);
+  const slot = document.createElement("span");
+  slot.className = "k-popup-slot";
+  slot.append(inner);
+  new ResizeObserver(() => slot.style.setProperty("--slot-h", `${inner.offsetHeight}px`)).observe(inner);
+  return slot;
 }
 
 /** A popup or a critical card in the stack: its slot, which opens and closes the room it takes. */
@@ -354,6 +401,7 @@ export interface PopupStackOptions {
   readonly schedule?: readonly PopupNote[];
   /** The bell's dot shown, as while anything is unread. */
   readonly unread?: boolean;
+  readonly width?: string;
   readonly height?: string;
 }
 
@@ -363,17 +411,16 @@ export const POPUP_TIMEOUT = 6000;
 const ARRIVALS = 1100;
 
 /**
- * The popup stack on its corner sheet: two-line popups, one per app, newest first, a critical one as
- * today's full card. Live, each popup runs its own time down and leaves by itself; the pointer on any
+ * The toasts under the bell: two-line popups, each on its own glass, one per app, newest first, a
+ * critical one as today's full card. Live, each popup runs its own time down and leaves by itself; the pointer on any
  * popup holds every one's time, and an open popup's stays held until it folds. Another from an app
  * already showing joins its popup: the newest's words, the count in the symbol's place, its time from
- * the whole again, its place kept. The bell carries the unread dot while anything is unread.
+ * the whole again, its place kept. The bell carries the unread dot while anything is unread. Live, the
+ bell opens the Notifications card under it, and the toasts up drop into it and fade.
  */
 export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement {
-  const stack = document.createElement("span");
-  stack.className = "k-popup-stack";
-  const { screen: room, buttons } = desk(CORNER_WIDTH, options.height ?? "var(--size-app_height)");
-  hang(room, sheet({ content: stack, edge: "top", corner: true }));
+  const { screen: room, buttons } = desk(options.width ?? CORNER_WIDTH, options.height ?? "var(--size-app_height)");
+  const stack = toastColumn(room, buttons[1]);
   // The bell's unread dot, on its symbol's top right corner.
   const bell = buttons[1]?.querySelector("svg");
   let dot: HTMLElement | null = null;
@@ -416,6 +463,7 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
     inner.classList.add(how === "side" ? "k-popup-out-side" : "k-popup-out-up");
     const close = () => {
       each.slot.setAttribute("data-shut", "");
+      each.slot.setAttribute("data-moving", "");
       if (reduced()) each.slot.remove();
       else each.slot.addEventListener("transitionend", () => each.slot.remove(), { once: true });
       if (live.size === 0 && options.schedule) window.setTimeout(() => play(options.schedule!), ARRIVALS);
@@ -427,11 +475,9 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
   }
 
   function place(note: PopupNote, index: number, animate: boolean): Popped {
-    const inner = document.createElement("span");
-    inner.className = "k-popup-inner";
-    const slot = document.createElement("span");
-    slot.className = "k-popup-slot";
-    slot.append(inner);
+    const slot = slotOf(document.createElement("span"));
+    const inner = slot.firstElementChild as HTMLElement;
+    inner.replaceChildren();
     const each: Popped = { slot, shown: inner, note, count: note.count ?? 1, run: null, open: false, pop: null };
     if (note.critical) {
       const shown = card(note, { dot: false, onDismiss: () => leave(each, "side") });
@@ -460,8 +506,6 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
         each.run.finished.then(() => leave(each, "up"), () => {});
       }
     }
-    // The slot's room is its popup's height, which only layout knows, closing as `--slot-open` goes to 0.
-    new ResizeObserver(() => slot.style.setProperty("--slot-h", `${inner.offsetHeight}px`)).observe(inner);
     return each;
   }
 
@@ -483,10 +527,44 @@ export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement
     live.add(each);
     if (held) return;
     requestAnimationFrame(() => {
+      each.slot.setAttribute("data-moving", "");
+      each.slot.addEventListener("transitionend", () => each.slot.removeAttribute("data-moving"), { once: true });
       each.slot.removeAttribute("data-shut");
       each.shown.classList.add("k-popup-in");
     });
     sync();
+  }
+
+  /** The Notifications card opening under the bell: every toast up drops into it and goes. */
+  function takeAll(): void {
+    for (const each of [...live]) {
+      live.delete(each);
+      each.run?.cancel();
+      const inner = each.slot.firstElementChild as HTMLElement;
+      inner.classList.remove("k-popup-in");
+      inner.classList.add("k-popup-taken");
+      if (reduced()) each.slot.remove();
+      else inner.addEventListener("animationend", () => each.slot.remove(), { once: true });
+    }
+    for (const id of timers) window.clearTimeout(id);
+  }
+
+  if (options.schedule && buttons[1]) {
+    const card = sheet({ content: notifications().element, edge: "right", under: buttons[1] });
+    hang(room, card);
+    card.box.dataset.taking = "";
+    for (const part of card.parts) part.dataset.live = "";
+    let open = false;
+    buttons[1].addEventListener("click", () => {
+      open = !open;
+      for (const part of card.parts) {
+        part.toggleAttribute("data-shown", open);
+        part.toggleAttribute("data-settled", open);
+      }
+      room.element.toggleAttribute("data-open", open);
+      if (open) takeAll();
+      else if (live.size === 0) window.setTimeout(() => play(options.schedule!), ARRIVALS);
+    });
   }
 
   let timers: number[] = [];

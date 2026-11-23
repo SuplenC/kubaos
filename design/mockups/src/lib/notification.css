@@ -412,8 +412,8 @@
   visibility: hidden;
 }
 
-/* A notification popup (`lib/notification-popup.ts`): two lines on the card's fill at its corner, its
-   height running from theirs to the card's it opens into as `--open` goes 0 to 1. */
+/* A notification popup (`lib/notification-popup.ts`): two lines on the shell's glass at the card's
+   corner, its height running from theirs to the card's it opens into as `--open` goes 0 to 1. */
 @property --open {
   syntax: "<number>";
   inherits: true;
@@ -426,7 +426,6 @@
   width: 100%;
   height: round(nearest, calc(var(--face-h, 0px) + (var(--full-h, 0px) - var(--face-h, 0px)) * var(--open)), 1px);
   border-radius: var(--notif-corner);
-  background: var(--color-surface_container);
   outline: none;
   cursor: pointer;
   transition: --open var(--motion-short) var(--easing-standard_accel);
