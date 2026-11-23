@@ -1425,3 +1425,177 @@ fn a_switch_to_a_longer_setup_keeps_a_run_that_only_undoes_a_release_took_out_fo
     world.remove("sw").0.unwrap();
     assert_eq!(stops(), 1, "the removal forgot it");
 }
+
+#[test]
+fn an_older_replaced_part_keeps_the_package_a_new_step_holds() {
+    let world = World::new(&[(
+        "ch",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install", "\"ch-a1\", \"ch-a2\""),
+            apt_step("Other", "\"ch-z\"")
+        )),
+    )]);
+    world.install("ch", true).0.unwrap();
+    world.write_app(
+        "ch",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install", "\"ch-a1\""),
+            apt_step("Other", "\"ch-z\", \"ch-y\"")
+        )),
+    );
+    world.host.state.borrow_mut().fail.insert("apt:ch-y".to_owned());
+    assert!(world.install("ch", true).0.is_err());
+    world.host.state.borrow_mut().fail.clear();
+    world.write_app(
+        "ch",
+        &super::app(&format!(
+            "{}{}{}",
+            apt_step("Keep", "\"ch-a2\""),
+            apt_step("Install", "\"ch-a3\""),
+            apt_step("Other", "\"ch-z\"")
+        )),
+    );
+    let from = world.host.state.borrow().log.len();
+
+    world.install("ch", true).0.unwrap();
+
+    let log = world.log_since(from);
+    assert!(world.host.state.borrow().dpkg.contains_key("ch-a2"));
+    assert!(
+        !log.iter().any(|l| l.starts_with("apt remove") && l.contains("ch-a2")),
+        "{log:#?}"
+    );
+    world.remove("ch").0.unwrap();
+    let state = world.host.state.borrow();
+    for package in ["ch-a1", "ch-a2", "ch-a3", "ch-z"] {
+        assert!(!state.dpkg.contains_key(package), "{package} stays: {:?}", state.dpkg);
+    }
+}
+
+#[test]
+fn an_older_replaced_part_keeps_the_file_a_new_step_writes() {
+    let world = World::new(&[(
+        "cf",
+        &super::app(&format!(
+            "{}{}",
+            file_step("Write", "~/.config/cf/a", "a"),
+            apt_step("Other", "\"cf-z\"")
+        )),
+    )]);
+    world.install("cf", true).0.unwrap();
+    world.write_app(
+        "cf",
+        &super::app(&format!(
+            "{}{}",
+            file_step("Write", "~/.config/cf/b", "b"),
+            apt_step("Other", "\"cf-z\", \"cf-y\"")
+        )),
+    );
+    world.host.state.borrow_mut().fail.insert("apt:cf-y".to_owned());
+    assert!(world.install("cf", true).0.is_err());
+    world.host.state.borrow_mut().fail.clear();
+    world.write_app(
+        "cf",
+        &super::app(&format!(
+            "{}{}{}",
+            file_step("Keep a", "~/.config/cf/a", "a"),
+            file_step("Write", "~/.config/cf/c", "c"),
+            apt_step("Other", "\"cf-z\"")
+        )),
+    );
+    let a = world.host_home().join(".config/cf/a");
+
+    let events = world.install("cf", true).1;
+
+    assert!(a.is_file(), "the file the new step writes is gone");
+    assert_eq!(reported(&events, "Keep a").len(), 1, "{:?}", events.steps());
+    assert!(!world.host_home().join(".config/cf/b").exists());
+}
+
+#[test]
+fn a_step_merged_in_part_leaves_what_apt_pulled_in_to_another_app_that_found_it() {
+    let world = World::new(&[
+        (
+            "pm",
+            &super::app(&format!(
+                "{}{}",
+                apt_step("Install the tool", "\"pm-tool\""),
+                apt_step("Install its plugins", "\"pm-plugin\", \"pm-extra\"")
+            )),
+        ),
+        ("oth", &super::app(&apt_step("Install lib", "\"libplugin\""))),
+    ]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .depends
+        .insert("pm-plugin".to_owned(), ["libplugin".to_owned()].into());
+    world.install("pm", true).0.unwrap();
+    world.install("oth", true).0.unwrap();
+    world.write_app(
+        "pm",
+        &super::app(&apt_step("Install the tool", "\"pm-tool\", \"pm-plugin\"")),
+    );
+
+    world.install("pm", true).0.unwrap();
+
+    let owners: Vec<&str> = ["pm", "oth"]
+        .into_iter()
+        .filter(|id| {
+            world.journals(id).1.unwrap().entries.iter().any(|e| {
+                e.claims
+                    .iter()
+                    .any(|c| c.owned && (c.claim == "dep:libplugin" || c.claim == "package:libplugin"))
+            })
+        })
+        .collect();
+    assert_eq!(owners, ["oth"]);
+    world.remove("pm").0.unwrap();
+    assert!(
+        world.host.state.borrow().dpkg.contains_key("libplugin"),
+        "the other app's package went"
+    );
+}
+
+#[test]
+fn a_step_merged_in_part_killed_after_its_undo_hands_over_what_apt_pulled_in_on_the_next_run() {
+    let world = World::new(&[(
+        "pk",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install the tool", "\"pk-tool\""),
+            apt_step("Install its plugins", "\"pk-plugin\", \"pk-extra\"")
+        )),
+    )]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .depends
+        .insert("pk-plugin".to_owned(), ["libpk".to_owned()].into());
+    world.install("pk", true).0.unwrap();
+    world.write_app(
+        "pk",
+        &super::app(&apt_step("Install the tool", "\"pk-tool\", \"pk-plugin\"")),
+    );
+    // Killed as the undo of the merged step's other package ends, before its journal is written.
+    world
+        .host
+        .state
+        .borrow_mut()
+        .fail
+        .insert("apt-remove:pk-extra".to_owned());
+    assert!(world.install("pk", true).0.is_err());
+    world.host.state.borrow_mut().fail.clear();
+
+    world.install("pk", true).0.unwrap();
+
+    world.remove("pk").0.unwrap();
+    let state = world.host.state.borrow();
+    for package in ["pk-tool", "pk-plugin", "pk-extra", "libpk"] {
+        assert!(!state.dpkg.contains_key(package), "{package} stays: {:?}", state.dpkg);
+    }
+}
