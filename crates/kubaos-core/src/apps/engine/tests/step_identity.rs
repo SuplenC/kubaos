@@ -120,9 +120,12 @@ fn claims(entry: &Entry) -> Vec<(String, bool)> {
     claims
 }
 
-/// Every entry of both journals of `id`, as `(root, action, state, claims)`: what each records,
-/// whatever its number.
-fn recorded(world: &World, id: &str) -> Vec<(bool, Action, State, Vec<(String, bool)>)> {
+/// What an entry records, whatever its number: whether it is root's, its action, its state and
+/// its claims.
+type Recorded = (bool, Action, State, Vec<(String, bool)>);
+
+/// Every entry of both journals of `id`.
+fn recorded(world: &World, id: &str) -> Vec<Recorded> {
     let (user, root) = world.journals(id);
     let mut all: Vec<_> = [(false, user), (true, root)]
         .into_iter()

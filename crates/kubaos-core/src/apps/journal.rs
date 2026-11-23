@@ -129,7 +129,9 @@ impl Adoption {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Entry {
-    /// Its place in the install's list of actions, from 1.
+    /// Its place in the install's list of actions, from 1: the step's number when it was last
+    /// written, which a reader brings to the folder's own with [`Journal::align`]. One after the
+    /// last step is a step a release took out.
     pub step: usize,
     pub state: State,
     /// What each thing it changes or found is, and whether it changed it.
