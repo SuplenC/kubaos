@@ -226,6 +226,28 @@ What the developer Suites (`home/suites/`) add beyond the toolchains mise instal
 | Segment Anything (SAM ViT-B) | Picks out the parts of a wallpaper in the depth Suite | Meta AI Research | Apache-2.0 | [github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything) |
 | vscode-js-debug | The Node Suite's debug adapter | Microsoft Corporation | MIT | [github.com/microsoft/vscode-js-debug](https://github.com/microsoft/vscode-js-debug) |
 
+### Kubernetes apps of the catalog
+
+The Apps catalog's Kubernetes tools (`apps/`), and the marks their icons carry.
+
+| Name | What KubaOS uses it for | Creators | Licence | Link |
+|---|---|---|---|---|
+| Helm | The catalog's Helm (`apps/helm/`) | The Helm Authors | Apache-2.0 | [github.com/helm/helm](https://github.com/helm/helm) |
+| kubectx + kubens | The catalog's kubectx + kubens (`apps/kubectx/`) | Ahmet Alp Balkan and the kubectx contributors | Apache-2.0 | [github.com/ahmetb/kubectx](https://github.com/ahmetb/kubectx) |
+| stern | The catalog's stern (`apps/stern/`) | The stern authors | Apache-2.0 | [github.com/stern/stern](https://github.com/stern/stern) |
+| kind | The catalog's kind (`apps/kind/`), and its logo as kind's icon | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes-sigs/kind](https://github.com/kubernetes-sigs/kind) |
+| minikube | The catalog's minikube (`apps/minikube/`), and its logo as minikube's icon | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes/minikube](https://github.com/kubernetes/minikube) |
+| k3d | The catalog's k3d (`apps/k3d/`), and its logo as k3d's icon | Thorsten Klein and the k3d contributors | MIT | [github.com/k3d-io/k3d](https://github.com/k3d-io/k3d) |
+| Kustomize | The catalog's Kustomize (`apps/kustomize/`), and its icon as Kustomize's | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes-sigs/kustomize](https://github.com/kubernetes-sigs/kustomize) |
+| Argo CD | The catalog's Argo CD CLI (`apps/argocd/`) | The Argo Project Authors | Apache-2.0 | [github.com/argoproj/argo-cd](https://github.com/argoproj/argo-cd) |
+| Flux | The catalog's Flux CLI (`apps/flux/`) | The Flux Authors | Apache-2.0 | [github.com/fluxcd/flux2](https://github.com/fluxcd/flux2) |
+| Headlamp | The catalog's Headlamp (`apps/headlamp/`), and its icon as Headlamp's | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes-sigs/headlamp](https://github.com/kubernetes-sigs/headlamp) |
+| Tilt | The catalog's Tilt (`apps/tilt/`), and its logo as Tilt's icon | Tilt Dev Inc. and the Tilt contributors | Apache-2.0 | [github.com/tilt-dev/tilt](https://github.com/tilt-dev/tilt) |
+| Skaffold | The catalog's Skaffold (`apps/skaffold/`), and its mark as Skaffold's icon | Google LLC and the Skaffold contributors | Apache-2.0 | [github.com/GoogleContainerTools/skaffold](https://github.com/GoogleContainerTools/skaffold) |
+| Helm's logo | Helm's icon (`apps/helm/helm.svg`), from Helm's website | Microsoft Corporation and the Helm Authors | MIT | [github.com/helm/helm-www](https://github.com/helm/helm-www) |
+| Argo's mark | The Argo CD CLI's icon (`apps/argocd/argocd.svg`) | The Argo Project Authors | The Linux Foundation's trademark, used to identify the app | [github.com/argoproj/argoproj](https://github.com/argoproj/argoproj) |
+| Flux's mark | The Flux CLI's icon (`apps/flux/flux.svg`), from Flux's website | The Flux Authors | Apache-2.0 | [github.com/fluxcd/website](https://github.com/fluxcd/website) |
+
 ### Cloud, container and CI apps of the catalog
 
 The Apps catalog's cloud CLIs, container and CI tools (`apps/`), and the marks their icons carry.

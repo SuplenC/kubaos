@@ -1,0 +1,22 @@
+# The Flux CLI from nixpkgs, through the User flake, one minor release behind upstream's and
+# inside Flux's support, which covers the newest three. Ubuntu doesn't package it, and Flux keeps
+# no apt repository.
+# https://fluxcd.io/flux/installation/#install-the-flux-cli
+name = "Flux CLI"
+category = "devops"
+tags = ["kubernetes", "k8s", "gitops", "flux", "fluxcd", "deploy", "continuous delivery", "cli"]
+summary = "GitOps for Kubernetes: push to git, the cluster follows. Eventually. Reconciliation is a mood."
+# The opening of its README, Apache-2.0 (github.com/fluxcd/flux2).
+description = """\
+Flux is a tool for keeping Kubernetes clusters in sync with sources of configuration (like Git \
+repositories and OCI artifacts), and automating updates to configuration when there is new \
+code to deploy."""
+description_from = "https://github.com/fluxcd/flux2/blob/v2.10.1/README.md"
+# Flux's mark, Apache-2.0, on a tile (flux.svg's header): no icon theme has Flux.
+icon = "flux"
+keeps = "Flux itself runs in your clusters, which keep it: the CLI only talks to them."
+
+[[action]]
+name = "Install the Flux CLI"
+kind = "nix"
+packages = ["fluxcd"]

@@ -1,0 +1,25 @@
+# Skaffold from nixpkgs, through the User flake, which reads the same skaffold.yaml schema as
+# upstream's newest. Ubuntu doesn't package it; Google's apt repository has it only as a
+# component of the Google Cloud CLI, which it depends on.
+# https://skaffold.dev/docs/install/
+name = "Skaffold"
+category = "devops"
+tags = ["kubernetes", "k8s", "dev", "build", "deploy", "continuous development", "cli"]
+summary = "Build, push and deploy on every save. Your laptop fan has notes."
+# The opening of its README, Apache-2.0 (github.com/GoogleContainerTools/skaffold).
+description = """\
+Skaffold is a command line tool that facilitates continuous development for Kubernetes \
+applications. You can iterate on your application source code locally then deploy to local or \
+remote Kubernetes clusters. Skaffold handles the workflow for building, pushing and deploying \
+your application. It also provides building blocks and describe customizations for a CI/CD \
+pipeline."""
+description_from = "https://github.com/GoogleContainerTools/skaffold/blob/v2.25.0/README.md"
+# Skaffold's mark, Apache-2.0, on a tile (skaffold.png's comment): Skaffold publishes it in
+# colour only as a PNG, and no icon theme has Skaffold.
+icon = "skaffold"
+keeps = "Skaffold's settings stay in ~/.skaffold: install Skaffold again and they're there."
+
+[[action]]
+name = "Install Skaffold"
+kind = "nix"
+packages = ["skaffold"]

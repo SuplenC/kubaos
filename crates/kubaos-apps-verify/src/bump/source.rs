@@ -37,6 +37,10 @@ const PROTON_PASS: &str = "https://proton.me/download/pass/linux/";
 const PROTON_PASS_RELEASES: &str = "https://proton.me/download/PassDesktop/linux/x64/version.json";
 /// Blender's release folders, one a series (`Blender5.3/`), each listing its files.
 const BLENDER: &str = "https://download.blender.org/release/";
+/// Helm's downloads, which its GitHub releases name but don't carry: the releases say which is
+/// the newest, and each tarball has its sha256 beside it, `<file>.sha256sum`.
+const HELM: &str = "https://get.helm.sh/";
+const HELM_RELEASES: &str = "repos/helm/helm/releases?per_page=100";
 
 /// One architecture's pin, as an action holds it.
 #[derive(Clone, Copy, Debug)]
@@ -84,6 +88,9 @@ pub fn newest(pin: &Pin<'_>) -> Result<Found, String> {
     }
     if pin.url.starts_with(BLENDER) {
         return blender(pin);
+    }
+    if pin.url.starts_with(HELM) {
+        return helm(pin);
     }
     if !pin.url.contains(pin.version) {
         return unversioned(pin);
@@ -424,6 +431,41 @@ fn blender(pin: &Pin<'_>) -> Result<Found, String> {
         url,
         version,
     })
+}
+
+fn helm(pin: &Pin<'_>) -> Result<Found, String> {
+    let releases = fetch::github(HELM_RELEASES).map_err(|e| chain(&e))?;
+    let newest = newest_tag(&releases, "v").ok_or_else(|| "helm/helm has no release tagged v<version>".to_owned())?;
+    let Some(url) = helm_download(pin, &newest) else {
+        return Ok(Found::Current);
+    };
+    let url = url?;
+    let name = url.rsplit('/').next().unwrap_or(&url);
+    let sums = fetch::get(&format!("{url}.sha256sum")).map_err(|e| chain(&e))?;
+    let sha256 = digest_for(&String::from_utf8_lossy(&sums), name)
+        .ok_or_else(|| format!("{url}.sha256sum names no sha256 for {name}"))?;
+    Ok(Found::Newer {
+        version: newest,
+        url,
+        sha256,
+    })
+}
+
+/// The download of Helm `newest` for `pin`'s platform, its file named as the pin's with the
+/// version swapped; none when `newest` is no newer.
+///
+/// # Errors
+///
+/// A message when the pin's file doesn't name its version.
+pub fn helm_download(pin: &Pin<'_>, newest: &str) -> Option<Result<String, String>> {
+    if !newer(pin, newest) {
+        return None;
+    }
+    let name = pin.url.strip_prefix(HELM).unwrap_or(pin.url);
+    if !name.contains(pin.version) {
+        return Some(Err(format!("{name} doesn't hold its version, {}", pin.version)));
+    }
+    Some(Ok(format!("{HELM}{}", name.replace(pin.version, newest))))
 }
 
 /// The newest version among a folder listing's files named `<before><version><after>`.

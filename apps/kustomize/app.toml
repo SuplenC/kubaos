@@ -1,0 +1,20 @@
+# Kustomize from Ubuntu's archive, a patch release behind upstream's. kubectl has a Kustomize of
+# its own (`kubectl kustomize`), which trails this one.
+# https://kubectl.docs.kubernetes.io/installation/kustomize/
+name = "Kustomize"
+category = "devops"
+tags = ["kubernetes", "k8s", "yaml", "manifests", "overlays", "patch", "cli"]
+summary = "Patch Kubernetes YAML without templates. Overlays all the way down."
+# The opening of its README, Apache-2.0 (github.com/kubernetes-sigs/kustomize).
+description = """\
+kustomize lets you customize raw, template-free YAML files for multiple purposes, leaving the \
+original YAML untouched and usable as is."""
+description_from = "https://github.com/kubernetes-sigs/kustomize/blob/kustomize/v5.8.3/README.md"
+# Kustomize's icon, Apache-2.0, on a tile (kustomize.png's comment): Kustomize publishes it only
+# as a PNG, and no icon theme has Kustomize.
+icon = "kustomize"
+
+[[action]]
+name = "Install Kustomize"
+kind = "apt"
+packages = ["kustomize"]

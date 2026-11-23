@@ -2,7 +2,9 @@ use serde_json::json;
 
 use super::GitHubPin;
 use super::Moved;
+use super::Pin;
 use super::Tag;
+use super::helm_download;
 use super::newest_android_studio;
 use super::newest_file;
 use super::newest_proton_pass;
@@ -146,4 +148,21 @@ fn a_folder_listings_newest_file_of_the_pins_shape() {
         Some("5.3.1")
     );
     assert_eq!(newest_file(listing, "blender-", "-windows-x64.zip"), None);
+}
+
+#[test]
+fn helms_newer_release_is_its_tarball_on_get_helm_sh_and_an_older_one_no_move() {
+    let pin = Pin {
+        version: "4.3.2",
+        arch: "arm64",
+        url: "https://get.helm.sh/helm-v4.3.2-linux-arm64.tar.gz",
+        sha256: "",
+    };
+
+    assert_eq!(
+        helm_download(&pin, "4.4.0"),
+        Some(Ok("https://get.helm.sh/helm-v4.4.0-linux-arm64.tar.gz".to_owned()))
+    );
+    assert_eq!(helm_download(&pin, "4.3.2"), None);
+    assert_eq!(helm_download(&pin, "3.22.0"), None, "Helm 3's patches are no move");
 }

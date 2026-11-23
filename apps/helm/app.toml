@@ -1,0 +1,37 @@
+# Helm from its release's tarball on get.helm.sh, pinned to the sha256 Helm publishes beside it
+# (the .sha256sum), unpacked into a folder of its version, which the link on PATH names. Helm's
+# GitHub releases carry only the signatures, so the tarball is Helm's own download. Ubuntu
+# doesn't package Helm; the apt repository Helm's docs list is a community member's, not Helm's;
+# and nixpkgs' is Helm 3, whose support ended in November 2026.
+# https://helm.sh/docs/intro/install/
+name = "Helm"
+category = "devops"
+tags = ["kubernetes", "k8s", "charts", "packages", "cli", "deploy"]
+summary = "Kubernetes' package manager. Your YAML, templated, so it can break in new and exciting ways."
+# The opening of its README, Apache-2.0 (github.com/helm/helm).
+description = """\
+Helm is a tool for managing Charts. Charts are packages of pre-configured Kubernetes \
+resources."""
+description_from = "https://github.com/helm/helm/blob/v4.3.2/README.md"
+# Helm's logo, MIT, on a tile (helm.svg's header): no icon theme has Helm.
+icon = "helm"
+keeps = """\
+Your chart repositories and plugins stay in ~/.config/helm and ~/.local/share/helm, its cache \
+in ~/.cache/helm, and what you installed in your clusters: install Helm again and it's all \
+there."""
+
+[[action]]
+name = "Download Helm"
+kind = "download"
+to = "/opt/helm/@VERSION@"
+version = "4.3.2"
+unpack = "tar-gz"
+strip = 1
+amd64 = { url = "https://get.helm.sh/helm-v4.3.2-linux-amd64.tar.gz", sha256 = "d1c0278d46beab79582d7e50f5b3dc206944ba8e577cde618513fd07daa53983" }
+arm64 = { url = "https://get.helm.sh/helm-v4.3.2-linux-arm64.tar.gz", sha256 = "df31cb61680ef728f82c770e5280dd565617bee6b039d37e85c677288be4bbb0" }
+
+[[action]]
+name = "Put helm on your PATH"
+kind = "symlink"
+to = "/usr/local/bin/helm"
+target = "/opt/helm/@VERSION@/helm"

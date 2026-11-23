@@ -2531,6 +2531,7 @@ mod editors;
 mod games;
 mod graphics;
 mod keys;
+mod kubernetes;
 mod media;
 mod office;
 mod requires;
