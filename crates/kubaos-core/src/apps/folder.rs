@@ -85,6 +85,11 @@ pub enum FolderError {
     )]
     NoSource(String),
     #[error(
+        "two steps of {} are named {name:?}: a step's name is what its journal entry goes by, so it is one step's alone",
+        setup.as_deref().map_or_else(|| "the install".to_owned(), |s| format!("setup {s}'s install"))
+    )]
+    DuplicateStepName { setup: Option<String>, name: String },
+    #[error(
         "{0} names a source on a `run` that installs nothing from it: a run's `source` is for the install-stage `run` that is the install's only source"
     )]
     StraySource(String),
@@ -438,6 +443,7 @@ impl Folder {
         if let Some(step) = folder.icon_step() {
             folder.actions.push(step);
         }
+        folder.check_names()?;
         Ok(folder)
     }
 
@@ -819,6 +825,29 @@ impl Folder {
             .iter()
             .chain(setup.into_iter().flat_map(|s| &s.actions))
             .any(|a| a.stage == Stage::Configure)
+    }
+
+    /// Refuses two steps of one install under one name: a journal entry is the step of its name,
+    /// so a second would take the first's entry, or leave it to be undone. Steps of two setups
+    /// may share a name, as no install has both.
+    fn check_names(&self) -> Result<(), FolderError> {
+        let setups: Vec<Option<&str>> = if self.has_setups() {
+            self.setups.iter().map(|s| Some(s.id.as_str())).collect()
+        } else {
+            vec![None]
+        };
+        for setup in setups {
+            let steps = self.steps(setup)?;
+            for (i, step) in steps.iter().enumerate() {
+                if steps[..i].iter().any(|s| s.name == step.name) {
+                    return Err(FolderError::DuplicateStepName {
+                        setup: setup.map(str::to_owned),
+                        name: step.name.clone(),
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Whether it can be set up more than one way.

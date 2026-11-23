@@ -92,6 +92,8 @@ pub enum StepError {
     WrongSide { app: String, step: usize },
     #[error("{app} has no step {step}")]
     NoStep { app: String, step: usize },
+    #[error("{name:?} is still a step of {app}'s install: only what a release took out of it is taken out")]
+    StillAStep { app: String, name: String },
     #[error("{why}")]
     RootFailed { why: String },
     #[error("the root helper refused it: {}", why.join("; "))]
@@ -293,17 +295,6 @@ impl<'h> Keeper<'h> {
         Ok((folder, steps))
     }
 
-    /// Writes this side's journal of the app `id` numbered as the folder now numbers its steps,
-    /// before a run uses its numbers: from then on [`Keeper::undo`] and [`Keeper::redo`] take an
-    /// entry by its number as written, so undoing one never moves another.
-    ///
-    /// # Errors
-    ///
-    /// The journal that couldn't be read or written.
-    pub fn align(&mut self, id: &str) -> Result<(), JournalError> {
-        self.aligned_journal(id).map(drop)
-    }
-
     /// This side's journal of the app `id`, numbered as the folder now numbers its steps, and
     /// written so when that renumbered it: a journal a release before wrote keeps its entries.
     fn journal(&self, id: &str) -> Result<Option<Journal>, StepError> {
@@ -312,7 +303,7 @@ impl<'h> Keeper<'h> {
 
     fn aligned_journal(&self, id: &str) -> Result<Option<Journal>, JournalError> {
         let was = Journal::read(&self.journals, id)?;
-        let journal = aligned(&self.journals, id, &self.catalog, self.words(), self.side)?;
+        let journal = aligned(&self.journals, id, &self.catalog, self.side)?;
         // Compared whole: a release that takes a step out can leave the same numbers, each now
         // another entry's.
         if let Some(journal) = &journal
@@ -396,19 +387,6 @@ impl<'h> Keeper<'h> {
     /// install hasn't, the ownership refusals of [`Keeper::preflight`], else what failed. A step
     /// that failed stays in the journal as started, for the rollback or the next run.
     pub fn step(&mut self, id: &str, setup: Option<&str>, step: usize, windows: bool) -> Result<Outcome, StepError> {
-        self.step_at(id, setup, step, windows, true)
-    }
-
-    /// [`Keeper::step`]; with `align`, the journal numbered as the folder now numbers its steps
-    /// first, else taken as written, as a rollback that puts entries back by their numbers does.
-    fn step_at(
-        &mut self,
-        id: &str,
-        setup: Option<&str>,
-        step: usize,
-        windows: bool,
-        align: bool,
-    ) -> Result<Outcome, StepError> {
         let (folder, steps) = self.steps(id, setup)?;
         let Some((_, action)) = steps.into_iter().find(|(n, _)| *n == step) else {
             let total = folder.steps(setup).map_err(StepError::Folder)?.len();
@@ -424,16 +402,11 @@ impl<'h> Keeper<'h> {
                 }
             });
         };
-        let journal = if align {
-            self.journal(id)?
-        } else {
-            Journal::read(&self.journals, id).map_err(StepError::Journal)?
-        };
-        let mut journal = journal.unwrap_or_else(|| Journal::new(id, setup));
+        let mut journal = self.journal(id)?.unwrap_or_else(|| Journal::new(id, setup));
         journal.setup = setup.map(str::to_owned);
         let mut old = journal.entry(step).cloned();
         if let Some(entry) = old.take_if(|e| !e.action.same_thing(&action)) {
-            self.set_aside(&mut journal, id, setup, &entry)?;
+            self.set_aside(&mut journal, id, &entry)?;
         }
         let recorded = self.recorded_for(&journal, &action, old.as_ref())?;
         let look = perform::look(&action, &mut *self.host, recorded).map_err(StepError::Perform)?;
@@ -466,7 +439,6 @@ impl<'h> Keeper<'h> {
                 journal.put(entry);
                 journal.save(&self.journals).map_err(StepError::Journal)?;
             }
-            self.finish_replaced(&mut journal, id, step)?;
             self.say(&journal, step);
             return Ok(if old.is_some() {
                 Outcome::Settled
@@ -502,7 +474,6 @@ impl<'h> Keeper<'h> {
         entry.state = State::Done;
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)?;
-        self.finish_replaced(&mut journal, id, step)?;
         self.say(&journal, step);
         Ok(Outcome::Done)
     }
@@ -612,28 +583,36 @@ impl<'h> Keeper<'h> {
         Ok(recorded)
     }
 
-    /// Undoes what the step `step` replaced, once its changed action stands, and forgets it.
+    /// Undoes what the step `step` replaced, once every step of the install stands, and forgets
+    /// it; what another entry of the app holds of it passes to that entry ([`pass_within`]), so a
+    /// package a release moved to a step of its own stays.
     fn finish_replaced(&mut self, journal: &mut Journal, id: &str, step: usize) -> Result<(), StepError> {
         let Some(mut entry) = journal.entry(step).cloned() else {
             return Ok(());
         };
-        let Some(replaced) = entry.replaced.take() else {
+        let Some(mut replaced) = entry.replaced.take() else {
             return Ok(());
         };
+        pass_within(journal, &mut replaced);
+        journal.put(Entry {
+            replaced: Some(replaced.clone()),
+            ..entry.clone()
+        });
+        journal.save(&self.journals).map_err(StepError::Journal)?;
         self.undo_entry(id, &replaced, &mut Vec::new(), true)?;
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)
     }
 
-    /// Undoes step `step` of the app `id`'s journal, numbered as written ([`Keeper::align`]),
-    /// and takes it out; what another app holds passes to it instead of being undone.
+    /// Undoes step `step` of the app `id`'s journal and takes it out; what another app holds
+    /// passes to it instead of being undone.
     ///
     /// # Errors
     ///
     /// What failed; the step stays in the journal then, as being undone. A step the journal
     /// hasn't is undone already.
     pub fn undo(&mut self, id: &str, step: usize) -> Result<Outcome, StepError> {
-        let Some(mut journal) = Journal::read(&self.journals, id).map_err(StepError::Journal)? else {
+        let Some(mut journal) = self.journal(id)? else {
             return Ok(Outcome::Undone);
         };
         let Some(entry) = journal.entry(step).cloned() else {
@@ -667,21 +646,41 @@ impl<'h> Keeper<'h> {
         Ok(Outcome::Undone)
     }
 
-    /// Undoes step `step` of the app `id`'s journal, numbered as written ([`Keeper::align`]),
-    /// which a release took out of the install, and takes it out. A claim another entry of the
-    /// app holds passes to that entry instead of being undone, and with a package, what apt
-    /// pulled in for it: a step a release merged into another leaves the machine as it is.
+    /// Takes out of the app `id`'s journal what a release took out of its install, once every
+    /// step of the install stands: the entry numbered `step`, when the install has no step of its
+    /// name, undone and taken out; or, for a step the install has, what its changed action
+    /// replaced. What another entry of the app holds passes to that entry instead of being undone
+    /// ([`pass_within`]): a step a release merged into another leaves the machine as it is.
     ///
     /// # Errors
     ///
-    /// As [`Keeper::undo`].
+    /// [`StepError::StillAStep`] for an entry whose step the install still has, on either side,
+    /// with nothing replaced: this side checks the folder itself, whatever the other side asked.
+    /// Else as [`Keeper::undo`].
     pub fn take_out(&mut self, id: &str, step: usize) -> Result<Outcome, StepError> {
-        let Some(mut journal) = Journal::read(&self.journals, id).map_err(StepError::Journal)? else {
+        let Some(mut journal) = self.journal(id)? else {
             return Ok(Outcome::Undone);
         };
         let Some(entry) = journal.entry(step).cloned() else {
             return Ok(Outcome::Undone);
         };
+        let folder = Folder::load(&self.catalog, id).map_err(StepError::Folder)?;
+        let steps = folder.steps(journal.setup.as_deref()).map_err(StepError::Folder)?;
+        let still = || StepError::StillAStep {
+            app: id.to_owned(),
+            name: entry.action.name.clone(),
+        };
+        if step <= steps.len() {
+            if entry.replaced.is_none() {
+                return Err(still());
+            }
+            self.finish_replaced(&mut journal, id, step)?;
+            return Ok(Outcome::Settled);
+        }
+        // HAZARD: a `run` with `undo` alone waits for the app's removal, whose undo it is.
+        if entry.action.removal_only() || steps.iter().any(|a| a.name == entry.action.name) {
+            return Err(still());
+        }
         self.undo_journaled(&mut journal, id, &entry, &mut Vec::new(), true)?;
         Ok(Outcome::Undone)
     }
@@ -709,9 +708,7 @@ impl<'h> Keeper<'h> {
                 journal::give_back(&self.journals, &handed.holder, &handed.claim, &handed.prior)
                     .map_err(StepError::Journal)?;
             }
-            let mut journal = Journal::read(&self.journals, id)
-                .map_err(StepError::Journal)?
-                .unwrap_or_else(|| Journal::new(id, setup));
+            let mut journal = self.journal(id)?.unwrap_or_else(|| Journal::new(id, setup));
             its_own = self.holds(id, setup, step, &undone.entry.action);
             if journal.entry(step).is_none() {
                 // Being undone, the step done again keeps what it owned; one that owned nothing
@@ -726,21 +723,24 @@ impl<'h> Keeper<'h> {
                 journal.save(&self.journals).map_err(StepError::Journal)?;
             }
         }
-        // An entry the folder has no step for any more (a release took it out, or changed it to
-        // another thing) is only put back, being undone: the next install takes it out, or does
-        // its changed step over it.
+        // An entry the folder has no step for any more (a release took it out, renamed it or
+        // changed it to another thing) is only put back, being undone: the next install takes
+        // it out, or does its changed step over it.
         if !its_own {
             return Ok(Outcome::Settled);
         }
-        self.step_at(id, setup, step, false, false)
+        self.step(id, setup, step, false)
     }
 
-    /// Whether step `step` of the app `id`'s install in `setup` is this side's and acts on the
-    /// same thing as `action`, an entry's: the entry is the step's, not one a release took out
-    /// or changed to another thing.
+    /// Whether step `step` of the app `id`'s install in `setup` is this side's, of the name of
+    /// `action`, an entry's, and acts on the same thing: the entry is the step's, not one a
+    /// release took out, renamed or changed to another thing.
     fn holds(&self, id: &str, setup: Option<&str>, step: usize, action: &Action) -> bool {
-        self.steps(id, setup)
-            .is_ok_and(|(_, steps)| steps.iter().any(|(n, now)| *n == step && now.same_thing(action)))
+        self.steps(id, setup).is_ok_and(|(_, steps)| {
+            steps
+                .iter()
+                .any(|(n, now)| *n == step && now.name == action.name && now.same_thing(action))
+        })
     }
 
     /// Sets the vendor repository of root's settled `apt` step `step` of the app `id` up again,
@@ -800,12 +800,10 @@ impl<'h> Keeper<'h> {
     }
 
     /// Whether `entry`, a `run` with `undo` alone of this side's journal of the app `id` in
-    /// `setup`, is stale: the folder has it as the other side's, whose entry runs it, and no
-    /// longer as this side's. Never when the folder can't be read.
+    /// `setup`, is stale: the folder has its step, by its name, as the other side's `run` with
+    /// `undo` alone, whose entry runs it, and no longer as this side's. Never when the folder
+    /// can't be read.
     fn moved_away(&self, id: &str, setup: Option<&str>, entry: &Entry) -> bool {
-        let Kind::Run { undo, .. } = &entry.action.kind else {
-            return false;
-        };
         if !entry.action.removal_only() {
             return false;
         }
@@ -815,52 +813,19 @@ impl<'h> Keeper<'h> {
         let Ok(steps) = folder.steps(setup) else {
             return false;
         };
-        let words = self.words().with_version(folder.version());
-        let undoes = |a: &Action| {
-            a.removal_only()
-                && a.resolve(&words, &folder.dir)
-                    .is_ok_and(|a| matches!(&a.kind, Kind::Run { undo: now, .. } if now == undo))
-        };
-        let there = |side: Side| steps.iter().any(|a| a.side() == side && undoes(a));
-        let other = match self.side {
-            Side::User => Side::Root,
-            Side::Root => Side::User,
-        };
-        there(other) && !there(self.side)
+        let mine = steps.iter().find(|a| a.name == entry.action.name);
+        mine.is_some_and(|a| a.side() != self.side && a.removal_only())
     }
 
     /// Takes `entry` out of `journal` for another thing its step now holds: undone, or, for a `run`
-    /// that only undoes, moved to the folder's own such step of this side that the journal doesn't
-    /// record yet, owned as it was, else forgotten.
-    fn set_aside(
-        &mut self,
-        journal: &mut Journal,
-        id: &str,
-        setup: Option<&str>,
-        entry: &Entry,
-    ) -> Result<(), StepError> {
+    /// that only undoes, forgotten.
+    fn set_aside(&mut self, journal: &mut Journal, id: &str, entry: &Entry) -> Result<(), StepError> {
         if !entry.action.removal_only() {
             return self.undo_journaled(journal, id, entry, &mut Vec::new(), false);
         }
         // HAZARD: never undone here: the app stays, and its undo (Proton VPN's kill switch turned
-        // off) is for a removal. It moves rather than wait for its new step to be reached, as a
-        // rolled-back removal does again only the steps it undid.
+        // off) is for a removal, which the step that now holds its name no longer asks for.
         journal.drop_step(entry.step);
-        let (_, steps) = self.steps(id, setup)?;
-        let moved = steps
-            .into_iter()
-            .find(|(n, action)| action.removal_only() && journal.entry(*n).is_none());
-        if let Some((step, action)) = moved {
-            let owned = entry.claims.iter().any(|c| c.owned);
-            journal.put(Entry {
-                step,
-                state: if owned { State::Done } else { State::Found },
-                claims: entry.claims.clone(),
-                prior: journal::Prior::default(),
-                action,
-                replaced: None,
-            });
-        }
         journal.save(&self.journals).map_err(StepError::Journal)
     }
 
@@ -1027,7 +992,8 @@ fn keep_brought(journal: &mut Journal, entry: &Entry, handed: &[Handed]) {
 }
 
 /// The entry of `journal` other than step `step`'s that takes `claim` from a step a release took
-/// out: one that holds it, or for a `dir:` claim, one whose path or folder is in that folder.
+/// out: one that holds it, or for a `dir:` claim, one whose path or folder is in that folder, as
+/// its file stands in it.
 fn taker(journal: &Journal, step: usize, claim: &str) -> Option<usize> {
     let dir = claim.strip_prefix("dir:").map(Path::new);
     let inside = |c: &Claim| {
@@ -1062,8 +1028,9 @@ fn folds(journal: &Journal, entry: &Entry) -> bool {
 /// Passes what `entry`, a step a release took out, owns and another entry of `journal` takes
 /// ([`taker`]) to that entry, which owns it from then on with `entry`'s prior state, so the undo
 /// leaves it: a package of two steps a release merged into one stays, as does the folder of a
-/// file another step writes in it. With a package, what apt pulled in for the step (its `dep:`
-/// claims) goes to the first entry that took one.
+/// file another step writes in it. What apt pulled in for the step (its `dep:` claims) goes to
+/// the first entry that took a package, and only once every package it owned passed: a step of
+/// which some package goes keeps them for its undo, which takes away those nothing needs.
 fn pass_within(journal: &mut Journal, entry: &mut Entry) {
     let (step, prior) = (entry.step, entry.prior.clone());
     let takers: Vec<(String, usize)> = passable(entry)
@@ -1092,6 +1059,9 @@ fn pass_within(journal: &mut Journal, entry: &mut Entry) {
     let Some(taker) = package_taker else {
         return;
     };
+    if entry.claims.iter().any(|c| c.owned && c.claim.starts_with("package:")) {
+        return;
+    }
     let deps: Vec<Claim> = entry
         .claims
         .iter_mut()
@@ -1130,14 +1100,14 @@ fn set_up_repo(entry: &Entry) -> Option<&str> {
 }
 
 /// The app `id`'s journal of `side` in `dir`, its entries numbered as the folder in `catalog` now
-/// numbers their steps in the setup it records ([`Journal::align`]), its actions resolved with
-/// `words`; as it is written when the folder or that setup can't be read. Every reader that
-/// matches entries to the folder's steps by number reads it so, whichever side wrote it last.
+/// numbers the steps of their names in the setup it records ([`Journal::align`]); as it is
+/// written when the folder or that setup can't be read. Every reader that matches entries to the
+/// folder's steps by number reads it so, whichever side wrote it last.
 ///
 /// # Errors
 ///
 /// [`JournalError`] when the journal can't be read.
-fn aligned(dir: &Path, id: &str, catalog: &Path, words: Words, side: Side) -> Result<Option<Journal>, JournalError> {
+fn aligned(dir: &Path, id: &str, catalog: &Path, side: Side) -> Result<Option<Journal>, JournalError> {
     let Some(mut journal) = Journal::read(dir, id)? else {
         return Ok(None);
     };
@@ -1147,15 +1117,27 @@ fn aligned(dir: &Path, id: &str, catalog: &Path, words: Words, side: Side) -> Re
     let Ok(all) = folder.steps(journal.setup.as_deref()) else {
         return Ok(Some(journal));
     };
-    let words = words.with_version(folder.version());
-    let steps: Vec<(usize, Option<Action>)> = all
+    let steps: Vec<(usize, &str)> = all
         .iter()
         .enumerate()
         .filter(|(_, action)| action.side() == side)
-        .map(|(i, action)| (i + 1, action.resolve(&words, &folder.dir).ok()))
+        .map(|(i, action)| (i + 1, action.name.as_str()))
         .collect();
     journal.align(&steps, all.len());
     Ok(Some(journal))
+}
+
+/// Whether `entry`, of an install whose steps are named `names`, numbered after its last step,
+/// stays recorded until the app's removal rather than being taken out by an install: a `run`
+/// with `undo` alone, whose undo is for the removal; one that owns nothing, found on the machine,
+/// which has nothing to undo; and one of a step the install has on the other side, moved there.
+fn lingers(entry: &Entry, names: &[&str]) -> bool {
+    let owns = entry.claims.iter().any(|c| c.owned)
+        || entry
+            .replaced
+            .as_ref()
+            .is_some_and(|r| r.claims.iter().any(|c| c.owned));
+    entry.action.removal_only() || !owns || names.contains(&entry.action.name.as_str())
 }
 
 /// The vendor repositories the root journals in `dir` record an `apt` step setting up, each with
@@ -1519,7 +1501,11 @@ impl<'a> Engine<'a> {
         }
         self.sink.event(&UpdateEvent::Progress { done: total, total });
         // After the steps, so what a step taken out shares with one that stands passes to it.
-        finished.switch |= self.take_out(id, total)?;
+        let (switch, undid) = self.take_out(id, &steps)?;
+        finished.switch |= switch;
+        if undid {
+            finished.switch |= self.check_again(id, setup, &steps)?;
+        }
         let mut journal = Journal::read(self.user.journals(), id)
             .map_err(EngineError::Journal)?
             .unwrap_or_else(|| Journal::new(id, setup));
@@ -1534,7 +1520,6 @@ impl<'a> Engine<'a> {
     /// with its ready checks passed when something will change, root started when a step needs
     /// it, and root's half of an adopted app recorded. Returns the steps either journal has.
     fn begin(&mut self, folder: &Folder, id: &str, setup: Option<&str>) -> Result<Begun, EngineError> {
-        self.user.align(id).map_err(EngineError::Journal)?;
         let user_journal = self.journal(Side::User, id)?;
         let root_journal = self.journal(Side::Root, id)?;
         let had = user_journal.as_ref().or(root_journal.as_ref()).map(|j| j.setup.clone());
@@ -1548,12 +1533,14 @@ impl<'a> Engine<'a> {
         // An installed app whose every step stands changes nothing, so it needn't be ready: an
         // update checks it while the app is open. A step whose record only words the same thing
         // differently stands too: the step rewrites its record and leaves the machine as it is.
-        let total = folder.steps(setup).map_err(EngineError::Folder)?.len();
+        let all = folder.steps(setup).map_err(EngineError::Folder)?;
+        let names: Vec<&str> = all.iter().map(|a| a.name.as_str()).collect();
+        let total = all.len();
         let taken_out = |journal: &Option<Journal>| {
             journal
                 .iter()
                 .flat_map(|j| &j.entries)
-                .any(|e| e.step > total && !e.action.removal_only())
+                .any(|e| e.replaced.is_some() || (e.step > total && !lingers(e, &names)))
         };
         let stands = was_complete
             && !taken_out(&user_journal)
@@ -1578,7 +1565,6 @@ impl<'a> Engine<'a> {
             ((switching || !was_complete) && root_entries) || adopting || root_unsettled || taken_out(&root_journal);
         if needs_root {
             self.start_root()?;
-            self.align_root(id)?;
         }
         if adopting {
             self.adopt_root(id)?;
@@ -1696,12 +1682,6 @@ impl<'a> Engine<'a> {
         }
         if root_journal.as_ref().is_some_and(|j| !j.entries.is_empty()) {
             self.start_root()?;
-        }
-        // The numbers the removal undoes by, and its rollback does again by, stay as written here
-        // to its end: undoing a step never moves another.
-        self.user.align(id).map_err(EngineError::Journal)?;
-        if self.root_started {
-            self.align_root(id)?;
         }
         let user_journal = Journal::read(self.user.journals(), id).map_err(EngineError::Journal)?;
         // What the user journal says of the app beyond its steps, which a rollback writes back:
@@ -2090,12 +2070,6 @@ impl<'a> Engine<'a> {
         if !self.root_started {
             self.root.start().map_err(StepError::RootLost)?;
             self.root_started = true;
-            self.align_root(request.app()).map_err(|e| match e {
-                EngineError::Step { source, .. } => *source,
-                e => StepError::RootFailed {
-                    why: crate::update::event::chain(&e),
-                },
-            })?;
         }
         match self.root.call(request) {
             Ok(Reply::Step { outcome, notes }) => {
@@ -2108,22 +2082,6 @@ impl<'a> Engine<'a> {
             Ok(Reply::Refused { why, .. }) => Err(StepError::RootRefused { why }),
             Ok(Reply::Ready) => Err(StepError::RootOutOfTurn),
             Err(e) => Err(StepError::RootLost(e)),
-        }
-    }
-
-    /// Has root write its journal of the app `id` numbered as the folder now numbers its steps
-    /// ([`Keeper::align`]), as the user's side reads it, before a run uses its numbers.
-    fn align_root(&mut self, id: &str) -> Result<(), EngineError> {
-        let failed = |why: String| EngineError::Step {
-            name: "Reading what root has of the app".to_owned(),
-            source: Box::new(StepError::RootFailed { why }),
-        };
-        match self.root.call(&Request::Align { app: id.to_owned() }) {
-            Ok(Reply::Ready) => Ok(()),
-            Ok(Reply::Failed { why }) => Err(failed(why)),
-            Ok(Reply::Refused { why, .. }) => Err(failed(why.join("; "))),
-            Ok(Reply::Step { .. }) => Err(failed("the root helper answered out of turn".to_owned())),
-            Err(e) => Err(EngineError::Root(e)),
         }
     }
 
@@ -2198,7 +2156,7 @@ impl<'a> Engine<'a> {
             Side::User => self.user.journals(),
             Side::Root => &self.root_journals,
         };
-        aligned(dir, id, &self.user.catalog, self.user.words(), side).map_err(EngineError::Journal)
+        aligned(dir, id, &self.user.catalog, side).map_err(EngineError::Journal)
     }
 
     /// Every step of both journals of the app `id`, newest first.
@@ -2253,26 +2211,46 @@ impl<'a> Engine<'a> {
         Ok(switch)
     }
 
-    /// Undoes, newest first, the steps a release took out of the app `id`'s install of `total`
-    /// steps, once its steps stand: the entries [`Journal::align`] numbers after the last step,
-    /// each through [`Keeper::take_out`], so what a step that stands holds of it stays. A `run`
-    /// with `undo` alone stays recorded, as its undo is for the app's removal, which runs it.
-    /// Whether `packages.toml` changed.
-    fn take_out(&mut self, id: &str, total: usize) -> Result<bool, EngineError> {
+    /// Takes out what a release took out of the app `id`'s install of `steps`, once its steps
+    /// stand, each through [`Keeper::take_out`], so what a step that stands holds of it stays:
+    /// first, newest first, the entries of names the install no longer has, but those that
+    /// linger until the removal ([`lingers`]); then what each changed step replaced. A step taken
+    /// out that passes everything it owned to steps that stand, a step a release merged into
+    /// another, is no undo, and isn't reported as one; nor is what a changed step replaced, as
+    /// the step stands. Whether `packages.toml` changed, and whether a step taken out was undone.
+    fn take_out(&mut self, id: &str, steps: &[Action]) -> Result<(bool, bool), EngineError> {
+        let names: Vec<&str> = steps.iter().map(|a| a.name.as_str()).collect();
+        let total = steps.len();
+        let mut gone = Vec::new();
+        let mut replaced = Vec::new();
+        for side in [Side::User, Side::Root] {
+            let Some(journal) = self.journal(side, id)? else {
+                continue;
+            };
+            for entry in &journal.entries {
+                let undoable = Undoable {
+                    step: entry.step,
+                    side,
+                    name: entry.action.name.clone(),
+                    kind_is_nix: matches!(entry.action.kind, Kind::Nix { .. }),
+                    kind_is_run: matches!(entry.action.kind, Kind::Run { .. }),
+                    removal_only: entry.action.removal_only(),
+                };
+                if entry.step > total {
+                    if !lingers(entry, &names) {
+                        gone.push((undoable, !folds(&journal, entry)));
+                    }
+                } else if entry.replaced.is_some() {
+                    replaced.push((undoable, false));
+                }
+            }
+        }
+        gone.sort_by_key(|(u, _)| std::cmp::Reverse(u.step));
+        let of = gone.first().map_or(0, |(u, _)| u.step);
         let mut switch = false;
-        let gone: Vec<Undoable> = self
-            .journaled(id)?
-            .into_iter()
-            .filter(|u| u.step > total && !u.removal_only)
-            .collect();
-        let of = gone.first().map_or(0, |u| u.step);
-        for undoable in gone {
-            // A step a release merged into another leaves its journal with nothing undone, which
-            // the run doesn't report as an undo.
-            let folded = self
-                .journal(undoable.side, id)?
-                .is_some_and(|j| j.entry(undoable.step).is_some_and(|e| folds(&j, e)));
-            if !folded {
+        let undid = gone.iter().any(|(_, reported)| *reported);
+        for (undoable, reported) in gone.into_iter().chain(replaced) {
+            if reported {
                 self.report(id, undoable.step, of, &undoable.name, ActionState::Undoing);
             }
             let taken = match undoable.side {
@@ -2292,9 +2270,50 @@ impl<'a> Engine<'a> {
                 name: undoable.name.clone(),
                 source: Box::new(source),
             })?;
-            if !folded {
-                switch |= undoable.kind_is_nix;
+            switch |= undoable.kind_is_nix;
+            if reported {
                 self.report(id, undoable.step, of, &undoable.name, ActionState::Undone);
+            }
+        }
+        Ok((switch, undid))
+    }
+
+    /// Checks every step of the app `id`'s install in `setup` again once a step taken out was
+    /// undone, and does again one whose check now fails: a step a release renamed was found done
+    /// under its new name while its old entry still held it, and the old one's undo took it away.
+    /// Root's steps are checked when root runs. Whether `packages.toml` changed.
+    fn check_again(&mut self, id: &str, setup: Option<&str>, steps: &[Action]) -> Result<bool, EngineError> {
+        let total = steps.len();
+        let mut switch = false;
+        for (i, action) in steps.iter().enumerate() {
+            let step = i + 1;
+            let outcome = match action.side() {
+                Side::User => {
+                    let outcome = self.user.step(id, setup, step, self.windows);
+                    self.user_notes();
+                    outcome
+                }
+                Side::Root if !self.root_started => continue,
+                Side::Root => self.root_step(&Request::Step {
+                    app: id.to_owned(),
+                    setup: setup.map(str::to_owned),
+                    step,
+                    windows: self.windows,
+                }),
+            };
+            match outcome {
+                Ok(Outcome::Done) => {
+                    switch |= matches!(action.kind, Kind::Nix { .. });
+                    self.report(id, step, total, &action.name, ActionState::Done);
+                }
+                Ok(_) => {}
+                Err(source) => {
+                    self.report(id, step, total, &action.name, ActionState::Failed);
+                    return Err(EngineError::Step {
+                        name: action.name.clone(),
+                        source: Box::new(source),
+                    });
+                }
             }
         }
         Ok(switch)

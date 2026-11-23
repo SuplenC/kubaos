@@ -305,7 +305,7 @@ fn a_step_inside_a_downloads_folder_comes_after_the_download() {
     let after = format!(
         "{ABOUT}{}{}",
         download("~/.v/@VERSION@", "1.0"),
-        download("~/.v/@VERSION@/gpu", "1.0")
+        download("~/.v/@VERSION@/gpu", "1.0").replacen("name = \"Download\"", "name = \"Download its GPU part\"", 1)
     );
 
     let refused = Folder::parse("sketch", Path::new("/catalog/sketch"), &before);

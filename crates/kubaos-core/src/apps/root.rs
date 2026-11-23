@@ -40,22 +40,6 @@ use super::engine::StepError;
 use super::folder::is_app_id;
 use crate::update::event::chain;
 
-impl Request {
-    /// The app it is about.
-    pub fn app(&self) -> &str {
-        match self {
-            Self::Preflight { app, .. }
-            | Self::Step { app, .. }
-            | Self::Undo { app, .. }
-            | Self::TakeOut { app, .. }
-            | Self::Align { app }
-            | Self::Redo { app, .. }
-            | Self::Adopt { app, .. }
-            | Self::Refresh { app, .. } => app,
-        }
-    }
-}
-
 /// What the user's side asks root to do.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
@@ -76,12 +60,11 @@ pub enum Request {
     },
     /// One step of root's journal of the app, undone.
     Undo { app: String, step: usize },
-    /// One step of root's journal of the app that a release took out, undone, but what another
-    /// of its entries holds.
+    /// What a release took out of root's half of the app's install, once its steps stand: an
+    /// entry of a step the install no longer has, or what a changed step replaced; what another
+    /// of its entries holds passes to it. Root checks the folder itself, and refuses a step the
+    /// install still has.
     TakeOut { app: String, step: usize },
-    /// Root's journal of the app numbered as the folder now numbers its steps, before a run
-    /// uses its numbers.
-    Align { app: String },
     /// A root step this run undid, done again for a removal rolled back, from root's own record
     /// of the undo.
     Redo {
@@ -282,10 +265,7 @@ impl<'h> Server<'h> {
             | Request::Step { app, setup, .. }
             | Request::Adopt { app, setup, .. }
             | Request::Redo { app, setup, .. } => (app, setup.as_deref()),
-            Request::Undo { app, .. }
-            | Request::TakeOut { app, .. }
-            | Request::Align { app }
-            | Request::Refresh { app, .. } => (app, None),
+            Request::Undo { app, .. } | Request::TakeOut { app, .. } | Request::Refresh { app, .. } => (app, None),
         };
         if !is_app_id(app) {
             return refuse(format!("{app:?} is not an app id"));
@@ -299,7 +279,7 @@ impl<'h> Server<'h> {
         // root alone writes; a refresh runs the release's repository setup all the same.
         let checked = match &request {
             Request::Refresh { .. } => self.release_only(),
-            Request::Undo { .. } | Request::Align { .. } if !self.catalog.join(app).exists() => Ok(()),
+            Request::Undo { .. } if !self.catalog.join(app).exists() => Ok(()),
             _ => self.root_only(app),
         };
         if let Err(why) = checked {
@@ -339,10 +319,6 @@ impl<'h> Server<'h> {
                     notes: self.keeper.take_notes(),
                 },
                 Err(e) => answer(&e),
-            },
-            Request::Align { app } => match self.keeper.align(&app) {
-                Ok(()) => Reply::Ready,
-                Err(e) => Reply::Failed { why: chain(&e) },
             },
             Request::Redo { app, setup, step } => match self.keeper.redo(&app, setup.as_deref(), step) {
                 Ok(outcome) => Reply::Step {
@@ -448,7 +424,10 @@ fn owned_by(path: &Path, owner: u32) -> Result<(), String> {
 /// The reply to a step that didn't go through: a refusal for a request the helper doesn't take.
 fn answer(e: &StepError) -> Reply {
     match e {
-        StepError::WrongSide { .. } | StepError::NoStep { .. } | StepError::Folder(_) => Reply::Refused {
+        StepError::WrongSide { .. }
+        | StepError::NoStep { .. }
+        | StepError::StillAStep { .. }
+        | StepError::Folder(_) => Reply::Refused {
             why: vec![chain(e)],
             yours: false,
         },

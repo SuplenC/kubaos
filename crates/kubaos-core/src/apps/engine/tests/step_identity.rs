@@ -400,61 +400,38 @@ fn steps_of_the_same_thing_a_release_changes_keep_their_entries_by_name_when_ano
 }
 
 #[test]
-fn steps_of_the_same_thing_a_release_renames_and_changes_keep_their_entries_by_their_undo_when_another_comes_in_front()
-{
+fn a_step_a_release_renames_is_undone_and_done_again_under_its_new_name() {
     let world = twins();
     world.install("twins", true).0.unwrap();
     let from = world.host.state.borrow().log.len();
-    // Neither name nor action is the one recorded: each run goes by what it undoes.
     let renamed = TWO_RUNS
         .replace("Start the first", "Start one")
-        .replace("Start the second", "Start two")
-        .replace("[\"./up-a\"]", "[\"./up-a\", \"again\"]")
-        .replace("[\"./up-b\"]", "[\"./up-b\", \"again\"]");
+        .replace("Start the second", "Start two");
     world.write_app("twins", &put_in_front(&renamed, THIRD_RUN));
 
-    let (installed, events) = world.install("twins", true);
+    world.install("twins", true).0.unwrap();
 
-    installed.unwrap();
-    assert!(!undid_anything(&events), "{:?}", events.0);
     let log = world.log_since(from);
-    assert!(log.contains(&"run ./up-c".to_owned()), "{log:#?}");
-    assert!(!log.iter().any(|l| l.starts_with("run ./down")), "{log:#?}");
+    for line in ["run ./up-c", "run ./down-a", "run ./down-b", "run ./up-a", "run ./up-b"] {
+        assert_eq!(log.iter().filter(|l| *l == line).count(), 1, "{line}: {log:#?}");
+    }
+    let at = |line: &str| log.iter().position(|l| l == line).unwrap();
+    assert!(
+        at("run ./down-a") < at("run ./up-a"),
+        "the old name's undo ran last: {log:#?}"
+    );
+    assert!(mark(&world, "twins-a").exists() && mark(&world, "twins-b").exists());
     let done = |step, name: &str| (step, name.to_owned(), State::Done, true);
     assert_eq!(
         root_entries(&world),
         [done(1, "Start the third"), done(3, "Start one"), done(4, "Start two")]
     );
-    let (_, root) = world.journals("twins");
-    let undoes: Vec<Vec<String>> = root
-        .unwrap()
-        .entries
-        .iter()
-        .filter_map(|e| match &e.action.kind {
-            crate::apps::action::Kind::Run { undo, .. } => Some(undo.clone()),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(
-        undoes,
-        [
-            vec!["./down-c".to_owned()],
-            vec!["./down-a".to_owned()],
-            vec!["./down-b".to_owned()]
-        ]
-    );
-
-    world.remove("twins").0.unwrap();
-    let log = world.log_since(from);
-    for down in ["run ./down-a", "run ./down-b", "run ./down-c"] {
-        assert_eq!(log.iter().filter(|l| *l == down).count(), 1, "{down}: {log:#?}");
-    }
 }
 
-/// A root `run` of `name` that starts `up` and undoes with `down`, as a journal records it.
-fn run_entry(step: usize, name: &str, up: &str, down: &str) -> Entry {
+/// A root `apt` step of `name` that installs `package`, as a journal records it.
+fn apt_entry(step: usize, name: &str, package: &str) -> Entry {
     let action: Action = toml::from_str(&format!(
-        "name = \"{name}\"\nkind = \"run\"\nroot = true\ndo = [\"{up}\"]\ncheck = [\"{up}-check\"]\nundo = [\"{down}\"]\n"
+        "name = \"{name}\"\nkind = \"apt\"\npackages = [\"{package}\"]\n"
     ))
     .unwrap();
     Entry {
@@ -467,31 +444,67 @@ fn run_entry(step: usize, name: &str, up: &str, down: &str) -> Entry {
     }
 }
 
-#[test]
-fn steps_of_the_same_thing_with_nothing_else_in_common_go_with_their_entries_in_order() {
-    let mut journal = Journal::new("twins", None);
-    journal.entries = vec![
-        run_entry(1, "a", "./a", "./down-a"),
-        run_entry(2, "b", "./b", "./down-b"),
-    ];
-    let steps: Vec<(usize, Option<Action>)> = [
-        ("c", "./c", "./down-c"),
-        ("d", "./d", "./down-d"),
-        ("e", "./e", "./down-e"),
-    ]
-    .iter()
-    .enumerate()
-    .map(|(i, (name, up, down))| (i + 1, Some(run_entry(0, name, up, down).action)))
-    .collect();
+fn numbered(journal: &Journal) -> Vec<(usize, String)> {
+    journal
+        .entries
+        .iter()
+        .map(|e| (e.step, format!("{:?}", e.action.kind)))
+        .collect()
+}
 
-    journal.align(&steps, 3);
+#[test]
+fn an_entry_goes_with_the_step_of_its_name_whatever_its_action_and_its_place() {
+    let mut journal = Journal::new("x", None);
+    journal.entries = vec![
+        apt_entry(1, "A", "pa"),
+        apt_entry(2, "B", "pb"),
+        apt_entry(3, "C", "pc"),
+    ];
+
+    journal.align(&[(1, "New"), (2, "C"), (4, "A")], 4);
 
     let names: Vec<(usize, &str)> = journal
         .entries
         .iter()
         .map(|e| (e.step, e.action.name.as_str()))
         .collect();
-    assert_eq!(names, [(1, "a"), (2, "b")]);
+    assert_eq!(names, [(2, "C"), (4, "A"), (5, "B")]);
+}
+
+#[test]
+fn entries_of_one_name_from_an_older_catalog_align_the_same_every_time() {
+    let mut journal = Journal::new("x", None);
+    journal.entries = vec![apt_entry(1, "N", "pa"), apt_entry(2, "N", "pb")];
+    let steps = [(1, "M"), (2, "N")];
+
+    journal.align(&steps, 2);
+    let once = numbered(&journal);
+    journal.align(&steps, 2);
+
+    assert_eq!(numbered(&journal), once);
+    assert_eq!(once.iter().map(|(n, _)| *n).collect::<Vec<_>>(), [2, 3]);
+    assert!(
+        once[0].1.contains("pa"),
+        "the first of the name keeps the step: {once:?}"
+    );
+}
+
+#[test]
+fn taking_an_entry_out_never_moves_another() {
+    let mut journal = Journal::new("x", None);
+    journal.entries = vec![
+        apt_entry(1, "Kept", "pk"),
+        apt_entry(2, "Gone", "pg"),
+        apt_entry(3, "Also gone", "pa"),
+    ];
+    let steps = [(1, "Kept")];
+    journal.align(&steps, 1);
+    let before = numbered(&journal);
+
+    journal.drop_step(before[1].0);
+    journal.align(&steps, 1);
+
+    assert_eq!(numbered(&journal), [before[0].clone(), before[2].clone()]);
 }
 
 /// A package, then two root runs: the images pulled, then the stack started, each undone apart.
@@ -839,5 +852,297 @@ fn a_roots_step_taken_out_in_front_of_another_of_an_app_of_root_alone_is_the_one
     assert_eq!(
         reported(&events, "Write its old config"),
         [ActionState::Undoing, ActionState::Undone]
+    );
+}
+
+/// The packages of an `apt` step of `name`, as TOML.
+fn apt_step(name: &str, packages: &str) -> String {
+    format!("[[action]]\nname = \"{name}\"\nkind = \"apt\"\npackages = [{packages}]\n\n")
+}
+
+#[test]
+fn an_apt_step_a_release_splits_in_two_keeps_both_packages_whichever_comes_first() {
+    let one = super::app(&apt_step("Install the tools", "\"tool-a\", \"tool-b\""));
+    let kept = apt_step("Install the tools", "\"tool-a\"");
+    let split = apt_step("Install tool b", "\"tool-b\"");
+    for (at, text) in [
+        ("after", super::app(&format!("{kept}{split}"))),
+        ("before", super::app(&format!("{split}{kept}"))),
+    ] {
+        let world = World::new(&[("split", &one)]);
+        world.install("split", true).0.unwrap();
+        let from = world.host.state.borrow().log.len();
+        world.write_app("split", &text);
+
+        world.install("split", true).0.unwrap();
+
+        let log = world.log_since(from);
+        assert!(!log.iter().any(|l| l.starts_with("apt")), "{at}: {log:#?}");
+        world.remove("split").0.unwrap();
+        let state = world.host.state.borrow();
+        assert!(
+            !state.dpkg.contains_key("tool-a") && !state.dpkg.contains_key("tool-b"),
+            "{at}: the removal left {:?}",
+            state.dpkg
+        );
+    }
+}
+
+#[test]
+fn a_run_a_release_moves_from_root_to_the_user_keeps_its_stack_until_the_removal() {
+    let engine = apt_step("Install the engine", "\"moved-engine\"");
+    let run = "[[action]]\nname = \"Start the stack\"\nkind = \"run\"\nroot = true\ndo = [\"./up\"]\n\
+               check = [\"./up-to-date\"]\nundo = [\"./down\"]\n";
+    let world = World::new(&[("moved", &super::app(&format!("{engine}{run}")))]);
+    stack_scripts(&world, "moved", "");
+    world.install("moved", true).0.unwrap();
+    let from = world.host.state.borrow().log.len();
+    world.write_app(
+        "moved",
+        &super::app(&format!("{engine}{}", run.replace("root = true\n", ""))),
+    );
+
+    let events = world.install("moved", true).1;
+
+    assert!(mark(&world, "moved").exists(), "the update tore the stack down");
+    assert!(!touched_the_stack(&world.log_since(from)));
+    assert!(!undid_anything(&events), "{:?}", events.0);
+
+    world.remove("moved").0.unwrap();
+    let downs = world.log_since(from).iter().filter(|l| *l == "run ./down").count();
+    assert_eq!(downs, 1);
+    assert!(!mark(&world, "moved").exists());
+}
+
+#[test]
+fn a_run_that_only_undoes_a_release_takes_out_while_it_adds_another_keeps_its_own_undo() {
+    let file = "[[action]]\nname = \"Write\"\nkind = \"file\"\nto = \"~/.config/uo/x\"\ntext = \"x\\n\"\n\n";
+    let off = |name: &str, script: &str| {
+        format!("[[action]]\nname = \"{name}\"\nkind = \"run\"\nundo = [\"./{script}\"]\n\n")
+    };
+    let world = World::new(&[("uo", &super::app(&format!("{file}{}", off("Turn A off", "off-a"))))]);
+    world.script("uo", "off-a", "systemctl stop a.service");
+    world.script("uo", "off-b", "systemctl stop b.service");
+    world.install("uo", true).0.unwrap();
+    world.write_app("uo", &super::app(&format!("{file}{}", off("Turn B off", "off-b"))));
+
+    world.install("uo", true).0.unwrap();
+
+    let calls = world.host.sandbox().calls();
+    assert!(!calls.iter().any(|c| c.starts_with("systemctl stop")), "{calls:?}");
+    world.remove("uo").0.unwrap();
+    let calls = world.host.sandbox().calls();
+    for stop in ["systemctl stop a.service", "systemctl stop b.service"] {
+        assert_eq!(calls.iter().filter(|c| *c == stop).count(), 1, "{stop}: {calls:?}");
+    }
+}
+
+#[test]
+fn root_refuses_to_take_out_a_step_its_catalog_still_has_whatever_the_user_side_asks() {
+    let files = "[[action]]\nname = \"One\"\nkind = \"file\"\nto = \"/etc/tk/one\"\ntext = \"1\\n\"\n\n\
+                 [[action]]\nname = \"Two\"\nkind = \"file\"\nto = \"/etc/tk/two\"\ntext = \"2\\n\"\n";
+    let world = World::new(&[(
+        "tk",
+        &super::app(&format!("{}{files}", apt_step("Install tk", "\"tk\""))),
+    )]);
+    world.install("tk", true).0.unwrap();
+    let mut root = world.root();
+
+    for step in [1, 2, 3, 9] {
+        let reply = root.serve(&format!(r#"{{"op":"take_out","app":"tk","step":{step}}}"#));
+        assert!(
+            matches!(
+                reply,
+                crate::apps::root::Reply::Refused { .. } | crate::apps::root::Reply::Step { .. }
+            ),
+            "{step}: {reply:?}"
+        );
+    }
+
+    assert!(
+        world.system_path("/etc/tk/one").is_file(),
+        "root took out a step the catalog has"
+    );
+    assert!(
+        world.system_path("/etc/tk/two").is_file(),
+        "root took out a step the catalog has"
+    );
+    assert!(world.host.state.borrow().dpkg.contains_key("tk"));
+    let reply = root.serve(r#"{"op":"align","app":"tk"}"#);
+    assert!(matches!(reply, crate::apps::root::Reply::Refused { .. }), "{reply:?}");
+}
+
+#[test]
+fn a_catalog_refuses_two_steps_of_one_install_under_one_name_but_not_across_setups() {
+    let twice = super::app(&format!(
+        "{}{}",
+        apt_step("Install the packages", "\"pa\""),
+        apt_step("Install the packages", "\"pb\"")
+    ));
+    let world = World::new(&[("flip", &twice)]);
+
+    let refused = format!("{:?}", crate::apps::Catalog::load(&world.catalog).unwrap_err());
+
+    assert!(refused.contains("DuplicateStepName"), "{refused}");
+    let setups = super::app(&format!(
+        "{}[setup.a]\nname = \"A\"\nsummary = \"A\"\n\n[[setup.a.action]]\nname = \"Write it\"\nkind = \"file\"\n\
+         to = \"~/a\"\ntext = \"a\\n\"\n\n[setup.b]\nname = \"B\"\nsummary = \"B\"\n\n[[setup.b.action]]\n\
+         name = \"Write it\"\nkind = \"file\"\nto = \"~/b\"\ntext = \"b\\n\"\n",
+        apt_step("Install the packages", "\"pa\"")
+    ));
+    let world = World::new(&[("both", &setups)]);
+    crate::apps::Catalog::load(&world.catalog).unwrap();
+}
+
+#[test]
+fn an_older_journal_of_two_steps_under_one_name_updates_keeping_every_package() {
+    let world = World::new(&[(
+        "flip",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install the packages", "\"pa\""),
+            apt_step("Install more", "\"pb\"")
+        )),
+    )]);
+    world.install("flip", true).0.unwrap();
+    // As a catalog before names were one step's alone left it: both entries of one name.
+    let (_, root) = world.journals("flip");
+    let mut root = root.unwrap();
+    root.entries[1].action.name = "Install the packages".to_owned();
+    root.save(&world.root_journals).unwrap();
+    let from = world.host.state.borrow().log.len();
+    world.write_app(
+        "flip",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install more", "\"pb\", \"px\""),
+            apt_step("Install the packages", "\"pa\", \"py\"")
+        )),
+    );
+
+    world.install("flip", true).0.unwrap();
+
+    let log = world.log_since(from);
+    assert!(!log.iter().any(|l| l.contains("remove")), "{log:#?}");
+    {
+        let state = world.host.state.borrow();
+        for package in ["pa", "pb", "px", "py"] {
+            assert!(state.dpkg.contains_key(package), "{package}: {:?}", state.dpkg);
+        }
+    }
+    world.remove("flip").0.unwrap();
+    let state = world.host.state.borrow();
+    for package in ["pa", "pb", "px", "py"] {
+        assert!(!state.dpkg.contains_key(package), "{package} stays: {:?}", state.dpkg);
+    }
+}
+
+#[test]
+fn an_update_killed_partway_through_a_release_that_renumbers_its_steps_finishes_on_the_next() {
+    let engine = apt_step("Install the engine", "\"crash-engine\"");
+    let run = "[[action]]\nname = \"Start the stack\"\nkind = \"run\"\nroot = true\ndo = [\"./up\"]\n\
+               check = [\"./up-to-date\"]\nundo = [\"./down\"]\n\n";
+    let file = "[[action]]\nname = \"Write\"\nkind = \"file\"\nto = \"~/.config/crash/x\"\ntext = \"x\\n\"\n";
+    let world = World::new(&[("crash", &super::app(&format!("{engine}{run}{file}")))]);
+    stack_scripts(&world, "crash", "");
+    world.install("crash", true).0.unwrap();
+    let from = world.host.state.borrow().log.len();
+    let front = "[[action]]\nname = \"Front\"\nkind = \"file\"\nto = \"/etc/crash/front\"\ntext = \"f\\n\"\n\n";
+    world.write_app("crash", &super::app(&format!("{front}{engine}{run}")));
+    let mut root = world.root();
+    let killed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        world.run(&mut root, &mut super::StopAt("Start the stack"), true, |e| {
+            e.install("crash", None)
+        })
+    }));
+    assert!(killed.is_err(), "the run wasn't killed");
+
+    world.install("crash", true).0.unwrap();
+
+    let log = world.log_since(from);
+    assert!(
+        !touched_the_stack(&log) && !log.iter().any(|l| l.starts_with("apt")),
+        "{log:#?}"
+    );
+    assert!(mark(&world, "crash").exists());
+    assert!(world.system_path("/etc/crash/front").is_file());
+    assert!(
+        !world.host_home().join(".config/crash/x").exists(),
+        "the file taken out stays"
+    );
+}
+
+#[test]
+fn a_found_step_a_release_takes_out_asks_for_no_root_and_reports_no_undo() {
+    let file = "[[action]]\nname = \"Write\"\nkind = \"file\"\nto = \"~/.config/found/x\"\ntext = \"x\\n\"\n";
+    let world = World::new(&[(
+        "found",
+        &super::app(&format!("{}{file}", apt_step("Install it", "\"pre-there\""))),
+    )]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .dpkg
+        .insert("pre-there".to_owned(), "1".to_owned());
+    world.install("found", true).0.unwrap();
+    world.write_app("found", &super::app(file));
+    let mut root = world.root();
+    let mut events = Events::default();
+
+    world
+        .run(&mut root, &mut events, true, |e| e.install("found", None))
+        .unwrap();
+
+    assert!(!root.started, "root was asked for");
+    assert!(!undid_anything(&events), "{:?}", events.0);
+    assert!(world.host.state.borrow().dpkg.contains_key("pre-there"));
+
+    world.remove("found").0.unwrap();
+    assert!(world.host.state.borrow().dpkg.contains_key("pre-there"));
+}
+
+#[test]
+fn a_step_a_release_merges_in_part_keeps_what_apt_pulled_in_for_its_undo() {
+    let world = World::new(&[(
+        "partial",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install the tool", "\"p-tool\""),
+            apt_step("Install its plugins", "\"p-plugin\", \"p-extra\"")
+        )),
+    )]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .depends
+        .insert("p-extra".to_owned(), ["libextra".to_owned()].into());
+    world.install("partial", true).0.unwrap();
+    assert!(world.host.state.borrow().dpkg.contains_key("libextra"));
+    world.write_app(
+        "partial",
+        &super::app(&apt_step("Install the tool", "\"p-tool\", \"p-plugin\"")),
+    );
+
+    world.install("partial", true).0.unwrap();
+
+    let (_, root) = world.journals("partial");
+    let root = root.unwrap();
+    assert_eq!(root.entries.len(), 1, "{root:?}");
+    let owned: Vec<&str> = root.entries[0]
+        .claims
+        .iter()
+        .filter(|c| c.owned)
+        .map(|c| c.claim.as_str())
+        .collect();
+    assert!(owned.contains(&"package:p-plugin"), "{owned:?}");
+    assert!(!owned.iter().any(|c| c.starts_with("dep:")), "{owned:?}");
+    let state = world.host.state.borrow();
+    assert!(state.dpkg.contains_key("p-plugin"));
+    assert!(
+        !state.dpkg.contains_key("p-extra") && !state.dpkg.contains_key("libextra"),
+        "{:?}",
+        state.dpkg
     );
 }

@@ -390,61 +390,38 @@ impl Journal {
         self.entries.retain(|e| e.step != step);
     }
 
-    /// Numbers each entry as the install now numbers the step it records, so a release that
-    /// puts a step in, takes one out or moves one leaves every other entry with its own step.
-    /// `steps` are this side's steps of the install, each with its number and resolved, or none
-    /// where it can't be; `total` is how many steps the install has, both sides'.
+    /// Numbers each entry as the install now numbers the step of its name, so a release that
+    /// puts a step in, takes one out or moves one leaves every other entry with its own step. A
+    /// step's name is unique in its install, and an entry is the step of its name, whatever else
+    /// a release changed of it: `steps` are this side's steps of the install, each with its
+    /// number and its name, and `total` is how many steps the install has, both sides'.
     ///
-    /// An entry goes with the first step left, in order, whose action is the one it recorded,
-    /// word for word; then with the first step left that acts on the same thing
-    /// ([`Action::same_thing`]) under the same name; then, for a `run`, with the first whose
-    /// `undo` is the one it recorded; then with the first that acts on the same thing at all: a
-    /// step the release changed, which updates it in place. Entries of one kind that a release
-    /// changed are told apart by their names, a run's by what it undoes, else by their order:
-    /// the first numbered goes with the first such step. An entry still without one takes the next
-    /// step left, in order, whose run undoes it as a changed step, but for one that acts on the
-    /// same thing as a step another entry took (a step a release merged into that one) and for a
-    /// `run` with `undo` alone, which never take another step's. One left after that, a step the
-    /// release took out or merged, is numbered after the last step, in order.
-    pub fn align(&mut self, steps: &[(usize, Option<Action>)], total: usize) {
+    /// An entry whose name no step of this side has (taken out, renamed, or moved to the other
+    /// side), or one whose name an entry numbered before it took, is numbered after the last
+    /// step: the number it has when that is after the last step and no other entry's, else the
+    /// next after every such number, in order. Each entry's number depends on its name and its
+    /// own number alone, so taking one out never moves another.
+    pub fn align(&mut self, steps: &[(usize, &str)], total: usize) {
         self.entries.sort_by_key(|e| e.step);
-        let mut numbers: Vec<Option<usize>> = vec![None; self.entries.len()];
         let mut taken = vec![false; steps.len()];
-        let passes: [fn(&Action, &Action) -> bool; 4] = [
-            |a, b| a == b,
-            |a, b| a.name == b.name && a.same_thing(b),
-            |a, b| undoes_alike(a, b) && a.same_thing(b),
-            Action::same_thing,
-        ];
-        for matches in passes {
-            for ((number, action), taken) in steps.iter().zip(&mut taken) {
-                let Some(action) = action.as_ref().filter(|_| !*taken) else {
-                    continue;
-                };
-                let entry = self
-                    .entries
-                    .iter()
-                    .zip(&numbers)
-                    .position(|(e, n)| n.is_none() && matches(&e.action, action));
-                if let Some(at) = entry {
-                    numbers[at] = Some(*number);
-                    *taken = true;
-                }
-            }
-        }
-        let mut left = steps.iter().zip(&taken).filter(|(_, t)| !**t).map(|((n, _), _)| *n);
-        let merged = |entry: &Entry| {
-            steps
+        let mut numbers: Vec<Option<usize>> = Vec::with_capacity(self.entries.len());
+        for entry in &self.entries {
+            let found = steps
                 .iter()
-                .zip(&taken)
-                .any(|((_, action), taken)| *taken && action.as_ref().is_some_and(|a| a.same_thing(&entry.action)))
-        };
+                .zip(&mut taken)
+                .find(|((_, name), taken)| !**taken && *name == entry.action.name);
+            numbers.push(found.map(|((number, _), taken)| {
+                *taken = true;
+                *number
+            }));
+        }
+        let mut kept = std::collections::BTreeSet::new();
         for (entry, number) in self.entries.iter().zip(&mut numbers) {
-            if number.is_none() && !entry.action.removal_only() && !merged(entry) {
-                *number = left.next();
+            if number.is_none() && entry.step > total && kept.insert(entry.step) {
+                *number = Some(entry.step);
             }
         }
-        let mut after = total;
+        let mut after = kept.last().copied().unwrap_or(total).max(total);
         for (entry, number) in self.entries.iter_mut().zip(numbers) {
             let number = number.unwrap_or_else(|| {
                 after += 1;
@@ -537,13 +514,6 @@ impl Owners {
             .filter(move |(id, _)| id.as_str() != app)
             .flat_map(|(id, claims)| claims.iter().map(move |c| (id.as_str(), c)))
     }
-}
-
-/// Whether `a` and `b` are runs with the same `undo`: what a run recorded undoes is what it
-/// is, whatever else a release changed of it.
-fn undoes_alike(a: &Action, b: &Action) -> bool {
-    use super::action::Kind;
-    matches!((&a.kind, &b.kind), (Kind::Run { undo: x, .. }, Kind::Run { undo: y, .. }) if x == y)
 }
 
 /// Writes `bytes` to the new file `path`: whatever was at `path` (a link someone left there

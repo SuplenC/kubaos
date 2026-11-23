@@ -537,12 +537,13 @@ impl Engine<'_> {
         let of = steps.len();
         let root = self.journal(Side::Root, id)?;
         let words = self.user.words().with_version(folder.version());
-        // A `run` with `undo` alone a release took out stays recorded after the last step until
-        // the removal forgets it: it changes nothing the configure stage reads.
+        // An entry that stays recorded after the last step until the removal changes nothing the
+        // configure stage reads.
+        let names: Vec<&str> = steps.iter().map(|a| a.name.as_str()).collect();
         let changed = std::iter::once(&journal)
             .chain(root.as_ref())
             .flat_map(|j| &j.entries)
-            .filter(|entry| entry.step <= of || !entry.action.removal_only())
+            .filter(|entry| entry.step <= of || !super::lingers(entry, &names))
             .any(|entry| {
                 let now = entry.step.checked_sub(1).and_then(|i| steps.get(i));
                 now.is_none_or(|action| !action.resolve(&words, &folder.dir).is_ok_and(|a| a == entry.action))
