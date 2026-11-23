@@ -1730,3 +1730,42 @@ fn what_apt_pulled_in_for_a_step_merged_in_part_goes_to_the_step_that_took_its_p
         .collect();
     assert_eq!(owner, [("Install its libraries", false), ("Install the tool", true)]);
 }
+
+#[test]
+fn a_step_a_release_drops_while_a_failed_update_left_its_change_pending_goes_whole_in_one_update() {
+    let text = |write: Option<&str>, other: &str| {
+        super::app(&format!(
+            "{}{}{}",
+            apt_step("Install", "\"dp-e\""),
+            write.map_or_else(String::new, |to| file_step("Write it", to, "x")),
+            apt_step("Other", other)
+        ))
+    };
+    let world = World::new(&[("dp", &text(Some("/etc/dp/a"), "\"dp-z\""))]);
+    world.install("dp", true).0.unwrap();
+    world.write_app("dp", &text(Some("/etc/dp/b"), "\"dp-z\", \"dp-y\""));
+    world.host.state.borrow_mut().fail.insert("apt:dp-y".to_owned());
+    assert!(world.install("dp", true).0.is_err());
+    world.host.state.borrow_mut().fail.clear();
+    assert!(world.system_path("/etc/dp/a").exists() && world.system_path("/etc/dp/b").exists());
+    world.write_app("dp", &text(None, "\"dp-z\""));
+
+    let events = world.install("dp", true).1;
+
+    assert!(!world.system_path("/etc/dp/a").exists(), "the old part stands");
+    assert!(!world.system_path("/etc/dp/b").exists(), "the step taken out stands");
+    assert_eq!(
+        reported(&events, "Write it"),
+        [ActionState::Undoing, ActionState::Undone]
+    );
+    let (_, root) = world.journals("dp");
+    assert!(
+        !root.unwrap().entries.iter().any(|e| e.action.name == "Write it"),
+        "its entry stays"
+    );
+    let mut root = world.root();
+    world
+        .run(&mut root, &mut Events::default(), true, |e| e.install("dp", None))
+        .unwrap();
+    assert!(!root.started, "a plain update asked for root");
+}

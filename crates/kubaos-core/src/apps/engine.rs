@@ -711,19 +711,22 @@ impl<'h> Keeper<'h> {
             app: id.to_owned(),
             name: entry.action.name.clone(),
         };
-        // What a changed step replaced goes whatever becomes of the entry: kept for the removal,
-        // as a step moved to the other side's is, the entry alone waits.
+        // HAZARD: a `run` with `undo` alone waits for the app's removal, whose undo it is.
+        let stays =
+            step <= steps.len() || entry.action.removal_only() || steps.iter().any(|a| a.name == entry.action.name);
+        // What a changed step replaced goes whatever becomes of the entry: one that stays (its step
+        // stands, or it waits for the removal) waits alone; one taken out goes whole after it.
         if entry.replaced.is_some() {
             self.finish_replaced(&mut journal, id, step)?;
-            return Ok(Outcome::Settled);
-        }
-        if step <= steps.len() {
+            if stays {
+                return Ok(Outcome::Settled);
+            }
+        } else if stays {
             return Err(still());
         }
-        // HAZARD: a `run` with `undo` alone waits for the app's removal, whose undo it is.
-        if entry.action.removal_only() || steps.iter().any(|a| a.name == entry.action.name) {
-            return Err(still());
-        }
+        let Some(entry) = journal.entry(step).cloned() else {
+            return Ok(Outcome::Undone);
+        };
         self.undo_journaled(&mut journal, id, &entry, &mut Vec::new(), true)?;
         Ok(Outcome::Undone)
     }
