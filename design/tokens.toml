@@ -44,11 +44,9 @@ scales = [1.0, 1.25, 1.5, 2.0]
 #
 # And the halo round the lock's kicker: a blur's radius has no edge to land on a device pixel.
 #
-# And the gap between the desktop's floating parts, `size.gap`: the compositor's own gap, which it
-# rounds to device pixels at every scale, as the mockups do where they draw it. And the glass's
-# shadow, `shadow.glass` and `shadow.glass_contact`, and its blur, `size.glass_blur`: soft through
-# and through, with no edge to land.
-off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo", "size.gap", "size.glass_blur", "shadow.glass", "shadow.glass_contact"]
+# And the glass's shadow, `shadow.glass` and `shadow.glass_contact`, and its blur, `size.glass_blur`:
+# soft through and through, with no edge to land.
+off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo", "size.glass_blur", "shadow.glass", "shadow.glass_contact"]
 
 # Lines thinner than the grid. Neither is a multiple of 4, so neither is a
 # length: each is drawn as whole device pixels at the scale it shows at.
@@ -283,8 +281,8 @@ panel = 392
 power_tile = 120
 # The shell's bar along the top of every screen: a small control (32) with 4
 # above and below, so its pills and buttons centre on whole device pixels.
-# The Bar layout's band, touching the top edge: the bar's row with `size.gap`
-# above and below, 40 again.
+# The Bar layout's band, touching the top edge: the bar's row centred in it,
+# 40 again.
 bar = 40
 # A strip of the bar in the Floating and Islands layouts: its row with 4 above
 # and below, its ends round.
@@ -294,7 +292,7 @@ bar_row = 28
 # The gap between the desktop's floating parts, the same everywhere: the bar or
 # its strips to the screen's edges, a window to the screen's edges, to the bar
 # and to the next window, a card under the bar and above the screen's bottom.
-gap = 6
+gap = 4
 # How far the glass blurs what shows through it, a blur's radius: the mockups' stand-in for the
 # compositor's blur behind every glass surface.
 glass_blur = 30
