@@ -22,6 +22,7 @@ use super::StepError;
 use super::Undoable;
 use crate::apps::action::Action;
 use crate::apps::action::Kind;
+use crate::apps::action::Side;
 use crate::apps::action::Stage;
 use crate::apps::action::perform::PerformError;
 use crate::apps::folder::Folder;
@@ -515,17 +516,17 @@ impl Engine<'_> {
     ///
     /// [`EngineError::NotInstalled`] for an app whose install isn't complete,
     /// [`EngineError::NothingToConfigure`] for one with no configure stage,
-    /// [`EngineError::Outdated`] for one whose journals record a step the folder has changed
-    /// since (a release moved its steps: an install brings it up to date first), else the step
-    /// that failed.
+    /// [`EngineError::Outdated`] for one whose journals record a step the folder has changed or
+    /// taken out since, or miss an install step it added (an install brings it up to date
+    /// first), else the step that failed.
     pub fn configure(&mut self, id: &str) -> Result<Ran, EngineError> {
         self.locked(|engine| engine.configure_locked(id))
     }
 
     fn configure_locked(&mut self, id: &str) -> Result<Ran, EngineError> {
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
-        let journal = Journal::read(self.user.journals(), id)
-            .map_err(EngineError::Journal)?
+        let journal = self
+            .journal(Side::User, id)?
             .filter(|j| j.complete)
             .ok_or_else(|| EngineError::NotInstalled {
                 app: folder.name.clone(),
@@ -534,15 +535,26 @@ impl Engine<'_> {
         let name = folder.name.clone();
         let steps = folder.steps(setup).map_err(EngineError::Folder)?;
         let of = steps.len();
-        let root = Journal::read(&self.root_journals, id).map_err(EngineError::Journal)?;
+        let root = self.journal(Side::Root, id)?;
         let words = self.user.words().with_version(folder.version());
-        let outdated = std::iter::once(&journal)
+        // A `run` with `undo` alone a release took out stays recorded after the last step until
+        // the removal forgets it: it changes nothing the configure stage reads.
+        let changed = std::iter::once(&journal)
             .chain(root.as_ref())
             .flat_map(|j| &j.entries)
+            .filter(|entry| entry.step <= of || !entry.action.removal_only())
             .any(|entry| {
                 let now = entry.step.checked_sub(1).and_then(|i| steps.get(i));
                 now.is_none_or(|action| !action.resolve(&words, &folder.dir).is_ok_and(|a| a == entry.action))
             });
+        let added = steps.iter().enumerate().any(|(i, action)| {
+            let side = match action.side() {
+                Side::User => Some(&journal),
+                Side::Root => root.as_ref(),
+            };
+            action.stage == Stage::Install && side.is_none_or(|j| j.entry(i + 1).is_none())
+        });
+        let outdated = changed || added;
         if outdated {
             return Err(EngineError::Outdated { app: name });
         }

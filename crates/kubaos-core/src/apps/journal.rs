@@ -387,6 +387,59 @@ impl Journal {
     pub fn drop_step(&mut self, step: usize) {
         self.entries.retain(|e| e.step != step);
     }
+
+    /// Numbers each entry as the install now numbers the step it records, so a release that
+    /// puts a step in, takes one out or moves one leaves every other entry with its own step.
+    /// `steps` are this side's steps of the install, each with its number and resolved, or none
+    /// where it can't be; `total` is how many steps the install has, both sides'.
+    ///
+    /// An entry goes with the first step left, in order, whose action is the one it recorded,
+    /// word for word; then with the first step left that acts on the same thing
+    /// ([`Action::same_thing`]), which the step updates in place. Entries of the same action or
+    /// the same thing go with such steps in the order they were numbered, the first with the
+    /// first. An entry still without one takes the next step left, in order, whose run undoes it
+    /// as a changed step, but for a `run` with `undo` alone, never another step's; one left
+    /// after that, a step the release took out, is numbered after the last step, in order.
+    pub fn align(&mut self, steps: &[(usize, Option<Action>)], total: usize) {
+        self.entries.sort_by_key(|e| e.step);
+        let mut numbers: Vec<Option<usize>> = vec![None; self.entries.len()];
+        let mut taken = vec![false; steps.len()];
+        let passes: [fn(&Action, &Action) -> bool; 2] = [|a, b| a == b, Action::same_thing];
+        for matches in passes {
+            for ((number, action), taken) in steps.iter().zip(&mut taken) {
+                let Some(action) = action.as_ref().filter(|_| !*taken) else {
+                    continue;
+                };
+                let entry = self
+                    .entries
+                    .iter()
+                    .zip(&numbers)
+                    .position(|(e, n)| n.is_none() && matches(&e.action, action));
+                if let Some(at) = entry {
+                    numbers[at] = Some(*number);
+                    *taken = true;
+                }
+            }
+        }
+        let mut left = steps.iter().zip(&taken).filter(|(_, t)| !**t).map(|((n, _), _)| *n);
+        for (entry, number) in self.entries.iter().zip(&mut numbers) {
+            if number.is_none() && !entry.action.removal_only() {
+                *number = left.next();
+            }
+        }
+        let mut after = total;
+        for (entry, number) in self.entries.iter_mut().zip(numbers) {
+            let number = number.unwrap_or_else(|| {
+                after += 1;
+                after
+            });
+            entry.step = number;
+            if let Some(replaced) = &mut entry.replaced {
+                replaced.step = number;
+            }
+        }
+        self.entries.sort_by_key(|e| e.step);
+    }
 }
 
 /// Every claim of every journal in some folders, by app: who owns a path, and who else holds a
