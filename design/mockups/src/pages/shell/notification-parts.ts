@@ -12,12 +12,13 @@ import { card, type Note } from "../../lib/notification-card.ts";
 import { notificationPopup, type PopupElement, type PopupNote, type PopupPinned } from "../../lib/notification-popup.ts";
 import { type GroupElement, group } from "../../lib/notification-group.ts";
 import { panelPage } from "../../lib/panel-page.ts";
-import { hang, type Screen, sheet } from "../../lib/sheet.ts";
+import { type BarLayout, hang, type Screen, screen, sheet } from "../../lib/sheet.ts";
 import { advance, centreFor, text } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { BUILD, clearButton, dndButton, KUBAOS, keysButton, SIGNAL, SLACK, status } from "../notifications.ts";
 import { ALL, CHROME } from "../../site/settings.ts";
-import { CORNER_WIDTH, controlCenter, desk, notifications, onScreen } from "../templates/panels.ts";
+import { barButtons, CORNER_WIDTH, controlCenter, desk, notifications, onScreen } from "../templates/panels.ts";
+import { wallpaper } from "./bar-parts.ts";
 
 /** `shown` in a room as wide as the popups hold a card. */
 export function room(shown: HTMLElement, tall = false): HTMLElement {
@@ -403,6 +404,8 @@ export interface PopupStackOptions {
   readonly unread?: boolean;
   readonly width?: string;
   readonly height?: string;
+  /** How the bar lies: its default, Bar, unless the sample shows another. */
+  readonly layout?: BarLayout;
 }
 
 /** How long a popup shows: the shell's setting, `Settings.notificationTimeout`, never a token. */
@@ -419,7 +422,8 @@ const ARRIVALS = 1100;
  bell opens the Notifications card under it, and the toasts up drop into it and fade.
  */
 export function popupStackOnScreen(options: PopupStackOptions = {}): HTMLElement {
-  const { screen: room, buttons } = desk(options.width ?? CORNER_WIDTH, options.height ?? "var(--size-app_height)");
+  const buttons = barButtons();
+  const room = screen({ width: options.width ?? CORNER_WIDTH, height: options.height ?? "var(--size-app_height)", wallpaper, bar: buttons, ...(options.layout ? { layout: options.layout } : {}) });
   const stack = toastColumn(room, buttons[1]);
   // The bell's unread dot, on its symbol's top right corner.
   const bell = buttons[1]?.querySelector("svg");

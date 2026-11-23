@@ -109,6 +109,8 @@ export default page<Shown>({
     { name: "Several from one app", for: "Slack's three: the count, the newest's words", sample: () => still([{ ...MARCO, count: 3 }]) },
     { name: "One opened", for: "its card in place; its time held", sample: () => still(SETTLED, { open: 1 }) },
     { name: "Critical among them", for: "today's full card, no timer", sample: () => still([CRITICAL, { ...MARCO, count: 3 }, BUILD]) },
+    { name: "In Floating", for: "under the bell, `size.gap` under the strip", sample: () => still(SETTLED.slice(0, 2), { layout: "floating" }) },
+    { name: "In Islands", for: "under the bell, `size.gap` under its island", sample: () => still(SETTLED.slice(0, 2), { layout: "islands" }) },
     { name: "Beside an open card", for: "`size.gap` beside it; its pill toggles it", sample: () => besideOnScreen([BUILD, OLA], true) },
   ],
   sizes: doesntApply("`size.panel` wide; as tall as its popups."),
