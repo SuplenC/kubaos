@@ -15,7 +15,7 @@ primarily designed for testing Kubernetes itself, but may be used for local deve
 CI."""
 description_from = "https://github.com/kubernetes-sigs/kind/blob/v0.33.0/README.md"
 # kind's logo, Apache-2.0, on a tile (kind.svg's header): no icon theme has kind.
-icon = "kind"
+icon = "kind.svg"
 keeps = """\
 Your clusters are containers of Docker's or Podman's, and keep running until `kind delete \
 cluster` takes them away; their entries stay in your kubeconfig."""

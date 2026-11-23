@@ -15,7 +15,7 @@ or more nodes in seconds, with its own image registry and load balancer if you w
 local development and CI."""
 description_from = "kubaos"
 # k3d's logo, MIT, on a tile (k3d.svg's header): no icon theme has k3d.
-icon = "k3d"
+icon = "k3d.svg"
 requires = ["docker"]
 keeps = """\
 Your clusters are Docker containers, and keep running until `k3d cluster delete` takes them \

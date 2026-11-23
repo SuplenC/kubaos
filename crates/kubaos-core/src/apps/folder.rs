@@ -120,6 +120,10 @@ pub enum FolderError {
         "the app has no icon: name Colloid's, put its vendor's logo in its folder, or draw one with `just app-icon {0}`"
     )]
     NoIcon(String),
+    #[error(
+        "{icon:?} names the icon theme's icon, which none draws, beside the folder's {file:?}: name the file, so the install puts it in the theme"
+    )]
+    ThemeIconBesideFile { icon: String, file: String },
     #[error("{0:?} is not an app this one can require: an app id, other than its own, named once")]
     InvalidRequirement(String),
     #[error("{0:?} is not a version: digits, letters and `.+~-:`, starting with a digit")]
@@ -529,7 +533,17 @@ impl Folder {
             }
         }
         let icon = &self.icon;
-        if !is_theme_icon(icon) {
+        // A bare name is looked up in the icon theme only, so a picture of the same name in the
+        // folder would never be installed or shown: the app would show its initial.
+        if is_theme_icon(icon) {
+            let beside = ["svg", "png", "jpg", "jpeg"].map(|extension| format!("{icon}.{extension}"));
+            if let Some(file) = beside.into_iter().find(|file| self.dir.join(file).is_file()) {
+                return Err(FolderError::ThemeIconBesideFile {
+                    icon: icon.clone(),
+                    file,
+                });
+            }
+        } else {
             match file_icon(icon) {
                 None => return Err(FolderError::InvalidIcon(icon.clone())),
                 Some(IconFile::Svg) => {}

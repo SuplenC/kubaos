@@ -14,7 +14,7 @@ Helm is a tool for managing Charts. Charts are packages of pre-configured Kubern
 resources."""
 description_from = "https://github.com/helm/helm/blob/v4.3.2/README.md"
 # Helm's logo, MIT, on a tile (helm.svg's header): no icon theme has Helm.
-icon = "helm"
+icon = "helm.svg"
 keeps = """\
 Your chart repositories and plugins stay in ~/.config/helm and ~/.local/share/helm, its cache \
 in ~/.cache/helm, and what you installed in your clusters: install Helm again and it's all \

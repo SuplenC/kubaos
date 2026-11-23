@@ -12,7 +12,7 @@ traditional feature set of other web UIs/dashboards (i.e., to list and view reso
 added functionality."""
 description_from = "https://github.com/kubernetes-sigs/headlamp/blob/v0.46.0/README.md"
 # Headlamp's icon, Apache-2.0, on a tile (headlamp.svg's header): no icon theme has Headlamp.
-icon = "headlamp"
+icon = "headlamp.svg"
 keeps = """\
 Your Headlamp settings and plugins stay in ~/.config/Headlamp, and your clusters in your own \
 kubeconfig: install Headlamp again and it's all there."""

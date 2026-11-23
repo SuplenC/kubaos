@@ -12,7 +12,7 @@ Argo CD is a declarative GitOps continuous delivery tool for Kubernetes."""
 description_from = "https://github.com/argoproj/argo-cd/blob/v3.6.2/README.md"
 # Argo's mark, the project's trademark, on a tile (argocd.svg's header): no icon theme has Argo
 # CD.
-icon = "argocd"
+icon = "argocd.svg"
 keeps = """\
 Your Argo CD servers and their sign-ins stay in ~/.config/argocd: install the CLI again and \
 they're there."""

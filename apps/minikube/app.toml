@@ -14,7 +14,7 @@ primary goals are to be the best tool for local Kubernetes application developme
 support all Kubernetes features that fit."""
 description_from = "https://github.com/kubernetes/minikube/blob/v1.39.0/README.md"
 # minikube's logo, Apache-2.0, on a tile (minikube.svg's header): no icon theme has minikube.
-icon = "minikube"
+icon = "minikube.svg"
 keeps = """\
 Your clusters, their images and minikube's settings stay in ~/.minikube until `minikube delete \
 --all --purge` takes them away; their entries stay in your kubeconfig."""

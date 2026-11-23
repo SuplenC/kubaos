@@ -14,7 +14,7 @@ watching files, building container images, and bringing your environment up-to-d
 docker build && kubectl apply or docker-compose up."""
 description_from = "https://github.com/tilt-dev/tilt/blob/v0.37.9/README.md"
 # Tilt's logo, Apache-2.0, on a tile (tilt.svg's header): no icon theme has Tilt.
-icon = "tilt"
+icon = "tilt.svg"
 keeps = "Tilt's settings and state stay in ~/.tilt-dev: install Tilt again and they're there."
 
 [[action]]

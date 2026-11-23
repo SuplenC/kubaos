@@ -16,7 +16,7 @@ pipeline."""
 description_from = "https://github.com/GoogleContainerTools/skaffold/blob/v2.25.0/README.md"
 # Skaffold's mark, Apache-2.0, on a tile (skaffold.png's comment): Skaffold publishes it in
 # colour only as a PNG, and no icon theme has Skaffold.
-icon = "skaffold"
+icon = "skaffold.png"
 keeps = "Skaffold's settings stay in ~/.skaffold: install Skaffold again and they're there."
 
 [[action]]

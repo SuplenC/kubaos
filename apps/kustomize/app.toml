@@ -12,7 +12,7 @@ original YAML untouched and usable as is."""
 description_from = "https://github.com/kubernetes-sigs/kustomize/blob/kustomize/v5.8.3/README.md"
 # Kustomize's icon, Apache-2.0, on a tile (kustomize.png's comment): Kustomize publishes it only
 # as a PNG, and no icon theme has Kustomize.
-icon = "kustomize"
+icon = "kustomize.png"
 
 [[action]]
 name = "Install Kustomize"

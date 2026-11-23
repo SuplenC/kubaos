@@ -13,7 +13,7 @@ repositories and OCI artifacts), and automating updates to configuration when th
 code to deploy."""
 description_from = "https://github.com/fluxcd/flux2/blob/v2.10.1/README.md"
 # Flux's mark, Apache-2.0, on a tile (flux.svg's header): no icon theme has Flux.
-icon = "flux"
+icon = "flux.svg"
 keeps = "Flux itself runs in your clusters, which keep it: the CLI only talks to them."
 
 [[action]]

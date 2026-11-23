@@ -7,6 +7,7 @@ use super::ai::world;
 use crate::apps::Catalog;
 use crate::apps::Platform;
 use crate::apps::action::Kind;
+use crate::apps::folder::Requirement;
 use crate::apps::picks::Picks;
 use crate::unfree::Unfree;
 
@@ -81,7 +82,7 @@ fn act_requires_docker_and_every_cloud_tool_comes_on_both_architectures_free() {
     let catalog = Catalog::load(&shipped("act").join("..")).unwrap();
 
     let act = catalog.get("act").unwrap();
-    let required: Vec<&str> = act.requires.iter().map(|r| r.id()).collect();
+    let required: Vec<&str> = act.requires.iter().map(Requirement::id).collect();
     assert_eq!(required, ["docker"]);
     for id in ALONE {
         assert!(catalog.get(id).unwrap().requires.is_empty(), "{id}");
