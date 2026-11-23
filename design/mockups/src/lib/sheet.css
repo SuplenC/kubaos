@@ -201,7 +201,8 @@
 
 /* A card's glass and its content's box: the same box, `size.gap` under the bar (or above the
    screen's bottom), centred under its item and stopped `size.gap` from the screen's sides, its
-   corners `radius.card`. Opening, it fades in as it comes down `space.s8` into place. */
+   corners `radius.card`, or concentric with the controls it holds (`--sheet-corner`). Opening, it
+   fades in as it comes down `space.s8` into place. */
 .k-sheet-part {
   position: absolute;
   display: block;
@@ -217,7 +218,7 @@
   left: var(--card-x);
   width: var(--sheet-span);
   height: var(--sheet-depth);
-  border-radius: var(--radius-card);
+  border-radius: var(--sheet-corner, var(--radius-card));
   opacity: var(--reveal);
   translate: 0 round(nearest, calc((var(--reveal) - 1) * var(--space-s8)), 1px);
 }
@@ -234,11 +235,11 @@
    hint or a tooltip over a button in its top row. A clip path, not `overflow: clip` with an
    `overflow-clip-margin`: Chromium drops that margin to 0 for any `calc()`. */
 .k-sheet {
-  clip-path: inset(calc(-1 * max(var(--focus-far), var(--screen-width, 0px) + var(--screen-height, 0px)) * clamp(0, (var(--reveal) - 0.999) * 1000, 1)) round var(--radius-card));
+  clip-path: inset(calc(-1 * max(var(--focus-far), var(--screen-width, 0px) + var(--screen-height, 0px)) * clamp(0, (var(--reveal) - 0.999) * 1000, 1)) round var(--sheet-corner, var(--radius-card)));
 }
 
 .k-sheet:has(> .k-sheet-rider > [data-leaving]) {
-  clip-path: inset(0 round var(--radius-card));
+  clip-path: inset(0 round var(--sheet-corner, var(--radius-card)));
 }
 
 .k-sheet-rider {

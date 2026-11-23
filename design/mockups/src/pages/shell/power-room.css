@@ -1,13 +1,6 @@
-/* The power menu's room (`power-room.ts`): the Lock's desktop with the frame closing in, the lights
-   going down over everything but the sheet, the sheet's tiles, the windows that won't quit, and the
+/* The power menu's room (`power-room.ts`): the Lock's desktop, the lights going down over the
+   desktop under the bar and the sheet, the sheet's tiles, the windows that won't quit, and the
    boot splash's sign over the black. Numbers move it, each 0 at rest. */
-
-/* The frame, from where the shell draws it (0) to closed in to `space.s32` all round (1). */
-@property --power-closein {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
 
 /* How dark the room is: black over the desktop, from none (0) to all of it (1). */
 @property --power-dark {
@@ -44,16 +37,13 @@
   initial-value: 0;
 }
 
-/* The frame closes in from `space.s8` to `space.s32` as the menu opens, on top of the Lock's own
-   slide in from past the screen's edges. */
 .k-screen.k-lock.power-room {
-  --frame-side: round(nearest, calc(var(--space-s8) + (var(--space-s32) - var(--space-s8)) * var(--power-closein) - (var(--space-s8) + var(--radius-surface)) * (1 - var(--framed))), 1px);
   --power-lights: calc(1 - var(--power-dark));
 }
 
-/* The lights: everything the room shows dims as one, the picture, its city, the windows, the
-   clock, the frame and the bar; the sheet's tubes are the last left burning. */
-.power-room :is(.k-screen-wallpaper, .k-lock-plate, .k-lock-windows, .k-lock-clock, .k-frame, .k-bar) {
+/* The lights: the desktop dims as one, the picture, its city, the windows and the clock. The bar
+   stays above them, as the sheet does: each goes by its own fade. */
+.power-room :is(.k-screen-wallpaper, .k-lock-plate, .k-lock-windows, .k-lock-clock) {
   filter: brightness(var(--power-lights));
 }
 
@@ -100,8 +90,8 @@
   padding: 0 var(--space-s4);
 }
 
-/* Once open, the sheet follows its content's size as the blocker comes and goes, as a live
-   sheet does: over `medium` on `standard_decel`. */
+/* Once open, the card follows its content's size as the blocker comes and goes, as a live
+   card does: over `medium` on `standard_decel`. */
 .power-sheet[data-power-settled] {
   transition:
     --sheet-span var(--motion-medium) var(--easing-standard_decel),

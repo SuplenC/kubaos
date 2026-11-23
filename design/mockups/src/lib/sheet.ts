@@ -128,6 +128,11 @@ export interface SheetOptions {
   readonly corner?: boolean;
   /** How far further down it starts (a length's CSS): a stack under another card. */
   readonly start?: string;
+  /**
+   * Its corners (a length's CSS) when what it holds is not a card's content boxes: concentric with
+   * its own controls, their radius and its content's padding. `radius.card` otherwise.
+   */
+  readonly rounding?: string;
 }
 
 /** A card: its glass for the glass layer, and its content's box for the layer above. */
@@ -168,6 +173,7 @@ export function sheet(options: SheetOptions): Sheet {
     part.dataset.edge = edge;
     if (options.start !== undefined && edge === "top") part.style.setProperty("--sheet-start", options.start);
     if (options.reveal !== undefined) part.style.setProperty("--reveal", String(options.reveal));
+    if (options.rounding !== undefined) part.style.setProperty("--sheet-corner", options.rounding);
   }
   let under: Element | null = options.under ?? null;
   // The card's size is its content's, and its place its item's, which only layout knows.
