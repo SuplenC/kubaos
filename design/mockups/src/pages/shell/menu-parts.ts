@@ -30,7 +30,7 @@ import { scroll } from "../../lib/scroll.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { clamped, text, wrapped } from "../../lib/text.ts";
 import { toast } from "../../lib/toast.ts";
-import { length } from "../../lib/tokens.ts";
+import { length, number } from "../../lib/tokens.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { CITIES, CONDITIONS, clockOf, dayRange, degrees, HOME, hourOf, NOW_HOUR, offsetOf, symbolOf } from "./weather-data.ts";
 
@@ -116,6 +116,40 @@ const CLOCK_ITEMS: readonly Item[] = [
   { title: "Settings: Weather", subtitle: "On or off, home city, units", extension: "kubaos", symbol: "fair_day", keywords: ["forecast", "temperature", "units"], actions: SETTINGS_ACTIONS },
 ];
 
+/**
+ * A setting's Item, as the KubaOS Extension makes one for each: its value the answer, its place in
+ * Settings its subtitle; it opens its row, and an Action puts it back to the default.
+ */
+function settingItem(title: string, where: string, symbol: string, keywords: readonly string[], value: () => string, initial: () => string): Item {
+  return {
+    title,
+    subtitle: where,
+    extension: "kubaos",
+    symbol,
+    keywords,
+    // Read as the menu is drawn: a value from the tokens is there once the page's CSS is.
+    get answer() {
+      return value();
+    },
+    get actions() {
+      return [
+        { title: "Open in Settings", keys: "↵" },
+        { title: `Back to ${initial()}`, keys: "⌃R" },
+      ];
+    },
+  };
+}
+
+/** The glass opacity by night, as a percent: the setting's default. */
+const glassNow = () => `${Math.round(number("opacity-glass") * 100)} %`;
+
+/** The desktop's look as Items: the glass, the bar's layout and the workspaces' marks, each at its default. */
+const LOOK_ITEMS: readonly Item[] = [
+  settingItem("Glass opacity", "Settings › Appearance › Wallpaper · how much of the wallpaper shows through", "wallpaper", ["glass", "opacity", "transparency", "blur"], glassNow, glassNow),
+  settingItem("Bar layout", "Settings › Desktop › Bar · a band, a floating strip or islands", "computer", ["bar", "floating", "islands", "layout"], () => "Bar", () => "Bar"),
+  settingItem("Workspace marks", "Settings › Desktop › Workspaces · numbers, dots or dashes", "computer", ["workspaces", "numbers", "kanji", "dots", "dashes"], () => "Dot and dash", () => "Dot and dash"),
+];
+
 /** The shots' Items, in the Daemon's order. */
 export const ITEMS: readonly Item[] = [
   { title: "Files", subtitle: "Access and organize files", extension: "apps", picture: plate },
@@ -133,6 +167,7 @@ export const ITEMS: readonly Item[] = [
   { title: "Workspace 3", subtitle: "Move to workspace 3", extension: "hyprland" },
   { title: "Design specimen", subtitle: "Every token and component, live", extension: "kubaos" },
   ...CLOCK_ITEMS,
+  ...LOOK_ITEMS,
 ];
 
 /** What the Action panel lists for every shot Result: the Item's own, then two Contributed. */
