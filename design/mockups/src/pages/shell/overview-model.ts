@@ -219,7 +219,7 @@ export function treeOf(space: Space): Node | null {
 }
 
 /**
- * Each window's rect in `area`, the room inside the frame and its gaps, `gap` between two: every
+ * Each window's rect in `area`, the room the screen's windows tile, `gap` between two: every
  * split halves its room, the first half rounded.
  */
 export function layout(node: Node | null, area: Rect, gap: number): Map<string, Rect> {

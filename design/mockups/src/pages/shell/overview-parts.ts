@@ -17,6 +17,7 @@
 import "./overview.css";
 import { tipLine } from "../../lib/banner.ts";
 import { focusRing, steadyGlow } from "../../lib/focus.ts";
+import { glass } from "../../lib/glass.ts";
 import { icon } from "../../lib/icon.ts";
 import { catchShare, caught as zoneCaught, inside, refuse, type Zone as Caught, zoneOf } from "../../lib/magnet.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
@@ -168,10 +169,10 @@ function ms(name: string): number {
   return durationMs(name) / settings().speed;
 }
 
-/** The room inside a screen's frame and Hyprland's gaps that its windows tile, as `looks.lua` sets them. */
+/** The room a screen's windows tile: under the Bar layout's band, `size.gap` from it and the screen's edges. */
 function tilingArea(width: number, height: number): model.Rect {
-  const side = L("space-s8") + L("space-s8");
-  const top = L("size-bar") + L("space-s8");
+  const side = L("size-gap");
+  const top = L("size-bar") + side;
   return { x: side, y: top, w: width - 2 * side, h: height - top - side };
 }
 
@@ -321,7 +322,7 @@ interface PlaceTag {
   shown: boolean;
 }
 
-/** A screen drawn: the desktop with its frame and bar, and the overview's layer over it. */
+/** A screen drawn: the desktop with its bar, and the overview's layer over it. */
 interface ScreenView {
   readonly screen: model.Screen;
   size: { w: number; h: number };
@@ -329,9 +330,10 @@ interface ScreenView {
   readonly element: HTMLElement;
   readonly layer: HTMLElement;
   readonly bar: HTMLElement;
-  /** What blurs and dims as it opens: the wallpaper. What steps aside: the frame's glass, the frame, the bar. */
+  /** What blurs and dims as it opens: the wallpaper. */
   readonly veiled: readonly HTMLElement[];
-  readonly aside: readonly HTMLElement[];
+  /** The bar's workspaces part, which shows its add buttons and borrowed groups' names while the Overview is up. */
+  readonly workspaces: HTMLElement | null;
   layout: Layout;
 }
 
@@ -478,11 +480,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   const slit = span("ov-slit");
   marks.append(room, slit, aim, select);
 
-  // How both drags go, on the focused screen: a tip on the frame's glass in the bottom margin's left
+  // How both drags go, on the focused screen: a tip on the shell's glass in the bottom margin's left
   // end, under every miniature, the delete slot's corner left free. It shows every time until the
   // person has made both drags with the pointer, and then leaves for good. Each button is a phrase
   // of its own, which a mouse button's keycap can take the place of without the sentence changing.
-  const tip = span("ov-tip", tipLine("Drag a window with the left button, a whole workspace with the right button."));
+  const tip = glass(span("ov-tip", tipLine("Drag a window with the left button, a whole workspace with the right button.")));
   const learned = new Set<Learned>(options.learned ?? []);
   tip.toggleAttribute("data-learned", learned.size === 2);
   marks.append(tip);
@@ -553,8 +555,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (!open && event.target instanceof Element && event.target.closest(".shell-ws")) setOpen(true);
     });
     const veiled = [element.querySelector<HTMLElement>(".k-screen-wallpaper")!];
-    const aside = [bar];
-    return { screen, size: { w, h }, at: { x: 0, y: 0 }, element, layer, bar, veiled, aside, layout: arrange(w, h, []) };
+    const workspaces = bar.querySelector<HTMLElement>(".shell-ws");
+    return { screen, size: { w, h }, at: { x: 0, y: 0 }, element, layer, bar, veiled, workspaces, layout: arrange(w, h, []) };
   }
 
   for (const screen of screensDrawn()) views.push(makeView(screen));
@@ -639,7 +641,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function plusEl(group: string): HTMLElement {
     let element = plusEls.get(group);
     if (element) return element;
-    element = span("ov-plus", icon("add", "var(--icon-s24)", "var(--ov-plus-ink)"));
+    element = glass(span("ov-plus", icon("add", "var(--icon-s24)", "var(--ov-plus-ink)")));
     element.dataset.group = group;
     plusEls.set(group, element);
     return element;
@@ -648,7 +650,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function labelEl(group: model.Group): HTMLElement {
     let element = labelEls.get(group.id);
     if (element) return element;
-    element = span("ov-label", text(group.name, "label", "secondary"));
+    element = glass(span("ov-label", text(group.name, "label", "secondary")));
     element.dataset.group = group.id;
     labelEls.set(group.id, element);
     return element;
@@ -663,7 +665,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const key = `${group}#${index}`;
     let made = placeTags.get(key);
     if (made) return made;
-    const number = span("ov-ws-number");
+    const number = glass(span("ov-ws-number"));
     const element = span("ov-place", number);
     element.dataset.place = key;
     made = { root: element, number, rolling: null, shown: false };
@@ -846,7 +848,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       tree = model.remove(tree, carried);
       if (over) tree = model.insert(tree, carried, (carry!.target as { at?: model.Place }).at);
     }
-    const rects = model.layout(tree, area, L("space-s8"));
+    const rects = model.layout(tree, area, L("size-gap"));
     // The floating windows over the tiles, each at its shares of the room.
     const floats = here.windows.filter((id) => id !== carried && desk.windows.get(id)?.float);
     for (const id of floats) {
@@ -1120,12 +1122,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         part.style.setProperty("--ov-ve", settling ? "var(--easing-standard_decel)" : "var(--easing-standard)");
         part.style.setProperty("--ov-veil", isOpen ? "1" : "0");
       }
-      // The frame steps aside as things leave a screen, and comes back as things arrive.
-      for (const part of each.aside) {
-        part.style.setProperty("--ov-vt", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : isOpen || settling ? "var(--motion-medium)" : "var(--motion-long)");
-        part.style.setProperty("--ov-ve", settling ? "var(--easing-standard_decel)" : isOpen ? "var(--easing-emphasized_accel)" : "var(--easing-emphasized_decel)");
-        part.style.setProperty("--ov-aside", isOpen ? "1" : "0");
-      }
+      each.workspaces?.toggleAttribute("data-overview", isOpen);
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
         for (const [k, id] of section.items.entries()) {
@@ -1189,7 +1186,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
 
   /**
    * Draws the Overview `p` of the way open, every part where the fingers have it and nothing gliding:
-   * the frame aside and the wallpaper veiled by `p`, the screen's desktop `p` of its way into its
+   * the wallpaper veiled by `p`, the screen's desktop `p` of its way into its
    * miniature, and every other miniature, number, slot and name `p` of the way in.
    */
   function follow(p: number): void {
@@ -1197,10 +1194,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     swiping = Math.max(0, Math.min(1, p));
     const at = String(swiping);
     for (const each of views) {
-      for (const part of [...each.veiled, ...each.aside]) {
+      for (const part of each.veiled) {
         part.style.setProperty("--ov-vt", "0s");
-        part.style.setProperty(each.veiled.includes(part) ? "--ov-veil" : "--ov-aside", at);
+        part.style.setProperty("--ov-veil", at);
       }
+      each.workspaces?.toggleAttribute("data-overview", swiping > 0);
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
         for (const [k, id] of section.items.entries()) {
@@ -1385,7 +1383,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!carry || (carry.kind === "window" && desk.windows.get(carry.id)?.float)) return undefined;
     const on = viewOfSpace(space);
     if (!on) return undefined;
-    const base = model.layout(model.remove(model.treeOf(desk.spaces.get(space)!), carry.id), tilingArea(on.size.w, on.size.h), L("space-s8"));
+    const base = model.layout(model.remove(model.treeOf(desk.spaces.get(space)!), carry.id), tilingArea(on.size.w, on.size.h), L("size-gap"));
     let best: { window: string; rect: model.Rect; far: number } | null = null;
     for (const [window, rect] of base) {
       const far = Math.max(rect.x - point.x, point.x - rect.x - rect.w, 0) + Math.max(rect.y - point.y, point.y - rect.y - rect.h, 0);
@@ -2062,10 +2060,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** The screen the slot stands on, by id. */
   let binOn: string | null = null;
 
-  // The slot: a workspace's shape on the frame's glass, its line in the Danger tone's glass at
+  // The slot: a workspace's shape on the shell's glass, its line in the Danger tone's glass at
   // rest, lit with its glow while something is pulled in; the delete symbol in its middle, and the
   // timer's bar along its foot while something waits.
-  const bin = span("ov-bin", span("ov-slot-symbol", icon("delete", "var(--icon-s32)", "var(--ov-slot-ink)")), span("ov-slot-timer", span("ov-slot-fill")));
+  const bin = glass(span("ov-bin", span("ov-slot-symbol", icon("delete", "var(--icon-s32)", "var(--ov-slot-ink)")), span("ov-slot-timer", span("ov-slot-fill"))));
   focusRing(bin, "control", "burn_error", false);
   // A sample's annotation: the slot's reach, the screen clipping it to its corner.
   const reach = options.reach ? span("ov-reach") : null;
@@ -2629,7 +2627,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const box = worldBox({ kind: "space", space });
     const on = viewOfSpace(space);
     if (!box || !on) return { x: 0, y: 0 };
-    const rect = model.layout(model.treeOf(desk.spaces.get(space)!), tilingArea(on.size.w, on.size.h), L("space-s8")).get(at.window);
+    const rect = model.layout(model.treeOf(desk.spaces.get(space)!), tilingArea(on.size.w, on.size.h), L("size-gap")).get(at.window);
     if (!rect) return centreOf({ space });
     const [dx, dy] = at.side === "left" ? [-1, 0] : at.side === "right" ? [1, 0] : at.side === "top" ? [0, -1] : [0, 1];
     const x = rect.x + rect.w / 2 + (dx * rect.w) / 3;
