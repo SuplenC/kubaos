@@ -1,0 +1,27 @@
+# Terraform from HashiCorp's signed apt repository, whose key system/packages.toml pins
+# ([repo.hashicorp]); Packer and Vault come from the same repository. Ubuntu doesn't package it,
+# and nixpkgs builds it as unfree, as its licence is the Business Source License. Its package
+# writes no source of its own.
+# https://developer.hashicorp.com/terraform/install
+name = "Terraform"
+category = "devops"
+tags = ["infrastructure as code", "iac", "hashicorp", "hcl", "provisioning", "cloud", "cli"]
+summary = "HashiCorp's infrastructure as code. Write HCL, run plan, pray, run apply."
+# Ours: its README is under the Business Source License 1.1, which asks for the licence shown
+# with every copy.
+description = """\
+Terraform describes infrastructure (networks, machines, DNS, whole cloud accounts) in HCL files, \
+shows the plan of what a change would do, and applies it, keeping a state of what it manages. \
+Providers reach every major cloud and hundreds of other services."""
+description_from = "kubaos"
+# Terraform's logo, HashiCorp's trademark, on a tile (terraform.svg's header): Colloid has none.
+icon = "terraform.svg"
+keeps = """\
+Your configurations and their state stay in your projects, and the credentials terraform login \
+keeps in ~/.terraform.d: install Terraform again and it picks up where it left off."""
+
+[[action]]
+name = "Install Terraform"
+kind = "apt"
+repo = "hashicorp"
+packages = ["terraform"]

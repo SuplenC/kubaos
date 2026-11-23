@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://aquasecurity.github.io/trivy-repo/deb
+Suites: generic
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/trivy.gpg

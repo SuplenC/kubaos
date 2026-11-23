@@ -1,0 +1,13 @@
+<!-- DigitalOcean's mark, DigitalOcean's trademark, used to identify the app. https://www.digitalocean.com/_do-www-marketing/646d1eeb/_next/static/media/favicon.91372345.svg, its site's icon, without the style that turns it near-white in a dark scheme, so it keeps its black on KubaOS's white rounded tile, unchanged otherwise, so it matches the catalog's other icons and reads on a dark menu and a light one. -->
+<svg height="500" viewBox="0 0 500 500" width="500" xmlns="http://www.w3.org/2000/svg">
+<defs><clipPath id="kubaos-tile"><rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625"/></clipPath></defs>
+<g clip-path="url(#kubaos-tile)">
+<rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625" fill="#fff"/>
+<svg x="125" y="125" width="250" height="250" viewBox="0 0 32 32">
+  <path class="do-favicon" fill="#000" d="M16.0219 25.8036V32C26.4874 32 34.6316 21.8881 31.2065 10.902C29.6842 6.11214 25.8785 2.27268 21.0834 0.790112C10.1231 -2.63119 0 5.54192 0 15.9959H6.20324C6.20324 9.45741 12.7109 4.36347 19.6372 6.87243C22.187 7.78478 24.2421 9.83756 25.1555 12.3845C27.6672 19.3032 22.6057 25.8036 16.0219 25.8036Z"/>
+  <path class="do-favicon" fill="#000" d="M9.85547 25.8417H16.0206V19.6834H9.85547V25.8417Z"/>
+  <path class="do-favicon" fill="#000" d="M9.85474 30.5934H5.09766V25.8417L9.85547 25.8417L9.85474 30.5934Z"/>
+  <path class="do-favicon" fill="#000" d="M1.10938 25.8417H5.06727V21.8882H1.10938V25.8417Z"/>
+</svg>
+</g>
+</svg>

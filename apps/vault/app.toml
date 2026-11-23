@@ -1,0 +1,33 @@
+# Vault from HashiCorp's signed apt repository, whose key system/packages.toml pins
+# ([repo.hashicorp]), shared with Terraform and Packer. Ubuntu doesn't package it, and nixpkgs
+# builds it as unfree, as its licence is the Business Source License. The package is the whole of
+# Vault: the CLI, which is what this is for, and its server, whose vault.service it puts in place
+# but neither enables nor starts. Its install script also sets the server up to be started: a
+# vault system user, /etc/vault.d's configuration, /opt/vault with a data folder and a
+# self-signed TLS key and certificate, and the capability to lock memory on /usr/bin/vault. A
+# removal keeps all of that but the capability, as a server's data and keys must never go with a
+# CLI's removal. It writes no source of its own.
+# https://developer.hashicorp.com/vault/install
+name = "Vault CLI"
+category = "devops"
+tags = ["secrets", "hashicorp", "passwords", "tokens", "pki", "encryption", "cli"]
+summary = "HashiCorp Vault from the terminal. Secrets go in the vault, not in the damn repo."
+# Ours: its README is under the Business Source License 1.1, which asks for the licence shown
+# with every copy.
+description = """\
+Vault stores and hands out secrets (API keys, passwords, certificates) behind tight access \
+control and an audit log. The CLI signs in to a Vault server, reads and writes its secrets and \
+runs its engines, such as its PKI."""
+description_from = "kubaos"
+# Vault's logo, HashiCorp's trademark, on its black tile (vault.svg's header): Colloid has none.
+icon = "vault.svg"
+keeps = """\
+The token vault login saved stays in ~/.vault-token: install Vault again and you're still signed \
+in, until the token runs out. What the package set up for a server stays too: the vault user, \
+/etc/vault.d and /opt/vault, with its data and its TLS key."""
+
+[[action]]
+name = "Install Vault"
+kind = "apt"
+repo = "hashicorp"
+packages = ["vault"]

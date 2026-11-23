@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://apt.releases.hashicorp.com
+Suites: resolute
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/hashicorp.gpg

@@ -50,7 +50,7 @@ The command-line tools, the services and the drivers open no window: they run in
 
 ## The table's columns
 
-One row an app, by category in the catalog's order (Browsers, Development, AI, Communication, Media, Graphics, Office, Security, System, Games), then by id.
+One row an app, by category in the catalog's order (Browsers, Development, DevOps, AI, Communication, Media, Graphics, Office, Security, System, Games), then by id.
 
 | Column | What it says |
 |---|---|

@@ -1,0 +1,26 @@
+# Packer from HashiCorp's signed apt repository, whose key system/packages.toml pins
+# ([repo.hashicorp]), shared with Terraform and Vault. Ubuntu's archive has no packer for 26.04,
+# and nixpkgs builds it as unfree, as its licence is the Business Source License. Its package
+# writes no source of its own.
+# https://developer.hashicorp.com/packer/install
+name = "Packer"
+category = "devops"
+tags = ["machine images", "images", "hashicorp", "hcl", "vm", "ami", "cli"]
+summary = "Bakes the same machine image for every cloud from one file. Snowflake servers can fuck off."
+# Ours: its README is under the Business Source License 1.1, which asks for the licence shown
+# with every copy.
+description = """\
+Packer builds machine images (AMIs, VM disks, container images) from one HCL template, for \
+several platforms at once, so every environment starts from the same image."""
+description_from = "kubaos"
+# Packer's logo, HashiCorp's trademark, on a tile (packer.svg's header): Colloid has none.
+icon = "packer.svg"
+keeps = """\
+The plugins packer init installed stay in ~/.config/packer, and your templates in your projects: \
+install Packer again and they're all there."""
+
+[[action]]
+name = "Install Packer"
+kind = "apt"
+repo = "hashicorp"
+packages = ["packer"]

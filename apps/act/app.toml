@@ -1,0 +1,26 @@
+# act from nixpkgs, through the User flake. Its authors keep no apt repository and Ubuntu doesn't
+# package it. It runs each job in a Docker container, so it requires Docker.
+# https://nektosact.com/installation/
+name = "act"
+category = "devops"
+tags = ["github", "actions", "ci", "workflows", "docker", "runner"]
+summary = "Your GitHub Actions, run on your machine. Fail fast, without forty pushes."
+# The opening of its README, MIT (github.com/nektos/act).
+description = """\
+Run your GitHub Actions locally! Why would you want to do this? Two reasons: Fast Feedback - \
+Rather than having to commit/push every time you want to test out the changes you are making to \
+your .github/workflows/ files (or for any changes to embedded GitHub actions), you can use act \
+to run the actions locally. Local Task Runner - you can use the GitHub Actions defined in your \
+.github/workflows/ to replace your Makefile!"""
+description_from = "https://github.com/nektos/act/blob/v0.2.98/README.md"
+# act's own logo, MIT, on a tile (act.svg's header): no icon theme has act.
+icon = "act.svg"
+requires = ["docker"]
+keeps = """\
+Your act settings stay in ~/.config/act/actrc, and the actions and images it fetched in \
+~/.cache/act and Docker's images: install act again and it runs without fetching them."""
+
+[[action]]
+name = "Install act"
+kind = "nix"
+packages = ["act"]

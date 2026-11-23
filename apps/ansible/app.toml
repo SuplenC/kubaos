@@ -1,0 +1,27 @@
+# Ansible from Ubuntu's archive: ansible 13.1.0, the community package, on ansible-core 2.20,
+# which upstream still supports. That is current enough, and Ubuntu's archive comes first in the
+# catalog's order of sources, before the Ansible PPA and nixpkgs.
+# https://docs.ansible.com/projects/ansible/latest/installation_guide/installation_distros.html
+name = "Ansible"
+category = "devops"
+tags = ["automation", "configuration management", "playbooks", "provisioning", "ssh", "yaml", "red hat", "cli"]
+summary = "Configures a hundred servers over SSH from one YAML file. No agents, just indentation errors."
+# Ansible's own words are under the GPL, which asks for its whole text with every copy, so this
+# is ours.
+description = """\
+Ansible automates machines over SSH, with nothing to install on them. Playbooks, written in \
+YAML, say what each machine of an inventory should have (packages, files, services, users), and \
+Ansible makes it so on all of them in parallel; ad-hoc commands run one task across them at \
+once. This is ansible-core with the community's collections of modules for clouds, network \
+devices and the rest."""
+description_from = "kubaos"
+# The Ansible mark, Red Hat's trademark, on a tile (ansible.svg's header): Colloid has none.
+icon = "ansible.svg"
+keeps = """\
+Your playbooks and inventories stay in your projects, and the collections and roles you \
+installed in ~/.ansible: install Ansible again and they're all there."""
+
+[[action]]
+name = "Install Ansible"
+kind = "apt"
+packages = ["ansible"]

@@ -1,0 +1,22 @@
+# doctl from nixpkgs, through the User flake. DigitalOcean keeps no apt repository and Ubuntu
+# doesn't package it.
+# https://docs.digitalocean.com/reference/doctl/how-to/install/
+name = "doctl"
+category = "devops"
+tags = ["digitalocean", "cloud", "cli", "droplets", "kubernetes"]
+summary = "DigitalOcean from your terminal. Droplets, clusters and apps, no dashboard tab."
+# The opening of its README, Apache-2.0 (github.com/digitalocean/doctl).
+description = """\
+doctl is a command-line interface (CLI) for the DigitalOcean API."""
+description_from = "https://github.com/digitalocean/doctl/blob/v2.7.0/README.md"
+# DigitalOcean's mark, DigitalOcean's trademark, used to identify the app, on a tile
+# (digitalocean.svg's header names its source): no icon theme has doctl.
+icon = "digitalocean.svg"
+keeps = """\
+Your API tokens, contexts and settings stay in ~/.config/doctl: install doctl again and it signs \
+in as before."""
+
+[[action]]
+name = "Install doctl"
+kind = "nix"
+packages = ["doctl"]

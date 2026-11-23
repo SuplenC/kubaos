@@ -1,0 +1,6 @@
+Types: deb
+URIs: https://packages.opentofu.org/opentofu/tofu/any/
+Suites: any
+Components: main
+Architectures: @ARCH@
+Signed-By: /etc/apt/keyrings/opentofu.gpg

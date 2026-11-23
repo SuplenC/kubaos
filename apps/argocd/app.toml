@@ -1,0 +1,27 @@
+# The Argo CD CLI from its GitHub release, the program itself, pinned to GitHub's digest of each
+# file. Ubuntu doesn't package it, and nixpkgs' is 3.3, out of Argo CD's support, which covers
+# the newest three minor releases; the CLI talks to servers of its own minor release best.
+# https://argo-cd.readthedocs.io/en/stable/cli_installation/
+name = "Argo CD CLI"
+category = "devops"
+tags = ["kubernetes", "k8s", "gitops", "argo", "deploy", "continuous delivery", "cli"]
+summary = "Argo CD from the terminal: sync, diff, roll back. Git is the truth, the cluster has opinions."
+# The opening of its README, Apache-2.0 (github.com/argoproj/argo-cd).
+description = """\
+Argo CD is a declarative GitOps continuous delivery tool for Kubernetes."""
+description_from = "https://github.com/argoproj/argo-cd/blob/v3.6.2/README.md"
+# Argo's mark, the project's trademark, on a tile (argocd.svg's header): no icon theme has Argo
+# CD.
+icon = "argocd.svg"
+keeps = """\
+Your Argo CD servers and their sign-ins stay in ~/.config/argocd: install the CLI again and \
+they're there."""
+
+[[action]]
+name = "Download the Argo CD CLI"
+kind = "download"
+to = "/usr/local/bin/argocd"
+version = "3.6.2"
+unpack = "file"
+amd64 = { url = "https://github.com/argoproj/argo-cd/releases/download/v3.6.2/argocd-linux-amd64", sha256 = "80cc51ce8eb39d5601d54fd14225ed15a04ccf4baa3427f5c1e72a4e342aa0b2" }
+arm64 = { url = "https://github.com/argoproj/argo-cd/releases/download/v3.6.2/argocd-linux-arm64", sha256 = "578e87773bfb0fe5047250f16f914d0362fbfce0b5b2b7ed7204776925dcdff9" }

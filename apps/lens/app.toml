@@ -4,7 +4,7 @@
 # Lens is two years behind.
 # https://docs.k8slens.dev/getting-started/install-lens/
 name = "Lens"
-category = "development"
+category = "devops"
 tags = ["kubernetes", "k8s", "cluster", "pods", "ide"]
 summary = "Your Kubernetes clusters in a window. It wants a Lens ID before it'll show you a single pod."
 # Mirantis' own words aren't under a licence that allows copying them, so this is ours.

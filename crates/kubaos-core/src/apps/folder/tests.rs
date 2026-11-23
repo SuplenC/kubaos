@@ -421,6 +421,21 @@ fn a_picture_icon_that_isnt_square_or_a_png_of_a_size_the_theme_lacks_is_refused
 }
 
 #[test]
+fn a_theme_icons_name_beside_a_picture_of_that_name_is_refused() {
+    let catalog = tempfile::tempdir().unwrap();
+    let dir = catalog.path().join("sketch");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("sketch.svg"), b"<svg/>").unwrap();
+
+    let named = Folder::parse("sketch", &dir, &format!("{ABOUT}{ACTION}"));
+
+    assert!(
+        matches!(&named, Err(FolderError::ThemeIconBesideFile { icon, file }) if icon == "sketch" && file == "sketch.svg"),
+        "{named:?}"
+    );
+}
+
+#[test]
 fn an_app_with_no_icon_is_refused_naming_how_to_draw_one() {
     let without = parse(&ABOUT.replace("icon = \"sketch\"\n", ""));
 

@@ -1,0 +1,28 @@
+# The Google Cloud CLI from Google's signed apt repository, whose key system/packages.toml pins
+# ([repo.google-cloud]). Ubuntu doesn't package it, and Google's repository has it the day it's
+# released, for amd64 and arm64. Its package writes no source of its own. gcloud's own component
+# manager is off in a package install: apt updates it, and its extra components are packages of
+# the same repository.
+# https://cloud.google.com/sdk/docs/install-sdk#deb
+name = "Google Cloud CLI"
+category = "devops"
+tags = ["gcloud", "google", "gcp", "cloud", "cli", "gsutil", "bq"]
+summary = "gcloud, gsutil and bq: Google Cloud from your terminal, one project flag at a time."
+# Google Cloud's documentation, CC-BY-4.0, Google LLC.
+description = """\
+The Google Cloud CLI is a set of tools to create and manage Google Cloud resources. You can use \
+these tools to perform many common platform tasks from the command line or through scripts and \
+other automation."""
+description_from = "https://cloud.google.com/sdk/gcloud"
+# The Google Cloud icon, Google's trademark, used to identify the app, on a tile (google-cloud.png's
+# comment names its source): Google publishes it only as a raster, and no icon theme has it.
+icon = "google-cloud.png"
+keeps = """\
+Your accounts, credentials and configurations stay in ~/.config/gcloud: install the Google Cloud \
+CLI again and it signs in as before."""
+
+[[action]]
+name = "Install the Google Cloud CLI"
+kind = "apt"
+repo = "google-cloud"
+packages = ["google-cloud-cli"]

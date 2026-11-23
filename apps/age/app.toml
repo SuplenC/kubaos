@@ -1,0 +1,25 @@
+# age from nixpkgs, through the User flake, at upstream's latest release. Ubuntu's archive has
+# 1.2.1, which predates age's post-quantum keys: it can't decrypt a file sent to one, so it isn't
+# current enough. Its author keeps no apt repository.
+# https://github.com/FiloSottile/age#installation
+name = "age"
+category = "devops"
+tags = ["encryption", "files", "keys", "post-quantum", "secrets", "gpg", "cli"]
+summary = "File encryption with small keys and no config. Everything GPG should've been."
+# The opening of its README, BSD-3-Clause, Copyright 2019 The age Authors
+# (github.com/FiloSottile/age).
+description = """\
+age is a simple, modern and secure file encryption tool, format, and Go library. It features \
+small explicit keys, post-quantum support, no config options, and UNIX-style composability."""
+description_from = "https://github.com/FiloSottile/age/blob/v1.3.2/README.md"
+# Generated, as Colloid has none for age and the terms of age's logo don't allow it on a tile:
+# age.svg's comment names the command that draws it.
+icon = "age.svg"
+keeps = """\
+Your keys stay wherever age-keygen wrote them: install age again and they open every file they \
+did before."""
+
+[[action]]
+name = "Install age"
+kind = "nix"
+packages = ["age"]

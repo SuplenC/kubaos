@@ -1,0 +1,8 @@
+<!-- Packer's logo, HashiCorp's: HashiCorp's trademark, used to identify the app. From hashicorp/design-system @hashicorp/flight-icons 5.3.0 (packages/flight-icons/svg/packer-color-24.svg, https://github.com/hashicorp/design-system/blob/%40hashicorp/flight-icons%405.3.0/packages/flight-icons/svg/packer-color-24.svg), MPL-2.0, Copyright (c) 2021 HashiCorp, Inc, unchanged, on KubaOS's white rounded tile, so it matches the catalog's other icons and reads on a dark menu and a light one. -->
+<svg height="500" viewBox="0 0 500 500" width="500" xmlns="http://www.w3.org/2000/svg">
+<defs><clipPath id="kubaos-tile"><rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625"/></clipPath></defs>
+<g clip-path="url(#kubaos-tile)">
+<rect x="31.25" y="31.25" width="437.5" height="437.5" rx="101.5625" fill="#fff"/>
+<svg x="105" y="105" width="290" height="290" viewBox="0 0 24 24"><g fill="#02a8ef"><path fill-rule="evenodd" d="m5 3.311 7.42 4.308V23.5L5 19.192z" clip-rule="evenodd"/><path d="M16.095 5.168 8.028.5v3.238l5.488 3.184v9.723l2.58 1.49c1.598.925 2.904.38 2.904-1.233V9.768c-.002-1.604-1.312-3.672-2.905-4.6"/></g></svg>
+</g>
+</svg>

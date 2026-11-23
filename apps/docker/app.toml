@@ -4,7 +4,7 @@
 # network-online.target, which would put a wait for the network on the way to the desktop.
 # https://docs.docker.com/engine/install/ubuntu/
 name = "Docker"
-category = "development"
+category = "devops"
 tags = ["containers", "compose", "docker", "images"]
 summary = "Containers and Compose. Because \"works on my machine\" needed a shipping format."
 # Docker's documentation, Apache-2.0 (github.com/docker/docs).

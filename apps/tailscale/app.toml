@@ -22,7 +22,7 @@ account you already have. Its daemon, tailscaled, runs at boot; `sudo tailscale 
 machine in, and the tailnet's own settings decide who reaches what."""
 description_from = "kubaos"
 # Tailscale's mark on a tile (tailscale.svg), as Colloid draws none.
-icon = "tailscale"
+icon = "tailscale.svg"
 keeps = """\
 This machine's sign-in and node key stay in /var/lib/tailscale: install Tailscale again and it's \
 back on your tailnet as the same machine. Remove it from the tailnet in Tailscale's admin console \

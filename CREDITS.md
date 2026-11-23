@@ -226,6 +226,71 @@ What the developer Suites (`home/suites/`) add beyond the toolchains mise instal
 | Segment Anything (SAM ViT-B) | Picks out the parts of a wallpaper in the depth Suite | Meta AI Research | Apache-2.0 | [github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything) |
 | vscode-js-debug | The Node Suite's debug adapter | Microsoft Corporation | MIT | [github.com/microsoft/vscode-js-debug](https://github.com/microsoft/vscode-js-debug) |
 
+### Kubernetes apps of the catalog
+
+The Apps catalog's Kubernetes tools (`apps/`), and the marks their icons carry.
+
+| Name | What KubaOS uses it for | Creators | Licence | Link |
+|---|---|---|---|---|
+| Helm | The catalog's Helm (`apps/helm/`) | The Helm Authors | Apache-2.0 | [github.com/helm/helm](https://github.com/helm/helm) |
+| kubectx + kubens | The catalog's kubectx + kubens (`apps/kubectx/`) | Ahmet Alp Balkan and the kubectx contributors | Apache-2.0 | [github.com/ahmetb/kubectx](https://github.com/ahmetb/kubectx) |
+| stern | The catalog's stern (`apps/stern/`) | The stern authors | Apache-2.0 | [github.com/stern/stern](https://github.com/stern/stern) |
+| kind | The catalog's kind (`apps/kind/`), and its logo as kind's icon | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes-sigs/kind](https://github.com/kubernetes-sigs/kind) |
+| minikube | The catalog's minikube (`apps/minikube/`), and its logo as minikube's icon | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes/minikube](https://github.com/kubernetes/minikube) |
+| k3d | The catalog's k3d (`apps/k3d/`), and its logo as k3d's icon | Thorsten Klein and the k3d contributors | MIT | [github.com/k3d-io/k3d](https://github.com/k3d-io/k3d) |
+| Kustomize | The catalog's Kustomize (`apps/kustomize/`), and its icon as Kustomize's | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes-sigs/kustomize](https://github.com/kubernetes-sigs/kustomize) |
+| Argo CD | The catalog's Argo CD CLI (`apps/argocd/`) | The Argo Project Authors | Apache-2.0 | [github.com/argoproj/argo-cd](https://github.com/argoproj/argo-cd) |
+| Flux | The catalog's Flux CLI (`apps/flux/`) | The Flux Authors | Apache-2.0 | [github.com/fluxcd/flux2](https://github.com/fluxcd/flux2) |
+| Headlamp | The catalog's Headlamp (`apps/headlamp/`), and its icon as Headlamp's | The Kubernetes Authors | Apache-2.0 | [github.com/kubernetes-sigs/headlamp](https://github.com/kubernetes-sigs/headlamp) |
+| Tilt | The catalog's Tilt (`apps/tilt/`), and its logo as Tilt's icon | Tilt Dev Inc. and the Tilt contributors | Apache-2.0 | [github.com/tilt-dev/tilt](https://github.com/tilt-dev/tilt) |
+| Skaffold | The catalog's Skaffold (`apps/skaffold/`), and its mark as Skaffold's icon | Google LLC and the Skaffold contributors | Apache-2.0 | [github.com/GoogleContainerTools/skaffold](https://github.com/GoogleContainerTools/skaffold) |
+| Helm's logo | Helm's icon (`apps/helm/helm.svg`), from Helm's website | Microsoft Corporation and the Helm Authors | MIT | [github.com/helm/helm-www](https://github.com/helm/helm-www) |
+| Argo's mark | The Argo CD CLI's icon (`apps/argocd/argocd.svg`) | The Argo Project Authors | The Linux Foundation's trademark, used to identify the app | [github.com/argoproj/argoproj](https://github.com/argoproj/argoproj) |
+| Flux's mark | The Flux CLI's icon (`apps/flux/flux.svg`), from Flux's website | The Flux Authors | Apache-2.0 | [github.com/fluxcd/website](https://github.com/fluxcd/website) |
+
+### Cloud, container and CI apps of the catalog
+
+The Apps catalog's cloud CLIs, container and CI tools (`apps/`), and the marks their icons carry.
+
+| Name | What KubaOS uses it for | Creators | Licence | Link |
+|---|---|---|---|---|
+| AWS CLI | The catalog's AWS CLI (`apps/aws-cli/`) | Amazon.com, Inc. | Apache-2.0 | [github.com/aws/aws-cli](https://github.com/aws/aws-cli) |
+| Google Cloud CLI | The catalog's Google Cloud CLI (`apps/google-cloud-cli/`) | Google LLC | Apache-2.0 | [cloud.google.com/sdk](https://cloud.google.com/sdk) |
+| Azure CLI | The catalog's Azure CLI (`apps/azure-cli/`) | Microsoft Corporation | MIT | [github.com/Azure/azure-cli](https://github.com/Azure/azure-cli) |
+| doctl | The catalog's doctl (`apps/doctl/`) | DigitalOcean, LLC | Apache-2.0 | [github.com/digitalocean/doctl](https://github.com/digitalocean/doctl) |
+| hcloud | The catalog's hcloud (`apps/hcloud/`) | Hetzner Cloud GmbH | MIT | [github.com/hetznercloud/cli](https://github.com/hetznercloud/cli) |
+| flyctl | The catalog's flyctl (`apps/flyctl/`) | Fly.io, Inc. | Apache-2.0 | [github.com/superfly/flyctl](https://github.com/superfly/flyctl) |
+| dive | The catalog's dive (`apps/dive/`) | Alex Goodman | MIT | [github.com/wagoodman/dive](https://github.com/wagoodman/dive) |
+| act | The catalog's act (`apps/act/`), and its logo as act's icon | The act authors | MIT | [github.com/nektos/act](https://github.com/nektos/act) |
+| GitLab CLI | The catalog's GitLab CLI (`apps/glab/`) | GitLab Inc. | MIT | [gitlab.com/gitlab-org/cli](https://gitlab.com/gitlab-org/cli) |
+| The Amazon Web Services logo | AWS CLI's icon (`apps/aws-cli/aws.svg`) | Amazon.com, Inc. | Amazon's trademark, used to identify the app | [aws.amazon.com/trademark-guidelines](https://aws.amazon.com/trademark-guidelines/) |
+| The Google Cloud icon | Google Cloud CLI's icon (`apps/google-cloud-cli/google-cloud.png`) | Google LLC | Google's trademark, used to identify the app | [cloud.google.com](https://cloud.google.com/) |
+| The Microsoft Azure icon | Azure CLI's icon (`apps/azure-cli/azure.svg`) | Microsoft Corporation | Microsoft's trademark, used to identify the app | [azure.microsoft.com](https://azure.microsoft.com/) |
+| DigitalOcean's mark | doctl's icon (`apps/doctl/digitalocean.svg`) | DigitalOcean, LLC | DigitalOcean's trademark, used to identify the app | [digitalocean.com](https://www.digitalocean.com/) |
+| Hetzner's logo | hcloud's icon (`apps/hcloud/hetzner.png`) | Hetzner Online GmbH | Hetzner's trademark, used to identify the app | [hetzner.com](https://www.hetzner.com/) |
+| GitLab's tanuki | GitLab CLI's icon (`apps/glab/gitlab.svg`) | GitLab Inc. | GitLab's trademark, used to identify the app | [gitlab.com/gitlab-org/gitlab](https://gitlab.com/gitlab-org/gitlab) |
+
+### Infrastructure-as-code, secrets and security apps of the catalog
+
+The Apps catalog's infrastructure-as-code, secrets and security tools (`apps/`), and the marks their icons carry.
+
+| Name | What KubaOS uses it for | Creators | Licence | Link |
+|---|---|---|---|---|
+| OpenTofu | The catalog's OpenTofu, from its project's apt repository | The OpenTofu Authors, a Linux Foundation project | MPL-2.0 | [github.com/opentofu/opentofu](https://github.com/opentofu/opentofu) |
+| OpenTofu's brand artifacts | OpenTofu's catalog icon, its logo mark | The OpenTofu Authors | MPL-2.0; the trademark under the Linux Foundation's trademark policy | [github.com/opentofu/brand-artifacts](https://github.com/opentofu/brand-artifacts) |
+| Terraform | The catalog's Terraform, from HashiCorp's apt repository | HashiCorp, an IBM company | BUSL-1.1 | [github.com/hashicorp/terraform](https://github.com/hashicorp/terraform) |
+| Packer | The catalog's Packer, from HashiCorp's apt repository | HashiCorp, an IBM company | BUSL-1.1 | [github.com/hashicorp/packer](https://github.com/hashicorp/packer) |
+| Vault | The catalog's Vault CLI, from HashiCorp's apt repository | HashiCorp, an IBM company | BUSL-1.1 | [github.com/hashicorp/vault](https://github.com/hashicorp/vault) |
+| Flight Icons | Terraform's, Packer's and Vault's catalog icons, their logos; HashiCorp's trademarks | HashiCorp, Inc | MPL-2.0 | [github.com/hashicorp/design-system](https://github.com/hashicorp/design-system/tree/main/packages/flight-icons) |
+| Pulumi | The catalog's Pulumi, its release's archive | Pulumi Corporation | Apache-2.0 | [github.com/pulumi/pulumi](https://github.com/pulumi/pulumi) |
+| Pulumi's docs | Pulumi's catalog icon, its mark; Pulumi's trademark | Pulumi Corporation | Apache-2.0 | [github.com/pulumi/docs](https://github.com/pulumi/docs) |
+| Ansible | The catalog's Ansible, from Ubuntu's archive | Red Hat and the Ansible community | GPL-3.0-or-later | [github.com/ansible/ansible](https://github.com/ansible/ansible) |
+| The Ansible mark | Ansible's catalog icon; Red Hat's trademark | Red Hat, Inc. | Trademark, used to identify the app | [docs.ansible.com](https://docs.ansible.com/images/community_logo_black.svg) |
+| SOPS | The catalog's SOPS, from nixpkgs | The SOPS Authors, a CNCF project | MPL-2.0 | [github.com/getsops/sops](https://github.com/getsops/sops) |
+| SOPS's docs | SOPS's catalog icon, its logo | The SOPS Authors | CC-BY-4.0 | [github.com/getsops/docs](https://github.com/getsops/docs) |
+| age | The catalog's age, from nixpkgs | Filippo Valsorda and Ben Cartwright-Cox, the age Authors | BSD-3-Clause | [github.com/FiloSottile/age](https://github.com/FiloSottile/age) |
+| Trivy | The catalog's Trivy, from Aqua Security's apt repository; its catalog icon, its logo mark | Aqua Security Software Ltd. | Apache-2.0; its logo CC-BY-4.0 | [github.com/aquasecurity/trivy](https://github.com/aquasecurity/trivy) |
+
 ### Rust crates
 
 What the workspace's crates depend on directly.

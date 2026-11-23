@@ -2,7 +2,7 @@
 # repository and Ubuntu doesn't package it.
 # https://k9scli.io/topics/install/
 name = "k9s"
-category = "development"
+category = "devops"
 tags = ["kubernetes", "k8s", "terminal", "cluster", "pods", "tui"]
 summary = "Your Kubernetes clusters in a terminal UI. Watch your pods crash in real time, in colour."
 # The opening of its README, Apache-2.0 (github.com/derailed/k9s).

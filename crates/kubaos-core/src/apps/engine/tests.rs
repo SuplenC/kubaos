@@ -2523,13 +2523,16 @@ fn a_removal_shows_each_step_it_undoes_by_name() {
 mod ai;
 mod architecture;
 mod browsers;
+mod cloud;
 mod communication;
 mod devtools;
 mod dkms;
 mod editors;
 mod games;
 mod graphics;
+mod iac;
 mod keys;
+mod kubernetes;
 mod media;
 mod office;
 mod requires;

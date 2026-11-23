@@ -1,0 +1,30 @@
+# kind from its GitHub release, the program itself, pinned to GitHub's digest of each file. A
+# kind release starts the Kubernetes of its own node image, and kubectl talks to clusters one
+# minor version either side of its own: Ubuntu's kind (0.30) starts Kubernetes 1.34 and
+# nixpkgs' (0.31) 1.35, too old for the catalog's kubectl, while the newest starts the
+# Kubernetes kubectl is.
+# https://kind.sigs.k8s.io/docs/user/quick-start/#installing-from-release-binaries
+name = "kind"
+category = "devops"
+tags = ["kubernetes", "k8s", "cluster", "local", "docker", "testing", "ci"]
+summary = "A whole Kubernetes cluster in Docker containers. Break it, delete it, make another."
+# The opening of its README, Apache-2.0 (github.com/kubernetes-sigs/kind).
+description = """\
+kind is a tool for running local Kubernetes clusters using Docker container "nodes". kind was \
+primarily designed for testing Kubernetes itself, but may be used for local development or \
+CI."""
+description_from = "https://github.com/kubernetes-sigs/kind/blob/v0.33.0/README.md"
+# kind's logo, Apache-2.0, on a tile (kind.svg's header): no icon theme has kind.
+icon = "kind.svg"
+keeps = """\
+Your clusters are containers of Docker's or Podman's, and keep running until `kind delete \
+cluster` takes them away; their entries stay in your kubeconfig."""
+
+[[action]]
+name = "Download kind"
+kind = "download"
+to = "/usr/local/bin/kind"
+version = "0.33.0"
+unpack = "file"
+amd64 = { url = "https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64", sha256 = "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d" }
+arm64 = { url = "https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-arm64", sha256 = "20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2" }

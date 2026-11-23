@@ -1,0 +1,25 @@
+# Trivy from Aqua Security's signed apt repository, whose key system/packages.toml pins
+# ([repo.trivy]). Ubuntu doesn't package it, and nixpkgs is four minor versions behind, which for
+# a security scanner is too far. Its package writes no source of its own.
+# https://trivy.dev/latest/getting-started/installation/
+name = "Trivy"
+category = "devops"
+tags = ["security", "scanner", "vulnerabilities", "cve", "sbom", "containers", "secrets", "misconfiguration", "cli"]
+summary = "Scans your images, repos and clusters for CVEs and leaked secrets. Brace yourself for the list."
+# The opening of its README, Apache-2.0 (github.com/aquasecurity/trivy).
+description = """\
+Trivy is a comprehensive and versatile security scanner. Trivy has scanners that look for \
+security issues, and targets where it can find those issues: container images, filesystems, \
+remote Git repositories, virtual machine images and Kubernetes."""
+description_from = "https://github.com/aquasecurity/trivy/blob/v0.76.2/README.md"
+# Trivy's logo mark, CC-BY-4.0, on a tile (trivy.svg's header): Colloid has none.
+icon = "trivy.svg"
+keeps = """\
+Its vulnerability database stays in ~/.cache/trivy, so a scan after you install Trivy again \
+doesn't download it first."""
+
+[[action]]
+name = "Install Trivy"
+kind = "apt"
+repo = "trivy"
+packages = ["trivy"]

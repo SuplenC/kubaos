@@ -1,0 +1,25 @@
+# OpenTofu from its project's signed apt repository, whose key system/packages.toml pins
+# ([repo.opentofu]). Ubuntu doesn't package it, and nixpkgs is two minor versions behind. Its
+# package writes no source of its own.
+# https://opentofu.org/docs/intro/install/deb/
+name = "OpenTofu"
+category = "devops"
+tags = ["infrastructure as code", "iac", "terraform", "tofu", "hcl", "provisioning", "cloud", "cli"]
+summary = "Terraform, still open source. Same HCL, same plan, same chance you nuke prod on apply."
+# The opening of its README, MPL-2.0 (github.com/opentofu/opentofu).
+description = """\
+OpenTofu is an OSS tool for building, changing, and versioning infrastructure safely and \
+efficiently. OpenTofu can manage existing and popular service providers as well as custom \
+in-house solutions."""
+description_from = "https://github.com/opentofu/opentofu/blob/v1.13.9/README.md"
+# OpenTofu's logo mark, MPL-2.0, on a tile (opentofu.svg's header): Colloid has none.
+icon = "opentofu.svg"
+keeps = """\
+Your configurations and their state stay in your projects, and the credentials tofu login keeps \
+in ~/.terraform.d: install OpenTofu again and it picks up where it left off."""
+
+[[action]]
+name = "Install OpenTofu"
+kind = "apt"
+repo = "opentofu"
+packages = ["tofu"]
