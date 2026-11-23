@@ -148,7 +148,7 @@
   transition: scale var(--motion-micro) var(--easing-standard);
 }
 
-:is(:active, [data-pinned="pressed"]) > .k-bar-dip,
-:is(:active, [data-pinned="pressed"]) > * > .k-bar-dip {
+/* Only the item's own content: `:active` holds for every ancestor of what is pressed too. */
+:is(.k-pill, .shell-cmd):is(:active, [data-pinned="pressed"]) > .k-bar-dip {
   scale: var(--scale-press_dip);
 }
