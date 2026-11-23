@@ -29,12 +29,12 @@ function itemGlyph(icon, extension) {
     return named !== "" ? named : glyph(extension);
 }
 
-// An Item's icon that is an app's initial: `initial:<name>`, as the KubaOS Extension gives an app
-// of the catalog with no logo and no symbol, its Item's title being "Install <name>".
+// An Item's icon that is an initial: `initial:<name>`, for an Item with no picture whose title
+// isn't the name its tile stands for ("Install <name>").
 const initialPrefix = "initial:";
 
 // The symbol a Result row's tile and the detail pane draw, as `itemGlyph`, but none for an app
-// that names none: a desktop app, or one of the catalog whose icon is its initial. Its tile, and
+// that names none: a desktop app, or an Item whose icon is an initial. Its tile, and
 // the pane's lg one, show the initial of `rowName` instead, its picture loading too.
 function tileGlyph(icon, extension) {
     if (icon.startsWith(initialPrefix) || (extension === "apps" && !icon.startsWith(symbolPrefix)))

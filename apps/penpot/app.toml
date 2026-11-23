@@ -15,6 +15,8 @@ with open standards like SVG, CSS, HTML, and JSON. Real-time collaboration stren
 foundation, and developers feel at home using Penpot, because design is expressed as code, \
 enabling a direct translation and shipping products faster."""
 description_from = "https://github.com/penpot/penpot/blob/2.19.2/README.md"
+# Penpot's logo mark, the one its windows take too (penpot.svg's comment names its source).
+icon = "penpot.svg"
 
 [setup.web]
 name = "Penpot"

@@ -282,16 +282,16 @@ What the mockups (`design/mockups/`) ship to the page.
 | Caskaydia Cove (Cascadia Code, Nerd Fonts build) | A terminal font to pick | Aaron Bell (Saja Typeworks) for Microsoft Corporation | OFL-1.1 | [nerdfonts.com](https://nerdfonts.com/) |
 | Colloid icon theme | The apps' icons, in its orange variant | vinceliuice | GPL-3.0-only | [github.com/vinceliuice/colloid-icon-theme](https://github.com/vinceliuice/colloid-icon-theme) |
 | DejaVu fonts | A fallback font in the screenshot harness | Bitstream, Inc., Tavmjong Bah and the DejaVu fonts team | Bitstream Vera licence; DejaVu changes public domain | [dejavu-fonts.github.io](https://dejavu-fonts.github.io/) |
-| Geist and Geist Mono | The interface and monospace fonts ([`Geist-OFL.txt`](crates/kubaos-ui/assets/fonts/Geist-OFL.txt)) | The Geist Project Authors: Basement.studio, Vercel, Andrés Briganti, Guido Ferreyra and Mateo Zaragoza | OFL-1.1 | [github.com/vercel/geist-font](https://github.com/vercel/geist-font) |
+| Geist and Geist Mono | The interface and monospace fonts, and a generated app icon's initial, outlined ([`Geist-OFL.txt`](crates/kubaos-ui/assets/fonts/Geist-OFL.txt)) | The Geist Project Authors: Basement.studio, Vercel, Andrés Briganti, Guido Ferreyra and Mateo Zaragoza | OFL-1.1 | [github.com/vercel/geist-font](https://github.com/vercel/geist-font) |
 | JetBrains Mono (Nerd Fonts build) | A terminal font to pick | Philipp Nurullin and Konstantin Bulenkov (JetBrains) | OFL-1.1 | [nerdfonts.com](https://nerdfonts.com/) |
 | Lucide | One of the icon sets the specimen compares ([licence](crates/kubaos-specimen/assets/icons/lucide-LICENSE.txt)) | Lucide Icons and Contributors | ISC | [npmjs.com/package/lucide-static](https://www.npmjs.com/package/lucide-static) |
-| M PLUS 1 | The Japanese accents: the weekday kanji, 曜日 and 東京 ([`MPLUS1-OFL.txt`](crates/kubaos-ui/assets/fonts/MPLUS1-OFL.txt)) | The M+ FONTS Project Authors: Coji Morishita | OFL-1.1 | [github.com/coz-m/MPLUS_FONTS](https://github.com/coz-m/MPLUS_FONTS) |
+| M PLUS 1 | The Japanese accents: the weekday kanji, 曜日 and 東京, and a generated app icon's kana or kanji, outlined ([`MPLUS1-OFL.txt`](crates/kubaos-ui/assets/fonts/MPLUS1-OFL.txt)) | The M+ FONTS Project Authors: Coji Morishita | OFL-1.1 | [github.com/coz-m/MPLUS_FONTS](https://github.com/coz-m/MPLUS_FONTS) |
 | Material Symbols | One of the icon sets the specimen compares ([licence](crates/kubaos-specimen/assets/icons/material-LICENSE.txt)) | Google | Apache-2.0 | [github.com/google/material-design-icons](https://github.com/google/material-design-icons) |
 | Nerd Fonts | Patches the terminal fonts with icons | Ryan L McIntyre | MIT for the patcher; each font keeps its own licence | [github.com/ryanoasis/nerd-fonts](https://github.com/ryanoasis/nerd-fonts) |
 | Noto | The system's fallback fonts, CJK and colour emoji included | Google | OFL-1.1 | [google.com/get/noto](https://www.google.com/get/noto/) |
 | Phosphor | One of the icon sets the specimen compares ([licence](crates/kubaos-specimen/assets/icons/phosphor-LICENSE.txt)) | Phosphor Icons | MIT | [npmjs.com/package/@phosphor-icons/web](https://www.npmjs.com/package/@phosphor-icons/web) |
 | sound-theme-freedesktop | The sound the clock's timers and alarms ring with, and the power warning's | The freedesktop.org sound theme's authors, named per sound in its CREDITS file | Mixed, per sound: CC-BY-SA, CC-BY-3.0, GPL-2.0-or-later, GPL-2.0 | [cgit.freedesktop.org/sound-theme-freedesktop](https://cgit.freedesktop.org/sound-theme-freedesktop) |
-| Tabler Icons | The KubaOS Symbols set (`crates/kubaos-ui/assets/symbols/`) and the style its weather symbols are drawn in ([`TABLER-LICENSE.txt`](crates/kubaos-ui/assets/symbols/TABLER-LICENSE.txt)) | Paweł Kuna | MIT | [github.com/tabler/tabler-icons](https://github.com/tabler/tabler-icons) |
+| Tabler Icons | The KubaOS Symbols set (`crates/kubaos-ui/assets/symbols/`), a generated app icon's symbol, and the style its weather symbols are drawn in ([`TABLER-LICENSE.txt`](crates/kubaos-ui/assets/symbols/TABLER-LICENSE.txt)) | Paweł Kuna | MIT | [github.com/tabler/tabler-icons](https://github.com/tabler/tabler-icons) |
 
 ### Services
 
@@ -334,6 +334,7 @@ The development tools KubaOS is made with.
 | curl | Downloads in the scripts and the dev shell | Daniel Stenberg and contributors | curl | [curl.se](https://curl.se/) |
 | Docker Engine | The end-to-end test containers (`test/run`) and the install image's build | Docker, Inc. | Apache-2.0 | [github.com/moby/moby](https://github.com/moby/moby) |
 | fontconfig | Font lookup in the screenshot harness | Keith Packard | BSD-2-Clause | [fontconfig.org](http://fontconfig.org/) |
+| fontTools | Outlines a generated app icon's initial from Geist or M PLUS 1 (`design/app-icon.py`) | Just van Rossum, Behdad Esfahbod and the fontTools authors | MIT | [github.com/fonttools/fonttools](https://github.com/fonttools/fonttools) |
 | GnuPG | Checks vendor keys in the dev shell and the system scripts | Free Software Foundation, Inc. | GPL-3.0-or-later | [gnupg.org](https://gnupg.org) |
 | hyperfine | Benchmarks commands | David Peter | Apache-2.0, MIT | [github.com/sharkdp/hyperfine](https://github.com/sharkdp/hyperfine) |
 | just | Runs the repo's recipes (`justfile`) | Casey Rodarmor | CC0-1.0 | [github.com/casey/just](https://github.com/casey/just) |

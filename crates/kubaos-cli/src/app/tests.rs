@@ -25,8 +25,7 @@ fn app(id: &str, name: &str, picked: bool, state: AppState, version: Option<&str
         summary: String::new(),
         category: Category::Development,
         tags: vec!["code".into()],
-        icon: None,
-        symbol: None,
+        icon: "fixture".into(),
         picked,
         state,
         version: version.map(str::to_owned),
@@ -121,6 +120,7 @@ tags = ["web"]
 summary = "Goes on the web | fast"
 description = "A browser."
 description_from = "kubaos"
+icon = "fixture"
 
 [[action]]
 name = "Install it"
@@ -137,6 +137,7 @@ tags = ["code"]
 summary = "Edits text"
 description = "An editor."
 description_from = "kubaos"
+icon = "fixture"
 
 [[action]]
 name = "Install it"
@@ -156,6 +157,7 @@ tags = ["design"]
 summary = "Draws boxes"
 description = "A design board."
 description_from = "kubaos"
+icon = "fixture"
 
 [setup.web]
 name = "Board"

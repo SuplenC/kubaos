@@ -32,7 +32,6 @@ use super::action::Unpack;
 use super::action::is_argv;
 use super::action::is_icon_name;
 use super::action::is_theme_icon;
-use super::symbols;
 use crate::apps::Platform;
 use crate::unfree::Unfree;
 
@@ -117,10 +116,10 @@ pub enum FolderError {
         "{icon:?} is {size}×{size}, which no folder of the icon theme holds: a PNG icon is 16, 22, 24, 32, 36, 48, 64, 72, 96, 128, 192, 256 or 512 pixels square"
     )]
     IconSize { icon: String, size: u32 },
-    #[error("an app has an icon or a symbol, not both")]
-    IconAndSymbol,
-    #[error("{0:?} is not a symbol: the Tabler name of one of KubaOS Symbols (design/tokens.toml, [symbols])")]
-    UnknownSymbol(String),
+    #[error(
+        "the app has no icon: name Colloid's, put its vendor's logo in its folder, or draw one with `just app-icon {0}`"
+    )]
+    NoIcon(String),
     #[error("{0:?} is not an app this one can require: an app id, other than its own, named once")]
     InvalidRequirement(String),
     #[error("{0:?} is not a version: digits, letters and `.+~-:`, starting with a digit")]
@@ -303,10 +302,8 @@ pub struct Folder {
     pub description: String,
     /// Where `description` came from: an https:// URL, or [`WRITTEN_BY_KUBAOS`] for KubaOS's own.
     pub description_from: String,
-    pub icon: Option<String>,
-    /// A KubaOS Symbol drawn in place of a picture, for an app with no logo: the Tabler name
-    /// `app.toml` gives, never beside an `icon`.
-    pub symbol: Option<String>,
+    /// The icon theme's name for its icon, or a picture of the folder by its file's name.
+    pub icon: String,
     pub ready: Vec<Ready>,
     /// The apps every setup's install installs first, in order.
     pub requires: Vec<Requirement>,
@@ -343,7 +340,6 @@ struct File {
     description: String,
     description_from: String,
     icon: Option<String>,
-    symbol: Option<String>,
     #[serde(default)]
     ready: Vec<Ready>,
     #[serde(default)]
@@ -423,8 +419,7 @@ impl Folder {
             summary: file.summary,
             description: file.description,
             description_from: file.description_from,
-            icon: file.icon,
-            symbol: file.symbol,
+            icon: file.icon.ok_or_else(|| FolderError::NoIcon(id.to_owned()))?,
             ready: file.ready,
             requires: file.requires,
             keeps: file.keeps,
@@ -445,7 +440,7 @@ impl Folder {
     /// goes in `scalable`, a `.png` in the folder of its size; a JPEG has none, as the icon theme
     /// reads only PNG, SVG and XPM, so the menu shows it from the app's folder alone.
     fn icon_step(&self) -> Option<Action> {
-        let icon = self.icon.as_deref()?;
+        let icon = self.icon.as_str();
         let size = match file_icon(icon)? {
             IconFile::Svg => "scalable".to_owned(),
             IconFile::Png => {
@@ -497,21 +492,15 @@ impl Folder {
         Ok(())
     }
 
-    /// The KubaOS Symbol a menu or a row draws for the app, by the name `kubaos-ui` and the shell
-    /// give it: its `symbol`'s.
-    pub fn symbol_shown(&self) -> Option<&'static str> {
-        self.symbol.as_deref().and_then(symbols::by_tabler)
-    }
-
     /// The icon as a menu shows it: a picture of the folder by its path, which is there whether
     /// or not the app is, else the icon theme's name.
-    pub fn icon_shown(&self) -> Option<String> {
-        let icon = self.icon.as_deref()?;
-        Some(if file_icon(icon).is_some() {
+    pub fn icon_shown(&self) -> String {
+        let icon = self.icon.as_str();
+        if file_icon(icon).is_some() {
             self.dir.join(icon).to_string_lossy().into_owned()
         } else {
             icon.to_owned()
-        })
+        }
     }
 
     fn check(&self) -> Result<(), FolderError> {
@@ -536,17 +525,8 @@ impl Folder {
                 return Err(FolderError::InvalidTag(tag.clone()));
             }
         }
-        if self.icon.is_some() && self.symbol.is_some() {
-            return Err(FolderError::IconAndSymbol);
-        }
-        if let Some(symbol) = &self.symbol
-            && symbols::by_tabler(symbol).is_none()
-        {
-            return Err(FolderError::UnknownSymbol(symbol.clone()));
-        }
-        if let Some(icon) = &self.icon
-            && !is_theme_icon(icon)
-        {
+        let icon = &self.icon;
+        if !is_theme_icon(icon) {
             match file_icon(icon) {
                 None => return Err(FolderError::InvalidIcon(icon.clone())),
                 Some(IconFile::Svg) => {}

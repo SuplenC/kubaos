@@ -14,7 +14,16 @@ just apps-list                   # in a checkout: the table, from that checkout'
 
 ## Icons
 
-An app's icon is, in this order: Colloid's, the system's icon theme, named by the app; else the vendor's official logo or app icon as an `.svg` in its folder (a `.png` where the vendor publishes only a raster, its note in the PNG's comment), never redrawn or recoloured, placed on the catalog's rounded tile at the same visual weight as the others (white, or the vendor's own tile colour where its mark needs it), its header naming where it was taken from and that it is the vendor's trademark, used to identify the app; else original art; else none (`docs/CONTRACTS.md`, "An app's folder").
+An app's icon is, in this order: Colloid's, the system's icon theme, named by the app; else the vendor's official logo or app icon as an `.svg` in its folder (a `.png` where the vendor publishes only a raster, its note in the PNG's comment), never redrawn or recoloured, placed on the catalog's rounded tile at the same visual weight as the others (white, or the vendor's own tile colour where its mark needs it), its header naming where it was taken from and that it is the vendor's trademark, used to identify the app; else a generated icon. Every app has one: the catalog refuses an app without.
+
+A generated icon is a fixed picture, `apps/<id>/<id>.svg`, drawn once and committed:
+
+```sh
+just app-icon gamescope aspect-ratio   # the KubaOS Symbol of that Tabler name
+just app-icon <id>                     # the app's initial, outlined
+```
+
+It is Colloid's plate in Colloid's own grey for a one-colour mark, `#4d4d4d` with a `#f2f2f2` glyph, the same on a dark menu and a light one, and its header names the command, so it can be drawn again. A vendor's icon, when one turns up, replaces it (`docs/CONTRACTS.md`, "An app's folder").
 
 ## Wayland
 

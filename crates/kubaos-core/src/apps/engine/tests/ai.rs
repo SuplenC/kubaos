@@ -44,6 +44,7 @@ tags = ["browser"]
 summary = "A browser for the tests"
 description = "A browser the tests install."
 description_from = "https://example.com/chrome"
+icon = "fixture"
 
 [[action]]
 name = "Install Google Chrome"
@@ -139,7 +140,7 @@ fn every_ai_app_installs_on_the_fake_machine_and_its_removal_leaves_it_as_before
                     // The app's own icon, an .svg of its folder, put in the user's icon theme.
                     Kind::File {
                         to, from: Some(from), ..
-                    } if app.icon.as_deref() == Some(from) => {
+                    } if *from == app.icon => {
                         let to = to.replace("~/", "");
                         assert!(world.host_home().join(to).is_file(), "{id}: {from} isn't in place");
                     }

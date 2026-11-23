@@ -32,6 +32,7 @@ const ABOUT: &str = r#"category = "development"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/app"
+icon = "fixture"
 "#;
 
 /// An apt app from a vendor's repository.

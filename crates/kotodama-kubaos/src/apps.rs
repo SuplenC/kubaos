@@ -87,14 +87,6 @@ const CONFIGURE_PREFIX: &str = "app-configure:";
 /// A Job is this and a count, `app-1`.
 const JOB_PREFIX: &str = "app-";
 
-/// What starts an Item's icon that is a KubaOS Symbol, not an icon theme's name or a path: the
-/// menu's row draws the rest as its tile's symbol.
-const SYMBOL_PREFIX: &str = "symbol:";
-/// What starts an Item's icon that is an app's initial: the menu's row takes the rest as the app's
-/// name and shows its first character on the tile, as an Item's title names the change ("Install
-/// <name>"), not the app.
-const INITIAL_PREFIX: &str = "initial:";
-
 /// Where the apps' status is read from.
 #[derive(Clone, Debug)]
 pub struct AppFiles {
@@ -834,16 +826,6 @@ fn share(n: usize, of: usize) -> f32 {
     if of == 0 { 0.0 } else { n as f32 / of as f32 }
 }
 
-/// An app's Item's icon: its picture, else its symbol as `symbol:<name>`, which the menu's row
-/// draws as a KubaOS Symbol, else its name as `initial:<name>`, whose initial the row's tile shows.
-fn item_icon(app: &AppStatus) -> String {
-    match (&app.icon, &app.symbol) {
-        (Some(icon), _) => icon.clone(),
-        (None, Some(symbol)) => format!("{SYMBOL_PREFIX}{symbol}"),
-        (None, None) => format!("{INITIAL_PREFIX}{}", app.name),
-    }
-}
-
 /// An app's Item, found by its id and each word of it as well as its name, "app" and `words`.
 fn item(id: String, title: String, subtitle: String, app: &AppStatus, words: &[&str], action: Action) -> Item {
     let keywords = std::iter::once(app.id.as_str())
@@ -858,7 +840,7 @@ fn item(id: String, title: String, subtitle: String, app: &AppStatus, words: &[&
         identity: None,
         title,
         subtitle: Some(subtitle),
-        icon: Some(item_icon(app)),
+        icon: Some(app.icon.clone()),
         names: Vec::new(),
         keywords,
         hidden: false,

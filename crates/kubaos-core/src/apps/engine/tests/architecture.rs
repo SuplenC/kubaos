@@ -15,6 +15,7 @@ category = "games"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Let dpkg install 32-bit packages"
@@ -35,6 +36,7 @@ category = "games"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Let dpkg install 32-bit packages"
@@ -55,6 +57,7 @@ category = "games"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Let you use it"

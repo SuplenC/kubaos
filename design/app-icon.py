@@ -5,13 +5,14 @@
 
 With a symbol, the tile carries that KubaOS Symbol, named by its Tabler name as `symbol` in an
 app.toml is; without one, the app's initial, by IconTile's rule: the first grapheme of its
-`name`, upper-cased, in the headline style's font, Geist, or M PLUS 1 for a kana or a kanji.
-The letter is outlined, so drawing the icon needs no font.
+`name`, upper-cased, in the headline style's weight of Geist, or of M PLUS 1 for a kana or a
+kanji. The letter is outlined, so drawing the icon needs no font.
 
 The tile is Colloid's plate, as every catalog icon's: 56 of 64 inset 4, corner 13, on a 500
-grid. The glyph sits on it as IconTile's lg symbol sits on its tile, a `headline` icon in a
-`control_lg` square, and the initial takes the line of that box, so both read at the weight
-IconTile gives them. Its colours are fixed, a picture's own, not the wallpaper's.
+grid. A symbol sits on it as IconTile's lg symbol sits on its tile, a `headline` icon in a
+`control_lg` square. A letter is drawn larger than IconTile's, so it reads as heavy as a symbol
+beside it at 32 and at 128 pixels. Its colours are fixed, a picture's own, not the
+wallpaper's.
 
 Run it through `just app-icon`, in the flake's `branding` shell, which has fontTools and names
 M PLUS 1 in `MPLUS1_DIR`. It overwrites the app's icon file; the header records the command,
@@ -42,10 +43,18 @@ HEADLINE = TOKENS["type"]["headline"]
 GLYPH_BOX = PLATE * HEADLINE["icon"] / TOKENS["size"]["control_lg"]
 TABLER_GRID = 24
 
-# TODO(#499): the tile's and the glyph's colours are Kuba's pick; until then, a white tile with
-# the light palette's `on_surface`, as the catalog's white vendor tiles.
-TILE = "#ffffff"
-INK = TOKENS["color"]["light"]["on_surface"]
+# A letter's size, judged by eye beside the symbols at 32 and 128 pixels: a Latin capital is this
+# much of the glyph box tall, by its font's cap height, and a kana's or a kanji's em is this much
+# of it, as an ideograph fills its em where a capital fills its cap height.
+LATIN_CAP = 0.64
+CJK_EM = 0.84
+
+# Colloid's own plate for a one-colour mark, its OBS icon's grey and the light grey of its
+# glyph, so a generated icon reads as one of Colloid's beside them. They are a picture's
+# colours, fixed, the same on a dark menu and a light one; no design token holds them, as no
+# KubaOS surface is drawn in them.
+TILE = "#4d4d4d"
+INK = "#f2f2f2"
 
 SYMBOLS_DIR = os.path.join(REPO, "crates/kubaos-ui/assets/symbols")
 FONTS_DIR = os.path.join(REPO, "crates/kubaos-ui/assets/fonts")
@@ -131,9 +140,18 @@ def font_for(letter):
     return os.path.join(FONTS_DIR, f"Geist-{weight}.ttf"), "Geist"
 
 
+def letter_size(font, ideograph):
+    """The size `font`'s letter is drawn at on the 500 grid: by its em for a kana or a kanji, else
+    by its cap height."""
+    em = font["head"].unitsPerEm
+    if ideograph:
+        return GLYPH_BOX * CJK_EM
+    return GLYPH_BOX * LATIN_CAP * em / font["OS/2"].sCapHeight
+
+
 def letter_glyph(letter, ink):
-    """`letter` outlined, in the headline style's size for the glyph box: across on its advance,
-    down on the top and bottom of its ink, as IconTile centres an initial."""
+    """`letter` outlined, at `letter_size`: across on its advance, down on the top and bottom of
+    its ink, as IconTile centres an initial."""
     if len(letter) != 1:
         fail(f"{letter!r} is more than one character, which no font here draws as one glyph")
     path, family = font_for(letter)
@@ -148,8 +166,7 @@ def letter_glyph(letter, ink):
         fail(f"{family}'s glyph for {letter!r} draws nothing")
     _, y_min, _, y_max = bounds.bounds
 
-    size = GLYPH_BOX * HEADLINE["size"] / HEADLINE["line"]
-    scale = size / font["head"].unitsPerEm
+    scale = letter_size(font, japanese(letter)) / font["head"].unitsPerEm
     x = GRID / 2 - glyph.width * scale / 2
     baseline = GRID / 2 + (y_min + y_max) / 2 * scale
 
