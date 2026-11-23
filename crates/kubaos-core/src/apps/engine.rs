@@ -628,15 +628,16 @@ impl<'h> Keeper<'h> {
         let Some(mut replaced) = entry.replaced.take() else {
             return Ok(());
         };
-        let taker = pass_within(journal, &mut replaced);
+        pass_chain(journal, &mut replaced);
         journal.put(Entry {
             replaced: Some(replaced.clone()),
             ..entry.clone()
         });
         journal.save(&self.journals).map_err(StepError::Journal)?;
-        self.undo_entry(id, &replaced, &mut Vec::new(), true)?;
-        if let Some(taker) = taker {
-            self.keep_needed(journal, &replaced, taker)?;
+        let mut handed = Vec::new();
+        self.undo_entry(id, &replaced, &mut handed, true)?;
+        for part in parts(&replaced) {
+            self.keep_needed(journal, part, &handed)?;
         }
         journal.put(entry);
         journal.save(&self.journals).map_err(StepError::Journal)
@@ -868,7 +869,9 @@ impl<'h> Keeper<'h> {
     ) -> Result<(), StepError> {
         let step = entry.step;
         let mut entry = entry.clone();
-        let taker = if within { pass_within(journal, &mut entry) } else { None };
+        if within {
+            pass_chain(journal, &mut entry);
+        }
         journal.put(Entry {
             state: if entry.state == State::Skipped {
                 State::Skipped
@@ -879,18 +882,24 @@ impl<'h> Keeper<'h> {
         });
         journal.save(&self.journals).map_err(StepError::Journal)?;
         self.undo_entry(id, &entry, handed, false)?;
-        if let Some(taker) = taker {
-            self.keep_needed(journal, &entry, taker)?;
+        if within {
+            for part in parts(&entry) {
+                self.keep_needed(journal, part, handed)?;
+            }
         }
         keep_brought(journal, &entry, handed);
         journal.drop_step(step);
         journal.save(&self.journals).map_err(StepError::Journal)
     }
 
-    /// Gives the entry of `taker`, which took a package of `entry`, what apt pulled in for `entry`
-    /// that its undo left installed: what a package that passed still needs, which goes with it.
-    fn keep_needed(&mut self, journal: &mut Journal, entry: &Entry, taker: usize) -> Result<(), StepError> {
-        let deps: Vec<String> = entry
+    /// Settles what apt pulled in for `part`, a step taken out or a replaced part just undone,
+    /// that [`pass_within`] marked for the entry that took one of its packages, as an unowned
+    /// `dep:` claim written before the undo: what the undo left installed, still needed by a
+    /// package that passed, goes to that entry, owned; what it took away, or handed to another
+    /// app that found it (`handed`), leaves the mark. The mark is in the journal before the undo
+    /// runs, so a run stopped between the undo and this finishes it on the next.
+    fn keep_needed(&mut self, journal: &mut Journal, part: &Entry, handed: &[Handed]) -> Result<(), StepError> {
+        let deps: Vec<String> = part
             .claims
             .iter()
             .filter(|c| c.owned)
@@ -904,14 +913,22 @@ impl<'h> Keeper<'h> {
             .host
             .installed(&deps)
             .map_err(|e| StepError::Perform(PerformError::Host(e)))?;
-        let Some(other) = journal.entries.iter_mut().find(|e| e.step == taker) else {
-            return Ok(());
-        };
-        for dep in deps.iter().filter(|d| left.contains(*d)) {
+        for dep in &deps {
             let claim = format!("dep:{dep}");
-            match other.claims.iter_mut().find(|c| c.claim == claim) {
-                Some(held) => held.owned = true,
-                None => other.claims.push(Claim::new(claim, true)),
+            let marked = journal
+                .entries
+                .iter_mut()
+                .find(|e| e.step != part.step && e.claims.iter().any(|c| c.claim == claim && !c.owned));
+            let Some(taker) = marked else {
+                continue;
+            };
+            let elsewhere = handed.iter().any(|h| h.claim == format!("package:{dep}"));
+            if left.contains(dep) && !elsewhere {
+                if let Some(held) = taker.claims.iter_mut().find(|c| c.claim == claim) {
+                    held.owned = true;
+                }
+            } else {
+                taker.claims.retain(|c| c.claim != claim);
             }
         }
         Ok(())
@@ -1073,13 +1090,15 @@ fn passable(entry: &Entry) -> impl Iterator<Item = &Claim> {
         .filter(|c| c.owned && c.claim != "run" && !c.claim.starts_with("dep:"))
 }
 
-/// Whether `entry`, a step a release took out, leaves `journal` with nothing to undo: another
-/// entry takes everything it owns ([`pass_within`]).
+/// Whether `entry`, a step a release took out or a replaced part, leaves `journal` with nothing
+/// to undo: another entry takes everything it and every older part of its chain own
+/// ([`pass_within`]).
 fn folds(journal: &Journal, entry: &Entry) -> bool {
-    let mut passable = passable(entry).peekable();
-    passable.peek().is_some()
-        && passable.all(|c| taker(journal, entry.step, &c.claim).is_some())
-        && !entry.claims.iter().any(|c| c.owned && c.claim == "run")
+    parts(entry).any(|part| passable(part).next().is_some())
+        && parts(entry).all(|part| {
+            passable(part).all(|c| taker(journal, part.step, &c.claim).is_some())
+                && !part.claims.iter().any(|c| c.owned && c.claim == "run")
+        })
 }
 
 /// Passes what `entry`, a step a release took out, owns and another entry of `journal` takes
@@ -1088,8 +1107,9 @@ fn folds(journal: &Journal, entry: &Entry) -> bool {
 /// file another step writes in it. What apt pulled in for the step (its `dep:` claims) goes to
 /// the first entry that took a package, and only once every package it owned passed: a step of
 /// which some package goes keeps them for its undo, which takes away those nothing needs, and
-/// returns that entry, to take what the undo leaves ([`Keeper::keep_needed`]).
-fn pass_within(journal: &mut Journal, entry: &mut Entry) -> Option<usize> {
+/// marks them on that entry, unowned, for it to take what the undo leaves
+/// ([`Keeper::keep_needed`]).
+fn pass_within(journal: &mut Journal, entry: &mut Entry) {
     let (step, prior) = (entry.step, entry.prior.clone());
     let takers: Vec<(String, usize)> = passable(entry)
         .filter_map(|c| taker(journal, step, &c.claim).map(|t| (c.claim.clone(), t)))
@@ -1114,9 +1134,24 @@ fn pass_within(journal: &mut Journal, entry: &mut Entry) -> Option<usize> {
             package_taker.get_or_insert(*to);
         }
     }
-    let taker = package_taker?;
+    let Some(taker) = package_taker else {
+        return;
+    };
     if entry.claims.iter().any(|c| c.owned && c.claim.starts_with("package:")) {
-        return Some(taker);
+        let deps: Vec<String> = entry
+            .claims
+            .iter()
+            .filter(|c| c.owned && c.claim.starts_with("dep:"))
+            .map(|c| c.claim.clone())
+            .collect();
+        if let Some(other) = journal.entries.iter_mut().find(|e| e.step == taker) {
+            for dep in deps {
+                if !other.claims.iter().any(|c| c.claim == dep) {
+                    other.claims.push(Claim::new(dep, false));
+                }
+            }
+        }
+        return;
     }
     let deps: Vec<Claim> = entry
         .claims
@@ -1135,7 +1170,21 @@ fn pass_within(journal: &mut Journal, entry: &mut Entry) -> Option<usize> {
             }
         }
     }
-    None
+}
+
+/// [`pass_within`] for `entry` and each older part its chain of replaced parts holds, so an
+/// older part's undo leaves what a step that stands holds as the newest's does.
+fn pass_chain(journal: &mut Journal, entry: &mut Entry) {
+    let mut part = Some(entry);
+    while let Some(now) = part {
+        pass_within(journal, now);
+        part = now.replaced.as_deref_mut();
+    }
+}
+
+/// `entry` and each older part its chain of replaced parts holds, newest first.
+fn parts(entry: &Entry) -> impl Iterator<Item = &Entry> {
+    std::iter::successors(Some(entry), |e| e.replaced.as_deref())
 }
 
 /// Whether a step of `kind` is what puts an app's program on the machine, whose being there says
@@ -1298,6 +1347,13 @@ fn carry(old: Option<&Entry>, look: &perform::Look) -> (Vec<Claim>, Option<Box<E
     let Some(old) = old else {
         return (claims, None);
     };
+    // A dependency marked for this step by a step taken out in part stays marked until that
+    // step's undo settles it: a check never sees it.
+    for mark in old.claims.iter().filter(|c| !c.owned && c.claim.starts_with("dep:")) {
+        if !claims.iter().any(|c| c.claim == mark.claim) {
+            claims.push(mark.clone());
+        }
+    }
     let mut stale = Vec::new();
     for owned in old.claims.iter().filter(|c| c.owned) {
         if let Some(claim) = claims.iter_mut().find(|c| c.claim == owned.claim) {
