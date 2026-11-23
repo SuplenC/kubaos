@@ -255,9 +255,12 @@ mod tests {
         }
     }
 
-    fn payload() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("kubaos-engine-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+    /// A payload folder of the test's own, removed when the returned guard drops.
+    fn payload() -> tempfile::TempDir {
+        let dir = tempfile::Builder::new()
+            .prefix("kubaos-engine-test-")
+            .tempdir()
+            .unwrap();
         let m = serde_json::json!({
             "version": "1", "arch": "x86_64", "built_at": "2026-10-16T10:00:00Z",
             "commit": "abc", "username": "kuba", "hostname": "vm",
@@ -265,17 +268,13 @@ mod tests {
             "sha256": "00", "kernel": "6.17.0-5-generic",
             "home_generation": "/nix/store/abc-home-manager-generation"
         });
-        // Tests run in parallel and share this dir: replace the file in one
-        // step, so nobody reads it half-written.
-        let tmp = dir.join(format!("manifest.json.{:?}", std::thread::current().id()));
-        std::fs::write(&tmp, m.to_string()).unwrap();
-        std::fs::rename(&tmp, dir.join("manifest.json")).unwrap();
+        std::fs::write(dir.path().join("manifest.json"), m.to_string()).unwrap();
         dir
     }
 
     fn dry(r: &mut DryRunner, fail: bool) -> (Result<(), Error>, Vec<Event>) {
         let p = payload();
-        let cfg = config(&p);
+        let cfg = config(p.path());
         let mut events = Vec::new();
         if fail {
             r.fail_on.push("grub-install".into());
@@ -395,7 +394,7 @@ mod tests {
     #[test]
     fn the_user_gets_a_flake_of_their_own() {
         let p = payload();
-        let mut cfg = config(&p);
+        let mut cfg = config(p.path());
         cfg.user.username = "alice".into();
         let mut r = DryRunner::new();
         user_flake_payload(&mut r);
@@ -432,7 +431,7 @@ mod tests {
     #[test]
     fn a_hostname_of_your_own_names_the_machine_and_the_flake_output_and_builds_nothing() {
         let p = payload();
-        let mut cfg = config(&p);
+        let mut cfg = config(p.path());
         cfg.host.hostname = "nerv-hq".into();
         let mut r = DryRunner::new();
         user_flake_payload(&mut r);
@@ -463,7 +462,7 @@ mod tests {
     #[test]
     fn every_keyboard_layout_reaches_the_keyboard_file_the_first_the_default() {
         let p = payload();
-        let mut cfg = config(&p);
+        let mut cfg = config(p.path());
         cfg.locale.keyboard_layout = vec!["it".into(), "us".into()];
         cfg.locale.keyboard_variant = vec![String::new(), "intl".into()];
         let mut r = DryRunner::new();
@@ -502,7 +501,7 @@ mod tests {
         // Anyone else: Nix builds <user>@<host> from their user flake,
         // offline, as that user, and that's what activates.
         let p = payload();
-        let mut cfg = config(&p);
+        let mut cfg = config(p.path());
         cfg.user.username = "alice".into();
         let mut r = DryRunner::new();
         let opts = RunOptions {
@@ -535,7 +534,7 @@ mod tests {
         // system/50-hyprland.sh rendered this for the build user; the
         // installed system needs it for the real one.
         let p = payload();
-        let mut cfg = config(&p);
+        let mut cfg = config(p.path());
         cfg.user.username = "alice".into();
         let tpl = "/mnt/t/usr/share/kubaos/system/files";
         let autologin = "/mnt/t/etc/systemd/system/getty@tty1.service.d/autologin.conf";
@@ -572,7 +571,7 @@ mod tests {
     #[test]
     fn the_install_records_its_release_for_kubaos_update() {
         let p = payload();
-        let cfg = config(&p);
+        let cfg = config(p.path());
         let mut r = DryRunner::new();
         user_flake_payload(&mut r);
         r.files
@@ -626,7 +625,7 @@ mod tests {
     /// `fail_on`. Returns the step it failed in and the commands run.
     fn dry_free_space(fail_on: &str) -> (StepId, Vec<String>) {
         let p = payload();
-        let mut cfg = config(&p);
+        let mut cfg = config(p.path());
         cfg.disk.target = DiskTarget::FreeSpace {
             start: 100 * disk::GIB,
             end: 400 * disk::GIB,

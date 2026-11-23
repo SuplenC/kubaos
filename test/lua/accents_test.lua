@@ -6,7 +6,9 @@
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
 local repo = assert(arg[1], "usage: lua5.5 test/lua/accents_test.lua REPO")
-package.path = repo .. "/config/hypr/?.lua;" .. package.path
+package.path = repo .. "/config/hypr/?.lua;" .. repo .. "/test/lua/?.lua;" .. package.path
+
+local scratch <close> = require("scratch").new()
 
 local failed = 0
 
@@ -33,8 +35,7 @@ local real_getenv = os.getenv
 -- `installed` is true and the user's keyboard.toml holding `settings` (no
 -- file for nil).
 local function binds_for(installed, settings)
-  local home = os.tmpname()
-  os.remove(home)
+  local home = scratch:path()
   local settings_path = home .. "/kubaos/desktop/keyboard/keyboard.toml"
   io.open = function(name, mode)
     if name == "/etc/keyd/kubaos.conf" then
@@ -44,7 +45,7 @@ local function binds_for(installed, settings)
       if not settings then
         return nil
       end
-      local path = os.tmpname()
+      local path = scratch:path()
       local f = assert(real_open(path, "w"))
       f:write(settings)
       f:close()
@@ -119,4 +120,4 @@ test("without keyd's config there is no sheet", function()
   same(#binds_for(false, nil).submaps, 0, "submaps")
 end)
 
-os.exit(failed == 0 and 0 or 1)
+os.exit(failed == 0 and 0 or 1, true)

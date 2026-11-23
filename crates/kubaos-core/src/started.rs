@@ -54,7 +54,7 @@ pub(crate) mod testing {
     use crate::sandbox::Sandbox;
 
     struct Thread {
-        _dir: tempfile::TempDir,
+        _dir: crate::sandbox::TempDir,
         sandbox: Sandbox,
         passed: Vec<(OsString, OsString)>,
     }
@@ -67,7 +67,7 @@ pub(crate) mod testing {
         THREAD.with(|cell| {
             let mut cell = cell.borrow_mut();
             let thread = cell.get_or_insert_with(|| {
-                let dir = tempfile::tempdir().expect("a folder for the thread's sandbox");
+                let dir = crate::sandbox::tempdir().expect("a folder for the thread's sandbox");
                 let home = dir.path().join("home");
                 fs::create_dir_all(&home).expect("make the sandbox's home");
                 let sandbox = Sandbox::new(&dir.path().join("sandbox"), &home, "tester");

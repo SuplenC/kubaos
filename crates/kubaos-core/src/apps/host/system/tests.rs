@@ -24,7 +24,7 @@ use crate::sandbox::Sandbox;
 /// `HOME`, and whether it inherited a variable of the process that ran it (cargo sets
 /// `CARGO_PKG_NAME` for every test).
 fn environment(host: SystemHost) -> String {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = sandbox::tempdir().unwrap();
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "kuba");
     let mut host = host.with_path(sandbox.bin());
     sandbox::program(
@@ -108,7 +108,7 @@ fn the_candidate_is_what_apt_cache_policy_would_install() {
 
 #[test]
 fn apt_moves_a_package_down_only_when_the_install_allows_it() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = sandbox::tempdir().unwrap();
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), dir.path(), "kuba");
     let mut host = SystemHost::new("kuba", dir.path(), "/usr/share/kubaos")
         .as_root()
@@ -212,7 +212,7 @@ fn mokutil_says_whether_the_key_is_enrolled_queued_or_neither() {
 
 #[test]
 fn a_certificate_named_through_kernelver_is_the_one_dkms_works_out_for_the_kernel() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = sandbox::tempdir().unwrap();
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "kuba");
     let framework = dir.path().join("framework.conf");
     let more = dir.path().join("signing.conf");
@@ -265,7 +265,7 @@ fn a_modules_users_count_the_devices_bound_to_its_drivers() {
 
 #[test]
 fn a_variable_dkms_configuration_sets_empty_reads_as_unset() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = sandbox::tempdir().unwrap();
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "kuba");
     let framework = dir.path().join("framework.conf");
     fs::write(&framework, "mok_certificate=\"$unset_by_anyone\"\n").unwrap();

@@ -23,6 +23,7 @@
 //! - [`Sandbox`], the stand-ins ([`STUBBED`]) and the tools ([`TOOLS`]), and [`output`] and
 //!   [`git`], a one-off command in a sandbox of its own.
 //! - Writing a program a test starts so that it starts at once ([`program`], [`settle`]).
+//! - The folder a sandbox and its test's home live in ([`tempdir`]), removed whole when it drops.
 //!
 //! # Not here
 //!
@@ -31,6 +32,7 @@
 use std::env;
 use std::ffi::OsStr;
 use std::fs;
+use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::fs::symlink;
 use std::path::Path;
@@ -359,6 +361,59 @@ impl Sandbox {
     }
 }
 
+/// A folder for a sandbox and its test's home, removed with everything in it when it drops.
+///
+/// A program in a sandbox may leave a tree without write permission (an unpacked image, a
+/// tarball kept read-only): [`tempfile::TempDir`] can't empty such a folder, says nothing, and
+/// leaves the whole folder in the system's temporary directory. This one gives its owner back
+/// the write permission first.
+#[derive(Debug)]
+pub struct TempDir(tempfile::TempDir);
+
+impl TempDir {
+    /// The folder's path.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        self.0.path()
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        writable(self.0.path());
+    }
+}
+
+/// A new [`TempDir`] in the system's temporary directory, as [`tempfile::tempdir`] makes one.
+///
+/// # Errors
+///
+/// When the folder can't be made.
+pub fn tempdir() -> io::Result<TempDir> {
+    tempfile::tempdir().map(TempDir)
+}
+
+/// Every folder under `dir`, `dir` included, made its owner's to write and enter, so that what is
+/// in it can be removed. A symlink is never followed: what it points at isn't the test's.
+fn writable(dir: &Path) {
+    let Ok(meta) = fs::symlink_metadata(dir) else {
+        return;
+    };
+    if !meta.is_dir() {
+        return;
+    }
+    let mode = meta.permissions().mode();
+    if mode & 0o700 != 0o700 {
+        let _ = fs::set_permissions(dir, fs::Permissions::from_mode(mode | 0o700));
+    }
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        writable(&entry.path());
+    }
+}
+
 /// The shell a script's `#!/bin/sh` runs, which the sandbox's `sh` is too: Ubuntu's is dash,
 /// a dev shell's `PATH` puts bash first, and the two differ (a `command -v` that finds nothing
 /// exits 127 in dash, 1 in bash), so a test's `sh -c` would depend on the shell it ran from.
@@ -385,7 +440,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let dir = tempfile::tempdir().expect("a folder for the sandbox");
+    let dir = tempdir().expect("a folder for the sandbox");
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
     if !program.contains('/') && !sandbox.bin().join(program).exists() {
         sandbox.link(program);
@@ -404,7 +459,7 @@ where
 ///
 /// When git can't start or fails.
 pub fn git(dir: &Path, args: &[&str]) -> String {
-    let sandbox_dir = tempfile::tempdir().expect("a folder for the sandbox");
+    let sandbox_dir = tempdir().expect("a folder for the sandbox");
     let sandbox = Sandbox::new(
         &sandbox_dir.path().join("sandbox"),
         &sandbox_dir.path().join("home"),

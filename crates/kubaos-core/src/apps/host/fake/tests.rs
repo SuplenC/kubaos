@@ -8,7 +8,7 @@ use crate::sandbox::NOWHERE;
 
 #[test]
 fn a_script_the_fake_machine_runs_reaches_the_stand_ins_and_never_the_session() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::sandbox::tempdir().unwrap();
     let mut host = FakeHost::new(dir.path());
     let scripts = dir.path().join("app");
     fs::create_dir_all(&scripts).unwrap();
@@ -48,7 +48,7 @@ fn a_script_the_fake_machine_runs_reaches_the_stand_ins_and_never_the_session() 
 
 #[test]
 fn a_run_naming_a_bare_command_runs_its_stand_in() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::sandbox::tempdir().unwrap();
     let mut host = FakeHost::new(dir.path());
 
     host.run(
@@ -68,7 +68,7 @@ fn apt_shows_a_protected_packages_removal_and_then_refuses_it_as_apt_does() {
     use crate::apps::host::AptPlan;
     use crate::apps::host::Removal;
 
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::sandbox::tempdir().unwrap();
     let mut host = FakeHost::new(dir.path());
     {
         let mut state = host.state.borrow_mut();
@@ -93,7 +93,7 @@ fn a_removal_leaves_a_package_with_conffiles_configured_and_a_purge_takes_them()
     use crate::apps::host::Known;
     use crate::apps::host::Removal;
 
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::sandbox::tempdir().unwrap();
     let mut host = FakeHost::new(dir.path());
     let conffile = host.place(std::path::Path::new("/etc/ld.so.conf.d/i386.conf"));
     fs::create_dir_all(conffile.parent().unwrap()).unwrap();
@@ -121,7 +121,7 @@ fn a_removal_leaves_a_package_with_conffiles_configured_and_a_purge_takes_them()
 
 #[test]
 fn dpkg_refuses_to_purge_a_package_something_else_needs_and_changes_nothing() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = crate::sandbox::tempdir().unwrap();
     let mut host = FakeHost::new(dir.path());
     {
         let mut state = host.state.borrow_mut();

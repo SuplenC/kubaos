@@ -7,7 +7,9 @@
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
 local repo = assert(arg[1], "usage: lua5.5 test/lua/input_test.lua REPO")
-package.path = repo .. "/config/hypr/?.lua;" .. package.path
+package.path = repo .. "/config/hypr/?.lua;" .. repo .. "/test/lua/?.lua;" .. package.path
+
+local scratch <close> = require("scratch").new()
 
 local failed = 0
 
@@ -33,13 +35,11 @@ local real_open = io.open
 -- (no file at all for nil), and the accents' XKB symbols installed when
 -- `accents` is true, and the user's keyboard.toml holding `mine` (none for nil).
 local function input_for(text, accents, mine)
-  local path = os.tmpname()
+  local path = scratch:path()
   if text then
     local f = assert(real_open(path, "w"))
     f:write(text)
     f:close()
-  else
-    os.remove(path)
   end
   io.open = function(name, mode)
     if name == "/etc/default/keyboard" then
@@ -49,7 +49,7 @@ local function input_for(text, accents, mine)
       if not mine then
         return nil
       end
-      local user = os.tmpname()
+      local user = scratch:path()
       local f = assert(real_open(user, "w"))
       f:write(mine)
       f:close()
@@ -125,4 +125,4 @@ test("a user file without layouts leaves the system's", function()
   same(input.kb_variant, ",intl", "kb_variant")
 end)
 
-os.exit(failed == 0 and 0 or 1)
+os.exit(failed == 0 and 0 or 1, true)

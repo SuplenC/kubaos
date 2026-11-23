@@ -19,6 +19,9 @@
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
 local repo = assert(arg[1], "usage: lua5.5 test/lua/power_panel_test.lua REPO")
+package.path = repo .. "/test/lua/?.lua;" .. package.path
+
+local scratch <close> = require("scratch").new()
 
 local failed = 0
 
@@ -228,8 +231,7 @@ local function hyprland(dir)
 end
 
 local function runtime()
-  local dir = os.tmpname()
-  os.remove(dir)
+  local dir = scratch:path()
   assert(os.execute("mkdir -p '" .. dir .. "/kubaos-power' '" .. dir .. "/dot-hypr'"))
   return dir
 end
@@ -371,5 +373,5 @@ test("a panel the lid turned off stays off", function()
 end)
 
 if failed > 0 then
-  os.exit(1)
+  os.exit(1, true)
 end

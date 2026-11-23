@@ -10,6 +10,7 @@ package.path = repo .. "/config/hypr/?.lua;" .. repo .. "/test/lua/?.lua;" .. pa
 
 local Fake = require("fake_hyprland")
 local blocks = require("workspace_blocks")
+local scratch <close> = require("scratch").new()
 
 local failed = 0
 
@@ -52,8 +53,7 @@ local real_getenv = os.getenv
 
 -- A new fake on a fresh state directory and user layer, without the module.
 local function bare()
-  local dir = os.tmpname()
-  os.remove(dir)
+  local dir = scratch:path()
   assert(os.execute("mkdir -p '" .. dir .. "/kubaos/hypr' '" .. dir .. "/config/kubaos/desktop/workspaces'"))
   os.getenv = function(key)
     if key == "XDG_STATE_HOME" then
@@ -2220,4 +2220,4 @@ test("SUPER + SHIFT + Space switches to the next keyboard layout", function()
   same({ switch.action.dsp, switch.action.args }, { "exec_cmd", "hyprctl switchxkblayout all next" }, "action")
 end)
 
-os.exit(failed == 0 and 0 or 1)
+os.exit(failed == 0 and 0 or 1, true)

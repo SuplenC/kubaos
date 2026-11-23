@@ -47,7 +47,7 @@ struct Ran {
 struct Fake {
     /// Where git, bash and sh run, with git and `ssh-keygen` linked in.
     sandbox: Sandbox,
-    _sandbox_dir: tempfile::TempDir,
+    _sandbox_dir: crate::sandbox::TempDir,
     ran: Vec<String>,
     canned: BTreeMap<&'static str, Result<String, ()>>,
     failing: Vec<&'static str>,
@@ -215,7 +215,7 @@ impl FakeDpkg {
 
 impl Fake {
     fn new() -> Self {
-        let dir = tempfile::tempdir().expect("a folder for the sandbox");
+        let dir = crate::sandbox::tempdir().expect("a folder for the sandbox");
         let sandbox = Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
         sandbox.link("git");
         sandbox.link("ssh-keygen");
@@ -496,7 +496,7 @@ fn summary(events: &[UpdateEvent]) -> &Summary {
 /// A machine in a temporary folder: an origin, the checkout cloned from it, a user flake, and
 /// the release record of the clone.
 struct World {
-    tmp: tempfile::TempDir,
+    tmp: crate::sandbox::TempDir,
     sys: SystemPaths,
     user: Paths,
     work: PathBuf,
@@ -505,7 +505,7 @@ struct World {
 
 impl World {
     fn new(channel: Channel, signed: bool) -> Self {
-        let tmp = tempfile::tempdir().unwrap();
+        let tmp = crate::sandbox::tempdir().unwrap();
         let key = fixture::key(&tmp.path().join("keys"));
         let origin = fixture::origin(tmp.path(), "0.1.0\n", &[("migrations/system/.keep", "")]);
         let sys = SystemPaths::under(tmp.path().join("root"));

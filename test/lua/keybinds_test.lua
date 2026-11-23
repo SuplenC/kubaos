@@ -8,6 +8,7 @@
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
 local repo = assert(arg[1], "usage: lua5.5 test/lua/keybinds_test.lua REPO")
+package.path = repo .. "/test/lua/?.lua;" .. package.path
 
 local failed = 0
 
@@ -46,9 +47,10 @@ dot = { workspaces = setmetatable({ slots = 1 }, { __index = anything }) }
 
 dofile(repo .. "/config/hypr/keybinds.lua")
 
-local dir = assert(io.popen("mktemp -d")):read("l")
+local scratch <close> = require("scratch").new()
+local dir = scratch:path()
 local bin, log = dir .. "/bin", dir .. "/log"
-os.execute("mkdir " .. bin)
+os.execute("mkdir -p '" .. bin .. "'")
 
 local function stub(name)
   local file = assert(io.open(bin .. "/" .. name, "w"))
@@ -89,5 +91,4 @@ test("with Chrome, the browser binds start it and nothing else", function()
   same(run("SUPER + SHIFT + ALT + B"), "google-chrome-stable --incognito\n", "SUPER + SHIFT + ALT + B")
 end)
 
-os.execute("rm -r " .. dir)
-os.exit(failed == 0 and 0 or 1)
+os.exit(failed == 0 and 0 or 1, true)

@@ -4,8 +4,8 @@ use std::path::PathBuf;
 
 use super::*;
 
-fn sandbox() -> (tempfile::TempDir, Sandbox) {
-    let dir = tempfile::tempdir().unwrap();
+fn sandbox() -> (TempDir, Sandbox) {
+    let dir = tempdir().unwrap();
     let home = dir.path().join("home");
     fs::create_dir_all(&home).unwrap();
     let sandbox = Sandbox::new(&dir.path().join("sandbox"), &home, "kuba");
@@ -223,4 +223,25 @@ fn a_settled_program_starts_while_a_process_holds_what_was_written_open_for_writ
     drop(holder.stdin.take());
     holder.wait().unwrap();
     assert_eq!(String::from_utf8_lossy(&started.unwrap().stdout), "hello\n");
+}
+
+#[test]
+fn a_temp_dir_removes_a_read_only_tree_and_leaves_what_a_link_in_it_points_at() {
+    let outside = tempfile::tempdir().unwrap();
+    fs::set_permissions(outside.path(), fs::Permissions::from_mode(0o500)).unwrap();
+    let dir = tempdir().unwrap();
+    let root = dir.path().to_path_buf();
+    let locked = root.join("image/usr/lib");
+    fs::create_dir_all(&locked).unwrap();
+    fs::write(locked.join("libpq.so.5"), b"").unwrap();
+    fs::set_permissions(&locked, fs::Permissions::from_mode(0o500)).unwrap();
+    fs::set_permissions(root.join("image"), fs::Permissions::from_mode(0o500)).unwrap();
+    std::os::unix::fs::symlink(outside.path(), root.join("away")).unwrap();
+
+    drop(dir);
+
+    assert!(!root.exists(), "the read-only tree is removed");
+    let mode = fs::metadata(outside.path()).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o500, "a link's target is left as it was");
+    fs::set_permissions(outside.path(), fs::Permissions::from_mode(0o700)).unwrap();
 }

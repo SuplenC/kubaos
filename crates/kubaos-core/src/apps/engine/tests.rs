@@ -141,7 +141,7 @@ text = "rival\n"
 "#;
 
 struct World {
-    _dir: tempfile::TempDir,
+    _dir: crate::sandbox::TempDir,
     host: FakeHost,
     catalog: PathBuf,
     user_journals: PathBuf,
@@ -186,7 +186,7 @@ impl Sink for StopAt {
 
 impl World {
     fn new(apps: &[(&str, &str)]) -> Self {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::sandbox::tempdir().unwrap();
         let checkout = dir.path().join("checkout");
         let catalog = checkout.join("apps");
         let system = checkout.join("system");
@@ -1295,7 +1295,7 @@ fn a_tarball_unpacks_owned_by_whoever_unpacks_it_and_writable_by_no_one_else() {
     const UNDER_UMASK: &str = "KUBAOS_TEST_UNDER_UMASK_002";
     if std::env::var_os(UNDER_UMASK).is_none() {
         let name = module_path!().split_once("::").map_or("", |(_, rest)| rest);
-        let dir = tempfile::tempdir().unwrap();
+        let dir = crate::sandbox::tempdir().unwrap();
         let sandbox = crate::sandbox::Sandbox::new(&dir.path().join("sandbox"), &dir.path().join("home"), "tester");
         let ran = sandbox
             .command("sh")
@@ -1887,7 +1887,7 @@ fn tarball(text: &str) -> Vec<u8> {
 /// An archive of `unpack` (`tar-gz`, `tar-zst` or `tar-xz`) holding `bin/tool` with `text`, made by
 /// the tar of a sandbox.
 fn packed(text: &str, unpack: &str) -> Vec<u8> {
-    let src = tempfile::tempdir().unwrap();
+    let src = crate::sandbox::tempdir().unwrap();
     fs::create_dir_all(src.path().join("bin")).unwrap();
     fs::write(src.path().join("bin/tool"), text).unwrap();
     let sandbox = Sandbox::new(&src.path().join("sandbox"), src.path(), "kuba");
