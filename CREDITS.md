@@ -245,6 +245,7 @@ The Apps catalog's Kubernetes tools (`apps/`), and the marks their icons carry.
 | Tilt | The catalog's Tilt (`apps/tilt/`), and its logo as Tilt's icon | Tilt Dev Inc. and the Tilt contributors | Apache-2.0 | [github.com/tilt-dev/tilt](https://github.com/tilt-dev/tilt) |
 | Skaffold | The catalog's Skaffold (`apps/skaffold/`), and its mark as Skaffold's icon | Google LLC and the Skaffold contributors | Apache-2.0 | [github.com/GoogleContainerTools/skaffold](https://github.com/GoogleContainerTools/skaffold) |
 | Helm's logo | Helm's icon (`apps/helm/helm.svg`), from Helm's website | Microsoft Corporation and the Helm Authors | MIT | [github.com/helm/helm-www](https://github.com/helm/helm-www) |
+| Helm's release keys | The keys the Apps bump holds Helm's checksums to (`crates/kubaos-apps-verify/keys/helm.asc`), Helm's `KEYS` file | The Helm Authors | Apache-2.0 | [github.com/helm/helm](https://github.com/helm/helm/blob/main/KEYS) |
 | Argo's mark | The Argo CD CLI's icon (`apps/argocd/argocd.svg`) | The Argo Project Authors | The Linux Foundation's trademark, used to identify the app | [github.com/argoproj/argoproj](https://github.com/argoproj/argoproj) |
 | Flux's mark | The Flux CLI's icon (`apps/flux/flux.svg`), from Flux's website | The Flux Authors | Apache-2.0 | [github.com/fluxcd/website](https://github.com/fluxcd/website) |
 

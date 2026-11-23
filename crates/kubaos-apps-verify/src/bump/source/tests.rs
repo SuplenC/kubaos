@@ -1,15 +1,20 @@
 use serde_json::json;
 
 use super::GitHubPin;
+use super::HELM_FINGERPRINTS;
+use super::HELM_KEYS;
 use super::Moved;
 use super::Pin;
 use super::Tag;
 use super::helm_download;
+use super::helm_sha256;
+use super::helm_signature;
 use super::newest_android_studio;
 use super::newest_file;
 use super::newest_proton_pass;
 use super::newest_tag;
 use super::percent_decoded;
+use crate::apt;
 
 #[test]
 fn a_release_download_reads_as_its_repository_tag_and_file() {
@@ -165,4 +170,77 @@ fn helms_newer_release_is_its_tarball_on_get_helm_sh_and_an_older_one_no_move() 
     );
     assert_eq!(helm_download(&pin, "4.3.2"), None);
     assert_eq!(helm_download(&pin, "3.22.0"), None, "Helm 3's patches are no move");
+}
+
+/// Helm 4.3.2's amd64 `.sha256sum` and its signature as the release carries it, made with one of
+/// Helm's keys; the same file signed with a throwaway key of no one's.
+const HELM_NAME: &str = "helm-v4.3.2-linux-amd64.tar.gz";
+const HELM_SUMS: &[u8] = include_bytes!("fixtures/helm-v4.3.2-linux-amd64.tar.gz.sha256sum");
+const HELM_SIGNATURE: &[u8] = include_bytes!("fixtures/helm-v4.3.2-linux-amd64.tar.gz.sha256sum.asc");
+const OTHER_SIGNATURE: &[u8] = include_bytes!("fixtures/helm-v4.3.2-linux-amd64.tar.gz.sha256sum.other.asc");
+
+#[test]
+fn helms_key_file_holds_exactly_the_pinned_keys() {
+    let mut found = apt::fingerprints(HELM_KEYS).unwrap();
+    let mut pinned = HELM_FINGERPRINTS.map(str::to_owned).to_vec();
+    found.sort();
+    pinned.sort();
+
+    assert_eq!(found, pinned);
+}
+
+#[test]
+fn a_helm_checksum_signed_by_helms_key_gives_its_sha256() {
+    assert_eq!(
+        helm_sha256(HELM_SUMS, Some(HELM_SIGNATURE), HELM_NAME).as_deref(),
+        Ok("d1c0278d46beab79582d7e50f5b3dc206944ba8e577cde618513fd07daa53983")
+    );
+}
+
+#[test]
+fn a_helm_checksum_changed_after_signing_is_refused() {
+    let tampered = String::from_utf8_lossy(HELM_SUMS).replacen("d1c0", "d1c1", 1);
+
+    let refused = helm_sha256(tampered.as_bytes(), Some(HELM_SIGNATURE), HELM_NAME).unwrap_err();
+
+    assert!(refused.contains("didn't verify"), "{refused}");
+}
+
+#[test]
+fn a_helm_checksum_signed_by_a_key_helm_doesnt_publish_is_refused() {
+    let refused = helm_sha256(HELM_SUMS, Some(OTHER_SIGNATURE), HELM_NAME).unwrap_err();
+
+    assert!(refused.contains("didn't verify"), "{refused}");
+}
+
+#[test]
+fn a_helm_checksum_with_no_signature_is_refused() {
+    let refused = helm_sha256(HELM_SUMS, None, HELM_NAME).unwrap_err();
+
+    assert!(refused.contains("has no"), "{refused}");
+}
+
+#[test]
+fn helms_signature_is_the_releases_asset_beside_the_checksum() {
+    let releases = json!([
+        {"tag_name": "v4.4.0", "assets": [
+            {"name": "helm-v4.4.0-linux-amd64.tar.gz.sha256sum.asc", "browser_download_url": "https://example.org/amd64.asc"},
+            {"name": "helm-v4.4.0-linux-arm64.tar.gz.asc", "browser_download_url": "https://example.org/arm64-tarball.asc"}
+        ]},
+        {"tag_name": "v4.3.2", "assets": []}
+    ]);
+
+    assert_eq!(
+        helm_signature(&releases, "4.4.0", "helm-v4.4.0-linux-amd64.tar.gz"),
+        Some("https://example.org/amd64.asc")
+    );
+    assert_eq!(
+        helm_signature(&releases, "4.4.0", "helm-v4.4.0-linux-arm64.tar.gz"),
+        None,
+        "the tarball's own signature isn't the checksum's"
+    );
+    assert_eq!(
+        helm_signature(&releases, "4.5.0", "helm-v4.5.0-linux-amd64.tar.gz"),
+        None
+    );
 }
