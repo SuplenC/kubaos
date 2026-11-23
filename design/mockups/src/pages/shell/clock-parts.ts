@@ -304,6 +304,11 @@ export interface ClockPopup {
   toWeather(whose: Whose): void;
   /** Back to the clock view. */
   toClock(): void;
+  /**
+   * Called as the card starts turning to `view`, from inside it or from the bar: the bar's light
+   * moves to that half of the clock.
+   */
+  onTurn: ((view: "clock" | "weather") => void) | null;
 }
 
 /** One part's move, running forwards from its first keyframe to its last, held at both ends. */
@@ -397,6 +402,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
   function go(to: Whose, from: WeatherCard | null): void {
     if (busy || !shown.element.isConnected) return;
     whose = to;
+    popup.onTurn?.("weather");
     const clock = shown;
     const weather = freshWeather(to);
     body.append(weather.element);
@@ -410,6 +416,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
 
   function back(): void {
     if (busy) return;
+    popup.onTurn?.("clock");
     const weather = shown as View & { readonly banner: WeatherCard };
     const clock = freshClock();
     body.prepend(clock.element);
@@ -429,7 +436,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     body.append(shown.element);
   }
 
-  return {
+  const popup: ClockPopup = {
     element: box,
     toWeather: (to) => {
       if (shown.rows[0]?.classList.contains("ck-top")) go(to, shown.cardOf(to));
@@ -437,7 +444,9 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     toClock: () => {
       if (!shown.rows[0]?.classList.contains("ck-top")) back();
     },
+    onTurn: null,
   };
+  return popup;
 }
 
 /** The popup's content alone. */
@@ -473,15 +482,12 @@ export function clockOnScreen(options: ClockOptions = {}, width = 1440, height =
       setClockOpen(clock, to);
       card.light(halfOf(to));
     };
+    // The card says when it turns, whether a press inside it or on the bar turned it.
+    popup.onTurn = turn;
     // The pill's weather opens home's weather; anywhere else on the pill opens the clock.
     clock.addEventListener("click", (event) => {
-      if ((event.target as Element).closest(".k-clock-pill-weather")) {
-        popup.toWeather("home");
-        turn("weather");
-      } else {
-        popup.toClock();
-        turn("clock");
-      }
+      if ((event.target as Element).closest(".k-clock-pill-weather")) popup.toWeather("home");
+      else popup.toClock();
     });
   }
   return room.element;
