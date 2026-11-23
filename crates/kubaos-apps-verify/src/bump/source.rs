@@ -5,7 +5,8 @@
 //!
 //! - [`newest`]: for one architecture's pin, the newest release its vendor publishes, with its
 //!   download and sha256.
-//! - Each vendor's feed: which URLs it covers and how it is read.
+//! - Each vendor's feed: which URLs it covers and how it is read, and Helm's pinned release keys,
+//!   which its checksums are held to.
 //!
 //! # Not here
 //!
@@ -16,6 +17,8 @@ use std::cmp::Ordering;
 
 use kubaos_core::apps::version;
 
+use crate::apt;
+use crate::apt::Signed;
 use crate::check::chain;
 use crate::check::digest_for;
 use crate::fetch;
@@ -38,9 +41,28 @@ const PROTON_PASS_RELEASES: &str = "https://proton.me/download/PassDesktop/linux
 /// Blender's release folders, one a series (`Blender5.3/`), each listing its files.
 const BLENDER: &str = "https://download.blender.org/release/";
 /// Helm's downloads, which its GitHub releases name but don't carry: the releases say which is
-/// the newest, and each tarball has its sha256 beside it, `<file>.sha256sum`.
+/// the newest, and each tarball has its sha256 beside it, `<file>.sha256sum`. The release carries
+/// that file's signature, `<file>.sha256sum.asc`, so the sha256 doesn't rest on `get.helm.sh`
+/// alone: a host serving a tampered tarball could serve a checksum to match it, not a signature.
 const HELM: &str = "https://get.helm.sh/";
 const HELM_RELEASES: &str = "repos/helm/helm/releases?per_page=100";
+/// The keys Helm's releases are signed with: its `KEYS` file as helm/helm keeps it, a key for
+/// each maintainer who cuts releases, since any of them may sign the next one.
+const HELM_KEYS: &[u8] = include_bytes!("../../keys/helm.asc");
+/// The primary keys [`HELM_KEYS`] holds. A signature by any other key is refused, and a test
+/// holds the file to this list, so a new key comes in only by changing both.
+const HELM_FINGERPRINTS: [&str; 10] = [
+    "672C657BE06B4B30969C4A57461449C25E36B98E",
+    "F1261BDE929012C8FF2E501D6EA5D7598529A53E",
+    "967F8AC5E2216F9F4FD270AD92AA783CBAAE8E3B",
+    "76939899B137D575D3274E756DCCB9D752D35BA8",
+    "49D09C86C3DC8DA3F0A076221EF612347F8A9958",
+    "ABA2529598F6626C420D335B62F49E747D911B60",
+    "4AB45F1CB0D292975C6371436E2A23D806B6E6DD",
+    "208DD36ED5BB3745A16743A4C7C6FBB5B91C1155",
+    "7FEC81FACC7FFB2A010ADD13C2D40F4D8196E874",
+    "BF888333D96A1C18E2682AAED79D67C9EC016739",
+];
 
 /// One architecture's pin, as an action holds it.
 #[derive(Clone, Copy, Debug)]
@@ -442,8 +464,10 @@ fn helm(pin: &Pin<'_>) -> Result<Found, String> {
     let url = url?;
     let name = url.rsplit('/').next().unwrap_or(&url);
     let sums = fetch::get(&format!("{url}.sha256sum")).map_err(|e| chain(&e))?;
-    let sha256 = digest_for(&String::from_utf8_lossy(&sums), name)
-        .ok_or_else(|| format!("{url}.sha256sum names no sha256 for {name}"))?;
+    let signature = helm_signature(&releases, &newest, name)
+        .map(|asc| fetch::get(asc).map_err(|e| chain(&e)))
+        .transpose()?;
+    let sha256 = helm_sha256(&sums, signature.as_deref(), name)?;
     Ok(Found::Newer {
         version: newest,
         url,
@@ -466,6 +490,51 @@ pub fn helm_download(pin: &Pin<'_>, newest: &str) -> Option<Result<String, Strin
         return Some(Err(format!("{name} doesn't hold its version, {}", pin.version)));
     }
     Some(Ok(format!("{HELM}{}", name.replace(pin.version, newest))))
+}
+
+/// Where Helm's release `version` carries the signature of `name`'s `.sha256sum`; none when the
+/// release has no such file.
+pub fn helm_signature<'a>(releases: &'a serde_json::Value, version: &str, name: &str) -> Option<&'a str> {
+    let tag = format!("v{version}");
+    let asc = format!("{name}.sha256sum.asc");
+    releases
+        .as_array()?
+        .iter()
+        .find(|release| release["tag_name"].as_str() == Some(&tag))?["assets"]
+        .as_array()?
+        .iter()
+        .find(|asset| asset["name"].as_str() == Some(&asc))?["browser_download_url"]
+        .as_str()
+}
+
+/// The sha256 of Helm's `name` from its `.sha256sum`, `sums`, once `signature` shows one of
+/// Helm's pinned keys signed it.
+///
+/// # Errors
+///
+/// A message when there is no signature, it doesn't verify with Helm's keys, or the signed file
+/// names no sha256 for `name`.
+pub fn helm_sha256(sums: &[u8], signature: Option<&[u8]>, name: &str) -> Result<String, String> {
+    let Some(signature) = signature else {
+        return Err(format!(
+            "Helm's release has no {name}.sha256sum.asc, so its sha256 can't be held to Helm's keys"
+        ));
+    };
+    let verified = apt::verify(
+        HELM_KEYS,
+        Signed::Detached {
+            release: sums,
+            signature,
+        },
+    )
+    .map_err(|e| format!("{name}.sha256sum: {}", chain(&e)))?;
+    if !HELM_FINGERPRINTS.contains(&verified.primary.as_str()) {
+        return Err(format!(
+            "{name}.sha256sum is signed by {}, which isn't one of Helm's pinned keys",
+            verified.primary
+        ));
+    }
+    digest_for(&verified.text, name).ok_or_else(|| format!("{name}.sha256sum names no sha256 for {name}"))
 }
 
 /// The newest version among a folder listing's files named `<before><version><after>`.
