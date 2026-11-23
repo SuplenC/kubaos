@@ -15,6 +15,7 @@ fn v(text: &str) -> Version {
 fn release(version: &str) -> Release {
     Release {
         version: v(version),
+        asset: format!("oss-Bitwarden-{version}-amd64.deb"),
         digest: Some(format!("sha256:{DIGEST}")),
     }
 }
@@ -22,23 +23,32 @@ fn release(version: &str) -> Release {
 /// GitHub's release list, as the API returns it, cut to the fields the phase reads.
 const RELEASES: &str = r#"[
   {"tag_name": "desktop-v2027.1.0", "draft": false, "prerelease": false,
-   "assets": [{"name": "Bitwarden-2027.1.0-amd64.deb", "digest": "sha256:aa"}]},
+   "assets": [
+     {"name": "bit-Bitwarden-2027.1.0-amd64.deb", "digest": "sha256:ab"},
+     {"name": "oss-Bitwarden-2027.1.0-amd64.deb", "digest": "sha256:aa"}
+   ]},
   {"tag_name": "desktop-v2026.12.1", "draft": false, "prerelease": true,
-   "assets": [{"name": "Bitwarden-2026.12.1-amd64.deb", "digest": "sha256:bb"}]},
+   "assets": [{"name": "oss-Bitwarden-2026.12.1-amd64.deb", "digest": "sha256:bb"}]},
   {"tag_name": "desktop-v2026.12.2", "draft": true, "prerelease": false, "assets": []},
   {"tag_name": "cli-v2026.12.0", "draft": false, "prerelease": false, "assets": []},
   {"tag_name": "desktop-v2026.12.0", "draft": false, "prerelease": false,
    "assets": [
-     {"name": "Bitwarden-2026.12.0-x86_64.AppImage", "digest": "sha256:cc"},
-     {"name": "Bitwarden-2026.12.0-amd64.deb", "digest": "sha256:dd"}
+     {"name": "oss-Bitwarden-2026.12.0-x86_64.AppImage", "digest": "sha256:cc"},
+     {"name": "oss-Bitwarden-2026.12.0-amd64.deb", "digest": "sha256:dd"}
    ]},
   {"tag_name": "desktop-v2026.11.0", "draft": false, "prerelease": false,
-   "assets": [{"name": "Bitwarden-2026.11.0-amd64.deb", "digest": null}]},
+   "assets": [{"name": "oss-Bitwarden-2026.11.0-amd64.deb", "digest": null}]},
+  {"tag_name": "desktop-v2026.10.1", "draft": false, "prerelease": false,
+   "assets": [
+     {"name": "commercial-Bitwarden-2026.10.1-amd64.deb", "digest": "sha256:ee"},
+     {"name": "Bitwarden-2026.10.1-amd64.deb", "digest": "sha256:ff"}
+   ]},
+  {"tag_name": "desktop-v2026.10.0", "draft": false, "prerelease": false, "assets": []},
   {"tag_name": "web-v2026.12.0", "draft": false, "prerelease": false, "assets": []}
 ]"#;
 
 #[test]
-fn the_list_keeps_published_desktop_releases_with_their_debs_digest() {
+fn the_list_keeps_published_desktop_releases_with_their_open_source_debs_digest() {
     let releases = parse_releases(RELEASES).unwrap();
 
     assert_eq!(
@@ -46,14 +56,27 @@ fn the_list_keeps_published_desktop_releases_with_their_debs_digest() {
         [
             Release {
                 version: v("2027.1.0"),
+                asset: "oss-Bitwarden-2027.1.0-amd64.deb".into(),
                 digest: Some("sha256:aa".into()),
             },
             Release {
                 version: v("2026.12.0"),
+                asset: "oss-Bitwarden-2026.12.0-amd64.deb".into(),
                 digest: Some("sha256:dd".into()),
             },
             Release {
                 version: v("2026.11.0"),
+                asset: "oss-Bitwarden-2026.11.0-amd64.deb".into(),
+                digest: None,
+            },
+            Release {
+                version: v("2026.10.1"),
+                asset: "Bitwarden-2026.10.1-amd64.deb".into(),
+                digest: Some("sha256:ff".into()),
+            },
+            Release {
+                version: v("2026.10.0"),
+                asset: "oss-Bitwarden-2026.10.0-amd64.deb".into(),
                 digest: None,
             },
         ]
@@ -106,7 +129,7 @@ fn a_prerelease_is_never_chosen() {
 fn the_download_url_is_the_desktop_tags_deb() {
     assert_eq!(
         release("2026.12.0").url(),
-        "https://github.com/bitwarden/clients/releases/download/desktop-v2026.12.0/Bitwarden-2026.12.0-amd64.deb"
+        "https://github.com/bitwarden/clients/releases/download/desktop-v2026.12.0/oss-Bitwarden-2026.12.0-amd64.deb"
     );
 }
 
