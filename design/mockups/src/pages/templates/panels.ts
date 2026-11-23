@@ -147,10 +147,19 @@ export interface PanelChoice {
   readonly lit?: boolean;
 }
 
+/** Which of the twins' buttons opens a panel's page: its place along the bar. */
+const OPENED_BY = new WeakMap<HTMLElement, number>();
+
+/** `page`, opened by the twins' button `index`. */
+function openedBy(page: PanelPage, index: number): PanelPage {
+  OPENED_BY.set(page.element, index);
+  return page;
+}
+
 export function system(choice: PanelChoice = {}): PanelPage {
-  return panelPage({
+  return openedBy(panelPage({
     ...options(choice, "system", [action("terminal", "Open btop", choice.lit)], systemBody(choice.state, choice.count)),
-  });
+  }), 0);
 }
 
 /**
@@ -167,14 +176,14 @@ export function notifications(choice: PanelChoice = {}): PanelPage {
   });
   page.element.classList.add("k-notif-panel");
   page.element.append(keysButton());
-  return page;
+  return openedBy(page, 1);
 }
 
 export function controlCenter(choice: PanelChoice = {}): PanelPage {
-  return panelPage({
+  return openedBy(panelPage({
     ...options(choice, "control", [action("wallpaper", "Wallpaper", choice.lit), action("power_settings_new", "Power")], controlBody(choice.state, choice.count)),
     tabs: { choices: [{ label: "Wi-Fi" }, { label: "Bluetooth" }, { label: "Output" }, { label: "Keyboard" }] },
-  });
+  }), 2);
 }
 
 export function clock(choice: PanelChoice = {}): PanelPage {
@@ -217,21 +226,22 @@ export function barButtons(interactive = true): HTMLElement[] {
   ];
 }
 
-/** A screen `width` by `height` (lengths' CSS) with its frame and the twins' buttons on the bar. */
+/** A screen `width` by `height` (lengths' CSS) with the twins' buttons on the bar. */
 export function desk(width: string, height: string): { screen: Screen; buttons: HTMLElement[] } {
   const buttons = barButtons();
   return { screen: screen({ width, height, wallpaper, bar: buttons }), buttons };
 }
 
-/** The room a panel sample is drawn in: the screen's corner, a panel wide and the frame round it. */
+/** The room a panel sample is drawn in: the screen's corner, a panel wide and room beside it. */
 export const CORNER_WIDTH = "calc(var(--size-panel) + var(--space-s64) + var(--space-s8))";
 
 /** `page` open on `edge` of a screen `width` by `height`, drawn still, `reveal` of the way open. */
 export function onScreen(page: PanelPage | HTMLElement, edge: Edge = "right", width = CORNER_WIDTH, height = "var(--size-app_min_height)", reveal?: number): HTMLElement {
-  const { screen: room } = desk(width, height);
+  const { screen: room, buttons } = desk(width, height);
   room.element.dataset.open = "";
   const element = page instanceof HTMLElement ? page : page.element;
-  hang(room, sheet({ content: element, edge, ...(reveal !== undefined ? { reveal } : {}) }));
+  const opener = edge === "right" ? buttons[OPENED_BY.get(element) ?? 0] : undefined;
+  hang(room, sheet({ content: element, edge, ...(opener ? { under: opener } : {}), ...(reveal !== undefined ? { reveal } : {}) }));
   return room.element;
 }
 
@@ -247,7 +257,7 @@ export function liveTwins(width: string, height: string): HTMLElement {
   for (const each of pages) each.view.tabIndex = -1;
   const set: Twins = twins(
     room,
-    pages.map((each, side) => ({ content: each.element, side, land: () => landOn(firsts[side]!) })),
+    pages.map((each, side) => ({ content: each.element, side, under: buttons[side]!, land: () => landOn(firsts[side]!) })),
   );
   buttons.forEach((each, index) => each.addEventListener("click", () => set.toggle(index)));
   return room.element;

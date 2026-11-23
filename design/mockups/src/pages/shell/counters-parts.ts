@@ -809,11 +809,12 @@ export function anchorOf(index: number, what: Editing): string {
 
 /** The bar with the counters' pill, and the sheet open under the corner holding `content`. */
 export function countersOnScreen(options: ScreenOptions = {}): HTMLElement {
-  const bar = [...(options.none ? [] : [countersPill(options.pill ?? "rest")]), ...barButtons(false)];
+  const opener = options.none ? null : countersPill(options.pill ?? "rest");
+  const bar = [...(opener ? [opener] : []), ...barButtons(false)];
   const room = screen({ width: CORNER, height: options.height ?? TALL, wallpaper, bar });
   if (options.content !== null) {
     room.element.dataset.open = "";
-    hang(room, sheet({ content: options.content ?? sheetBox(listPage(countersList(COUNTERS).element)), edge: "top", corner: true, ...(options.reveal !== undefined ? { reveal: options.reveal } : {}) }));
+    hang(room, sheet({ content: options.content ?? sheetBox(listPage(countersList(COUNTERS).element)), edge: "top", corner: true, ...(opener ? { under: opener } : {}), ...(options.reveal !== undefined ? { reveal: options.reveal } : {}) }));
   }
   if (options.over) {
     const card = options.over.card;
@@ -838,7 +839,7 @@ export function liveCounters(start: readonly Counter[] = COUNTERS): HTMLElement 
   const pillElement = countersPill();
   const room = screen({ width: CORNER, height: TALL, wallpaper, bar: [pillElement, ...barButtons(false)] });
   const box = sheetBox();
-  const made = sheet({ content: box, edge: "top", corner: true });
+  const made = sheet({ content: box, edge: "top", corner: true, under: pillElement });
   hang(room, made);
   for (const part of made.parts) part.dataset.live = "";
   let card: HTMLElement | null = null;

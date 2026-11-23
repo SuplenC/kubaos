@@ -328,8 +328,9 @@ export function sysmon(options: SysmonOptions = {}): HTMLElement {
 
 /** The panel open on the right edge of a screen corner, under the bar's panel pills. */
 export function sysmonOnScreen(options: SysmonOptions = {}, height = TALL, reveal?: number, rings = false): HTMLElement {
-  const room = screen({ width: CORNER, height, wallpaper, bar: [rings ? rimPill() : sysmonPill(), bellPill(), statusPill()] });
+  const opener = rings ? rimPill() : sysmonPill();
+  const room = screen({ width: CORNER, height, wallpaper, bar: [opener, bellPill(), statusPill()] });
   room.element.dataset.open = "";
-  hang(room, sheet({ content: sysmon(options), edge: "right", ...(reveal !== undefined ? { reveal } : {}) }));
+  hang(room, sheet({ content: sysmon(options), edge: "right", under: opener, ...(reveal !== undefined ? { reveal } : {}) }));
   return room.element;
 }

@@ -1,0 +1,43 @@
+/* The shell's glass (`lib/glass.ts`): one material for the bar, its cards and every other surface
+   that floats over the desktop. `surface` at the glass setting over the compositor's blur, a
+   highlight inside its top edge, a ring inside its whole edge and the glass's two shadows. The
+   blur is a backdrop filter, the mockups' stand-in for the compositor's: an ancestor with a filter,
+   a mask or an opacity under 1 would become what it blurs, so nothing holding glass carries one.
+
+   The setting is `--glass-setting`, a share from `opacity.glass_floor` to 1 that a screen may set
+   for every glass on it; unset, it is `opacity.glass` by night and `opacity.glass_day` by day. */
+.k-glass {
+  --glass-alpha: var(--glass-setting, calc(var(--opacity-glass) + (var(--opacity-glass_day) - var(--opacity-glass)) * var(--day)));
+  --glass-ring: color-mix(
+    in srgb,
+    rgb(from var(--color-on_surface) r g b / var(--opacity-glass_ring)),
+    rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft)) calc(var(--day) * 100%)
+  );
+  --glass-shadow:
+    0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass-opacity)),
+    0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass_contact-opacity));
+  background: rgb(from var(--color-surface) r g b / var(--glass-alpha));
+  backdrop-filter: blur(var(--size-glass_blur)) saturate(var(--scale-glass_saturate));
+  box-shadow:
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--opacity-glass_highlight)),
+    inset 0 0 0 var(--stroke-hairline_device_px) var(--glass-ring),
+    var(--glass-shadow);
+}
+
+/* Glass flush with the screen's edges, the Bar layout's band: an edge of its own would draw a line
+   along the screen's, so it keeps only its shadow. */
+.k-glass[data-flush] {
+  box-shadow: var(--glass-shadow);
+}
+
+/* The edge light: the Tabs' lit rail without its unlit rail, `primary_core` with the content glow
+   by night, `primary` a step thicker with no glow by day. It lies under the bar item whose card is
+   open, and its echo along the top edge of that card. */
+.k-edge-light {
+  position: absolute;
+  display: block;
+  height: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  background: color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
+  pointer-events: none;
+}

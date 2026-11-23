@@ -453,7 +453,8 @@ export function clockOnScreen(options: ClockOptions = {}, width = 1440, height =
   const room = barScreen(width, height, { content: { ...EVERYDAY, ...(options.home === "no city" ? { noHome: true } : {}) } });
   room.element.dataset.open = "";
   const popup = clockPopupOf(options);
-  hang(room, sheet({ content: popup.element, edge: "top", ...(reveal !== undefined ? { reveal } : {}) }));
+  const capsule = room.element.querySelector(".k-clock-pill-capsule");
+  hang(room, sheet({ content: popup.element, edge: "top", ...(capsule ? { under: capsule } : {}), ...(reveal !== undefined ? { reveal } : {}) }));
   if (options.live) {
     // The pill's weather opens home's weather; anywhere else on the pill opens the clock.
     room.element.querySelector(".k-clock-pill")?.addEventListener("click", (event) => {

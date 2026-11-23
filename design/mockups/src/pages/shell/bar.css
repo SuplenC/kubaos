@@ -1,14 +1,37 @@
 /* The bar's own boxes, as `config/quickshell/modules/bar/` lays them out. */
 
-/* The bar along the screen's top: the left group from the start, the clock in the middle, the right
-   group to the end, so the clock stays centred whatever either side holds. */
+/* The bar's row, `size.bar_row` tall in every layout: the left group from the start, the clock in
+   the middle, the right group to the end, so the clock stays centred whatever either side holds. */
 .shell-bar-row {
   flex: 1 1 0;
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  height: var(--size-bar);
+  height: var(--size-bar_row);
+}
+
+/* In the Islands layout each group is a strip of its own, as wide as what it holds: the left one
+   from the start, the clock's in the middle, the right one to the end. A strip's ends are its own
+   padding, so the groups keep no clear space of their own. */
+.shell-bar-row > .k-bar-island {
+  max-width: 100%;
+}
+
+.shell-bar-row > .k-bar-island:has(> .shell-bar-left) {
+  justify-self: start;
+}
+
+.shell-bar-row > .k-bar-island:has(> .k-clock-pill) {
+  justify-self: center;
+}
+
+.shell-bar-row > .k-bar-island:has(> .shell-bar-right) {
+  justify-self: end;
+}
+
+.k-bar-island > :is(.shell-bar-left, .shell-bar-right) {
+  padding-inline: 0;
 }
 
 /* The clock's capsule is the screen's middle: the side of the pill with less beside the capsule
@@ -53,20 +76,21 @@
   padding-left: var(--space-s40);
 }
 
-/* A bar alone, without its screen: the frame's surface under it, at the frame's glass. It is a
-   screen's width and never narrower: squeezed into a narrow card, its right group would run over
-   the clock, which the bar does only on a screen too narrow for it. */
+/* A bar alone, without its screen: the Floating layout's strip on the glass, a screen's width less
+   `size.gap` either side, and never narrower: squeezed into a narrow card, its right group would
+   run over the clock, which the bar does only on a screen too narrow for it. */
 .shell-bar-strip {
   position: relative;
   display: flex;
   flex: none;
+  align-items: center;
   box-sizing: border-box;
-  width: var(--strip-width);
-  min-width: var(--strip-width);
+  width: calc(var(--strip-width) - 2 * round(nearest, var(--size-gap), 1px));
+  min-width: calc(var(--strip-width) - 2 * round(nearest, var(--size-gap), 1px));
   max-width: none;
-  height: var(--size-bar);
-  padding: 0 var(--space-s8);
-  background: rgb(from var(--color-surface) r g b / var(--opacity-frame));
+  height: var(--size-bar_strip);
+  padding: 0 var(--space-s4);
+  border-radius: var(--radius-full);
 }
 
 /* The title of the focused window: one line, cut where its room ends, sliding in from below. */

@@ -10,7 +10,8 @@ import { icon } from "../../lib/icon.ts";
 import { meter } from "../../lib/meter.ts";
 import { sparkline, minute } from "../../lib/meter.ts";
 import { makePill, type Pill, type PillOptions, paired, pill } from "../../lib/pill.ts";
-import { type Screen, screen } from "../../lib/sheet.ts";
+import { glass } from "../../lib/glass.ts";
+import { type BarLayout, type Screen, screen } from "../../lib/sheet.ts";
 import { declare } from "../../lib/probe.ts";
 import { advance, clamped, text } from "../../lib/text.ts";
 import { length } from "../../lib/tokens.ts";
@@ -754,23 +755,31 @@ export interface BarOptions {
   readonly state?: Shown;
 }
 
-/** The bar alone, `width` logical pixels wide, on the frame's glass, given way as far as it needs. */
+/**
+ * The bar alone on a screen `width` logical pixels wide, as the Floating layout's strip on the
+ * glass, given way as far as it needs.
+ */
 export function barStrip(options: BarOptions): HTMLElement {
   const content = options.content ?? EVERYDAY;
   const { state } = fitBar(options.width, content);
-  const strip = document.createElement("span");
-  strip.className = "shell-bar-strip";
+  const strip = glass(document.createElement("span"));
+  strip.classList.add("shell-bar-strip");
   strip.style.setProperty("--strip-width", `calc(${options.width} * var(--px))`);
   strip.append(draw(content, state, options.state ?? "rest", options.workspaces).row);
   return strip;
 }
 
-/** The bar on a screen `width` logical pixels by `height` (a length's CSS), its frame round the wallpaper. */
-export function barScreen(width: number, height: string, options: Omit<BarOptions, "width"> = {}): Screen {
+/** How the bar lies on a screen: one of the layouts, the setting's default unless given. */
+export interface ScreenBarOptions extends Omit<BarOptions, "width"> {
+  readonly layout?: BarLayout;
+}
+
+/** The bar on a screen `width` logical pixels by `height` (a length's CSS), over the wallpaper. */
+export function barScreen(width: number, height: string, options: ScreenBarOptions = {}): Screen {
   const content = options.content ?? EVERYDAY;
-  // Inside the frame's sides, as a strip of the screen's width is inside its own.
   const { state } = fitBar(width, content);
-  return screen({ width: `calc(${width} * var(--px))`, height, wallpaper, bar: [draw(content, state, options.state ?? "rest", options.workspaces).row] });
+  const row = draw(content, state, options.state ?? "rest", options.workspaces).row;
+  return screen({ width: `calc(${width} * var(--px))`, height, wallpaper, bar: [row], ...(options.layout ? { layout: options.layout } : {}) });
 }
 
 /** A window size's width in logical pixels. */

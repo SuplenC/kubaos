@@ -295,13 +295,13 @@ export function cornerOnScreen(content: HTMLElement, height = "var(--size-app_he
 
 /**
  * Critical popups while an open panel covers the corner: the system monitor open from its pill, and
- * under it, on the right edge `radius.surface` and `space.s12` below it, a stack of the critical ones
+ * under it, at the right `size.gap` below it, a stack of the critical ones
  * alone. Live, the pill opens and closes the panel; the stack comes and goes with it, and keeps its
  * place as the panel goes, so it retracts where it is.
  */
 export function belowOnScreen(critical: readonly (readonly Note[])[], live = false, height = "calc(var(--size-app_height) + var(--space-s64) * 2)"): HTMLElement {
   const { screen: room, buttons } = desk(CORNER_WIDTH, height);
-  const cover = sheet({ content: system({ count: 1 }).element, edge: "right" });
+  const cover = sheet({ content: system({ count: 1 }).element, edge: "right", under: buttons[0]! });
   hang(room, cover);
   const stack = stackOf(...critical.map((notes) => group(notes, { popup: true, live })));
   const below = sheet({ content: stack, edge: "right", start: "0px" });
@@ -309,7 +309,7 @@ export function belowOnScreen(critical: readonly (readonly Note[])[], live = fal
   room.element.dataset.open = "";
   // The stack starts where the panel ends, which only layout knows.
   const place = () => {
-    for (const part of below.parts) part.style.setProperty("--sheet-start", `calc(${cover.box.offsetHeight}px + var(--radius-surface) + var(--space-s12))`);
+    for (const part of below.parts) part.style.setProperty("--sheet-start", `calc(${cover.box.offsetHeight}px + var(--gap))`);
   };
   new ResizeObserver(place).observe(cover.box);
   if (live) {
