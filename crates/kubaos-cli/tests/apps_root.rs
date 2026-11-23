@@ -20,6 +20,7 @@ category = "system"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Install the tool"

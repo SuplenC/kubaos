@@ -29,6 +29,7 @@ category = "system"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Install the tool"
@@ -66,6 +67,7 @@ category = "system"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Install the engine"
@@ -86,6 +88,7 @@ category = "system"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Download the tool"
@@ -123,6 +126,7 @@ category = "system"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Install the rival's tool"
@@ -692,6 +696,7 @@ category = "system"
 tags = ["fixture"]
 description = "An app the tests install."
 description_from = "https://example.com/fixture"
+icon = "fixture"
 
 [[action]]
 name = "Install the app"
@@ -759,7 +764,7 @@ fn an_installed_app_whose_new_step_fails_keeps_what_it_had() {
 fn app(actions: &str) -> String {
     format!(
         "name = \"Test\"\nsummary = \"An app for the tests\"\ncategory = \"system\"\ntags = [\"test\"]\n\
-         description = \"An app the tests install.\"\ndescription_from = \"https://example.com/test\"\n{actions}"
+         description = \"An app the tests install.\"\ndescription_from = \"https://example.com/test\"\nicon = \"fixture\"\n{actions}"
     )
 }
 
@@ -2106,7 +2111,8 @@ fn world_with_dependencies(apps: &[(&str, &str)]) -> World {
 
 #[test]
 fn an_apps_svg_icon_is_installed_into_the_icon_theme_journaled_and_goes_with_it() {
-    let tool = app("icon = \"tool.svg\"\n\n[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n");
+    let tool = app("[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n")
+        .replace("icon = \"fixture\"", "icon = \"tool.svg\"");
     let world = World::new(&[("tool", &tool)]);
     let svg = "<!-- The tool's logo, MIT. -->\n<svg/>\n";
     world.folder_file("tool", "tool.svg", svg);
@@ -2130,9 +2136,8 @@ fn an_apps_svg_icon_is_installed_into_the_icon_theme_journaled_and_goes_with_it(
 
 /// A machine whose `tool` has the picture `bytes` as its icon `name`.
 fn world_with_icon(name: &str, bytes: &[u8]) -> World {
-    let tool = app(&format!(
-        "icon = \"{name}\"\n\n[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n"
-    ));
+    let tool = app("[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n")
+        .replace("icon = \"fixture\"", &format!("icon = \"{name}\""));
     let world = World::new(&[("tool", &tool)]);
     world.folder_file("tool", name, bytes);
     world

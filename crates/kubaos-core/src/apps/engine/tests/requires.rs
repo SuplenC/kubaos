@@ -14,7 +14,7 @@ use crate::apps::picks::Picks;
 use crate::update::event::UpdateEvent;
 
 const ABOUT: &str = "summary = \"An app for the tests\"\ncategory = \"development\"\ntags = [\"editor\"]\n\
-                     description = \"An app the tests install.\"\ndescription_from = \"https://example.com/test\"\n";
+                     description = \"An app the tests install.\"\ndescription_from = \"https://example.com/test\"\nicon = \"fixture\"\n";
 
 /// An editor from apt, with a file of its own as root.
 fn neovim() -> String {

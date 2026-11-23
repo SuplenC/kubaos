@@ -44,6 +44,7 @@ tags = ["browser"]
 summary = "A browser for the tests"
 description = "A browser the tests install."
 description_from = "https://example.com/chrome"
+icon = "fixture"
 
 [[action]]
 name = "Install Google Chrome"

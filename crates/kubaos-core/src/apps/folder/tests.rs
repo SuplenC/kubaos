@@ -11,9 +11,15 @@ tags = ["design", "vector graphics"]
 summary = "Draw boxes, then argue about them"
 description = "Sketch is a design tool for the web."
 description_from = "https://sketch.example/about"
+icon = "sketch"
 "#;
 
 const ACTION: &str = "[[action]]\nname = \"Keep it running\"\nkind = \"linger\"\n";
+
+/// [`ABOUT`] with `icon` as its icon.
+fn about_with_icon(icon: &str) -> String {
+    ABOUT.replace("icon = \"sketch\"\n", &format!("icon = \"{icon}\"\n"))
+}
 
 fn parse(about: &str) -> Result<Folder, FolderError> {
     Folder::parse("sketch", Path::new("/catalog/sketch"), &format!("{about}{ACTION}"))
@@ -30,7 +36,7 @@ fn an_app_says_what_it_is() {
 
 #[test]
 fn an_app_missing_any_of_what_it_is_is_refused() {
-    for key in ["category", "tags", "summary", "description", "description_from"] {
+    for key in ["category", "tags", "summary", "description", "description_from", "icon"] {
         let mut about: Vec<&str> = ABOUT
             .lines()
             .filter(|line| !line.starts_with(&format!("{key} =")))
@@ -53,7 +59,7 @@ fn a_description_is_copied_from_an_https_url_or_written_by_kubaos() {
 
 #[test]
 fn an_svg_icon_of_the_folder_is_put_in_the_icon_theme_after_the_apps_own_install_steps() {
-    let folder = parse(&format!("{ABOUT}icon = \"sketch.svg\"\n")).unwrap();
+    let folder = parse(&about_with_icon("sketch.svg")).unwrap();
 
     let steps = folder.steps(None).unwrap();
     assert_eq!(steps.len(), 2);
@@ -71,21 +77,21 @@ fn an_svg_icon_of_the_folder_is_put_in_the_icon_theme_after_the_apps_own_install
             binary: false,
         }
     );
-    assert_eq!(folder.icon_shown().as_deref(), Some("/catalog/sketch/sketch.svg"));
+    assert_eq!(folder.icon_shown(), "/catalog/sketch/sketch.svg");
 }
 
 #[test]
 fn a_theme_icon_is_named_as_it_is_and_installs_nothing() {
-    let folder = parse(&format!("{ABOUT}icon = \"sketch\"\n")).unwrap();
+    let folder = parse(ABOUT).unwrap();
 
     assert_eq!(folder.steps(None).unwrap().len(), 1);
-    assert_eq!(folder.icon_shown().as_deref(), Some("sketch"));
+    assert_eq!(folder.icon_shown(), "sketch");
 }
 
 #[test]
 fn an_icon_that_is_neither_a_picture_of_the_folder_nor_a_theme_name_is_refused() {
     for icon in ["sketch.xpm", "../sketch.svg", "art/sketch.svg", "-sketch"] {
-        let result = parse(&format!("{ABOUT}icon = \"{icon}\"\n"));
+        let result = parse(&about_with_icon(icon));
 
         assert!(matches!(result, Err(FolderError::InvalidIcon(_))), "{icon}: {result:?}");
     }
@@ -343,7 +349,7 @@ fn with_picture(icon: &str, bytes: &[u8]) -> (tempfile::TempDir, Result<Folder, 
     let dir = catalog.path().join("sketch");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join(icon), bytes).unwrap();
-    let folder = Folder::parse("sketch", &dir, &format!("{ABOUT}icon = \"{icon}\"\n{ACTION}"));
+    let folder = Folder::parse("sketch", &dir, &format!("{}{ACTION}", about_with_icon(icon)));
     (catalog, folder)
 }
 
@@ -360,10 +366,7 @@ fn a_png_icon_is_put_in_the_icon_themes_folder_of_its_size() {
         "{:?}",
         steps[1].kind
     );
-    assert_eq!(
-        folder.icon_shown(),
-        Some(folder.dir.join("sketch.png").display().to_string())
-    );
+    assert_eq!(folder.icon_shown(), folder.dir.join("sketch.png").display().to_string());
 }
 
 #[test]
@@ -377,7 +380,7 @@ fn a_jpeg_icon_is_shown_from_the_folder_and_installs_nothing() {
             1,
             "{icon}: the icon theme reads no JPEG"
         );
-        assert_eq!(folder.icon_shown(), Some(folder.dir.join(icon).display().to_string()));
+        assert_eq!(folder.icon_shown(), folder.dir.join(icon).display().to_string());
     }
 }
 
@@ -418,27 +421,25 @@ fn a_picture_icon_that_isnt_square_or_a_png_of_a_size_the_theme_lacks_is_refused
 }
 
 #[test]
-fn a_symbol_names_a_tabler_icon_of_kubaos_symbols_and_installs_nothing() {
-    let folder = parse(&format!("{ABOUT}symbol = \"aspect-ratio\"\n")).unwrap();
+fn an_app_with_no_icon_is_refused_naming_how_to_draw_one() {
+    let without = parse(&ABOUT.replace("icon = \"sketch\"\n", ""));
 
-    assert_eq!(folder.steps(None).unwrap().len(), 1, "a symbol is drawn, not installed");
-    assert_eq!(folder.symbol_shown(), Some("aspect_ratio"));
-    assert_eq!(folder.icon_shown(), None);
+    assert!(
+        matches!(&without, Err(FolderError::NoIcon(id)) if id == "sketch"),
+        "{without:?}"
+    );
+    assert!(
+        without.unwrap_err().to_string().contains("just app-icon sketch"),
+        "the error names the generator"
+    );
 }
 
 #[test]
-fn a_symbol_kubaos_symbols_dont_ship_or_beside_an_icon_is_refused() {
-    let unknown = parse(&format!("{ABOUT}symbol = \"rocket-off\"\n"));
-    let kubaos_name = parse(&format!("{ABOUT}symbol = \"aspect_ratio\"\n"));
-    let both = parse(&format!("{ABOUT}icon = \"sketch\"\nsymbol = \"gauge\"\n"));
+fn a_symbol_beside_the_icon_is_an_unknown_key() {
+    let symbol = parse(&format!("{ABOUT}symbol = \"gauge\"\n"));
 
     assert!(
-        matches!(&unknown, Err(FolderError::UnknownSymbol(s)) if s == "rocket-off"),
-        "{unknown:?}"
+        matches!(&symbol, Err(FolderError::Parse(e)) if e.to_string().contains("unknown field `symbol`")),
+        "{symbol:?}"
     );
-    assert!(
-        matches!(kubaos_name, Err(FolderError::UnknownSymbol(_))),
-        "{kubaos_name:?}"
-    );
-    assert!(matches!(both, Err(FolderError::IconAndSymbol)), "{both:?}");
 }

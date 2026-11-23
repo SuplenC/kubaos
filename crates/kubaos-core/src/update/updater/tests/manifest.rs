@@ -476,6 +476,7 @@ tags = ["containers"]
 summary = "Containers"
 description = "Docker Engine."
 description_from = "https://docs.docker.com/engine/"
+icon = "fixture"
 
 [[action]]
 name = "Install Docker"
@@ -539,6 +540,7 @@ tags = ["containers"]
 summary = "Containers"
 description = "Docker Engine."
 description_from = "https://docs.docker.com/engine/"
+icon = "fixture"
 a_newer_key = "x"
 
 [[action]]

@@ -46,14 +46,13 @@ Item {
     width: ListView.view.width
     height: K.Tokens.size.row_two_line
 
-    // Items without a picture of their own show the symbol their icon names, as an app with no
-    // logo does, else their Extension's, as a sum or a bind does. An app that names no symbol
-    // shows its initial instead, while its picture loads too.
+    // Items without a picture of their own show their Extension's symbol, as a sum or a bind
+    // does. A desktop app shows the initial of its title instead, while its picture loads too.
     K.IconTile {
         x: K.Tokens.space.s12
         y: (row.height - K.Tokens.size.control_md) / 2
-        icon: Words.tileGlyph(row.icon, row.extension)
-        name: Words.rowName(row.icon, row.title)
+        icon: Words.tileGlyph(row.extension)
+        name: row.title
         source: row.iconSource
         opacity: row.dim
     }

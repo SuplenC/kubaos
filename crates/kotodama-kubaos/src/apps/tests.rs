@@ -81,11 +81,17 @@ fn dpkg_with(installed: &[&str]) -> String {
     lines
 }
 
-/// Writes `folders`, each `(id, app.toml)`, as the catalog `dir`.
+/// Writes `folders`, each `(id, app.toml)`, as the catalog `dir`, each with the icon theme's icon
+/// of its id where its text names no icon.
 fn write_catalog(dir: &Path, folders: &[(&str, &str)]) {
     for (id, text) in folders {
+        let icon = if text.contains("\nicon = ") {
+            String::new()
+        } else {
+            format!("icon = \"{id}\"\n")
+        };
         fs::create_dir_all(dir.join(id)).unwrap();
-        fs::write(dir.join(id).join("app.toml"), format!("{ABOUT}{text}")).unwrap();
+        fs::write(dir.join(id).join("app.toml"), format!("{ABOUT}{icon}{text}")).unwrap();
     }
 }
 
@@ -210,7 +216,7 @@ fn an_apps_tags_find_its_install_item_and_never_its_removal() {
 }
 
 #[test]
-fn the_icon_is_the_folders_or_the_app_s_initial() {
+fn an_apps_items_carry_its_icon() {
     let apps = apps(&[]);
 
     assert_eq!(
@@ -219,26 +225,8 @@ fn the_icon_is_the_folders_or_the_app_s_initial() {
     );
     assert_eq!(
         item(&apps, "app-install:claude-code").icon.as_deref(),
-        Some("initial:Claude Code")
+        Some("claude-code")
     );
-}
-
-#[test]
-fn an_app_with_a_symbol_hands_the_menu_its_kubaos_symbol() {
-    let gauge = r#"
-name = "Gauge"
-summary = "Frames a second"
-tags = ["overlay"]
-symbol = "gauge"
-
-[[action]]
-name = "Install Gauge"
-kind = "apt"
-packages = ["gauge"]
-"#;
-    let apps = apps_of(&[("gauge", gauge)], "amd64", &[], None);
-
-    assert_eq!(item(&apps, "app-install:gauge").icon.as_deref(), Some("symbol:speed"));
 }
 
 #[test]

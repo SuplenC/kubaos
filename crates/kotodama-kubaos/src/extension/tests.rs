@@ -437,7 +437,7 @@ fn with_claude_code(text: &str) -> Extension<FakeBus, FakeRunner> {
         folder.join("app.toml"),
         "name = \"Claude Code\"\ncategory = \"ai\"\ntags = [\"coding agent\"]\n\
          summary = \"A coding agent\"\ndescription = \"A coding agent.\"\n\
-         description_from = \"https://example.com\"\n\
+         description_from = \"https://example.com\"\nicon = \"fixture\"\n\
          [[action]]\nname = \"Install it\"\nkind = \"apt\"\npackages = [\"claude-code\"]\n",
     )
     .expect("write the app");

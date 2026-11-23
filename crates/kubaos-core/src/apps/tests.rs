@@ -30,6 +30,7 @@ tags = ["fixture"]
 summary = "An app for the tests"
 description = "An app the tests install."
 description_from = "https://example.com/app"
+icon = "fixture"
 "#;
 
 fn app(name: &str, actions: &str) -> String {
@@ -125,7 +126,7 @@ fn an_app_that_isnt_valid_is_named() {
 fn the_status_shows_an_svg_icon_by_its_path_in_the_catalog_whether_or_not_the_app_is_there() {
     let (_dir, catalog) = catalog_of(&[(
         "agent",
-        app("Agent", AGENT).replace("name = \"Agent\"", "name = \"Agent\"\nicon = \"agent.svg\""),
+        app("Agent", AGENT).replace("icon = \"fixture\"", "icon = \"agent.svg\""),
     )]);
     let journals = tempfile::tempdir().unwrap();
 
@@ -141,8 +142,8 @@ fn the_status_shows_an_svg_icon_by_its_path_in_the_catalog_whether_or_not_the_ap
 
     let dir = &catalog.get("agent").unwrap().dir;
     assert_eq!(
-        status.get("agent").unwrap().icon.as_deref(),
-        Some(dir.join("agent.svg").to_str().unwrap())
+        status.get("agent").unwrap().icon,
+        dir.join("agent.svg").to_str().unwrap()
     );
 }
 
@@ -357,7 +358,7 @@ fn the_list_and_the_status_say_what_each_app_is_in_json() {
 fn app_in(name: &str, category: &str, rest: &str) -> String {
     format!(
         "name = \"{name}\"\ncategory = \"{category}\"\ntags = [\"fixture\"]\nsummary = \"{name}, for the tests\"\n\
-         description = \"An app the tests list.\"\ndescription_from = \"kubaos\"\n{rest}"
+         description = \"An app the tests list.\"\ndescription_from = \"kubaos\"\nicon = \"fixture\"\n{rest}"
     )
 }
 

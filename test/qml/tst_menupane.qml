@@ -3,9 +3,9 @@ import QtTest
 import KubaOS.Components as K
 import "../../config/quickshell/modules/menu"
 
-// The detail pane's mark, in its row's order: an app's picture once it has loaded, else the symbol
-// its icon names, else its Extension's; an app shown by its initial gets the lg tile with it, its
-// row's tile at the pane's size, while its picture loads too.
+// The detail pane's mark, in its row's order: an Item's picture once it has loaded, else its
+// Extension's symbol; a desktop app gets the lg tile with its initial instead, its row's tile at
+// the pane's size, while its picture loads too.
 TestCase {
     id: suite
 
@@ -54,22 +54,6 @@ TestCase {
         compare(tile.letter, "K");
         compare(tile.width, K.Tokens.size.control_lg);
         verify(!findChild(pane, "symbol").visible, "no bolt, no desktop symbol");
-    }
-
-    function test_a_catalog_app_s_initial_icon_shows_the_name_it_carries() {
-        pane.entry = suite.entry("initial:Claude Code", "kubaos", "Install Claude Code");
-
-        compare(findChild(pane, "initialTile").letter, "C");
-        verify(!findChild(pane, "symbol").visible);
-    }
-
-    function test_a_symbol_stays_the_pane_s_big_symbol() {
-        pane.entry = suite.entry("symbol:speed", "kubaos", "Speed test");
-        const symbol = findChild(pane, "symbol");
-
-        verify(symbol.visible);
-        compare(symbol.name, "speed");
-        compare(findChild(pane, "initialTile"), null);
     }
 
     function test_an_item_with_no_icon_shows_its_extension_s_symbol() {

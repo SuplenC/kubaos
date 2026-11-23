@@ -21,8 +21,9 @@ Wireless driver for Xbox One S, Xbox Elite Series 2, and Xbox Series X|S control
 via Bluetooth. Supports force feedback, rumble effects, trigger force feedback, battery level \
 indication, and working paddle buttons."""
 description_from = "https://github.com/atar-axis/xpadneo/blob/v0.10.5/io.github.atar_axis.xpadneo.metainfo.xml"
-# A symbol, Tabler's: Colloid draws no icon for xpadneo, and xpadneo publishes no logo.
-symbol = "device-gamepad-2"
+# Generated, as Colloid draws no icon for xpadneo and xpadneo publishes no logo: xpadneo.svg's
+# comment names the command that draws it.
+icon = "xpadneo.svg"
 keeps = """\
 Your controllers stay paired with this machine: without xpadneo they still work, through the \
 kernel's own driver, with fewer of their buttons and no trigger rumble."""

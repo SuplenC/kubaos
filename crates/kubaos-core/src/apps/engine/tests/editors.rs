@@ -57,7 +57,7 @@ fn every_packaged_editor_and_terminal_installs_on_the_fake_machine_and_its_remov
                     // The app's own icon, an .svg of its folder, put in the user's icon theme.
                     Kind::File {
                         to, from: Some(from), ..
-                    } if app.icon.as_deref() == Some(from) => {
+                    } if *from == app.icon => {
                         let to = to.replace("~/", "");
                         assert!(world.host_home().join(to).is_file(), "{id}: {from} isn't in place");
                     }

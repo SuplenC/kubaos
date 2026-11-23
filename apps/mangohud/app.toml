@@ -13,9 +13,9 @@ summary = "FPS, frame times and temperatures on top of your game. Now you know e
 description = """\
 A Vulkan and OpenGL overlay for monitoring FPS, temperatures, CPU/GPU load and more."""
 description_from = "https://github.com/flightlessmango/MangoHud/blob/v0.8.2-rc2/README.md"
-# A symbol, Tabler's: Colloid draws no icon for MangoHud, and MangoHud publishes no logo of its
-# own.
-symbol = "gauge"
+# Generated, as Colloid draws no icon for MangoHud and MangoHud publishes no logo of its own:
+# mangohud.svg's comment names the command that draws it.
+icon = "mangohud.svg"
 keeps = """\
 Your MangoHud settings stay in ~/.config/MangoHud: install it again and the overlay looks as you \
 left it."""
