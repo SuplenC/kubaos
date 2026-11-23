@@ -5,7 +5,7 @@ import { type ColourPicker, colourPicker } from "../../../../lib/colour-picker.t
 import { paintPage, playChange } from "../../../../site/change.ts";
 import { change, type Mode, settings, SPEEDS } from "../../../../site/settings.ts";
 import type { Setting, SettingsSection } from "../settings-parts.ts";
-import { D, type Values } from "../settings-values.ts";
+import { D, glassSteps, type Values } from "../settings-values.ts";
 import { choice, fact, opens, pick, stops, toggle } from "./kit.ts";
 
 const CURSOR_SIZES = Array.from({ length: 21 }, (_, i) => `${16 + i * 4} px`);
@@ -31,8 +31,24 @@ function flip(values: Values, to: Mode): void {
   if (!frame || from === to) return;
   const theme = settings().theme;
   frame.dataset.mode = to;
+  showGlass(values);
   if (values.switchMove === 2) paintPage([frame], { theme, mode: to });
   else playChange([frame], { theme, mode: from }, { theme, mode: to });
+}
+
+/** The glass's stop the window is drawn in: by night or by day, as it is drawn. */
+const byDay = (values: Values) => (values.drawn === "light" ? 1 : 0);
+
+/**
+ * The window's own glass at its mode's stop: the custom property the shared glass reads, set only
+ * off the default, so the default stays the tokens' own.
+ */
+export function showGlass(values: Values): void {
+  const frame = values.window;
+  if (!frame) return;
+  const at = byDay(values);
+  if (values.glass[at] === D.glass[at]) frame.style.removeProperty("--glass-setting");
+  else frame.style.setProperty("--glass-setting", String(glassSteps()[values.glass[at]]! / 100));
 }
 
 /** The mode by the sun, as the sample's evening has it. */
@@ -70,6 +86,10 @@ export function appearance(values: Values): SettingsSection {
             opens("night-wallpaper", "Dark mode's wallpaper", "Its colours give every screen its accent.", "gallery", () => "Shinjuku, rain"),
             opens("day-wallpaper", "Light mode's wallpaper", "Leave it and the night's serves both.", "gallery", () => (values.dayWallpaper === 0 ? "Same as dark" : "Kyoto, noon"), { unbuilt: true }),
             choice("wallpaper-motion", "Moving wallpapers", "A video plays when allowed; otherwise its still shows.", ["Always", "Plugged in", "Never"], () => values.wallpaperMotion, (index) => (values.wallpaperMotion = index), { initial: () => D.wallpaperMotion }),
+            stops("glass", "Glass opacity", "How much of the wallpaper shows through the bar, its cards and windows.", "wallpaper", glassSteps().map((each) => `${each} %`), () => values.glass[byDay(values)], (index) => {
+              values.glass[byDay(values)] = index;
+              showGlass(values);
+            }, { unbuilt: true, initial: () => D.glass[byDay(values)] }),
           ],
         ],
       },

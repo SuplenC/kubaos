@@ -32,8 +32,11 @@ export default sectionPage({
   title: "Settings: Desktop",
   lede: "Windows and workspaces: how they tile, take the keys and gather, and the bar over them.",
   hint: "drag a reading; pin a screen",
-  seed: { seed: { desktop: { gaps: 1, followMouse: false, ...PINNED } } },
+  seed: { seed: { desktop: { gaps: 2, followMouse: false, ...PINNED } } },
   variants: [
+    { name: "Workspace marks", for: "Dot and dash, the default", sample: screen(() => settingsWindow(landedOn(DESKTOP, "marks"))) },
+    { name: "Marks: Numbers", for: "Numbers in and Only the current one show under it", sample: screen(() => settingsWindow(landedOn(DESKTOP, "marks", { seed: { desktop: { marks: 0 } } }))) },
+    { name: "Bar layout: Floating", for: "the bar's layout changed, Reset shows", sample: screen(() => settingsWindow(landedOn(DESKTOP, "bar-layout", { seed: { desktop: { layout: 1 } } }))) },
     { name: "Groups: a screen pinned away", for: "the other desk's screen listed while it is pinned", sample: at(PINNED, "groups") },
     { name: "Groups: a new group", for: "the Dell pinned to group 3; its name row comes", sample: at({ pins: { dell: 3 } }, "groups") },
     { name: "Groups: a name refused", for: "too long for the bar: the line says why", sample: at({ names: ["Left side of the big desk", "", "", ""] }, "groups") },

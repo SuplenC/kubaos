@@ -8,6 +8,7 @@ import type { Mode } from "../../../site/settings.ts";
 import { resizable, still } from "../../templates/window.ts";
 import { defaults, outline, sectionData, type Values } from "./settings-data.ts";
 import { placeOf, type ResetPins } from "./settings-parts.ts";
+import { showGlass } from "./sections/appearance.ts";
 
 /** Where the window stands as it is drawn, and the values it holds. */
 export interface WindowOptions extends Omit<SidebarPageOptions, "outline"> {
@@ -55,6 +56,7 @@ function drawn(options: WindowOptions, values: Values): HTMLElement {
 function framed(frame: HTMLElement, values: Values): void {
   values.window = frame;
   if (values.drawn === "light") frame.dataset.mode = "light";
+  showGlass(values);
 }
 
 /** The Settings window, still, at `size`: a state's sample. */
