@@ -84,6 +84,14 @@
   min-height: 0;
 }
 
+/* An app's own picture, the pane's mark: the whole file at the symbol's size, as `IconImage` draws it. */
+.k-menu-pane-picture {
+  display: block;
+  width: var(--icon-s48);
+  height: var(--icon-s48);
+  object-fit: contain;
+}
+
 .k-menu-pane-content[data-empty] {
   align-self: center;
 }
