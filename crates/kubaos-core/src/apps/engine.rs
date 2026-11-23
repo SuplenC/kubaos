@@ -290,9 +290,19 @@ impl<'h> Keeper<'h> {
         Ok((folder, steps))
     }
 
-    /// This side's journal of the app `id`, numbered as the folder now numbers its steps.
+    /// This side's journal of the app `id`, numbered as the folder now numbers its steps, and
+    /// written so when that renumbered it: a journal a release before wrote keeps its entries.
     fn journal(&self, id: &str) -> Result<Option<Journal>, StepError> {
-        aligned(&self.journals, id, &self.catalog, self.words(), self.side).map_err(StepError::Journal)
+        let numbers = |j: &Journal| j.entries.iter().map(|e| e.step).collect::<Vec<_>>();
+        let was = Journal::read(&self.journals, id).map_err(StepError::Journal)?;
+        let journal =
+            aligned(&self.journals, id, &self.catalog, self.words(), self.side).map_err(StepError::Journal)?;
+        if let Some(journal) = &journal
+            && was.as_ref().map(numbers) != Some(numbers(journal))
+        {
+            journal.save(&self.journals).map_err(StepError::Journal)?;
+        }
+        Ok(journal)
     }
 
     /// Checks, before anything runs, that no step of this side writes a path or a key another

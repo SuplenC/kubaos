@@ -395,16 +395,22 @@ impl Journal {
     ///
     /// An entry goes with the first step left, in order, whose action is the one it recorded,
     /// word for word; then with the first step left that acts on the same thing
-    /// ([`Action::same_thing`]), which the step updates in place. Entries of the same action or
-    /// the same thing go with such steps in the order they were numbered, the first with the
-    /// first. An entry still without one takes the next step left, in order, whose run undoes it
-    /// as a changed step, but for a `run` with `undo` alone, never another step's; one left
-    /// after that, a step the release took out, is numbered after the last step, in order.
+    /// ([`Action::same_thing`]) under the same name, then with the first that acts on the same
+    /// thing under any name: a step the release changed, which updates it in place. Entries of
+    /// one kind that a release changed are told apart by their names, else by their order: the
+    /// first numbered goes with the first such step. An entry still without one takes the next
+    /// step left, in order, whose run undoes it as a changed step, but for a `run` with `undo`
+    /// alone, never another step's; one left after that, a step the release took out, is
+    /// numbered after the last step, in order.
     pub fn align(&mut self, steps: &[(usize, Option<Action>)], total: usize) {
         self.entries.sort_by_key(|e| e.step);
         let mut numbers: Vec<Option<usize>> = vec![None; self.entries.len()];
         let mut taken = vec![false; steps.len()];
-        let passes: [fn(&Action, &Action) -> bool; 2] = [|a, b| a == b, Action::same_thing];
+        let passes: [fn(&Action, &Action) -> bool; 3] = [
+            |a, b| a == b,
+            |a, b| a.name == b.name && a.same_thing(b),
+            Action::same_thing,
+        ];
         for matches in passes {
             for ((number, action), taken) in steps.iter().zip(&mut taken) {
                 let Some(action) = action.as_ref().filter(|_| !*taken) else {

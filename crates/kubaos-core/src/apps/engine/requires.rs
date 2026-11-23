@@ -525,12 +525,12 @@ impl Engine<'_> {
 
     fn configure_locked(&mut self, id: &str) -> Result<Ran, EngineError> {
         let folder = Folder::load(&self.user.catalog, id).map_err(EngineError::Folder)?;
-        let journal = self
-            .journal(Side::User, id)?
-            .filter(|j| j.complete)
-            .ok_or_else(|| EngineError::NotInstalled {
-                app: folder.name.clone(),
-            })?;
+        let journal =
+            self.journal(Side::User, id)?
+                .filter(|j| j.complete)
+                .ok_or_else(|| EngineError::NotInstalled {
+                    app: folder.name.clone(),
+                })?;
         let setup = journal.setup.as_deref();
         let name = folder.name.clone();
         let steps = folder.steps(setup).map_err(EngineError::Folder)?;
