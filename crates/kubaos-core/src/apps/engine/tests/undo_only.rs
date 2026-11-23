@@ -303,6 +303,33 @@ fn a_run_that_only_undoes_a_release_takes_out_needs_no_root_and_still_runs_its_u
 }
 
 #[test]
+fn a_setup_switch_keeps_a_run_that_only_undoes_a_release_took_out_for_the_removal() {
+    let setups = "\n[setup.plain]\nname = \"Plain\"\nsummary = \"The guard alone\"\n\n\
+                  [setup.fancy]\nname = \"Fancy\"\nsummary = \"With its config\"\n\n\
+                  [[setup.fancy.action]]\nname = \"Write its config\"\nkind = \"file\"\n\
+                  to = \"~/.config/guard/config\"\ntext = \"fancy\\n\"\n";
+    let world = World::new(&[("guard", &format!("{GUARD}{setups}"))]);
+    world.script("guard", "off", "systemctl stop guard.service");
+    let install = |setup: &str| {
+        let mut root = world.root();
+        world
+            .run(&mut root, &mut Events::default(), true, |e| e.install("guard", Some(setup)))
+            .unwrap();
+    };
+    install("plain");
+    let before_it = GUARD[..GUARD.find("[[action]]\nname = \"Turn").unwrap()].to_owned();
+    world.write_app("guard", &format!("{before_it}{setups}"));
+
+    install("fancy");
+
+    assert!(!turned_off(&world), "the switch ran the removal's undo");
+
+    world.remove("guard").0.unwrap();
+
+    assert_eq!(offs(&world), 1);
+}
+
+#[test]
 fn a_run_with_do_but_no_check_or_with_no_undo_is_refused() {
     let half = GUARD.replace(r#"undo = ["./off"]"#, "do = [\"./off\"]\nundo = [\"./off\"]");
     let none = GUARD.replace("undo = [\"./off\"]\n", "");

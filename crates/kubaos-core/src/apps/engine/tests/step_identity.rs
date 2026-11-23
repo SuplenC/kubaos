@@ -147,6 +147,18 @@ fn touched_the_stack(log: &[String]) -> bool {
         .any(|l| l.starts_with("run ./up") && !l.starts_with("run ./up-to-date") || l.starts_with("run ./down"))
 }
 
+/// What the run reported of the step named `name`, in order.
+fn reported(events: &Events, name: &str) -> Vec<ActionState> {
+    events
+        .0
+        .iter()
+        .filter_map(|e| match e {
+            crate::update::event::UpdateEvent::Action(a) if a.name == name => Some(a.state),
+            _ => None,
+        })
+        .collect()
+}
+
 fn undid_anything(events: &Events) -> bool {
     events
         .steps()
@@ -198,9 +210,13 @@ fn a_step_a_release_takes_out_is_undone_and_the_steps_after_it_stay() {
     assert_ne!(without, LAYERED);
     world.write_app("layered", &without);
 
-    install(&world, "layered", "local");
+    let events = install(&world, "layered", "local");
 
     assert!(!stack.exists(), "the step taken out stands");
+    assert_eq!(
+        reported(&events, "Put the stack in place"),
+        [ActionState::Undoing, ActionState::Undone]
+    );
     let log = world.log_since(from);
     assert!(!touched_the_stack(&log), "{log:#?}");
     let names: Vec<String> = recorded(&world, "layered").into_iter().map(|r| r.1.name).collect();
@@ -568,10 +584,12 @@ fn two_steps_a_release_makes_one_are_neither_undone_nor_done_again() {
     world.write_app("merged", &one);
 
     // The plugin's step leaves the journal, its package to the merged step: nothing runs.
-    world.install("merged", true).0.unwrap();
+    let (installed, events) = world.install("merged", true);
 
+    installed.unwrap();
     let log = world.log_since(from);
     assert!(!log.iter().any(|l| l.starts_with("apt")), "{log:#?}");
+    assert_eq!(reported(&events, "Install its plugin"), []);
     let (_, root) = world.journals("merged");
     let root = root.unwrap();
     assert_eq!(root.entries.len(), 1, "{root:?}");
@@ -687,4 +705,133 @@ fn penpots_local_setup_installed_before_its_icon_step_keeps_its_stack_when_the_i
     run(&world, |e| e.remove("penpot").map(|_| Vec::new())).unwrap();
     let downs = world.log_since(from).iter().filter(|l| *l == "run ./down").count();
     assert_eq!(downs, 1);
+}
+
+/// A new root step, which a release puts in beside the merge.
+const NEW_ROOT_FILE: &str = "[[action]]\nname = \"Write its config\"\nkind = \"file\"\n\
+                             to = \"/etc/merged/new.conf\"\ntext = \"new\\n\"\n\n";
+
+#[test]
+fn two_steps_a_release_makes_one_beside_a_new_step_of_their_side_are_neither_undone_nor_done_again() {
+    let merged = TWO_PACKAGES.replace(
+        "packages = [\"merged-tool\"]\n\n[[action]]\nname = \"Install its plugin\"\nkind = \"apt\"\npackages = [\"merged-plugin\"]",
+        "packages = [\"merged-tool\", \"merged-plugin\"]",
+    );
+    let after = format!("{merged}\n{}", NEW_ROOT_FILE.trim_end());
+    let before = put_in_front(&merged, NEW_ROOT_FILE);
+    for (at, text) in [("after", after), ("before", before)] {
+        let world = World::new(&[("merged", TWO_PACKAGES)]);
+        world.install("merged", true).0.unwrap();
+        let from = world.host.state.borrow().log.len();
+        world.write_app("merged", &text);
+
+        world.install("merged", true).0.unwrap();
+
+        let log = world.log_since(from);
+        assert!(!log.iter().any(|l| l.starts_with("apt")), "{at}: {log:#?}");
+        assert!(world.system_path("/etc/merged/new.conf").is_file(), "{at}");
+        let state = world.host.state.borrow();
+        assert!(state.dpkg.contains_key("merged-tool") && state.dpkg.contains_key("merged-plugin"), "{at}");
+    }
+}
+
+/// A package, then two files of one folder: only the first's entry made the folder.
+const FILES: &str = r#"
+name = "Files"
+summary = "An app of two files"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
+icon = "fixture"
+
+[[action]]
+name = "Install the tool"
+kind = "apt"
+packages = ["files-tool"]
+
+[[action]]
+name = "Write a"
+kind = "file"
+to = "~/.config/filesapp/a"
+text = "a\n"
+
+[[action]]
+name = "Write b"
+kind = "file"
+to = "~/.config/filesapp/b"
+text = "b\n"
+"#;
+
+/// The `[[action]]` of the step named `name` in `text`, taken out.
+fn without(text: &str, name: &str) -> String {
+    let at = text.find(&format!("[[action]]\nname = \"{name}\"")).unwrap();
+    let end = text[at + 1..].find("[[action]]").map_or(text.len(), |n| at + 1 + n);
+    format!("{}{}", &text[..at], &text[end..])
+}
+
+#[test]
+fn a_users_step_taken_out_in_front_of_another_of_its_side_is_the_one_undone() {
+    let world = World::new(&[("files", FILES)]);
+    world.install("files", true).0.unwrap();
+    let (a, b) = (
+        world.host_home().join(".config/filesapp/a"),
+        world.host_home().join(".config/filesapp/b"),
+    );
+    world.write_app("files", &without(FILES, "Write a"));
+
+    let events = world.install("files", true).1;
+
+    assert!(!a.exists(), "the step taken out stands");
+    assert!(b.is_file(), "the step that stands was undone");
+    assert_eq!(reported(&events, "Write a"), [ActionState::Undoing, ActionState::Undone]);
+    assert_eq!(reported(&events, "Write b"), [ActionState::Done]);
+
+    world.remove("files").0.unwrap();
+    assert!(
+        !world.host_home().join(".config/filesapp").exists(),
+        "the folder the step taken out made stays"
+    );
+}
+
+/// Root's: a config, then the package.
+const ROOTY: &str = r#"
+name = "Rooty"
+summary = "An app of root's steps alone"
+category = "system"
+tags = ["fixture"]
+description = "An app the tests install."
+description_from = "https://example.com/fixture"
+icon = "fixture"
+
+[[action]]
+name = "Write its old config"
+kind = "file"
+to = "/etc/rooty/old.conf"
+text = "old\n"
+
+[[action]]
+name = "Install the engine"
+kind = "apt"
+packages = ["rooty-engine"]
+"#;
+
+#[test]
+fn a_roots_step_taken_out_in_front_of_another_of_an_app_of_root_alone_is_the_one_undone() {
+    let world = World::new(&[("rooty", ROOTY)]);
+    world.install("rooty", true).0.unwrap();
+    let old = world.system_path("/etc/rooty/old.conf");
+    let from = world.host.state.borrow().log.len();
+    world.write_app("rooty", &without(ROOTY, "Write its old config"));
+
+    let events = world.install("rooty", true).1;
+
+    assert!(!old.exists(), "the step taken out stands");
+    let log = world.log_since(from);
+    assert!(!log.iter().any(|l| l.starts_with("apt")), "{log:#?}");
+    assert!(world.host.state.borrow().dpkg.contains_key("rooty-engine"));
+    assert_eq!(
+        reported(&events, "Write its old config"),
+        [ActionState::Undoing, ActionState::Undone]
+    );
 }
