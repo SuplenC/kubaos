@@ -98,3 +98,57 @@
   filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
   pointer-events: none;
 }
+
+/* The pointer's edge light (`edgeRail`): its lower edge on the glass's, from `--rail-from` as wide
+   as `--rail-width`, in its host's pixels. Hovered, the rail dimmer: `primary` at
+   `opacity.track_lit`, with no glow, by night and by day; it comes in over `short` on `standard` and
+   travels from item to item the same way. Pressed, the lit rail's full brightness over `micro`. */
+.k-edge-hover {
+  --rail-lit: 0;
+  top: calc(var(--rail-edge, 0px) - max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px)));
+  left: round(nearest, var(--rail-from, 0px), 1px);
+  width: round(nearest, var(--rail-width, 0px), 1px);
+  opacity: 0;
+  background: color-mix(
+    in srgb,
+    rgb(from var(--color-primary) r g b / var(--opacity-track_lit)),
+    color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%)) calc(var(--rail-lit) * 100%)
+  );
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * (1 - var(--day)) * var(--rail-lit))));
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    --rail-lit var(--motion-micro) var(--easing-standard);
+}
+
+.k-edge-hover[data-shown] {
+  opacity: 1;
+}
+
+.k-edge-hover[data-travel] {
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    --rail-lit var(--motion-micro) var(--easing-standard),
+    left var(--motion-short) var(--easing-standard),
+    width var(--motion-short) var(--easing-standard);
+}
+
+.k-edge-hover[data-pressed] {
+  --rail-lit: 1;
+}
+
+@property --rail-lit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A bar item that opens something, pressed: its content dips to `scale.press_dip` over `micro`, as
+   the Command menu button's mark does. Every item draws its content in `.k-bar-dip`. */
+.k-bar-dip {
+  transition: scale var(--motion-micro) var(--easing-standard);
+}
+
+:is(:active, [data-pinned="pressed"]) > .k-bar-dip,
+:is(:active, [data-pinned="pressed"]) > * > .k-bar-dip {
+  scale: var(--scale-press_dip);
+}

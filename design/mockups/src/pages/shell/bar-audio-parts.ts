@@ -26,7 +26,7 @@ import strawberry from "../../assets/apps/strawberry.svg?url";
 export type CirclePinned = "hover" | "pressed";
 
 export interface CircleOptions {
-  /** On the accent's fill, its content `on_primary`: play or pause. */
+  /** Play or pause, its symbol in `primary`. */
   readonly filled?: boolean;
   readonly pinned?: CirclePinned;
   /** What a press, or Enter from the keyboard on its menu, does. */
@@ -37,7 +37,7 @@ export interface CircleOptions {
   readonly hint?: string;
 }
 
-/** One press target in an audio pill: `content` centred in a circle a chip tall, with its state layer. */
+/** One press target in an audio pill: `content` centred in a target a chip tall, flat on the glass. */
 export function pillCircle(content: Element, options: CircleOptions): HTMLElement {
   const item = document.createElement("span");
   item.className = "shell-pill-item";
@@ -56,9 +56,9 @@ function glyph(name: string, color: string): SVGElement {
   return icon(name, "var(--icon-s16)", `var(--color-${color})`);
 }
 
-/** Circles in a pill, `space.s4` in and apart. */
-export function circlesPill(circles: readonly HTMLElement[]): HTMLElement {
-  const made = pill({ lone: false, end: "s4", gap: "s4", content: circles });
+/** Circles in a pill, `space.s4` in and apart; `opens` for one that opens a card, as the mute pill opens Audio's. */
+export function circlesPill(circles: readonly HTMLElement[], opens = false): HTMLElement {
+  const made = pill({ lone: false, end: "s4", gap: "s4", content: circles, opens });
   made.classList.add("shell-audio-pill");
   return made;
 }
@@ -137,7 +137,7 @@ export function mutePill(options: MuteOptions = {}): HTMLElement {
     pillCircle(outGlyph, { label: output.missing ? PANEL : output.muted ? "Unmute the output" : "Mute the output", hint: outHint, ...pinnedOf("output"), ...pressOf(output.missing, options.onOutput) }),
     pillCircle(inGlyph, { label: input.missing ? PANEL : input.muted ? "Unmute the mic" : "Mute the mic", hint: inHint, ...pinnedOf("input"), ...pressOf(input.missing, options.onInput) }),
   ];
-  const made = circlesPill(options.micOnly ? circles.slice(1) : circles);
+  const made = circlesPill(options.micOnly ? circles.slice(1) : circles, true);
   made.classList.add("shell-mute-pill");
   return made;
 }
@@ -225,7 +225,7 @@ export interface NowPlaying {
 
 /**
  * The active player's icon, the song and its artist in a `size.now_playing` room, then previous,
- * play or pause on the accent's fill, next; folded, the icon and the controls alone. Two widths,
+ * play or pause in `primary`, next; folded, the icon and the controls alone. Two widths,
  * whatever plays, the words fading as their room closes or opens between them (`Pill`). Paused,
  * the words hold at their start.
  */
@@ -237,7 +237,7 @@ export function makeNowPlaying(options: PlayingOptions = {}): NowPlaying {
   const pinnedOf = (part: PlayingPart) => (options.pinned?.part === part ? { pinned: options.pinned.state } : {});
   const icon_ = pillCircle(appPicture(active), { label: `Players: ${active.app}`, ...pinnedOf("icon"), ...(options.onIcon ? { onPress: options.onIcon } : {}) });
   icon_.setAttribute("aria-haspopup", "menu");
-  const playGlyph = () => glyph(playing ? "pause" : "play_arrow", "on_primary");
+  const playGlyph = () => glyph(playing ? "pause" : "play_arrow", "primary");
   const play = pillCircle(playGlyph(), { label: playing ? "Pause" : "Play", filled: true, ...pinnedOf("play"), ...(options.onPlay ? { onPress: options.onPlay } : {}) });
   const previous = pillCircle(glyph("skip_previous", "on_surface_variant"), { label: "Previous", ...pinnedOf("previous"), ...(options.onPrevious ? { onPress: options.onPrevious } : {}) });
   const next = pillCircle(glyph("skip_next", "on_surface_variant"), { label: "Next", ...pinnedOf("next"), ...(options.onNext ? { onPress: options.onNext } : {}) });

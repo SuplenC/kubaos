@@ -18,7 +18,7 @@
 // light along the bar's lower edge, echoed along the card's top edge between its corners.
 
 import "./sheet.css";
-import { edgeLight, glass } from "./glass.ts";
+import { edgeLight, edgeRail, glass, stretchUnder } from "./glass.ts";
 import { probe } from "./probe.ts";
 import { durationMs, length, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
@@ -57,7 +57,9 @@ export interface Screen {
 
 /**
  * The bar's islands: a row of groups (the bar's left, its clock and its right) takes a strip each,
- * and a bar of loose items takes one strip round them all.
+ * and a bar of loose items takes one strip round them all. An item of a group marked
+ * `data-own-island` (the Command menu button) is a small round island of its own before its
+ * group's, which needs no hairline after it: the hairline there goes.
  */
 function islands(items: readonly Element[]): Element[] {
   const island = (...held: Element[]) => {
@@ -66,9 +68,18 @@ function islands(items: readonly Element[]): Element[] {
     element.append(...held);
     return element;
   };
+  const split = (group: Element) => {
+    const own = [...group.children].filter((child) => child.hasAttribute("data-own-island"));
+    if (own.length === 0) return island(group);
+    for (const each of own) if (each.nextElementSibling?.classList.contains("shell-bar-divider")) each.nextElementSibling.remove();
+    const pair = document.createElement("span");
+    pair.className = "k-bar-islands";
+    pair.append(...own.map((each) => island(each)), island(group));
+    return pair;
+  };
   const only = items.length === 1 ? items[0]! : null;
   if (only?.classList.contains("shell-bar-row")) {
-    only.replaceChildren(...[...only.children].map((group) => island(group)));
+    only.replaceChildren(...[...only.children].map(split));
     return [only];
   }
   return items.length ? [island(...items)] : [];
@@ -104,6 +115,7 @@ export function screen(options: ScreenOptions): Screen {
   const light = edgeLight();
   light.classList.add("k-bar-light");
   over.append(bar, light);
+  edgeRail(over);
   element.append(picture, dim, glassLayer, over);
   return { element, glass: glassLayer, over };
 }
@@ -122,6 +134,8 @@ export interface SheetOptions {
   readonly edge: Edge;
   /** The bar item it opened from: it centres under it, and the edge light lies under it. */
   readonly under?: Element;
+  /** Where the edge light lies instead, a part of `under`: the half of the clock whose view is open. */
+  readonly lit?: Element;
   /** How far open it is drawn, 0 to 1: a picture of it opening. */
   readonly reveal?: number;
   /** Under the bar at the screen's right, as the popup stack and the bell's peek stand. */
@@ -143,6 +157,8 @@ export interface Sheet {
   readonly parts: readonly HTMLElement[];
   /** Puts the card under another bar item, or none; it moves there as its settings say. */
   readonly anchor: (item: Element | null) => void;
+  /** Puts the edge light under `item`, a part of the card's item, or back under the whole item: none. */
+  readonly light: (item: Element | null) => void;
 }
 
 /** What each card does once it is hung on a screen: follows the screen's size and its bar's. */
@@ -176,6 +192,7 @@ export function sheet(options: SheetOptions): Sheet {
     if (options.rounding !== undefined) part.style.setProperty("--sheet-corner", options.rounding);
   }
   let under: Element | null = options.under ?? null;
+  let lit: Element | null = options.lit ?? null;
   // The card's size is its content's, and its place its item's, which only layout knows.
   const place = () => {
     const room = box.closest<HTMLElement>(".k-screen");
@@ -187,15 +204,26 @@ export function sheet(options: SheetOptions): Sheet {
       part.style.setProperty("--sheet-depth", `${rider.offsetHeight}px`);
       part.style.setProperty("--card-centre", `${centre}px`);
     }
-    if (room && edges) {
-      room.style.setProperty("--item-start", `${edges[0]}px`);
-      room.style.setProperty("--item-end", `${edges[1]}px`);
+    const shining = lit ?? under;
+    if (room && edges && shining) {
+      // The light stops where its glass's rounded end begins to curve: the item's edges are
+      // pulled in as far, so the light and its echo both end there.
+      const gap = length("size-gap") * settings().scale;
+      const [start, end] = edgesIn(shining, room);
+      const stretch = stretchUnder(shining, room, gap);
+      room.style.setProperty("--item-start", `${stretch ? Math.max(start, stretch.from + gap) : start}px`);
+      room.style.setProperty("--item-end", `${stretch ? Math.min(end, stretch.to - gap) : end}px`);
     }
+    // The item under an open card says so: the pointer's light leaves it to the card's.
+    const open = !box.hasAttribute("data-live") || box.hasAttribute("data-shown");
+    for (const item of room?.querySelectorAll("[data-card-open]") ?? []) if (item !== shining || !open) item.removeAttribute("data-card-open");
+    if (shining instanceof HTMLElement && open) shining.dataset.cardOpen = "";
     box.toggleAttribute("data-under", edges !== null);
     room?.toggleAttribute("data-lit", edges !== null);
   };
   const watch = new ResizeObserver(place);
   watch.observe(rider);
+  new MutationObserver(place).observe(box, { attributes: true, attributeFilter: ["data-shown"] });
   placers.set(box, (room) => {
     watch.observe(room.element);
     const bar = room.over.querySelector(".k-bar");
@@ -205,9 +233,14 @@ export function sheet(options: SheetOptions): Sheet {
   probe(box, { role: "component", name: "Sheet", variant: "", fixed: { width: false, height: false, holds: true } });
   const anchor = (item: Element | null) => {
     under = item;
+    lit = null;
     place();
   };
-  return { surface, box, parts, anchor };
+  const light = (item: Element | null) => {
+    lit = item;
+    place();
+  };
+  return { surface, box, parts, anchor, light };
 }
 
 /** `sheet` placed on `on`: its glass into the glass layer, its content above it. */

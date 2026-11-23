@@ -154,6 +154,20 @@
   gap: var(--gap);
 }
 
+/* An island with a small round one before it, as the Command menu button's: `size.gap` apart. */
+.k-bar-islands {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--gap);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.k-bar-islands > .k-bar-island:last-child {
+  flex: 0 1 auto;
+}
+
 .k-bar-island {
   display: flex;
   flex: none;

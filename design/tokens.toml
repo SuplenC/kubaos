@@ -46,7 +46,11 @@ scales = [1.0, 1.25, 1.5, 2.0]
 #
 # And the glass's shadow, `shadow.glass` and `shadow.glass_contact`, and its blur, `size.glass_blur`:
 # soft through and through, with no edge to land.
-off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo", "size.glass_blur", "shadow.glass", "shadow.glass_contact"]
+#
+# And the bar's measures set by eye: its start spacing (`size.bar_start`, `size.bar_mark_air`), the
+# hairline between its groups (`size.bar_divider`) and the workspaces' small marks (`size.ws_dot`,
+# `size.ws_dash_thick`), each centred on its row, so its edges land where the eye puts them.
+off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo", "size.glass_blur", "shadow.glass", "shadow.glass_contact", "size.bar_start", "size.bar_mark_air", "size.bar_divider", "size.ws_dot", "size.ws_dash_thick"]
 
 # Lines thinner than the grid. Neither is a multiple of 4, so neither is a
 # length: each is drawn as whole device pixels at the scale it shows at.
@@ -299,6 +303,29 @@ glass_blur = 30
 # The widest a name the bar shows grows (a live preview's branch): past it, it
 # ends in an ellipsis, so the bar's right side never runs into the clock.
 bar_label = 160
+# The bar's items lie flat on the glass, in groups parted by a hairline `bar_divider` tall, its
+# middle `space.s12` from the ink either side. The start is spaced by eye: the strip's end
+# `bar_start` from the Command menu button's mark, the mark `bar_mark_air` from the hairline after
+# it, and that hairline `bar_start` from the first workspace's mark: the heavy mark takes a little
+# more air than the light first workspace.
+bar_divider = 14
+bar_start = 10
+bar_mark_air = 13
+# The Command menu button's mark, the クバ tubes, in its `bar_row` square target.
+bar_mark = 20
+# A small filled capsule inside the glass, round what must be seen across the room (a recording,
+# the screen shared, the camera in use) and round the clock's time while its card is open.
+bar_capsule = 20
+# A workspace's cell in the bar, fixed whatever its mark, so a switch moves nothing. Its marks: a dot
+# `ws_dot` round (an empty workspace's a ring `stroke.thin` thick); a dash `ws_dash` long and
+# `ws_dash_thick` thick, the shown one `ws_dash_lit` long; Dot and dash's shown one `ws_dash_lit`
+# long and `ws_dotdash_thick` thick.
+ws_cell = 24
+ws_dot = 6
+ws_dash = 8
+ws_dash_lit = 16
+ws_dash_thick = 3
+ws_dotdash_thick = 4
 # The room for the song and its artist in the bar's now playing, wide: one width whatever plays,
 # so nothing in the bar moves when the song changes. A song and its artist of about 26 letters
 # at `body` read whole; a longer pair scrolls in it (`Marquee`).
@@ -935,6 +962,10 @@ glass_floor = 0.73
 # ring is the soft hairline, `outline_variant` at `outline_soft`.
 glass_highlight = 0.12
 glass_ring = 0.07
+# The hairline between the bar's groups, `on_surface` at `bar_divider`; round a borrowed workspace
+# group, which must read as a group of its own at rest, at `bar_divider_strong`.
+bar_divider = 0.14
+bar_divider_strong = 0.32
 # The furthest the wallpaper is turned toward the surface behind full-screen text, so the words
 # read over any photo: at 0.90 every text role keeps 4.5:1 over pure black in light and pure
 # white in dark. Kōbō's welcome and done screens, from the text's side; the lock screen, behind
@@ -972,6 +1003,9 @@ behind = 0.96
 # How much more colourful what shows through the glass is drawn, its saturation: the mockups'
 # stand-in for the compositor's vibrancy behind every glass surface.
 glass_saturate = 1.4
+# A bar item pressed: its content dips to this share of its size, as the Command menu button's
+# mark does, while the edge light under it goes to full brightness.
+press_dip = 0.92
 # A window carried in the Overview, away from any place it could take: drawn this share of the size
 # it has on its workspace's miniature, a lone window's shape, so it never hides what it is over.
 carried = 0.5

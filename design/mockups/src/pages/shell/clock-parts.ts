@@ -30,6 +30,7 @@ import { clamped, text } from "../../lib/text.ts";
 import { cubic, durationMs } from "../../lib/tokens.ts";
 import { type CardSky, carry, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
 import { settings } from "../../site/settings.ts";
+import { setClockOpen } from "../../lib/clock-pill.ts";
 import { barScreen, EVERYDAY } from "./bar-parts.ts";
 import { TALL } from "./control-center-parts.ts";
 import { type City, CITIES, CONDITIONS, clockOf, dayName, dayRange, degrees, HOME, hourOf, hoursOf, offsetOf, readingsOf, symbolOf, tilesOf, UPDATED } from "./weather-data.ts";
@@ -446,20 +447,41 @@ export function clockPopup(options: ClockOptions = {}): HTMLElement {
 
 /**
  * A screen `width` logical pixels wide, its bar given way as that width needs, the popup open on
- * the top edge. Live, the bar's time turns the popup to the clock and its temperature to home's
- * weather.
+ * the top edge, centred under the clock, its capsule filled and the edge light under the half that
+ * is open: the time's for the clock view, the weather's for the weather view. Live, the bar's time
+ * turns the popup to the clock and its temperature to home's weather, and the light travels to that
+ * half, its leading edge over `medium` and its trailing one over `long`.
  */
 export function clockOnScreen(options: ClockOptions = {}, width = 1440, height = TALL, reveal?: number): HTMLElement {
   const room = barScreen(width, height, { content: { ...EVERYDAY, ...(options.home === "no city" ? { noHome: true } : {}) } });
   room.element.dataset.open = "";
   const popup = clockPopupOf(options);
-  const capsule = room.element.querySelector(".k-clock-pill-capsule");
-  hang(room, sheet({ content: popup.element, edge: "top", ...(capsule ? { under: capsule } : {}), ...(reveal !== undefined ? { reveal } : {}) }));
-  if (options.live) {
+  const clock = room.element.querySelector<HTMLElement>(".k-clock-pill");
+  const halfOf = (view: "clock" | "weather") => clock?.querySelector(view === "weather" ? ".k-clock-pill-weather" : ".k-clock-pill-when") ?? null;
+  const view = options.view ?? "clock";
+  if (clock) setClockOpen(clock, view);
+  const card = sheet({ content: popup.element, edge: "top", ...(clock ? { under: clock } : {}), ...(halfOf(view) ? { lit: halfOf(view)! } : {}), ...(reveal !== undefined ? { reveal } : {}) });
+  hang(room, card);
+  if (options.live && clock) {
+    let travelling = 0;
+    const turn = (to: "clock" | "weather") => {
+      if (clock.dataset.open === to) return;
+      window.clearTimeout(travelling);
+      room.element.dataset.toward = to === "weather" ? "right" : "left";
+      room.element.dataset.swapping = "";
+      travelling = window.setTimeout(() => delete room.element.dataset.swapping, ms("long"));
+      setClockOpen(clock, to);
+      card.light(halfOf(to));
+    };
     // The pill's weather opens home's weather; anywhere else on the pill opens the clock.
-    room.element.querySelector(".k-clock-pill")?.addEventListener("click", (event) => {
-      if ((event.target as Element).closest(".k-clock-pill-weather")) popup.toWeather("home");
-      else popup.toClock();
+    clock.addEventListener("click", (event) => {
+      if ((event.target as Element).closest(".k-clock-pill-weather")) {
+        popup.toWeather("home");
+        turn("weather");
+      } else {
+        popup.toClock();
+        turn("clock");
+      }
     });
   }
   return room.element;

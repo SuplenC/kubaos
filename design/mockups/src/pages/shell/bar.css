@@ -1,8 +1,10 @@
 /* The bar's own boxes, as `config/quickshell/modules/bar/` lays them out. */
 
-/* The bar's row, `size.bar_row` tall in every layout: the left group from the start, the clock in
-   the middle, the right group to the end, so the clock stays centred whatever either side holds. */
+/* The bar's row, `size.bar_row` tall in every layout: the start from the start, the clock in the
+   middle, the end to the end, so the clock stays centred whatever either side holds. `--bar-pad` is
+   the room between the glass's end and the row: the band's `size.gap`, a strip's `space.s4`. */
 .shell-bar-row {
+  --bar-pad: var(--space-s4);
   flex: 1 1 0;
   min-width: 0;
   display: grid;
@@ -11,14 +13,19 @@
   height: var(--size-bar_row);
 }
 
-/* In the Islands layout each group is a strip of its own, as wide as what it holds: the left one
-   from the start, the clock's in the middle, the right one to the end. A strip's ends are its own
-   padding, so the groups keep no clear space of their own. */
-.shell-bar-row > .k-bar-island {
+.k-screen[data-layout="bar"] .shell-bar-row {
+  --bar-pad: var(--gap);
+}
+
+/* In the Islands layout each group is a strip of its own, as wide as what it holds: the start's
+   from the start (the Command menu button's round island before it), the clock's in the middle,
+   the end's to the end. A strip's ends are its own padding, so the groups keep no clear space of
+   their own. */
+.shell-bar-row > :is(.k-bar-island, .k-bar-islands) {
   max-width: 100%;
 }
 
-.shell-bar-row > .k-bar-island:has(> .shell-bar-left) {
+.shell-bar-row > :has(.shell-bar-left) {
   justify-self: start;
 }
 
@@ -40,40 +47,88 @@
   margin-inline: var(--capsule-before, 0) var(--capsule-after, 0);
 }
 
-.shell-bar-left {
+/* A side: its groups in a row, each parted from the next by a hairline. */
+.shell-bar-left,
+.shell-bar-right {
   display: flex;
   align-items: center;
-  gap: var(--space-s8);
   min-width: 0;
+}
+
+.shell-bar-left {
   /* space.s40 clear of the clock, at every width. */
   padding-right: var(--space-s40);
 }
 
+.shell-bar-right {
+  justify-content: flex-end;
+  padding-left: var(--space-s40);
+}
+
+/* A group: its items `space.s8` apart. */
+.shell-bar-group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s8);
+}
+
+/* The hairline between two groups: `size.bar_divider` tall, `on_surface` at `opacity.bar_divider`,
+   `space.s12` from the ink either side. A lone symbol's own room (`space.s4`) counts toward it. */
+.shell-bar-divider {
+  display: block;
+  flex: none;
+  width: var(--stroke-hairline_device_px);
+  height: var(--size-bar_divider);
+  margin-inline: var(--space-s12);
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-bar_divider));
+}
+
+.shell-bar-divider:has(+ :is(.k-pill[data-lone], .shell-bar-group:has(> .k-pill[data-lone]:first-child))) {
+  margin-inline-end: calc(var(--space-s12) - var(--space-s4));
+}
+
+:is(.k-pill[data-lone], .shell-bar-group:has(> .k-pill[data-lone]:last-child)) + .shell-bar-divider {
+  margin-inline-start: calc(var(--space-s12) - var(--space-s4));
+}
+
+/* The start, spaced by eye: the glass's end `size.bar_start` from the Command menu button's mark,
+   the mark `size.bar_mark_air` from the hairline, the hairline `size.bar_start` from the first
+   workspace's mark (`--ws-ink`, how far inside its cell the mark's ink starts). In Islands the
+   button is a round island of its own, and the workspaces' island starts `size.bar_start` from
+   their first mark. */
+.shell-bar-left > .shell-cmd:first-child {
+  margin-inline-start: calc(var(--size-bar_start) - (var(--size-bar_row) - var(--size-bar_mark)) / 2 - var(--bar-pad));
+}
+
+.shell-bar-left > .shell-cmd + .shell-bar-divider {
+  margin-inline: calc(var(--size-bar_mark_air) - (var(--size-bar_row) - var(--size-bar_mark)) / 2) 0;
+}
+
+.shell-bar-left > .shell-cmd + .shell-bar-divider + :is(.shell-ws, .shell-ws-room) {
+  margin-inline-start: calc(var(--size-bar_start) - var(--ws-ink, 0px));
+}
+
+.k-bar-island > .shell-bar-left > :is(.shell-ws, .shell-ws-room):first-child {
+  margin-inline-start: calc(var(--size-bar_start) - var(--ws-ink, 0px) - var(--bar-pad));
+}
+
+/* The title, shrinking with its room. */
 .shell-bar-left > .shell-title {
-  /* space.s12 after the pills: the row's gap and a step more. */
-  margin-left: var(--space-s4);
   min-width: 0;
   flex: 0 1 auto;
 }
 
-/* Now playing ends the left, beside the clock at the bar's gap between pills, as a pill of the
+/* Now playing ends the start, beside the clock at the bar's gap between pills, as a pill of the
    clock's own would stand: the clear space is for what isn't a pill, the title, which now playing
    then keeps from the clock. The title stands between the pills and it. */
 .shell-bar-left > .shell-playing-pill {
   margin-left: auto;
+  padding-left: var(--space-s8);
 }
 
 .shell-bar-left:has(> .shell-playing-pill) {
   padding-right: var(--space-s8);
-}
-
-.shell-bar-right {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-s8);
-  min-width: 0;
-  padding-left: var(--space-s40);
 }
 
 /* A bar alone, without its screen: the Floating layout's strip on the glass, a screen's width less
@@ -90,6 +145,20 @@
   max-width: none;
   height: var(--size-bar_strip);
   padding: 0 var(--space-s4);
+  border-radius: var(--radius-full);
+}
+
+/* A few of the bar's items on a short strip of glass as wide as they are (`onGlass`): a sample's
+   piece of the Floating layout, so their edge light has the glass's edge to lie on. */
+.shell-bar-piece {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s8);
+  box-sizing: border-box;
+  height: var(--size-bar_strip);
+  padding: 0 var(--space-s12);
   border-radius: var(--radius-full);
 }
 
@@ -142,8 +211,8 @@
   min-width: round(up, calc(var(--widest) * var(--px) - 0.001px), 1px);
 }
 
-/* The tray, and the audio pills: each press target in a circle a chip tall, which takes the state
-   layer. */
+/* The tray, and the audio pills: each press target in a box a chip tall, flat on the glass: the
+   item it belongs to answers the pointer (the edge light, the dip). */
 .shell-tray-item,
 .shell-pill-item {
   position: relative;
@@ -154,43 +223,15 @@
   height: var(--size-chip);
   border-radius: var(--radius-full);
   cursor: pointer;
-  background: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0)));
-  transition: --hovered var(--motion-short) var(--easing-standard);
 }
 
-@property --hovered {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
+/* A tray app pressed: its picture dips, as a pill's content does. */
+.shell-tray-item > * {
+  transition: scale var(--motion-micro) var(--easing-standard);
 }
 
-@property --held {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
-}
-
-.shell-tray-item:hover,
-.shell-tray-item[data-pinned="hover"],
-.shell-tray-item[data-pinned="pressed"],
-.shell-pill-item:hover,
-.shell-pill-item[data-pinned="hover"],
-.shell-pill-item[data-pinned="pressed"] {
-  --hovered: 1;
-}
-
-.shell-tray-item:active,
-.shell-tray-item[data-pinned="pressed"],
-.shell-pill-item:active,
-.shell-pill-item[data-pinned="pressed"] {
-  --held: 1;
-}
-
-/* Play or pause, on the accent's fill: its state layer is its content's colour over the fill. */
-.shell-pill-item[data-filled] {
-  background:
-    linear-gradient(rgb(from var(--color-on_primary) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0))), rgb(from var(--color-on_primary) r g b / calc(var(--opacity-hover) * var(--hovered, 0) + (var(--opacity-press) - var(--opacity-hover)) * var(--held, 0)))),
-    var(--color-primary);
+.shell-tray-item:is(:active, [data-pinned="pressed"]) > * {
+  scale: var(--scale-press_dip);
 }
 
 /* The song's room, `space.s4` more each side than the pill's gap, so its words stand `space.s12`
@@ -279,4 +320,84 @@
   overflow-y: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--color-outline_variant) transparent;
+}
+
+/* The Command menu button (`bar-command.ts`): the mark centred in its square target, its tubes'
+   colours from the state model's `--hover` and `--press` (`.k-control`), and each stroke's light,
+   `--stroke-lit`, from 0 out to 1 lit. */
+@property --stroke-lit {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.shell-cmd {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--size-bar_row);
+  height: var(--size-bar_row);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+/* Pressed, a disc of `on_surface` at `opacity.press` behind the mark. */
+.shell-cmd::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-press) * var(--press)));
+}
+
+.shell-cmd-mark {
+  position: relative;
+  display: block;
+  width: var(--size-bar_mark);
+  height: var(--size-bar_mark);
+  overflow: visible;
+}
+
+/* A stroke's tube: its unlit glass warming hovered, its tone lit. */
+.shell-cmd-stroke {
+  --stroke-lit: 0;
+  --unlit: var(--color-primary_unlit);
+  --warm: var(--color-primary_glass);
+  --tone: var(--color-primary);
+  --core: var(--color-logo_core_warm);
+  /* Going out: every stroke at once. */
+  transition: --stroke-lit var(--motion-short) var(--easing-standard);
+}
+
+.shell-cmd-stroke[data-tone="cold"] {
+  --unlit: var(--color-cold_unlit);
+  --warm: var(--color-cold_glass);
+  --tone: var(--color-cold);
+  --core: var(--color-logo_core_cold);
+}
+
+/* Lighting: each stroke `duration.swap_lag` after the one before, in writing order. */
+.shell-cmd[data-open] .shell-cmd-stroke {
+  --stroke-lit: 1;
+  transition: --stroke-lit var(--motion-short) var(--easing-standard) calc(var(--order) * var(--motion-swap_lag));
+}
+
+.shell-cmd-tube {
+  stroke: color-mix(in srgb, color-mix(in srgb, var(--unlit), var(--warm) calc(var(--hover) * 100%)), var(--tone) calc(var(--stroke-lit) * 100%));
+}
+
+.shell-cmd-core {
+  stroke: var(--core);
+  opacity: var(--stroke-lit);
+}
+
+/* The glow, by night only. */
+.shell-cmd-glow {
+  stroke: rgb(from var(--tone) r g b / calc(var(--focus-near_opacity) * var(--stroke-lit) * (1 - var(--day))));
+}
+
+/* The glint of dead glass along each tube, the glass's highlight, gone as it lights. */
+.shell-cmd-glint {
+  stroke: rgb(from var(--color-on_surface) r g b / calc(var(--opacity-glass_highlight) * (1 - var(--stroke-lit))));
 }

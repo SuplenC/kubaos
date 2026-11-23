@@ -1946,38 +1946,48 @@
   initial-value: 1;
 }
 
-/* A pill (`lib/pill.ts`): `size.control_sm` tall at the full radius on its fill, its content a row
-   centred on device pixels, `space.s12` at each end, `space.s8` round a lone symbol. An
-   interactive one is quiet under the pointer: hovered its fill goes a step on (`--fill-hover`),
-   pressed a step further (`--fill-pressed`), with no line and no glow (`lib/pill.ts`). */
+/* A pill (`lib/pill.ts`): flat on the bar's glass, `size.bar_row` tall, its content a row centred
+   on device pixels with no ends of its own, `space.s4` round a lone symbol. A capsuled one (a
+   recording, the screen shared, the camera) draws its fill as a capsule `size.bar_capsule` tall
+   inside the row, `space.s8` at each end, its state layer a step on hovered (`--fill-hover`) and
+   pressed (`--fill-pressed`). The pointer's other answer is the edge light (`glass.css`). */
 .k-pill {
   position: relative;
   display: inline-flex;
   flex: none;
+  align-items: center;
   box-sizing: border-box;
-  height: var(--size-control_sm);
+  height: var(--size-bar_row);
   border-radius: var(--radius-full);
-  --end: var(--space-s12);
-  background: var(--fill);
+  --end: 0px;
   color: var(--ink);
 }
 
 .k-pill[data-lone] {
-  --end: var(--space-s8);
+  --end: var(--space-s4);
 }
 
 .k-pill.k-control {
   cursor: pointer;
-  background: color-mix(in srgb, color-mix(in srgb, var(--fill), var(--fill-hover) calc(var(--hover) * 100%)), var(--fill-pressed) calc(var(--press) * 100%));
 }
 
 .k-pill-clip {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   width: 100%;
   padding: 0 var(--end);
   border-radius: inherit;
+}
+
+.k-pill[data-capsule] {
+  --end: var(--space-s8);
+}
+
+.k-pill[data-capsule] > .k-pill-clip {
+  height: var(--size-bar_capsule);
+  background: color-mix(in srgb, color-mix(in srgb, var(--fill), var(--fill-hover) calc(var(--hover, 0) * 100%)), var(--fill-pressed) calc(var(--press, 0) * 100%));
 }
 
 /* Content leaving or arriving, in a room as wide as it times how open it is, rounded up to a device

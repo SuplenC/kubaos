@@ -1,5 +1,5 @@
-/* The bar's workspaces (`workspaces.ts`). Its slots, its tints and its indicator are drawn in one
-   stacking context, so the indicator sits over the tints and under the numbers. */
+/* The bar's workspaces (`workspaces.ts`), flat on the glass: a row of fixed cells, each holding its
+   workspace's mark, the shown one's lit. */
 
 @property --present {
   syntax: "<number>";
@@ -13,34 +13,51 @@
   initial-value: 1;
 }
 
-@property --ws-start {
+/* How far the extras show, 0 to 1: the add buttons and a borrowed group's name (and in Numbers'
+   "only the current one", the other numbers), there while the pointer is on the workspaces or the
+   Overview is up. Their room opens over `long` on `emphasized_decel` (`--ws-extras`), and they fade
+   on `standard` (`--ws-extras-shown`), as the bar's entries glide. */
+@property --ws-extras {
   syntax: "<number>";
-  inherits: false;
+  inherits: true;
   initial-value: 0;
 }
 
-@property --ws-end {
+@property --ws-extras-shown {
   syntax: "<number>";
-  inherits: false;
-  initial-value: 1;
+  inherits: true;
+  initial-value: 0;
 }
 
 .shell-ws {
+  --ws-extras: 0;
+  --ws-extras-shown: 0;
   position: relative;
   display: inline-flex;
   flex: none;
+  align-items: center;
   box-sizing: border-box;
-  height: var(--size-control_sm);
-  padding: var(--space-s4);
-  border-radius: var(--radius-full);
-  background: var(--color-surface_container);
+  height: var(--size-bar_row);
   user-select: none;
+  transition:
+    --ws-extras var(--motion-long) var(--easing-emphasized_decel),
+    --ws-extras-shown var(--motion-long) var(--easing-standard);
+}
+
+.shell-ws:is(:hover, [data-overview], [data-pinned="hover"], [data-pinned="pressed"], [data-carrying]),
+.shell-ws-room:has(> .shell-ws-menu) > .shell-ws {
+  --ws-extras: 1;
+  --ws-extras-shown: 1;
+}
+
+.shell-ws[data-pinned] {
+  transition: none;
 }
 
 .shell-ws-cells {
   position: relative;
   display: flex;
-  height: var(--size-chip);
+  height: var(--size-ws_cell);
   overflow: clip;
 }
 
@@ -49,27 +66,35 @@
 }
 
 .shell-ws-slot {
+  --slot-shown: 1;
   position: relative;
   display: block;
   flex: none;
-  width: round(nearest, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
-  height: var(--size-chip);
+  width: round(nearest, calc(var(--slot-width) * var(--px) * var(--present) * var(--slot-shown)), 1px);
+  height: var(--size-ws_cell);
   overflow: clip;
+}
+
+/* The extras: a group's `+` and a borrowed group's name; in "only the current one", every slot but
+   the shown workspace's. */
+.shell-ws-slot:is([data-kind="ghost"], [data-kind="label"]),
+.shell-ws[data-only-current] .shell-ws-slot:not(:has(> .shell-ws-cell[data-shown])) {
+  --slot-shown: var(--ws-extras);
 }
 
 /* A slot growing in rounds its width up and one shrinking out rounds down: two on one clock, one
    coming as the other goes, add up to a whole slot at every frame, so the row never changes width
    by a pixel while a carried workspace's hole crosses from one group to another. */
 .shell-ws-slot[data-coming] {
-  width: round(up, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
+  width: round(up, calc(var(--slot-width) * var(--px) * var(--present) * var(--slot-shown)), 1px);
 }
 
 .shell-ws-slot[data-gone] {
-  width: round(down, calc(var(--slot-width) * var(--px) * var(--present)), 1px);
+  width: round(down, calc(var(--slot-width) * var(--px) * var(--present) * var(--slot-shown)), 1px);
 }
 
-/* A slot's content fades as it comes and goes; its piece of a group's tint or outline does not, so
-   the band stays whole while the slot narrows. */
+/* A slot's content fades as it comes and goes; its piece of a group's outline does not, so the
+   outline stays whole while the slot narrows. */
 @property --ws-slide {
   syntax: "<number>";
   inherits: true;
@@ -77,10 +102,15 @@
 }
 
 /* A slot's content: it fades as the slot comes and goes, and slides by `--ws-slide` from where it
-   stood as the slot takes its new place; its pieces of a group's tint and outline do neither. */
-.shell-ws-slot > :not(.shell-ws-tint, .shell-ws-drop) {
+   stood as the slot takes its new place; its piece of a group's outline does neither. */
+.shell-ws-slot > :not(.shell-ws-drop) {
   opacity: var(--ws-shown);
-  translate: calc(var(--ws-slide) * var(--size-chip)) 0;
+  translate: calc(var(--ws-slide) * var(--size-ws_cell)) 0;
+}
+
+.shell-ws-slot:is([data-kind="ghost"], [data-kind="label"]) > :not(.shell-ws-drop),
+.shell-ws[data-only-current] .shell-ws-slot:not(:has(> .shell-ws-cell[data-shown])) > :not(.shell-ws-drop) {
+  opacity: calc(var(--ws-shown) * var(--ws-extras-shown));
 }
 
 /* A slot whose content slides to it from where it stood: its box clips nothing while it does. */
@@ -88,25 +118,15 @@
   overflow: visible;
 }
 
-/* A borrowed group's tint, and the outline of a group taking a carried workspace: each slot draws
-   its piece, exactly its own box, so pieces never overlap, and only the group's two ends round off.
-   A piece stays in its box while the slot's content slides. */
-.shell-ws-tint,
+/* The outline of a group taking a carried workspace: each slot draws its piece, exactly its own
+   box, so pieces never overlap, and only the group's two ends round off. A piece stays in its box
+   while the slot's content slides. */
 .shell-ws-drop {
   position: absolute;
   z-index: 0;
   inset: 0;
   box-sizing: border-box;
-  height: var(--size-chip);
-}
-
-.shell-ws-tint {
-  background: rgb(from var(--color-secondary) r g b / var(--opacity-tint));
-}
-
-/* A whole group going: its tint fades with its content, every piece together, so no notch opens. */
-.shell-ws-slot[data-group-gone] > .shell-ws-tint {
-  opacity: var(--ws-shown);
+  height: var(--size-ws_cell);
 }
 
 .shell-ws-drop {
@@ -122,44 +142,37 @@
   border-inline-end: var(--drop-line) solid var(--color-primary);
 }
 
-:is(.shell-ws-tint, .shell-ws-drop)[data-head] {
+.shell-ws-drop[data-head] {
   border-start-start-radius: var(--radius-full);
   border-end-start-radius: var(--radius-full);
 }
 
-:is(.shell-ws-tint, .shell-ws-drop)[data-tail] {
+.shell-ws-drop[data-tail] {
   border-start-end-radius: var(--radius-full);
   border-end-end-radius: var(--radius-full);
 }
 
-/* The indicator: as wide as its edges are apart, a cell tall; narrower than a cell, as it leaves
-   or arrives, a circle as wide, so it shrinks and grows as a hole does. */
-.shell-ws-indicator {
-  --ws-wide: max(0px, round(nearest, calc((var(--ws-end) - max(0, var(--ws-start))) * var(--size-chip)), 1px));
-  position: absolute;
-  z-index: 1;
-  top: round(down, calc((var(--size-chip) - min(var(--size-chip), var(--ws-wide))) / 2), 1px);
-  left: round(nearest, calc(max(0, var(--ws-start)) * var(--size-chip)), 1px);
-  width: var(--ws-wide);
-  height: min(var(--size-chip), var(--ws-wide));
-  border-radius: var(--radius-full);
-  background: var(--color-primary);
-}
-
+/* The hairline between two groups, the bar's own (`size.bar_divider` tall, `on_surface` at
+   `opacity.bar_divider`); before and after a borrowed group, at `opacity.bar_divider_strong`, so it
+   reads as a group of its own at rest, with no name. */
 .shell-ws-rule {
   position: absolute;
   left: round(down, calc((100% - var(--stroke-hairline_device_px)) / 2), 1px);
-  top: round(down, calc(var(--size-chip) / 4), 1px);
+  top: round(down, calc((var(--size-ws_cell) - var(--size-bar_divider)) / 2), 1px);
   width: var(--stroke-hairline_device_px);
-  height: calc(var(--size-chip) / 2);
-  background: var(--color-outline_variant);
+  height: var(--size-bar_divider);
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-bar_divider));
+}
+
+.shell-ws-rule[data-strong] {
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-bar_divider_strong));
 }
 
 .shell-ws-name {
   position: absolute;
   z-index: 2;
   left: round(nearest, calc(var(--inset) * var(--px)), 1px);
-  top: round(down, calc((var(--size-chip) - var(--t-line)) / 2), 1px);
+  top: round(down, calc((var(--size-ws_cell) - var(--t-line)) / 2), 1px);
 }
 
 .shell-ws-slot[data-kind="label"],
@@ -172,8 +185,8 @@
   z-index: 2;
   display: grid;
   place-items: center;
-  width: var(--size-chip);
-  height: var(--size-chip);
+  width: var(--size-ws_cell);
+  height: var(--size-ws_cell);
 }
 
 .shell-ws-cell > * {
@@ -207,10 +220,6 @@
   --cell-hover: 0;
   --cell-press: 0;
   --ws-mark: 0;
-  transition:
-    --cell-hover var(--motion-short) var(--easing-standard),
-    --cell-press var(--motion-micro) var(--easing-standard),
-    --ws-mark var(--motion-short) var(--easing-standard);
 }
 
 .shell-ws-cell::before {
@@ -280,12 +289,12 @@
   overflow: visible;
   display: grid;
   place-items: center;
-  width: var(--size-chip);
-  height: var(--size-chip);
+  width: var(--size-ws_cell);
+  height: var(--size-ws_cell);
   border-radius: var(--radius-full);
   translate:
-    round(nearest, calc((var(--ws-x) + var(--ws-ox, 0) * var(--ws-glide)) * 1px - var(--size-chip) / 2), 1px)
-    round(nearest, calc((var(--ws-y) + var(--ws-oy, 0) * var(--ws-glide)) * 1px - var(--size-chip) / 2), 1px);
+    round(nearest, calc((var(--ws-x) + var(--ws-ox, 0) * var(--ws-glide)) * 1px - var(--size-ws_cell) / 2), 1px)
+    round(nearest, calc((var(--ws-y) + var(--ws-oy, 0) * var(--ws-glide)) * 1px - var(--size-ws_cell) / 2), 1px);
   pointer-events: none;
 }
 
@@ -311,4 +320,131 @@
   outline: none;
   cursor: text;
   user-select: text;
+}
+
+/* A workspace's mark, lit as far as `--ws-lit` (the shown workspace, and one asking for attention)
+   and, for a dash, stretched as far as `--ws-shape`. Switching, the leaving mark turns off over
+   `short` on `standard` and narrows the same way; the arriving one turns on `duration.swap_lag`
+   later over `short` on `standard`, and widens over `medium` on `emphasized_decel`. Lit, it burns
+   the core of its tone (`primary`, an urgent one's `error`) with the content glow by night, and is
+   its tone by day. */
+@property --ws-lit {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --ws-shape {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.shell-ws-cell {
+  --ws-lit: 0;
+  --ws-shape: 0;
+  --ws-tone: var(--color-primary);
+  --ws-core: var(--color-primary_core);
+  transition:
+    --cell-hover var(--motion-short) var(--easing-standard),
+    --cell-press var(--motion-micro) var(--easing-standard),
+    --ws-mark var(--motion-short) var(--easing-standard),
+    --ws-lit var(--motion-short) var(--easing-standard),
+    --ws-shape var(--motion-short) var(--easing-standard);
+}
+
+.shell-ws-cell[data-urgent] {
+  --ws-lit: 1;
+  --ws-tone: var(--color-error);
+  --ws-core: var(--color-error_core);
+}
+
+.shell-ws-cell[data-shown] {
+  --ws-lit: 1;
+  --ws-shape: 1;
+  transition:
+    --cell-hover var(--motion-short) var(--easing-standard),
+    --cell-press var(--motion-micro) var(--easing-standard),
+    --ws-mark var(--motion-short) var(--easing-standard),
+    --ws-lit var(--motion-short) var(--easing-standard) var(--motion-swap_lag),
+    --ws-shape var(--motion-medium) var(--easing-emphasized_decel) var(--motion-swap_lag);
+}
+
+/* Dashes stretch for an urgent workspace too; in Dot and dash an urgent one is a lit dot. */
+.shell-ws[data-marks="dashes"] .shell-ws-cell[data-urgent] {
+  --ws-shape: 1;
+}
+
+.shell-ws[data-pinned] .shell-ws-cell {
+  transition: none;
+}
+
+/* Each form's mark at rest and stretched: a dot, a ring for an empty workspace; a dash, faint for
+   an empty one; Dot and dash's dot, stretched to a thicker dash. */
+.shell-ws {
+  --mark-w: var(--size-ws_dot);
+  --mark-h: var(--size-ws_dot);
+  --mark-lit-w: var(--size-ws_dot);
+  --mark-lit-h: var(--size-ws_dot);
+}
+
+.shell-ws[data-marks="dashes"] {
+  --mark-w: var(--size-ws_dash);
+  --mark-h: var(--size-ws_dash_thick);
+  --mark-lit-w: var(--size-ws_dash_lit);
+  --mark-lit-h: var(--size-ws_dash_thick);
+}
+
+.shell-ws[data-marks="dotdash"] {
+  --mark-lit-w: var(--size-ws_dash_lit);
+  --mark-lit-h: var(--size-ws_dotdash_thick);
+}
+
+.shell-ws-mark {
+  --mark-lit-colour: color-mix(in srgb, var(--ws-core), var(--ws-tone) calc(var(--day) * 100%));
+  --mark-ring: max(var(--stroke-hairline_device_px), round(nearest, var(--stroke-thin), var(--stroke-hairline_device_px)));
+  position: relative;
+  display: grid;
+  place-items: center;
+  transition: scale var(--motion-micro) var(--easing-standard);
+}
+
+.shell-ws:not([data-marks="numbers"]) .shell-ws-mark {
+  box-sizing: border-box;
+  width: round(nearest, calc(var(--mark-w) + (var(--mark-lit-w) - var(--mark-w)) * var(--ws-shape)), 1px);
+  height: round(nearest, calc(var(--mark-h) + (var(--mark-lit-h) - var(--mark-h)) * var(--ws-shape)), 1px);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--mark-fill), var(--mark-lit-colour) calc(var(--ws-lit) * 100%));
+  box-shadow: 0 0 var(--focus-content_near) rgb(from var(--ws-tone) r g b / calc(var(--focus-near_opacity) * var(--ws-lit) * (1 - var(--day))));
+  --mark-fill: var(--color-on_surface_variant);
+}
+
+/* An empty workspace: a ring of `outline` round a hollow dot; a faint dash. */
+.shell-ws:is([data-marks="dots"], [data-marks="dotdash"]) .shell-ws-cell:not([data-occupied]) > .shell-ws-mark {
+  --mark-fill: transparent;
+  border: var(--mark-ring) solid color-mix(in srgb, var(--color-outline), var(--mark-lit-colour) calc(var(--ws-lit) * 100%));
+}
+
+.shell-ws[data-marks="dashes"] .shell-ws-cell:not([data-occupied]) > .shell-ws-mark {
+  --mark-fill: rgb(from var(--color-on_surface_variant) r g b / var(--opacity-placeholder));
+}
+
+/* A number lit: the same numeral over it, in its tone, with the content glow by night. */
+.shell-ws-mark > * {
+  grid-area: 1 / 1;
+}
+
+.shell-ws-lit-number {
+  opacity: var(--ws-lit);
+  text-shadow: 0 0 var(--focus-content_near) rgb(from var(--ws-tone) r g b / calc(var(--focus-content_glow) * (1 - var(--day))));
+}
+
+.shell-ws-mark > .shell-ws-number {
+  opacity: calc(1 - var(--ws-lit));
+}
+
+/* Pressed, the mark dips as every bar item's content does. */
+.shell-ws-cell:active > .shell-ws-mark,
+.shell-ws[data-pinned="pressed"] .shell-ws-cell[data-pointer] > .shell-ws-mark {
+  scale: var(--scale-press_dip);
 }

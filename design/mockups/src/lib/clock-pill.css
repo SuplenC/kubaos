@@ -1,14 +1,32 @@
-/* The ClockPill (`clock-pill.ts`): `space.s4` from its curves to the seal and the capsule, which fill
-   its height less `space.s4` above and below; plain words at either end stand `space.s12` from the
-   curve, as a pill's words do. It keeps how far its capsule's middle is off its own in
-   `--capsule-before` and `--capsule-after`, for an owner that puts the capsule on the screen's
+/* The ClockPill (`clock-pill.ts`), flat on the glass: the time's half (seal, date, time `space.s8`
+   apart) and the weather's, `space.s8` apart, each a press target of its own a row tall. The seal
+   and the capsule are `size.bar_capsule` tall. It keeps how far its capsule's middle is off its own
+   in `--capsule-before` and `--capsule-after`, for an owner that puts the capsule on the screen's
    middle (the bar, `bar.css`). */
-.k-clock-pill .k-clock-pill-plain:first-child {
-  margin-inline-start: var(--space-s8);
+.k-clock-pill {
+  --clock-open: 0;
+  --clock-ink: color-mix(in srgb, var(--color-on_surface), var(--color-on_primary) calc(var(--clock-open) * 100%));
+  transition: --clock-open var(--motion-short) var(--easing-standard);
 }
 
-.k-clock-pill .k-clock-pill-plain:last-child {
-  margin-inline-end: var(--space-s8);
+.k-clock-pill[data-open],
+.k-clock-pill[data-recording] {
+  --clock-open: 1;
+}
+
+.k-clock-pill-when {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s8);
+  height: var(--size-bar_row);
+}
+
+/* How far its card is open, 0 to 1: the capsule's fill, its room, and the time's ink. */
+@property --clock-open {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
 }
 
 /* The time, centred in a slot as wide as the widest time it shows. */
@@ -19,23 +37,9 @@
   padding-inline-start: round(down, calc((var(--slot-width) - var(--time-width)) / 2), 1px);
 }
 
-/* The weather is a press target of its own, and the rest of the pill opens the clock: its target
-   reaches from the middle of the gap before it (half the row's `space.s8`) to the pill's end edge
-   (its `space.s8` from the curve and the pill's end padding), the pill's full height, so no point
-   of the pill is dead or opens the other, its corners included. Its look is the pill's own: it is
-   drawn by nothing. */
+/* The weather is a press target of its own, a row tall. */
 .k-clock-pill-weather {
-  position: relative;
-}
-
-.k-clock-pill-weather::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: calc(-1 * var(--space-s4));
-  right: calc(-1 * (var(--space-s8) + var(--end)));
-  height: var(--size-control_sm);
-  translate: 0 -50%;
+  height: var(--size-bar_row);
 }
 
 /* The pill's own box takes the press in its rounded corners too, as the weather's target does at
@@ -51,21 +55,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--size-control_sm) - 2 * var(--space-s4));
-  height: calc(var(--size-control_sm) - 2 * var(--space-s4));
+  width: var(--size-bar_capsule);
+  height: var(--size-bar_capsule);
   border-radius: var(--radius-full);
   background: var(--color-cold);
 }
 
-/* The time in a flat capsule of `primary`, `space.s8` inside. */
+/* The time in a capsule of `primary`, `space.s8` inside, filled only while its card is open: at
+   rest the capsule's room is given back to the words beside it, so the time stands as plain as the
+   date, and it opens as the fill comes in. */
 .k-clock-pill-capsule {
   flex: none;
   display: flex;
   align-items: center;
-  height: calc(var(--size-control_sm) - 2 * var(--space-s4));
+  height: var(--size-bar_capsule);
   padding-inline: var(--space-s8);
+  margin-inline: calc((var(--clock-open) - 1) * var(--space-s8));
   border-radius: var(--radius-full);
-  background: var(--color-primary);
+  background: rgb(from var(--color-primary) r g b / var(--clock-open));
 }
 
 /* Recording merged in: its dot leads, the seal and the capsule in its colours. */

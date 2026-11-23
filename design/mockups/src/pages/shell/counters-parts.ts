@@ -98,7 +98,7 @@ export function ruleLine(counter: Counter): string | undefined {
 
 /** The bar's pill: the Tabler `tallymarks` symbol alone. */
 export function countersPill(state: Shown = "rest"): HTMLElement {
-  const made = pill({ content: [glyph("tallymarks")], lone: true, interactive: true, tooltip: "Counters", ...stateOptions(state) });
+  const made = pill({ content: [glyph("tallymarks")], lone: true, interactive: true, opens: true, tooltip: "Counters", ...stateOptions(state) });
   made.classList.add("ct-pill");
   return made;
 }
