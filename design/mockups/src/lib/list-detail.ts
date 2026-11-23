@@ -12,6 +12,7 @@ import { chip, type ChipKind } from "./chip.ts";
 import { type KeyHint, keycap, keyHints, keys } from "./keycap.ts";
 import { emptyState } from "./empty-state.ts";
 import { field } from "./field.ts";
+import { glass } from "./glass.ts";
 import { icon } from "./icon.ts";
 import { iconTile } from "./icon-tile.ts";
 import { container, divider, fill, filling, fillingHeight, flow, gap, header, page, row, stack } from "./layout.ts";
@@ -83,12 +84,13 @@ export interface MenuMeasures {
  * the least. `fit` lets it take fewer than eight rows where eight would run past the screen.
  */
 export function menuMeasures(screenWidth: number, screenHeight: number, fit = false): MenuMeasures {
+  const padding = length("space-s16");
   const space = length("space-s12");
   const column = length("size-column");
   const width = Math.max(column, Math.min(column * 2, onGrid(screenWidth / 2)));
-  const pane = width >= length("size-dialog") + length("size-rail") ? Math.max(length("size-rail"), onGrid((width - space * 3) * 0.4)) : 0;
+  const pane = width >= length("size-dialog") + length("size-rail") ? Math.max(length("size-rail"), onGrid((width - padding * 2 - space) * 0.4)) : 0;
   const pitch = length("size-row_two_line") + length("space-s4");
-  const chrome = space * 5 + length("size-control_md") + length("size-control_sm");
+  const chrome = padding * 2 + space * 3 + length("size-control_md") + length("size-control_sm");
   const wanted = Math.floor((screenHeight * 0.64 - chrome) / pitch);
   const least = fit ? Math.max(1, Math.min(8, Math.floor((screenHeight - chrome + length("space-s4")) / pitch))) : 8;
   const rows = Math.max(least, Math.min(14, wanted));
@@ -219,8 +221,8 @@ export interface MenuOptions {
 }
 
 /**
- * The Command menu's panel: the frame's glass in the soft hairline at the surface radius,
- * `space.s12` inside and between its parts: the search field, the body (the Results beside the
+ * The Command menu's panel: the shell's glass at a card's corner, `space.s16` inside, so the pane's
+ * corners run concentric with its own, and `space.s12` between its parts: the search field, the body (the Results beside the
  * pane where it fits), and under a hairline across the panel the footer, a small control tall,
  * holding the keys. The field keeps the keyboard and hands ↑ ↓, Page Up and Down, Ctrl+N/P and
  * Enter to the list.
@@ -254,8 +256,8 @@ export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLE
   // A hint that would pass the footer's end is left out whole, never cut through a keycap.
   const foot = row(0, "centre", options.footer ?? keyHints(hints, { room: "100%" }));
   foot.classList.add("k-menu-footer");
-  const panel = document.createElement("span");
-  panel.className = "k-command";
+  const panel = glass(document.createElement("span"));
+  panel.classList.add("k-command");
   panel.tabIndex = 0;
   workedOut(panel, "size-column").style.width = px(measures.width);
   const head = options.head ?? search;
@@ -286,12 +288,16 @@ export function commandMenu(options: MenuOptions, measures: MenuMeasures): HTMLE
 }
 
 /**
- * The Command menu on a screen of the toolbar's window size: its panel's measures follow the screen
- * as it resizes, centred across it and two fifths of the way down the room it leaves.
+ * The Command menu on a screen of the toolbar's window size, over `wallpaper` where it is given:
+ * its panel's measures follow the screen as it resizes, centred across it and two fifths of the way down the room it leaves.
  */
-export function menuOnScreen(options: MenuOptions): HTMLElement {
+export function menuOnScreen(options: MenuOptions, wallpaper?: string): HTMLElement {
   const screen = document.createElement("span");
   screen.className = "k-menu-screen";
+  const picture = document.createElement("img");
+  picture.className = "k-menu-wallpaper";
+  picture.alt = "";
+  if (wallpaper) picture.src = wallpaper;
   let drawn = "";
   new ResizeObserver(() => {
     const scale = Number.parseFloat(getComputedStyle(screen).getPropertyValue("--scale")) || settings().scale;
@@ -304,7 +310,7 @@ export function menuOnScreen(options: MenuOptions): HTMLElement {
     const panel = commandMenu(options, measures);
     panel.style.left = `${Math.round(((width - measures.width) / 2) * scale)}px`;
     panel.style.top = `${Math.round(measures.top * scale)}px`;
-    screen.replaceChildren(panel);
+    screen.replaceChildren(...(wallpaper ? [picture] : []), panel);
   }).observe(screen);
   return screen;
 }

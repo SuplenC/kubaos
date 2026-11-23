@@ -155,7 +155,8 @@ export default page<Shown>({
     ]),
     measures: [
       { part: "Footer's line", token: "size-control_sm" },
-      { part: "Clear of the hairline, the edge", token: "space-s12" },
+      { part: "Clear of the hairline", token: "space-s12" },
+      { part: "Clear of the edge", token: "space-s16" },
       { part: "Hints apart", token: "space-s16" },
       { part: "Keycaps to their words", token: "space-s8" },
       { part: "Question to its keys", token: "space-s12" },
