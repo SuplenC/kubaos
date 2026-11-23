@@ -402,9 +402,10 @@ impl Journal {
     /// step the release changed, which updates it in place. Entries of one kind that a release
     /// changed are told apart by their names, a run's by what it undoes, else by their order:
     /// the first numbered goes with the first such step. An entry still without one takes the next
-    /// step left, in order, whose run undoes it as a changed step, but for a `run` with `undo`
-    /// alone, never another step's; one left after that, a step the release took out, is
-    /// numbered after the last step, in order.
+    /// step left, in order, whose run undoes it as a changed step, but for one that acts on the
+    /// same thing as a step another entry took (a step a release merged into that one) and for a
+    /// `run` with `undo` alone, which never take another step's. One left after that, a step the
+    /// release took out or merged, is numbered after the last step, in order.
     pub fn align(&mut self, steps: &[(usize, Option<Action>)], total: usize) {
         self.entries.sort_by_key(|e| e.step);
         let mut numbers: Vec<Option<usize>> = vec![None; self.entries.len()];
@@ -432,8 +433,14 @@ impl Journal {
             }
         }
         let mut left = steps.iter().zip(&taken).filter(|(_, t)| !**t).map(|((n, _), _)| *n);
+        let merged = |entry: &Entry| {
+            steps
+                .iter()
+                .zip(&taken)
+                .any(|((_, action), taken)| *taken && action.as_ref().is_some_and(|a| a.same_thing(&entry.action)))
+        };
         for (entry, number) in self.entries.iter().zip(&mut numbers) {
-            if number.is_none() && !entry.action.removal_only() {
+            if number.is_none() && !entry.action.removal_only() && !merged(entry) {
                 *number = left.next();
             }
         }

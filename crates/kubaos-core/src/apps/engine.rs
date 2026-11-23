@@ -311,11 +311,12 @@ impl<'h> Keeper<'h> {
     }
 
     fn aligned_journal(&self, id: &str) -> Result<Option<Journal>, JournalError> {
-        let numbers = |j: &Journal| j.entries.iter().map(|e| e.step).collect::<Vec<_>>();
         let was = Journal::read(&self.journals, id)?;
         let journal = aligned(&self.journals, id, &self.catalog, self.words(), self.side)?;
+        // Compared whole: a release that takes a step out can leave the same numbers, each now
+        // another entry's.
         if let Some(journal) = &journal
-            && was.as_ref().map(numbers) != Some(numbers(journal))
+            && was.as_ref() != Some(journal)
         {
             journal.save(&self.journals)?;
         }
@@ -1025,36 +1026,70 @@ fn keep_brought(journal: &mut Journal, entry: &Entry, handed: &[Handed]) {
     }
 }
 
-/// Passes what `entry`, a step a release took out, owns and another entry of `journal` holds to
-/// that entry, which owns it from then on with `entry`'s prior state, so the undo leaves it: a
-/// package of two steps a release merged into one stays. With a package, what apt pulled in for
-/// the step (its `dep:` claims) goes to the first entry that took one. A `run` claim is every
-/// run's own, never passed.
+/// The entry of `journal` other than step `step`'s that takes `claim` from a step a release took
+/// out: one that holds it, or for a `dir:` claim, one whose path or folder is in that folder.
+fn taker(journal: &Journal, step: usize, claim: &str) -> Option<usize> {
+    let dir = claim.strip_prefix("dir:").map(Path::new);
+    let inside = |c: &Claim| {
+        let path = c.path().or_else(|| c.claim.strip_prefix("dir:").map(Path::new));
+        dir.is_some_and(|dir| path.is_some_and(|p| p.starts_with(dir)))
+    };
+    let others = || journal.entries.iter().filter(move |e| e.step != step);
+    others()
+        .find(|e| e.claims.iter().any(|c| c.claim == claim))
+        .or_else(|| others().find(|e| e.claims.iter().any(inside)))
+        .map(|e| e.step)
+}
+
+/// The claims of `entry` that another entry of `journal` may take: what it owns, but a `run`
+/// claim, every run's own, and what apt pulled in, which goes with the package it came for.
+fn passable(entry: &Entry) -> impl Iterator<Item = &Claim> {
+    entry
+        .claims
+        .iter()
+        .filter(|c| c.owned && c.claim != "run" && !c.claim.starts_with("dep:"))
+}
+
+/// Whether `entry`, a step a release took out, leaves `journal` with nothing to undo: another
+/// entry takes everything it owns ([`pass_within`]).
+fn folds(journal: &Journal, entry: &Entry) -> bool {
+    let mut passable = passable(entry).peekable();
+    passable.peek().is_some()
+        && passable.all(|c| taker(journal, entry.step, &c.claim).is_some())
+        && !entry.claims.iter().any(|c| c.owned && c.claim == "run")
+}
+
+/// Passes what `entry`, a step a release took out, owns and another entry of `journal` takes
+/// ([`taker`]) to that entry, which owns it from then on with `entry`'s prior state, so the undo
+/// leaves it: a package of two steps a release merged into one stays, as does the folder of a
+/// file another step writes in it. With a package, what apt pulled in for the step (its `dep:`
+/// claims) goes to the first entry that took one.
 fn pass_within(journal: &mut Journal, entry: &mut Entry) {
     let (step, prior) = (entry.step, entry.prior.clone());
-    let mut taker = None;
-    for claim in entry
-        .claims
-        .iter_mut()
-        .filter(|c| c.owned && c.claim != "run" && !c.claim.starts_with("dep:"))
-    {
-        let Some(other) = journal
-            .entries
-            .iter_mut()
-            .find(|e| e.step != step && e.claims.iter().any(|c| c.claim == claim.claim))
-        else {
+    let takers: Vec<(String, usize)> = passable(entry)
+        .filter_map(|c| taker(journal, step, &c.claim).map(|t| (c.claim.clone(), t)))
+        .collect();
+    let mut package_taker = None;
+    for (claim, to) in &takers {
+        let Some(other) = journal.entries.iter_mut().find(|e| e.step == *to) else {
             continue;
         };
-        if let Some(held) = other.claims.iter_mut().find(|c| c.claim == claim.claim && !c.owned) {
-            held.owned = true;
-            other.prior.take_from(&prior);
+        match other.claims.iter_mut().find(|c| c.claim == *claim) {
+            Some(held) if !held.owned => {
+                held.owned = true;
+                other.prior.take_from(&prior);
+            }
+            Some(_) => {}
+            None => other.claims.insert(0, Claim::new(claim.clone(), true)),
         }
-        claim.owned = false;
-        if claim.claim.starts_with("package:") {
-            taker.get_or_insert(other.step);
+        if let Some(c) = entry.claims.iter_mut().find(|c| c.claim == *claim) {
+            c.owned = false;
+        }
+        if claim.starts_with("package:") {
+            package_taker.get_or_insert(*to);
         }
     }
-    let Some(taker) = taker else {
+    let Some(taker) = package_taker else {
         return;
     };
     let deps: Vec<Claim> = entry
@@ -1416,7 +1451,7 @@ impl<'a> Engine<'a> {
         } = self.begin(&folder, id, setup)?;
         let mut finished = Finished::default();
         if switching {
-            finished.switch |= self.switch_away(id, folder.shared_steps())?;
+            finished.switch |= self.switch_away(id, &folder)?;
         }
         let total = steps.len();
         let mut this_run = Vec::new();
@@ -2186,10 +2221,21 @@ impl<'a> Engine<'a> {
     }
 
     /// Takes away the steps of another setup than the one being installed: those after the app's
-    /// own `shared` actions. Whether `packages.toml` changed.
-    fn switch_away(&mut self, id: &str, shared: usize) -> Result<bool, EngineError> {
+    /// own shared actions in `folder`. A `run` with `undo` alone a release took out stays, as its
+    /// undo is for the app's removal. Whether `packages.toml` changed.
+    fn switch_away(&mut self, id: &str, folder: &Folder) -> Result<bool, EngineError> {
         let mut switch = false;
-        let leaving: Vec<Undoable> = self.journaled(id)?.into_iter().filter(|u| u.step > shared).collect();
+        let shared = folder.shared_steps();
+        let had = match self.journal(Side::User, id)? {
+            Some(journal) => journal.setup,
+            None => self.journal(Side::Root, id)?.and_then(|j| j.setup),
+        };
+        let had_total = folder.steps(had.as_deref()).map_or(usize::MAX, |steps| steps.len());
+        let leaving: Vec<Undoable> = self
+            .journaled(id)?
+            .into_iter()
+            .filter(|u| u.step > shared && !(u.removal_only && u.step > had_total))
+            .collect();
         let total = leaving.first().map_or(0, |u| u.step);
         for undoable in leaving {
             self.report(id, undoable.step, total, &undoable.name, ActionState::Undoing);
@@ -2221,7 +2267,14 @@ impl<'a> Engine<'a> {
             .collect();
         let of = gone.first().map_or(0, |u| u.step);
         for undoable in gone {
-            self.report(id, undoable.step, of, &undoable.name, ActionState::Undoing);
+            // A step a release merged into another leaves its journal with nothing undone, which
+            // the run doesn't report as an undo.
+            let folded = self
+                .journal(undoable.side, id)?
+                .is_some_and(|j| j.entry(undoable.step).is_some_and(|e| folds(&j, e)));
+            if !folded {
+                self.report(id, undoable.step, of, &undoable.name, ActionState::Undoing);
+            }
             let taken = match undoable.side {
                 Side::User => {
                     let taken = self.user.take_out(id, undoable.step).map(drop);
@@ -2239,8 +2292,10 @@ impl<'a> Engine<'a> {
                 name: undoable.name.clone(),
                 source: Box::new(source),
             })?;
-            switch |= undoable.kind_is_nix;
-            self.report(id, undoable.step, of, &undoable.name, ActionState::Undone);
+            if !folded {
+                switch |= undoable.kind_is_nix;
+                self.report(id, undoable.step, of, &undoable.name, ActionState::Undone);
+            }
         }
         Ok(switch)
     }

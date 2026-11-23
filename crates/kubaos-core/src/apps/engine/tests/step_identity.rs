@@ -731,7 +731,10 @@ fn two_steps_a_release_makes_one_beside_a_new_step_of_their_side_are_neither_und
         assert!(!log.iter().any(|l| l.starts_with("apt")), "{at}: {log:#?}");
         assert!(world.system_path("/etc/merged/new.conf").is_file(), "{at}");
         let state = world.host.state.borrow();
-        assert!(state.dpkg.contains_key("merged-tool") && state.dpkg.contains_key("merged-plugin"), "{at}");
+        assert!(
+            state.dpkg.contains_key("merged-tool") && state.dpkg.contains_key("merged-plugin"),
+            "{at}"
+        );
     }
 }
 
@@ -784,7 +787,10 @@ fn a_users_step_taken_out_in_front_of_another_of_its_side_is_the_one_undone() {
 
     assert!(!a.exists(), "the step taken out stands");
     assert!(b.is_file(), "the step that stands was undone");
-    assert_eq!(reported(&events, "Write a"), [ActionState::Undoing, ActionState::Undone]);
+    assert_eq!(
+        reported(&events, "Write a"),
+        [ActionState::Undoing, ActionState::Undone]
+    );
     assert_eq!(reported(&events, "Write b"), [ActionState::Done]);
 
     world.remove("files").0.unwrap();

@@ -313,7 +313,9 @@ fn a_setup_switch_keeps_a_run_that_only_undoes_a_release_took_out_for_the_remova
     let install = |setup: &str| {
         let mut root = world.root();
         world
-            .run(&mut root, &mut Events::default(), true, |e| e.install("guard", Some(setup)))
+            .run(&mut root, &mut Events::default(), true, |e| {
+                e.install("guard", Some(setup))
+            })
             .unwrap();
     };
     install("plain");
