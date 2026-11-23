@@ -79,6 +79,12 @@
   transition: --ov-veil var(--ov-vt, 0s) var(--ov-ve, linear);
 }
 
+/* The bar stays over the screen's own desktop, which flies over the other workspaces at `z-index`
+   1: the layer holding it makes no stacking context of its own. */
+.ov-screen > .k-screen-over {
+  z-index: 1;
+}
+
 .ov-screen[data-open] .k-screen-over {
   pointer-events: none;
 }
