@@ -1678,3 +1678,55 @@ fn a_pending_change_of_a_step_moved_to_the_other_side_is_finished_and_later_upda
     world.remove("mv").0.unwrap();
     assert!(!world.system_path("/etc/mv/b").exists());
 }
+
+#[test]
+fn what_apt_pulled_in_for_a_step_merged_in_part_goes_to_the_step_that_took_its_package_not_an_earlier_record() {
+    let world = World::new(&[(
+        "pq",
+        &super::app(&format!(
+            "{}{}{}",
+            apt_step("Install its libraries", "\"q-lib\""),
+            apt_step("Install the tool", "\"q-tool\""),
+            apt_step("Install its plugins", "\"q-plugin\", \"q-extra\"")
+        )),
+    )]);
+    world
+        .host
+        .state
+        .borrow_mut()
+        .depends
+        .insert("q-plugin".to_owned(), ["libq".to_owned()].into());
+    world.install("pq", true).0.unwrap();
+    // As an app taken in records what apt pulled in: the dependency, unowned.
+    let (_, root) = world.journals("pq");
+    let mut root = root.unwrap();
+    root.entries[0]
+        .claims
+        .push(crate::apps::journal::Claim::new("dep:libq", false));
+    root.save(&world.root_journals).unwrap();
+    world.write_app(
+        "pq",
+        &super::app(&format!(
+            "{}{}",
+            apt_step("Install its libraries", "\"q-lib\""),
+            apt_step("Install the tool", "\"q-tool\", \"q-plugin\"")
+        )),
+    );
+
+    world.install("pq", true).0.unwrap();
+
+    let (_, root) = world.journals("pq");
+    let owner: Vec<(&str, bool)> = root
+        .as_ref()
+        .unwrap()
+        .entries
+        .iter()
+        .filter_map(|e| {
+            e.claims
+                .iter()
+                .find(|c| c.claim == "dep:libq")
+                .map(|c| (e.action.name.as_str(), c.owned))
+        })
+        .collect();
+    assert_eq!(owner, [("Install its libraries", false), ("Install the tool", true)]);
+}

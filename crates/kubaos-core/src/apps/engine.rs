@@ -686,15 +686,17 @@ impl<'h> Keeper<'h> {
     }
 
     /// Takes out of the app `id`'s journal what a release took out of its install, once every
-    /// step of the install stands: the entry numbered `step`, when the install has no step of its
-    /// name, undone and taken out; or, for a step the install has, what its changed action
-    /// replaced. What another entry of the app holds passes to that entry instead of being undone
+    /// step of the install stands: for an entry with a replaced part, what its changed action
+    /// replaced, whether its step stands or the entry waits for the removal; else the entry
+    /// numbered `step`, when the install has no step of its name, undone and taken out. What
+    /// another entry of the app holds passes to that entry instead of being undone
     /// ([`pass_within`]): a step a release merged into another leaves the machine as it is.
     ///
     /// # Errors
     ///
-    /// [`StepError::StillAStep`] for an entry whose step the install still has, on either side,
-    /// with nothing replaced: this side checks the folder itself, whatever the other side asked.
+    /// [`StepError::StillAStep`] for an entry with nothing replaced whose step the install still
+    /// has, on either side, or that waits for the removal: this side checks the folder itself,
+    /// whatever the other side asked.
     /// Else as [`Keeper::undo`].
     pub fn take_out(&mut self, id: &str, step: usize) -> Result<Outcome, StepError> {
         let Some(mut journal) = self.journal(id)? else {
@@ -709,12 +711,14 @@ impl<'h> Keeper<'h> {
             app: id.to_owned(),
             name: entry.action.name.clone(),
         };
-        if step <= steps.len() {
-            if entry.replaced.is_none() {
-                return Err(still());
-            }
+        // What a changed step replaced goes whatever becomes of the entry: kept for the removal,
+        // as a step moved to the other side's is, the entry alone waits.
+        if entry.replaced.is_some() {
             self.finish_replaced(&mut journal, id, step)?;
             return Ok(Outcome::Settled);
+        }
+        if step <= steps.len() {
+            return Err(still());
         }
         // HAZARD: a `run` with `undo` alone waits for the app's removal, whose undo it is.
         if entry.action.removal_only() || steps.iter().any(|a| a.name == entry.action.name) {
@@ -913,12 +917,24 @@ impl<'h> Keeper<'h> {
             .host
             .installed(&deps)
             .map_err(|e| StepError::Perform(PerformError::Host(e)))?;
+        // The entry that took one of `part`'s packages is the one `pass_within` marked; another
+        // may hold the same dependency unowned, as an app taken in records what apt pulled in.
+        let passed: Vec<&str> = part
+            .claims
+            .iter()
+            .filter(|c| !c.owned && c.claim.starts_with("package:"))
+            .map(|c| c.claim.as_str())
+            .collect();
         for dep in &deps {
             let claim = format!("dep:{dep}");
-            let marked = journal
+            let marks = |e: &Entry| e.step != part.step && e.claims.iter().any(|c| c.claim == claim && !c.owned);
+            let took = |e: &Entry| e.claims.iter().any(|c| c.owned && passed.contains(&c.claim.as_str()));
+            let at = journal
                 .entries
-                .iter_mut()
-                .find(|e| e.step != part.step && e.claims.iter().any(|c| c.claim == claim && !c.owned));
+                .iter()
+                .position(|e| marks(e) && took(e))
+                .or_else(|| journal.entries.iter().position(marks));
+            let marked = at.map(|at| &mut journal.entries[at]);
             let Some(taker) = marked else {
                 continue;
             };
@@ -2299,8 +2315,10 @@ impl<'a> Engine<'a> {
     }
 
     /// Takes away the steps of another setup than the one being installed: those after the app's
-    /// own shared actions in `folder`. A `run` with `undo` alone a release took out stays, as its
-    /// undo is for the app's removal. Whether `packages.toml` changed.
+    /// own shared actions in `folder`, up to that setup's last step. An entry after it, of a step a
+    /// release took out, renamed, merged or moved, stays for the install's end, which hands what a
+    /// step that stands holds of it over ([`Engine::take_out`]), or for the removal. Whether
+    /// `packages.toml` changed.
     fn switch_away(&mut self, id: &str, folder: &Folder) -> Result<bool, EngineError> {
         let mut switch = false;
         let shared = folder.shared_steps();
@@ -2312,7 +2330,7 @@ impl<'a> Engine<'a> {
         let leaving: Vec<Undoable> = self
             .journaled(id)?
             .into_iter()
-            .filter(|u| u.step > shared && !(u.removal_only && u.step > had_total))
+            .filter(|u| u.step > shared && u.step <= had_total)
             .collect();
         let total = leaving.first().map_or(0, |u| u.step);
         for undoable in leaving {
@@ -2334,7 +2352,9 @@ impl<'a> Engine<'a> {
     /// Takes out what a release took out of the app `id`'s install of `steps`, once its steps
     /// stand, each through [`Keeper::take_out`], so what a step that stands holds of it stays:
     /// first, newest first, the entries of names the install no longer has, but those that
-    /// linger until the removal ([`lingers`]); then what each changed step replaced. A step taken
+    /// linger until the removal ([`lingers`]); then what each changed step replaced, that of an
+    /// entry that lingers too, so the entry alone waits and a plain update asks for nothing. A
+    /// step taken
     /// out that passes everything it owned to steps that stand, a step a release merged into
     /// another, is no undo, and isn't reported as one; nor is what a changed step replaced, as
     /// the step stands. Whether `packages.toml` changed, and whether a step taken out was undone.
@@ -2356,10 +2376,8 @@ impl<'a> Engine<'a> {
                     kind_is_run: matches!(entry.action.kind, Kind::Run { .. }),
                     removal_only: entry.action.removal_only(),
                 };
-                if entry.step > total {
-                    if !lingers(entry, &names) {
-                        gone.push((undoable, !folds(&journal, entry)));
-                    }
+                if entry.step > total && !lingers(entry, &names) {
+                    gone.push((undoable, !folds(&journal, entry)));
                 } else if let Some(part) = &entry.replaced {
                     replaced.push((undoable, false, !folds(&journal, part)));
                 }
