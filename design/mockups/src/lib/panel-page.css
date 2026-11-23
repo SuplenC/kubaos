@@ -30,3 +30,8 @@
   flex: 0 1 auto;
   min-height: 0;
 }
+
+/* The thumb at the panel's end, in the container's padding, out of the content's way. */
+.k-panel-page > .k-panel-body > .k-scroll > .k-scroll-thumb {
+  right: calc(-1 * var(--padding));
+}
