@@ -43,7 +43,11 @@ scales = [1.0, 1.25, 1.5, 2.0]
 # on the grid would buy nothing.
 #
 # And the halo round the lock's kicker: a blur's radius has no edge to land on a device pixel.
-off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo"]
+#
+# And the gap between the desktop's floating parts, `size.gap`: the compositor's own gap, which it
+# rounds to device pixels at every scale, as the mockups do where they draw it. And the glass's
+# shadow, `shadow.glass` and `shadow.glass_contact`: soft through and through, with no edge to land.
+off_grid = ["size.slider_stop", "size.slider_anchor", "size.halo_edge", "size.halo", "size.gap", "shadow.glass", "shadow.glass_contact"]
 
 # Lines thinner than the grid. Neither is a multiple of 4, so neither is a
 # length: each is drawn as whole device pixels at the scale it shows at.
@@ -177,6 +181,9 @@ control = 12
 content = 16
 # The shell's big surfaces alone: a panel, a window, the screen frame.
 surface = 24
+# A card on the glass: a panel detached from the bar, the clock's card. Concentric with the content
+# boxes inside it, `content` 16 in at its padding of 16.
+card = 32
 # Pills and circles: switches, icon buttons, sliders, avatars,
 # badges.
 full = true
@@ -275,7 +282,18 @@ panel = 392
 power_tile = 120
 # The shell's bar along the top of every screen: a small control (32) with 4
 # above and below, so its pills and buttons centre on whole device pixels.
+# The Bar layout's band, touching the top edge: the bar's row with `size.gap`
+# above and below, 40 again.
 bar = 40
+# A strip of the bar in the Floating and Islands layouts: its row with 4 above
+# and below, its ends round.
+bar_strip = 36
+# The row every item of the bar sits in, in every layout: each item's box.
+bar_row = 28
+# The gap between the desktop's floating parts, the same everywhere: the bar or
+# its strips to the screen's edges, a window to the screen's edges, to the bar
+# and to the next window, a card under the bar and above the screen's bottom.
+gap = 6
 # The widest a name the bar shows grows (a live preview's branch): past it, it
 # ends in an ellipsis, so the bar's right side never runs into the clock.
 bar_label = 160
@@ -904,6 +922,17 @@ frame_blur = 0.85
 # questions and first boot's cards, the whole screen, and a first-boot card opened alone in a
 # window.
 glass = 0.80
+# The glass of the shell, one material for the bar, its cards, toasts, the Command menu, small
+# popups and the shell's windows: `surface` at the glass setting over the compositor's blur. The
+# setting runs from `glass_floor` to full, one value for every glass surface; `glass` is its value
+# by night and `glass_day` by day. The floor is the least at which body text keeps 4.5:1 over white.
+glass_day = 0.90
+glass_floor = 0.73
+# The glass's edge by night: a 1 px highlight inside its top edge, `on_surface` at
+# `glass_highlight`, and a 1 px ring inside its whole edge, `on_surface` at `glass_ring`. By day the
+# ring is the soft hairline, `outline_variant` at `outline_soft`.
+glass_highlight = 0.12
+glass_ring = 0.07
 # The furthest the wallpaper is turned toward the surface behind full-screen text, so the words
 # read over any photo: at 0.90 every text role keeps 4.5:1 over pure black in light and pure
 # white in dark. Kōbō's welcome and done screens, from the text's side; the lock screen, behind
@@ -1050,6 +1079,18 @@ opacity = 0.55
 y = 16
 blur = 48
 opacity = 0.60
+
+# The glass's shadow, two layers of the `shadow` role under every glass surface: a wide soft one
+# that lifts it off the desktop, and a tight contact one that keeps its edge crisp.
+[shadow.glass]
+y = 10
+blur = 30
+opacity = 0.45
+
+[shadow.glass_contact]
+y = 1
+blur = 3
+opacity = 0.40
 
 # A card in a stack, cast onto the edge of the card tucked under it: close and
 # tight, so it reads as one card lying on another. Lighter in light mode, where

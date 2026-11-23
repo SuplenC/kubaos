@@ -335,6 +335,8 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             out.line(format!("        readonly property int content: {}", r.content));
             out.line("        // The shell's big surfaces: panels, the window, the screen frame.");
             out.line(format!("        readonly property int surface: {}", r.surface));
+            out.line("        // A card on the glass, detached from the bar: a panel, the clock's card.");
+            out.line(format!("        readonly property int card: {}", r.card));
             if r.full {
                 out.comment(
                     "        ",

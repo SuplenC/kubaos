@@ -300,6 +300,11 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             Some("The shell's big surfaces: panels, the window, the screen frame.".into()),
             format!("Some({})", r.surface),
         ),
+        (
+            "Card".into(),
+            Some("A card on the glass, detached from the bar: a panel, the clock's card.".into()),
+            format!("Some({})", r.card),
+        ),
     ];
     if tokens.radius.full {
         radii.push((
