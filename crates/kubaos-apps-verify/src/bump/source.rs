@@ -49,8 +49,10 @@ const HELM_RELEASES: &str = "repos/helm/helm/releases?per_page=100";
 /// The keys Helm's releases are signed with: its `KEYS` file as helm/helm keeps it, a key for
 /// each maintainer who cuts releases, since any of them may sign the next one.
 const HELM_KEYS: &[u8] = include_bytes!("../../keys/helm.asc");
-/// The primary keys [`HELM_KEYS`] holds. A signature by any other key is refused, and a test
-/// holds the file to this list, so a new key comes in only by changing both.
+/// The primary keys [`HELM_KEYS`] holds, which a test holds the file to, so a new key comes in
+/// only by changing both: gpg verifies against that keyring alone, so a signature by any other key
+/// is refused.
+#[cfg(test)]
 const HELM_FINGERPRINTS: [&str; 10] = [
     "672C657BE06B4B30969C4A57461449C25E36B98E",
     "F1261BDE929012C8FF2E501D6EA5D7598529A53E",
@@ -508,7 +510,8 @@ pub fn helm_signature<'a>(releases: &'a serde_json::Value, version: &str, name: 
 }
 
 /// The sha256 of Helm's `name` from its `.sha256sum`, `sums`, once `signature` shows one of
-/// Helm's pinned keys signed it.
+/// Helm's pinned keys signed it: gpg checks it against a keyring of `HELM_KEYS` alone, which a
+/// test holds to `HELM_FINGERPRINTS`.
 ///
 /// # Errors
 ///
@@ -528,13 +531,16 @@ pub fn helm_sha256(sums: &[u8], signature: Option<&[u8]>, name: &str) -> Result<
         },
     )
     .map_err(|e| format!("{name}.sha256sum: {}", chain(&e)))?;
-    if !HELM_FINGERPRINTS.contains(&verified.primary.as_str()) {
-        return Err(format!(
-            "{name}.sha256sum is signed by {}, which isn't one of Helm's pinned keys",
-            verified.primary
-        ));
-    }
-    digest_for(&verified.text, name).ok_or_else(|| format!("{name}.sha256sum names no sha256 for {name}"))
+    // Only a line that names the file counts: the signed text is Helm's word for that file alone.
+    verified
+        .text
+        .lines()
+        .filter_map(|line| line.split_once(char::is_whitespace))
+        .find(|(_, file)| file.trim().trim_start_matches('*') == name)
+        .map(|(sum, _)| sum)
+        .filter(|sum| sum.len() == 64 && sum.chars().all(|c| c.is_ascii_hexdigit()))
+        .map(str::to_ascii_lowercase)
+        .ok_or_else(|| format!("{name}.sha256sum names no sha256 for {name}"))
 }
 
 /// The newest version among a folder listing's files named `<before><version><after>`.

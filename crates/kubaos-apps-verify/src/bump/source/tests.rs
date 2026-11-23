@@ -207,7 +207,7 @@ fn a_helm_checksum_changed_after_signing_is_refused() {
 }
 
 #[test]
-fn a_helm_checksum_signed_by_another_key_is_refused() {
+fn a_helm_checksum_signed_by_a_key_helm_doesnt_publish_is_refused() {
     let refused = helm_sha256(HELM_SUMS, Some(OTHER_SIGNATURE), HELM_NAME).unwrap_err();
 
     assert!(refused.contains("didn't verify"), "{refused}");
