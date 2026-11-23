@@ -6,7 +6,9 @@
 
    The setting is `--glass-setting`, a share from `opacity.glass_floor` to 1 that a screen may set
    for every glass on it; unset, it is `opacity.glass` by night and `opacity.glass_day` by day. */
-.k-glass {
+.k-glass,
+.k-glass-rise {
+  --glass-filter: blur(var(--size-glass_blur)) saturate(var(--scale-glass_saturate));
   --glass-alpha: var(--glass-setting, calc(var(--opacity-glass) + (var(--opacity-glass_day) - var(--opacity-glass)) * var(--day)));
   --glass-ring: color-mix(
     in srgb,
@@ -16,12 +18,30 @@
   --glass-shadow:
     0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass-opacity)),
     0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass_contact-opacity));
+}
+
+.k-glass {
   background: rgb(from var(--color-surface) r g b / var(--glass-alpha));
-  backdrop-filter: blur(var(--size-glass_blur)) saturate(var(--scale-glass_saturate));
+  backdrop-filter: var(--glass-filter);
   box-shadow:
     inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--opacity-glass_highlight)),
     inset 0 0 0 var(--stroke-hairline_device_px) var(--glass-ring),
     var(--glass-shadow);
+}
+
+/* A part that turns to glass as it opens out of a control (a select's list): `--glass-rise`, 0 to
+   1, takes it from its own fill, `--glass-from`, to the glass, its edge and shadow coming up with
+   it. It blurs what is behind it only while its owner sets `--glass-blur` to `--glass-filter`, open,
+   so a shut control costs no blur. */
+.k-glass-rise {
+  --glass-rise-by: var(--glass-rise, 0);
+  background: color-mix(in srgb, var(--glass-from), rgb(from var(--color-surface) r g b / var(--glass-alpha)) calc(var(--glass-rise-by) * 100%));
+  backdrop-filter: var(--glass-blur, none);
+  box-shadow:
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / calc(var(--opacity-glass_highlight) * var(--glass-rise-by))),
+    inset 0 0 0 var(--stroke-hairline_device_px) color-mix(in srgb, var(--glass-ring), transparent calc((1 - var(--glass-rise-by)) * 100%)),
+    0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-glass-opacity) * var(--glass-rise-by))),
+    0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-glass_contact-opacity) * var(--glass-rise-by)));
 }
 
 /* Glass flush with the screen's edges, the Bar layout's band: an edge of its own would draw a line

@@ -4,8 +4,8 @@
 // its name in `label`, a hint's type and no larger than a small button's label, the body in `small`
 // and `on_surface_variant` `space.s4` under it, and what it holds `space.s8` below (its keys, as
 // `KeyHints`). The name's own key stands on the name's line. The card is a popover as wide as its
-// words, `size.tooltip` at most: `surface_container`, the control radius, `space.s8` inside above
-// and below and `space.s12` at the sides, raised to the ladder's top step, a tooltip's
+// words, `size.tooltip` at most: the shell's glass at the control radius, `space.s8` inside above
+// and below and `space.s12` at the sides, on the ladder's top step, a tooltip's
 // (`lib/elevation.ts`).
 //
 // It isn't neon: no line, no glow and no states of its own. It floats `space.s8` above its control,
@@ -19,7 +19,8 @@
 // A card can answer a press instead of a light (`floatingTooltip`'s `shows: "pressed"`): a press shows
 // it for two holds, then it goes, and the next press starts it again.
 
-import { raise, type Step } from "./elevation.ts";
+import type { Step } from "./elevation.ts";
+import { glass } from "./glass.ts";
 import { keycap, keys } from "./keycap.ts";
 import { row, stack } from "./layout.ts";
 import { probe } from "./probe.ts";
@@ -32,12 +33,15 @@ import { settings } from "../site/settings.ts";
 const MENU_AHEAD = "menu.md: a menu's popover is 4 inside, its items' symbols 16, 8 from their words";
 
 /**
- * `content` on a popover `size.menu` wide, raised to `step`, at the control radius: `space.s4`
- * inside round a menu, `space.s12` round anything else. `kubaos-ui`'s `menu::popover`.
+ * `content` on a popover `size.menu` wide, on the shell's glass at the control radius: `space.s4`
+ * inside round a menu, `space.s12` round anything else. `step` is where it stands on the ladder,
+ * which orders what floats over what; the glass draws every step alike. `kubaos-ui`'s
+ * `menu::popover`.
  */
 export function popover(step: Step, ...content: Element[]): HTMLElement {
-  const card = raise(document.createElement("span"), step);
+  const card = glass(document.createElement("span"));
   card.classList.add("k-popover");
+  card.dataset.step = String(step);
   card.append(...content);
   // A menu's popover and its items are drawn as `docs/design/components/menu.md` has them, which
   // `kubaos-ui`'s haven't caught up with yet.

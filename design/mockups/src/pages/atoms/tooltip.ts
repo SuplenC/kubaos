@@ -130,7 +130,7 @@ export default page({
       {
         name: "Shows",
         what: "It fades in over `short` on `standard` with its control, where it will stay; it never flickers.",
-        tracks: [{ part: "card", on: "the tooltip", target: ".k-tooltip", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+        tracks: [{ part: "card", on: "the tooltip", target: ".k-tooltip", property: "--tooltip-shown", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "cuts",
         sample: () => card(),
@@ -140,7 +140,7 @@ export default page({
       {
         name: "Hides",
         what: "It fades out over `short` on `standard`, where it is.",
-        tracks: [{ part: "card", on: "the tooltip", target: ".k-tooltip", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }],
+        tracks: [{ part: "card", on: "the tooltip", target: ".k-tooltip", property: "--tooltip-shown", from: 1, to: 0, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "cuts",
         sample: () => card(),

@@ -1625,7 +1625,7 @@
    in (`--rim-tone`): `on_surface` on a surface's fill, `surface` on the inverse one (a toast),
    where `on_surface` would be the fill itself. Its fill is its day role (`--fill`) by day and the
    role above it (`--fill-night`) at night, where `--elevation-lighter` is 1. A part that rises as
-   it opens (a select) names how far it is up as `--raised`, 0 to 1, which its shadow and rim come
+   it moves (a tucked notification) names how far it is up as `--raised`, 0 to 1, which its shadow and rim come
    up with. */
 .k-raised {
   --raised-by: var(--raised, 1);
@@ -1664,8 +1664,8 @@
   --ambient-blur: var(--elevation-4-ambient-blur);
 }
 
-/* A popover (`lib/tooltip.ts`): `size.menu` wide, at the control radius, raised on
-   `surface_container` (`surface_container_high` at night). Holding words it is `space.s12` inside;
+/* A popover (`lib/tooltip.ts`): `size.menu` wide, on the shell's glass (`glass.css`) at the control
+   radius. Holding words it is `space.s12` inside;
    holding a menu, `space.s4`, as a select's open list is, so the items' corners run parallel to its
    own and their words still start `space.s12` from its edge. */
 .k-popover {
@@ -1675,8 +1675,6 @@
   width: var(--popover-width, var(--size-menu));
   padding: var(--space-s12);
   border-radius: var(--radius-control);
-  --fill: var(--color-surface_container);
-  --fill-night: var(--color-surface_container_high);
 }
 
 /* A tooltip's popover: a small card, as wide as its words and `size.tooltip` at most, so a short
@@ -1734,22 +1732,33 @@
 }
 
 /* A tooltip's card over its control: shown while the control is lit, fading in and out over
-   `short`, never flickering; the pointer never takes it. */
+   `short`, never flickering; the pointer never takes it. The card fades, not the tooltip holding
+   it: a glass under an ancestor with an opacity would blur nothing behind it. */
+@property --tooltip-shown {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
 .k-tooltip {
   display: block;
   flex: none;
 }
 
+.k-tooltip > .k-popover {
+  opacity: var(--tooltip-shown);
+}
+
 .k-tip-room > .k-tooltip {
   pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
+  --tooltip-shown: 0;
+  transition: --tooltip-shown var(--motion-short) var(--easing-standard);
 }
 
 /* Over a disabled control it still shows under the pointer, so the control still says what it does. */
 .k-tip-room:has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
 .k-tip-room > .k-tooltip[data-shown] {
-  opacity: 1;
+  --tooltip-shown: 1;
 }
 
 .k-tip-room:has(> .k-control[data-pinned]) > .k-tooltip,
@@ -1772,8 +1781,8 @@
   top: calc(100% + var(--space-s8));
   left: 0;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
+  --tooltip-shown: 0;
+  transition: --tooltip-shown var(--motion-short) var(--easing-standard);
 }
 
 .k-tip-anchor > .k-tooltip[data-side="above"] {
@@ -1788,7 +1797,7 @@
 
 .k-tip-anchor:not([data-shows="pressed"]):has(> .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip,
 .k-tip-anchor > .k-tooltip[data-shown] {
-  opacity: 1;
+  --tooltip-shown: 1;
 }
 
 /* A term's card (`termed` in `lib/tooltip.ts`): beside its sentence in the layout, drawn over the
@@ -1816,13 +1825,13 @@
   bottom: round(nearest, calc(anchor(top) + var(--space-s8)), 1px);
   left: round(nearest, anchor(left), 1px);
   pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
+  --tooltip-shown: 0;
+  transition: --tooltip-shown var(--motion-short) var(--easing-standard);
 }
 
 .k-term-room:has(.k-term:is(:hover, :focus-visible)) > .k-tooltip,
 .k-term-room > .k-tooltip[data-shown] {
-  opacity: 1;
+  --tooltip-shown: 1;
 }
 
 .k-tip-anchor:has(> .k-control[data-pinned]) > .k-tooltip,
@@ -1838,7 +1847,7 @@
 }
 
 .k-tip-anchor:has(> .k-select-room:not([data-open]) > .k-control:is(:hover, :focus-visible, [data-pinned])) > .k-tooltip {
-  opacity: 1;
+  --tooltip-shown: 1;
 }
 
 .k-tip-anchor:has(> .k-select-room > .k-control[data-pinned]) > .k-tooltip {
@@ -2577,8 +2586,8 @@
   bottom: calc(100% + var(--space-s8));
   left: 0;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
+  --tooltip-shown: 0;
+  transition: --tooltip-shown var(--motion-short) var(--easing-standard);
 }
 
 .k-tab > .k-tooltip[data-held="end"] {
@@ -2588,7 +2597,7 @@
 
 .k-tab:is(:hover, :focus-visible, [data-pinned]) > .k-tooltip,
 .k-tab > .k-tooltip[data-shown] {
-  opacity: 1;
+  --tooltip-shown: 1;
 }
 
 .k-tab[data-pinned] > .k-tooltip,
@@ -2984,9 +2993,9 @@
    `surface_container_high` with a field's sunken edge, `outline` at full. Lit from the keyboard,
    as a field is, its fill rises to the highest container and its tube burns inside its edge.
    Under the pointer the fill alone rises, `opacity.hover` / `opacity.press` of the way, and
-   pressed all the way, with no line and no glow. Open, the same box grows by its list into a surface raised to step 2: the step's
-   shadow and rim, `surface_container_high` by day and the highest container at night; its hairline
-   goes and so does its tube. It grows down from where it is, or up where `data-up` says. */
+   pressed all the way, with no line and no glow. Open, the same box grows by its list into the
+   shell's glass (`glass.css`), its edge and shadow coming up as it opens; its hairline goes and so
+   does its tube. It grows down from where it is, or up where `data-up` says. */
 .k-select {
   position: absolute;
   left: 0;
@@ -2998,11 +3007,9 @@
   border-radius: var(--radius-control);
   outline: none;
   cursor: pointer;
-  --raised: var(--select-open);
+  --glass-rise: var(--select-open);
   --rest-fill: var(--color-surface_container_high);
-  --shut-fill: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(max(var(--lit), var(--rise, 0)) * 100%));
-  --fill: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_high) calc(var(--select-open) * 100%));
-  --fill-night: color-mix(in srgb, var(--shut-fill), var(--color-surface_container_highest) calc(var(--select-open) * 100%));
+  --glass-from: color-mix(in srgb, var(--rest-fill), var(--color-surface_container_highest) calc(max(var(--lit), var(--rise, 0)) * 100%));
   --sunken-tone: var(--color-outline);
   --sunken-strength: 1;
   --edge-line: var(--sunken-line);
@@ -3013,6 +3020,10 @@
 .k-select-room[data-up] > .k-select {
   top: auto;
   bottom: 0;
+}
+
+.k-select-room:is([data-open], [data-folding], [data-shown]) > .k-select {
+  --glass-blur: var(--glass-filter);
 }
 
 /* Open or folding, a live select's surface is in the top layer, fixed over its room where
@@ -3664,10 +3675,9 @@
   initial-value: 0;
 }
 
-/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the content radius, raised
-   to the ladder's step 3: `surface_container_high` by day, the highest container at night, the
-   step's shadow and the rim. A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
-   rim. It is at least `aspect.dialog` of its width tall, on the grid, and at most its room less
+/* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the content radius, on the
+   shell's glass (`glass.css`). A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
+   glass's ring. It is at least `aspect.dialog` of its width tall, on the grid, and at most its room less
    `space.s48` above and below. It arrives rising `space.s16` into place a whole device pixel at a
    time (`--dialog-rise`). */
 .k-dialog {
@@ -3681,8 +3691,6 @@
   max-height: calc(100% - 2 * var(--space-s48));
   padding: var(--space-s24);
   border-radius: var(--radius-content);
-  --fill: var(--color-surface_container_high);
-  --fill-night: var(--color-surface_container_highest);
   translate: 0 round(nearest, calc(var(--dialog-rise) * var(--space-s16)), 1px);
 }
 
