@@ -435,8 +435,11 @@ fn an_app_with_no_icon_is_refused_naming_how_to_draw_one() {
 }
 
 #[test]
-fn a_symbol_in_place_of_an_icon_is_refused() {
-    let symbol = parse(&ABOUT.replace("icon = \"sketch\"", "symbol = \"gauge\""));
+fn a_symbol_beside_the_icon_is_an_unknown_key() {
+    let symbol = parse(&format!("{ABOUT}symbol = \"gauge\"\n"));
 
-    assert!(symbol.is_err(), "{symbol:?}");
+    assert!(
+        matches!(&symbol, Err(FolderError::Parse(e)) if e.to_string().contains("unknown field `symbol`")),
+        "{symbol:?}"
+    );
 }

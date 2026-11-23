@@ -16,8 +16,8 @@ Item {
     property var entry: null
     readonly property bool runs: (entry?.unavailable ?? "") === ""
     readonly property string iconSource: Words.iconSource(entry?.icon ?? "", name => Quickshell.iconPath(name, true))
-    // The symbol the row's tile draws; none for an app shown by its initial.
-    readonly property string glyph: Words.tileGlyph(entry?.icon ?? "", entry?.extension ?? "")
+    // The symbol the row's tile draws; none for a desktop app, shown by its initial.
+    readonly property string glyph: Words.tileGlyph(entry?.extension ?? "")
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property real dim: content.runs ? 1 : K.Tokens.opacity.disabled_content
 
@@ -26,9 +26,9 @@ Item {
 
         width: content.width
 
-        // A page's one big mark, in the row's order: the app's picture once it has loaded, else
-        // the symbol its icon names, else its Extension's. An app that names none shows its
-        // initial on the lg tile, its row's tile at the pane's size, while its picture loads too.
+        // A page's one big mark, in the row's order: the Item's picture once it has loaded, else
+        // its Extension's symbol. A desktop app shows its initial on the lg tile instead, its
+        // row's tile at the pane's size, while its picture loads too.
         Item {
             width: K.Tokens.icon.s48
             height: K.Tokens.icon.s48
@@ -60,7 +60,7 @@ Item {
                     objectName: "initialTile"
                     size: "Lg"
                     icon: ""
-                    name: Words.rowName(content.entry?.icon ?? "", content.entry?.title ?? "")
+                    name: content.entry?.title ?? ""
                     opacity: content.dim
                 }
             }

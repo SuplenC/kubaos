@@ -18,6 +18,7 @@ Run it through `just app-icon`, in the flake's `branding` shell, which has fontT
 M PLUS 1 in `MPLUS1_DIR`. It overwrites the app's icon file; the header records the command,
 so the file can be drawn again."""
 import os
+import re
 import sys
 import tomllib
 import unicodedata
@@ -57,6 +58,7 @@ TILE = "#4d4d4d"
 INK = "#f2f2f2"
 
 SYMBOLS_DIR = os.path.join(REPO, "crates/kubaos-ui/assets/symbols")
+MAKE_SYMBOLS = os.path.join(REPO, "crates/kubaos-ui/assets/make-symbols.sh")
 FONTS_DIR = os.path.join(REPO, "crates/kubaos-ui/assets/fonts")
 WEIGHT_FILE = {"regular": "Regular", "medium": "Medium", "semibold": "SemiBold"}
 
@@ -76,6 +78,13 @@ def symbol_name(tabler):
         if symbol.get("tabler") == tabler:
             return name
     fail(f"{tabler!r} is not the Tabler name of one of KubaOS Symbols (design/tokens.toml, [symbols])")
+
+
+def tabler_version():
+    """The @tabler/icons release the symbols are pinned to: the one `make-symbols.sh` fetches."""
+    with open(MAKE_SYMBOLS) as f:
+        pin = re.search(r"@tabler/icons/-/icons-([0-9][0-9.]*)\.tgz", f.read())
+    return pin.group(1) if pin else fail(f"no @tabler/icons release in {MAKE_SYMBOLS}")
 
 
 def symbol_paths(tabler):
@@ -188,7 +197,7 @@ def icon(glyph, tile):
 def draw(name, tabler=None, tile=TILE, ink=INK):
     """The icon's SVG body for an app called `name`, and what its glyph is, for the header."""
     if tabler:
-        return icon(symbol_glyph(tabler, ink), tile), f"Tabler's {tabler} (@tabler/icons 3.49.0, MIT)"
+        return icon(symbol_glyph(tabler, ink), tile), f"Tabler's {tabler} (@tabler/icons {tabler_version()}, MIT)"
     letter = initial(name)
     if not letter:
         fail(f"{name!r} has no letter to draw")
