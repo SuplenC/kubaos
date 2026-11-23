@@ -1,8 +1,11 @@
 // The Desktop page: the screen with no frame round it (`config/quickshell/modules/frame/Frame.qml`
 // draws today's frame). The bar lies on the glass in one of three layouts, a setting: Bar, a band
 // touching the top edge; Floating, one strip `size.gap` from the edges; Islands, a strip per group.
-// Each panel is a detached card under the item that opens it, and the desktop never dims.
+// Each panel is a detached card under the item that opens it, and the desktop never dims. A window
+// maximised keeps `size.gap` from the bar and the screen's edges in every layout; a window full
+// screen is the whole screen, the bar hidden until the pointer touches the top edge.
 
+import "./frame.css";
 import { type BarLayout, BAR_LAYOUTS, twins } from "../../lib/sheet.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { powerMoves } from "../../site/moves.ts";
@@ -10,8 +13,12 @@ import { WINDOWS, windowSize } from "../../site/settings.ts";
 import { controlCenter, notifications, system } from "../templates/panels.ts";
 import { audioPanel } from "./audio-parts.ts";
 import { barScreen, logicalWidth } from "./bar-parts.ts";
+import { deskWindow, FIREFOX, tiling } from "./sharing-parts.ts";
 
 type State = "rest" | "open";
+
+/** One window on the desktop: maximised, tiled alone; or full screen, the bar hidden. */
+type Shown = "maximised" | "full";
 
 const LAPTOP = WINDOWS[2]!;
 const LAYOUT_NAMES = ["Bar", "Floating", "Islands"] as const;
@@ -24,6 +31,33 @@ interface DesktopOptions {
   readonly open?: number;
   /** Its buttons open, swap and close the cards. */
   readonly live?: boolean;
+  /** One window on it, maximised or full screen. */
+  readonly window?: Shown;
+  /** Full screen, the bar slid back in, as the pointer on the top edge has it. */
+  readonly peek?: boolean;
+}
+
+/**
+ * The one window, under the bar and the cards: tiled alone `size.gap` from the bar and the edges,
+ * or the whole screen. Full screen, the pointer touching the top edge slides the bar back in, and
+ * leaving the bar slides it out.
+ */
+function withWindow(room: HTMLElement, shown: Shown, peek: boolean, live: boolean): void {
+  const full = shown === "full";
+  const desk = tiling(document.createElement("span"), 1, 1);
+  desk.append(deskWindow({ app: FIREFOX, title: FIREFOX.titles[0]!, column: "1", row: "1", focused: true, full }));
+  room.querySelector(".k-screen-wallpaper")!.after(desk);
+  if (!full) return;
+  room.dataset.full = "";
+  room.toggleAttribute("data-peek", peek);
+  if (!live) return;
+  const edge = document.createElement("span");
+  edge.className = "desktop-edge";
+  edge.addEventListener("pointerenter", () => room.toggleAttribute("data-peek", true));
+  room.querySelector(".k-screen-over")!.append(edge);
+  room.querySelector(".k-bar")!.addEventListener("pointerleave", (event) => {
+    if ((event as PointerEvent).relatedTarget !== edge) room.toggleAttribute("data-peek", false);
+  });
 }
 
 /** The desktop in `layout`, the cards of the bar's four panel items on it, one open or none. */
@@ -42,6 +76,7 @@ function desktop(options: DesktopOptions = {}): HTMLElement {
     requestAnimationFrame(() => set.toggle(shown));
   }
   if (options.live) items.forEach((item, index) => item.addEventListener("click", () => set.toggle(index)));
+  if (options.window) withWindow(room.element, options.window, options.peek ?? false, options.live ?? false);
   return room.element;
 }
 
@@ -55,6 +90,26 @@ const OPENS: Move = {
   back: "cuts",
   sample: () => desktop({ open: 0 }),
 };
+
+const PEEKS: Move = {
+  name: "The bar, full screen",
+  what: "The pointer on the top edge: the bar slides in over the window.",
+  tracks: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
+  reduced: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
+  back: "cuts",
+  sample: () => desktop({ window: "full" }),
+};
+
+const HIDES: Move = {
+  name: "The bar hides again",
+  what: "The pointer leaves the bar: it slides out above the screen.",
+  tracks: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
+  reduced: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
+  back: "cuts",
+  sample: () => desktop({ window: "full", peek: true }),
+};
+
+const WINDOWS_SHOWN: readonly (Shown | undefined)[] = [undefined, "maximised", "full"];
 
 const CLOSES: Move = {
   name: "A card closes",
@@ -74,10 +129,16 @@ export default page<State>({
   stage: {
     live: () => desktop({ live: true }),
     switches: {
-      each: [{ label: "Bar layout", choices: ["Bar", "Floating", "Islands"] }],
-      live: ([layout]) => desktop({ layout: BAR_LAYOUTS[layout ?? 0]!, live: true }),
+      each: [
+        { label: "Bar layout", choices: ["Bar", "Floating", "Islands"] },
+        { label: "Window", choices: ["None", "Maximised", "Full screen"] },
+      ],
+      live: ([layout, shown]) => {
+        const window = WINDOWS_SHOWN[shown ?? 0];
+        return desktop({ layout: BAR_LAYOUTS[layout ?? 0]!, live: true, ...(window ? { window } : {}) });
+      },
     },
-    hint: "click the monitor, audio, bell or status",
+    hint: "click the monitor, audio, bell or status; full screen, the top edge",
     daylight: true,
   },
   variants: [
@@ -90,6 +151,21 @@ export default page<State>({
       name: `${LAYOUT_NAMES[index]!}, a card open`,
       for: "`size.gap` under the bar, under its item",
       sample: () => desktop({ layout, open: 1 }),
+    })),
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: `${LAYOUT_NAMES[index]!}, maximised`,
+      for: "`size.gap` from the bar and the edges",
+      sample: () => desktop({ layout, window: "maximised" }),
+    })),
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: `${LAYOUT_NAMES[index]!}, full screen`,
+      for: "the whole screen, the bar hidden",
+      sample: () => desktop({ layout, window: "full" }),
+    })),
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: `${LAYOUT_NAMES[index]!}, full screen, top edge`,
+      for: "the bar slid in over the window",
+      sample: () => desktop({ layout, window: "full", peek: true }),
     })),
   ],
   sizes: doesntApply("its gaps are tokens at every screen size: the reflow shows them."),
@@ -119,20 +195,28 @@ export default page<State>({
   motion: {
     arrives: [OPENS],
     leaves: [CLOSES],
-    between: powerMoves(() => desktop({ open: 0 })),
+    between: [PEEKS, HIDES, ...powerMoves(() => desktop({ open: 0 }))],
   },
   keyboard: {
-    keys: [{ keys: ["Esc"], does: "closes the open card" }],
+    keys: [
+      { keys: ["Esc"], does: "closes the open card" },
+      { keys: ["Super+F"], does: "the window full screen, and back" },
+      { keys: ["Super+Alt+F"], does: "the window maximised, and back" },
+    ],
     order: "The desktop takes no Tab; an open card holds the keyboard on its screen.",
     lands: "A card closing gives the keyboard back to the window.",
   },
   measures: {
-    samples: nonEmpty(BAR_LAYOUTS.map((layout, index) => ({ name: LAYOUT_NAMES[index]!, for: "the bar and a card under it", sample: () => desktop({ layout, open: 1 }) }))),
+    samples: nonEmpty([
+      ...BAR_LAYOUTS.map((layout, index) => ({ name: LAYOUT_NAMES[index]!, for: "the bar and a card under it", sample: () => desktop({ layout, open: 1 }) })),
+      ...BAR_LAYOUTS.map((layout, index) => ({ name: `${LAYOUT_NAMES[index]!}, maximised`, for: "the window's gaps", sample: () => desktop({ layout, window: "maximised" }) })),
+    ]),
     measures: [
       { part: "Band, the Bar layout", token: "size-bar" },
       { part: "A strip", token: "size-bar_strip" },
       { part: "The items' row", token: "size-bar_row" },
       { part: "Every gap", token: "size-gap" },
+      { part: "A window's corner", token: "radius-surface" },
       { part: "A card's corners", token: "radius-card" },
       { part: "Glass shadow's drop", token: "shadow-glass-y" },
       { part: "Glass shadow's blur", token: "shadow-glass-blur" },

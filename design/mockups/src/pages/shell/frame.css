@@ -1,0 +1,37 @@
+/* The Desktop page's windows (`frame.ts`): one window maximised, tiled alone `size.gap` from the
+   bar and the screen's edges in every layout; or full screen, the whole screen, the bar hidden. */
+
+/* How far a full screen's bar has slid back in: out above the screen (0) to its place (1). */
+@property --desktop-peek {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A window full screen: the whole screen, no gap round it. */
+.k-screen[data-full] > .share-desk {
+  inset: 0;
+}
+
+/* Full screen, the bar is out above the screen, by its reach and its shadow's drop and blur so
+   nothing of it shows. While the pointer touches the top edge it slides back in over the window,
+   which keeps its full size, over `medium` on `emphasized_decel`; the pointer leaving it, it slides
+   out again over `medium` on `emphasized_accel`. */
+.k-screen[data-full] .k-bar {
+  translate: 0 round(nearest, calc(-1 * (var(--bar-reach) + var(--shadow-glass-y) + var(--shadow-glass-blur)) * (1 - var(--desktop-peek))), 1px);
+  transition: --desktop-peek var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-screen[data-full][data-peek] .k-bar {
+  --desktop-peek: 1;
+  transition: --desktop-peek var(--motion-medium) var(--easing-emphasized_decel);
+}
+
+/* The top edge the pointer touches to call the bar back: the screen's top row of device pixels. */
+.desktop-edge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--stroke-hairline_device_px);
+}

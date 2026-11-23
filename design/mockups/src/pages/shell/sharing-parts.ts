@@ -385,6 +385,8 @@ export interface DeskWindowOptions extends Placed {
   readonly focused?: boolean;
   /** It is shared, or lit while picking: its border violet, its tube violet while it is focused. */
   readonly shared?: boolean;
+  /** Full screen: it is the whole screen, its corners square as the screen's. */
+  readonly full?: boolean;
 }
 
 /**
@@ -397,7 +399,7 @@ export interface DeskWindowOptions extends Placed {
 const windowCorner = () => role("surface");
 
 export function deskWindow(options: DeskWindowOptions): HTMLElement {
-  const corner = windowCorner();
+  const corner = options.full ? { css: "0px" } : windowCorner();
   const drawn = document.createElement("span");
   drawn.className = "share-window";
   drawn.style.setProperty("--corner", corner.css);
