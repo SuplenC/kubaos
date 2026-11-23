@@ -494,12 +494,13 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   }
 
   /**
-   * A number's light, over it: the same numeral in the shown one's style, `primary` (an urgent
-   * one's `error`), with its glow by night. It shows as far as the cell is lit.
+   * A number's light, over it: the same numeral, `primary` (an urgent one's `error`), with its glow
+   * by night; a digit a size up and heavier, `button`, so where you are reads before its colour
+   * does. It shows as far as the cell is lit, the unlit numeral fading under it.
    */
   function litNumber(entry: Entry): HTMLElement {
     const urgent = entry.workspace === options.urgent;
-    const lit = text(numberText(entry.workspace, kanji), numberStyle(true, kanji), urgent ? "error" : "primary");
+    const lit = text(numberText(entry.workspace, kanji), kanji ? "accent" : "button", urgent ? "error" : "primary");
     lit.classList.add("shell-ws-lit-number");
     return lit;
   }
