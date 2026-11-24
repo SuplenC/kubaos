@@ -6,15 +6,18 @@
 import { number } from "../../../lib/tokens.ts";
 import type { Mode } from "../../../site/settings.ts";
 
-/** The glass setting's stops, a percent each, from `opacity.glass_floor` to fully opaque. */
-export function glassSteps(): number[] {
-  const floor = Math.round(number("opacity-glass_floor") * 100);
+/**
+ * The glass setting's stops, a percent each, from its floor to fully opaque: `opacity.glass_floor`
+ * by night, `opacity.glass_floor_day` by day.
+ */
+export function glassSteps(byDay: boolean): number[] {
+  const floor = Math.round(number(byDay ? "opacity-glass_floor_day" : "opacity-glass_floor") * 100);
   return Array.from({ length: 101 - floor }, (_, i) => floor + i);
 }
 
-/** The stop of `glassSteps()` an opacity token names. */
+/** The stop of the night's or the day's `glassSteps()` an opacity token names. */
 function glassStop(token: "glass" | "glass_day"): number {
-  return glassSteps().indexOf(Math.round(number(`opacity-${token}`) * 100));
+  return glassSteps(token === "glass_day").indexOf(Math.round(number(`opacity-${token}`) * 100));
 }
 
 /** Every value a window shows, as it opens: KubaOS's defaults. */
@@ -26,7 +29,7 @@ export interface Values {
   drawn: Mode;
   dayWallpaper: number;
   wallpaperMotion: number;
-  /** Glass opacity's stop by night and by day, of `glassSteps()`. */
+  /** Glass opacity's stop by night and by day, each of its own `glassSteps()`. */
   glass: [number, number];
   accentFrom: number;
   preset: number;

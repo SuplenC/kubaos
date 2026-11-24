@@ -35,7 +35,7 @@ const UNBUILT: Variant[] = settingsOf(appearance(defaults()))
 
 /** The glass setting at `percent` by night, the day's at its default. */
 function glassAt(percent: number): [number, number] {
-  return [glassSteps().indexOf(percent), D.glass[1]];
+  return [glassSteps(false).indexOf(percent), D.glass[1]];
 }
 
 const NEON = { dark: { theme: "neon", mode: "dark" as const }, light: { theme: "neon", mode: "light" as const } };

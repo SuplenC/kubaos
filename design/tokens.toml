@@ -951,10 +951,13 @@ frame_blur = 0.85
 glass = 0.80
 # The glass of the shell, one material for the bar, its cards, toasts, the Command menu, small
 # popups and the shell's windows: `surface` at the glass setting over the compositor's blur. The
-# setting runs from `glass_floor` to full, one value for every glass surface; `glass` is its value
-# by night and `glass_day` by day. The floor is the least at which body text keeps 4.5:1 over white.
+# setting runs from its floor to full, one value for every glass surface; `glass` is its value by
+# night and `glass_day` by day. By night the floor is `glass_floor`, the least at which body text
+# keeps 4.5:1 over white; by day it is `glass_floor_day`, the least at which the accent's labels keep
+# their contrast over a dark wallpaper.
 glass_day = 0.90
 glass_floor = 0.73
+glass_floor_day = 0.80
 # The glass's edge by night: a 1 px highlight inside its top edge, `on_surface` at
 # `glass_highlight`, and a 1 px ring inside its whole edge, `on_surface` at `glass_ring`. By day the
 # ring is the soft hairline, `outline_variant` at `outline_soft`.
