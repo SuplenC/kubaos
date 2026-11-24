@@ -15,6 +15,8 @@
 #   - failed (a vendor renamed its file, an unversioned URL serves a new file): the issue titled
 #     "Apps bump: ID needs a hand" opens, or its text follows the newest failure.
 #   - current: an open issue of the app closes, with a comment.
+#   - a feed down (a WARN row: kubaos-apps-verify passes, writing nothing): the app and its issue
+#     stay as they are, for the next run.
 # An app that needs a hand is its issue, not a failed run: the run fails only when a step of its own
 # does. --dry-run prints each step and pushes, opens and closes nothing.
 set -euo pipefail
@@ -96,6 +98,11 @@ for id in "${ids[@]}"; do
     else
       run gh issue create --title "$issue_title" --body "$body"
     fi
+    continue
+  fi
+
+  if grep -q '^kubaos-apps-verify: [0-9]* warned' <<<"$table"; then
+    echo "   a feed was down; $id waits for the next run"
     continue
   fi
 

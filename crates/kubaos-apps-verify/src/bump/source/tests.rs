@@ -9,12 +9,16 @@ use super::Tag;
 use super::helm_download;
 use super::helm_sha256;
 use super::helm_signature;
+use super::json;
 use super::newest_android_studio;
 use super::newest_file;
 use super::newest_proton_pass;
 use super::newest_tag;
 use super::percent_decoded;
 use crate::apt;
+use crate::check::Outcome;
+use crate::stub::Reply;
+use crate::stub::Stub;
 
 #[test]
 fn a_release_download_reads_as_its_repository_tag_and_file() {
@@ -243,4 +247,16 @@ fn helms_signature_is_the_releases_asset_beside_the_checksum() {
         helm_signature(&releases, "4.5.0", "helm-v4.5.0-linux-amd64.tar.gz"),
         None
     );
+}
+
+#[test]
+fn a_feed_that_doesnt_read_fails_and_one_that_is_down_warns() {
+    let garbled = Stub::always(Reply::Body(b"<html>maintenance</html>".to_vec()));
+    let down = Stub::always(Reply::Status(502));
+
+    let unread = json(&garbled.url("/version.json")).unwrap_err();
+    let outage = json(&down.url("/version.json")).unwrap_err();
+
+    assert_eq!(unread.outcome, Outcome::Error);
+    assert_eq!(outage.outcome, Outcome::Warning);
 }

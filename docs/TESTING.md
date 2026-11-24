@@ -269,7 +269,7 @@ The runner's disk has 86 GB free at the start, so no job deletes the image's pre
 
 ## The Apps catalog against its upstreams
 
-`just apps-verify [ID…]` (`crates/kubaos-apps-verify`) holds every app named, or every app, to its upstreams, and prints a table: one row per check, `ok`, `note` (nothing to hold the pin to, such as a vendor that publishes no digest, or a web app on this machine), `MISMATCH` or `ERROR` (a check that couldn't run). It exits 1 on a mismatch or an error, 2 on a usage error. `just apps-verify --changed origin/main` checks the apps a branch changed: their folders, and the apps of a vendor repository whose pin or sources file changed. Per app, every action in every setup:
+`just apps-verify [ID…]` (`crates/kubaos-apps-verify`) holds every app named, or every app, to its upstreams, and prints a table: one row per check, `ok`, `note` (nothing to hold the pin to, such as a vendor that publishes no digest, or a web app on this machine), `WARN` (an upstream that was down), `MISMATCH` or `ERROR` (a check that couldn't run, or an answer that is wrong for the pin). It exits 1 on a mismatch or an error, 2 on a usage error. `just apps-verify --changed origin/main` checks the apps a branch changed: their folders, and the apps of a vendor repository whose pin or sources file changed. Per app, every action in every setup:
 
 | Action | Checks |
 |---|---|
@@ -282,11 +282,23 @@ The runner's disk has 86 GB free at the start, so no job deletes the image's pre
 
 The other actions (`file`, `symlink`, `setting`, `unit`, `group`, `linger`, `architecture`, `output`, `run`) pin nothing upstream; the catalog's own tests (`cargo test -p kubaos-core apps`) hold their shapes.
 
+An outside service being down says nothing about the catalog, so it warns and the run passes; anything that shows the catalog wrong fails:
+
+| Warns: the service was down | Fails: the catalog is wrong, or the check can't tell |
+|---|---|
+| HTTP 5xx or 429 (a web app's 5xx too, unless it is Cloudflare's challenge) | a sha256 that isn't the pin, as served or as the vendor publishes it |
+| a redirect loop, or too many redirects | a key that isn't the pinned fingerprint, a release file whose signature doesn't verify with the pinned keys, a missing key (HTTP 404) or one gpg can't read |
+| a timeout, a name that doesn't resolve, a refused or broken connection, no answer, a failed TLS handshake | a missing package candidate, or one that isn't one of the app's versions |
+| | any other HTTP error on a pinned URL, a 404 or 410 among them; a web app that answers one |
+| | a feed that doesn't read, or names no release or no file for the pin; Helm's checksum without a good signature by its pinned keys |
+
+Each fetch is tried 7 times while it looks down, waiting 1, 2, 4, 8, 16 and 32 seconds between, before it counts as an outage; an answer that is wrong for the pin is not tried again. Every warning is a `WARN` row naming the app, the URL and what failed, and in GitHub Actions also a `::warning::` annotation on the run's summary, so an outage that lasts stays in sight. curl's exit code and the HTTP status tell the two apart (`crates/kubaos-apps-verify/src/fetch.rs`), and the crate's tests hold each kind to its class against a stub server on loopback, never the network. A `nix eval` that fails, nixpkgs unreachable among its causes, is an error.
+
 It reads the network only: it never installs anything and reads no apt, dpkg or gpg state of the machine's (keys are checked in a gpg home of their own, in a temporary folder). `GITHUB_TOKEN`, when set, lifts GitHub's limit of 60 release lookups an hour; it goes to curl on its stdin. The dev shell has the gpg and curl it runs. Over the whole catalog it takes several minutes, most of it downloading the pinned `.deb`s and downloads.
 
 ### Moving pins on: the Apps bump
 
-`just apps-verify --bump [ID…]` checks nothing: it moves each pinned `deb` and `download` of the apps named, or of every app, on to its vendor's newest release, and writes the new `version`, URLs and sha256s into the app's `app.toml` in place, its comments kept. It prints a table with a row an action, `ok` (current), `moved` (old → new), `note` (no feed knows its newest release) or `ERROR`, and exits 1 on an error. An app is written only when none of its pins failed, and an action's architectures move to one version or not at all.
+`just apps-verify --bump [ID…]` checks nothing: it moves each pinned `deb` and `download` of the apps named, or of every app, on to its vendor's newest release, and writes the new `version`, URLs and sha256s into the app's `app.toml` in place, its comments kept. It prints a table with a row an action, `ok` (current), `moved` (old → new), `note` (no feed knows its newest release), `WARN` (its feed was down, by the same rule as the check) or `ERROR`, and exits 1 on an error. An app is written only when none of its pins failed or warned, and an action's architectures move to one version or not at all. `test/apps-bump/run` leaves an app whose feed was down as it is, its issue included, for the next day's run.
 
 | Pin | Newest release from |
 |---|---|

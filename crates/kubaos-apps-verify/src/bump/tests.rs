@@ -4,8 +4,12 @@ use super::Found;
 use super::Step;
 use super::actions;
 use super::agree;
+use super::app;
 use super::pins;
 use super::write;
+use crate::check::Outcome;
+use crate::stub::Reply;
+use crate::stub::Stub;
 
 const APP: &str = r#"# The app's own comment stays.
 name = "T3 Code"
@@ -131,4 +135,43 @@ fn every_architecture_current_is_current() {
     let step = agree("0.1.9", &[("amd64", Found::Current), ("arm64", Found::Current)]);
 
     assert_eq!(step, Step::Current("0.1.9".into()));
+}
+
+/// A catalog of one app, `tool`, with one download at `url` whose version the URL doesn't name.
+fn unversioned_app(url: &str) -> (tempfile::TempDir, String) {
+    let catalog = tempfile::tempdir().unwrap();
+    let text = format!(
+        "name = \"Tool\"\n\n[[action]]\nname = \"Download it\"\nkind = \"download\"\nversion = \"1.0\"\namd64 = {{ url = \"{url}\", sha256 = \"{}\" }}\n",
+        "0".repeat(64)
+    );
+    std::fs::create_dir(catalog.path().join("tool")).unwrap();
+    std::fs::write(catalog.path().join("tool/app.toml"), &text).unwrap();
+    (catalog, text)
+}
+
+#[test]
+fn a_feed_down_on_every_try_is_a_warning_that_passes_and_writes_nothing() {
+    let stub = Stub::always(Reply::Status(503));
+    let (catalog, text) = unversioned_app(&stub.url("/tool-latest.tar.gz"));
+
+    let rows = app(catalog.path(), "tool");
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].outcome, Outcome::Warning, "{}", rows[0].detail);
+    assert_eq!(crate::exit_code(&rows), 0);
+    assert_eq!(
+        std::fs::read_to_string(catalog.path().join("tool/app.toml")).unwrap(),
+        text
+    );
+}
+
+#[test]
+fn a_download_that_serves_another_file_fails() {
+    let stub = Stub::always(Reply::Body(b"new".to_vec()));
+    let (catalog, _) = unversioned_app(&stub.url("/tool-latest.tar.gz"));
+
+    let rows = app(catalog.path(), "tool");
+
+    assert_eq!(rows[0].outcome, Outcome::Error, "{}", rows[0].detail);
+    assert_eq!(crate::exit_code(&rows), 1);
 }

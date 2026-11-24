@@ -16,8 +16,11 @@
 //! source's sha256 as served and as the vendor publishes it; each nixpkgs package at the checkout's
 //! `flake.lock`, for each system the action is for, and its `unfree` mark against nixpkgs'; and a
 //! web app's URL. It prints a table and exits 1 on a mismatch or a check that couldn't run, 2 on a
-//! usage error. It installs nothing and reads no apt, dpkg or gpg state of the machine's: keys are
-//! checked in a gpg home of their own.
+//! usage error. An upstream that is down on every try (an HTTP 5xx or 429, a redirect loop, a
+//! timeout, a name that doesn't resolve, a refused or broken connection, a failed TLS handshake) is
+//! a warning: its row says `WARN`, GitHub Actions shows it as an annotation, and the run passes, as
+//! the catalog may well be right. It installs nothing and reads no apt, dpkg or gpg state of the
+//! machine's: keys are checked in a gpg home of their own.
 //!
 //! `--changed BASE` checks the apps whose folder changed since the merge base with BASE, and the
 //! apps whose vendor repository changed (`system/packages.toml`, a sources file).
@@ -25,8 +28,9 @@
 //! `--bump` checks nothing: it moves each pinned `.deb` and download of the apps named, or of every
 //! app, on to its vendor's newest release, writing the new version, URL and sha256 into the app's
 //! `app.toml`. It exits 1 when a pin's newest release can't be found or has no file for it, as when
-//! a vendor renames its downloads. The daily `Apps bump` workflow runs it and opens a pull request
-//! for each app it moved, whose checks run this check on the app.
+//! a vendor renames its downloads, and warns, writing nothing, when a feed is down. The daily `Apps
+//! bump` workflow runs it and opens a pull request for each app it moved, whose checks run this
+//! check on the app.
 //!
 //! # Owns
 //!
@@ -41,6 +45,8 @@ mod apt;
 mod bump;
 mod check;
 mod fetch;
+#[cfg(test)]
+mod stub;
 
 use std::collections::BTreeSet;
 use std::env;
@@ -56,6 +62,7 @@ use kubaos_core::apps::catalog::CATALOG;
 use kubaos_core::apt::Manifest;
 
 use crate::check::Context;
+use crate::check::Outcome;
 use crate::check::Row;
 use crate::check::chain;
 
@@ -124,18 +131,51 @@ fn main() -> ExitCode {
     match run(&args) {
         Ok(rows) => {
             print!("{}", table(&rows));
+            if env::var_os("GITHUB_ACTIONS").is_some_and(|on| on == "true") {
+                print!("{}", annotations(&rows));
+            }
+            let warned = rows.iter().filter(|row| row.outcome == Outcome::Warning).count();
+            // HAZARD: `test/apps-bump/run` reads this line, so a feed that was down leaves the
+            // app's issue open. Reworded, the run closes it as though the pins were current.
+            if warned > 0 {
+                eprintln!("kubaos-apps-verify: {warned} warned, upstream down");
+            }
             let failed = rows.iter().filter(|row| row.outcome.fails()).count();
             if failed > 0 {
                 eprintln!("kubaos-apps-verify: {failed} failed");
-                return ExitCode::FAILURE;
             }
-            ExitCode::SUCCESS
+            ExitCode::from(exit_code(&rows))
         }
         Err(Usage(e)) => {
             eprintln!("kubaos-apps-verify: {e}");
             ExitCode::from(2)
         }
     }
+}
+
+/// 1 when a row fails, else 0: warnings pass.
+fn exit_code(rows: &[Row]) -> u8 {
+    u8::from(rows.iter().any(|row| row.outcome.fails()))
+}
+
+/// A GitHub Actions `::warning::` line for each warning, so an outage shows on the run's summary
+/// even though the run passes.
+///
+/// <https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-a-warning-message>
+fn annotations(rows: &[Row]) -> String {
+    let mut out = String::new();
+    for row in rows.iter().filter(|row| row.outcome == Outcome::Warning) {
+        let message = format!("{} {} {}: {}", row.app, row.check, row.subject, row.detail);
+        out.push_str("::warning title=Upstream down::");
+        out.push_str(&escape(&message));
+        out.push('\n');
+    }
+    out
+}
+
+/// `text` escaped for a workflow command's message: `%`, CR and LF would end or change it.
+fn escape(text: &str) -> String {
+    text.replace('%', "%25").replace('\r', "%0D").replace('\n', "%0A")
 }
 
 /// An app that isn't the catalog's, or a catalog or manifest that can't be read.

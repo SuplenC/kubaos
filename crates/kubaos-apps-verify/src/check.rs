@@ -27,6 +27,8 @@ use crate::apt;
 use crate::apt::AptError;
 use crate::apt::Sources;
 use crate::fetch;
+use crate::fetch::Class;
+use crate::fetch::FetchError;
 
 /// The architectures KubaOS is built for, as dpkg names them, with Nix's system for each.
 const ARCHES: [(&str, &str); 2] = [("amd64", "x86_64-linux"), ("arm64", "aarch64-linux")];
@@ -46,9 +48,13 @@ pub enum Outcome {
     Note,
     /// `--bump` moved the pin on to a newer release.
     Moved,
+    /// Upstream was down or out of reach on every try, said in the detail; not a failure, since
+    /// the pin may well be right.
+    Warning,
     /// The pin and upstream disagree.
     Mismatch,
-    /// The check couldn't run: upstream unreachable, a signature that doesn't verify.
+    /// The check couldn't run, or upstream's answer is wrong: a missing file, a signature that
+    /// doesn't verify, a feed that doesn't read.
     Error,
 }
 
@@ -58,6 +64,7 @@ impl Outcome {
             Self::Ok => "ok",
             Self::Note => "note",
             Self::Moved => "moved",
+            Self::Warning => "WARN",
             Self::Mismatch => "MISMATCH",
             Self::Error => "ERROR",
         }
@@ -65,6 +72,51 @@ impl Outcome {
 
     pub fn fails(self) -> bool {
         matches!(self, Self::Mismatch | Self::Error)
+    }
+}
+
+/// Why a check reached no verdict, and how its row reports it: a warning for an outage, else an
+/// error.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Problem {
+    pub outcome: Outcome,
+    pub detail: String,
+}
+
+impl Problem {
+    /// A problem that fails the check.
+    pub fn error(detail: impl Into<String>) -> Self {
+        Self {
+            outcome: Outcome::Error,
+            detail: detail.into(),
+        }
+    }
+
+    pub fn fetch(error: &FetchError) -> Self {
+        Self::classed(error, error.class())
+    }
+
+    pub fn apt(error: &AptError) -> Self {
+        Self::classed(error, error.class())
+    }
+
+    fn classed(error: &dyn std::error::Error, class: Class) -> Self {
+        Self {
+            outcome: match class {
+                Class::Outage => Outcome::Warning,
+                Class::Failure => Outcome::Error,
+            },
+            detail: chain(error),
+        }
+    }
+
+    /// The problem with `context` before its detail.
+    #[must_use]
+    pub fn context(self, context: impl std::fmt::Display) -> Self {
+        Self {
+            detail: format!("{context}: {}", self.detail),
+            ..self
+        }
     }
 }
 
@@ -86,7 +138,7 @@ pub struct Context {
     /// The Ubuntu release the apps are for, by its codename.
     release: String,
     /// Ubuntu's newest version of each package, by architecture, fetched on first use.
-    ubuntu: Mutex<BTreeMap<String, Result<Versions, String>>>,
+    ubuntu: Mutex<BTreeMap<String, Result<Versions, Problem>>>,
 }
 
 /// The newest version of each package, by name.
@@ -104,12 +156,12 @@ impl Context {
 
     /// Ubuntu's newest version of each package for `arch`, from the release, `-updates` and
     /// `-security`, each `InRelease` verified with the archive's keys.
-    fn ubuntu(&self, arch: &str) -> Result<Versions, String> {
+    fn ubuntu(&self, arch: &str) -> Result<Versions, Problem> {
         let mut cache = self.ubuntu.lock().expect("Ubuntu index cache mutex poisoned");
         if let Some(found) = cache.get(arch) {
             return found.clone();
         }
-        let found = self.fetch_ubuntu(arch).map_err(|e| chain(&e));
+        let found = self.fetch_ubuntu(arch).map_err(|e| Problem::apt(&e));
         cache.insert(arch.to_owned(), found.clone());
         found
     }
@@ -218,20 +270,20 @@ struct Repository {
     sources: Sources,
     release: apt::Release,
     /// Its newest version of each package, by architecture, fetched on first use.
-    indexes: Mutex<BTreeMap<String, Result<Versions, String>>>,
+    indexes: Mutex<BTreeMap<String, Result<Versions, Problem>>>,
 }
 
 impl Repository {
     /// The repository's newest version of each package for `arch`, over its indexes, or `None`
     /// when its sources file doesn't serve `arch`.
-    fn index(&self, arch: &str) -> Option<Result<Versions, String>> {
+    fn index(&self, arch: &str) -> Option<Result<Versions, Problem>> {
         if !self.sources.serves(arch) {
             return None;
         }
         let mut cache = self.indexes.lock().expect("repository index cache mutex poisoned");
         let found = cache.entry(arch.to_owned()).or_insert_with(|| {
             let components: Vec<&str> = self.sources.components.iter().map(String::as_str).collect();
-            apt::index(&self.sources.dists(), &self.release, &components, arch).map_err(|e| chain(&e))
+            apt::index(&self.sources.dists(), &self.release, &components, arch).map_err(|e| Problem::apt(&e))
         });
         Some(found.clone())
     }
@@ -266,7 +318,8 @@ fn vendor(context: &Context, name: &str, row: &mut Report<'_>) -> Option<Reposit
         let key = match apt::key(url) {
             Ok(key) => key,
             Err(e) => {
-                row("key", subject, Outcome::Error, chain(&e));
+                let problem = Problem::apt(&e);
+                row("key", subject, problem.outcome, problem.detail);
                 good = false;
                 continue;
             }
@@ -332,7 +385,8 @@ fn vendor(context: &Context, name: &str, row: &mut Report<'_>) -> Option<Reposit
             None
         }
         Err(e) => {
-            row("InRelease", subject, Outcome::Error, chain(&e));
+            let problem = Problem::apt(&e);
+            row("InRelease", subject, problem.outcome, problem.detail);
             None
         }
     }
@@ -356,12 +410,8 @@ fn candidate(
         match repository.index(arch) {
             Some(Ok(newest)) => found = newest.get(name).map(|version| (repository.label(), version.clone())),
             Some(Err(e)) => {
-                return row(
-                    "candidate",
-                    subject,
-                    Outcome::Error,
-                    format!("{}: {e}", repository.label()),
-                );
+                let problem = e.context(repository.label());
+                return row("candidate", subject, problem.outcome, problem.detail);
             }
             None => {}
         }
@@ -372,7 +422,10 @@ fn candidate(
             Ok(newest) => newest
                 .get(name)
                 .map(|version| (format!("ubuntu {}", context.release), version.clone())),
-            Err(e) => return row("candidate", subject, Outcome::Error, format!("ubuntu ({arch}): {e}")),
+            Err(e) => {
+                let problem = e.context(format!("ubuntu ({arch})"));
+                return row("candidate", subject, problem.outcome, problem.detail);
+            }
         },
     };
     let searched = repository.map_or_else(
@@ -404,7 +457,10 @@ fn pinned(what: &str, url: &str, sha256: &str, row: &mut Report<'_>) {
             Outcome::Mismatch,
             format!("pinned {sha256}, served {got}"),
         ),
-        Err(e) => row("sha256", subject.clone(), Outcome::Error, chain(&e)),
+        Err(e) => {
+            let problem = Problem::fetch(&e);
+            row("sha256", subject.clone(), problem.outcome, problem.detail);
+        }
     }
     match published(url) {
         Ok(Some((source, digest))) if digest == sha256 => row("published", subject, Outcome::Ok, source),
@@ -420,17 +476,18 @@ fn pinned(what: &str, url: &str, sha256: &str, row: &mut Report<'_>) {
             Outcome::Note,
             "the vendor publishes no digest beside it".to_owned(),
         ),
-        Err(e) => row("published", subject, Outcome::Error, e),
+        Err(e) => row("published", subject, e.outcome, e.detail),
     }
 }
 
 /// The sha256 a vendor publishes for `url`, and where it was found: a GitHub release asset's
 /// digest, or a checksum file beside the download.
-fn published(url: &str) -> Result<Option<(String, String)>, String> {
+fn published(url: &str) -> Result<Option<(String, String)>, Problem> {
     if let Some(rest) = url.strip_prefix("https://github.com/") {
         let parts: Vec<&str> = rest.splitn(6, '/').collect();
         if let [owner, repo, "releases", "download", tag, name] = parts[..] {
-            let release = fetch::github(&format!("repos/{owner}/{repo}/releases/tags/{tag}")).map_err(|e| chain(&e))?;
+            let release =
+                fetch::github(&format!("repos/{owner}/{repo}/releases/tags/{tag}")).map_err(|e| Problem::fetch(&e))?;
             let digest = release["assets"]
                 .as_array()
                 .into_iter()
@@ -551,7 +608,8 @@ fn evaluate(root: &Path, system: &str, package: &str) -> Result<serde_json::Valu
     Ok(serde_json::from_slice(&output.stdout).unwrap_or_default())
 }
 
-/// A web app's URL answers with a success after its redirects, or Cloudflare's bot challenge. One
+/// A web app's URL answers with a success after its redirects, or Cloudflare's bot challenge; one
+/// that is down on every try is a warning. One
 /// of this machine's, plain HTTP on a loopback host, isn't reachable from here; any other URL that
 /// isn't HTTPS is a mismatch.
 fn web_app(url: &str, row: &mut Report<'_>) {
@@ -595,7 +653,10 @@ fn web_app(url: &str, row: &mut Report<'_>) {
             Outcome::Mismatch,
             format!("HTTP {}", answer.status),
         ),
-        Err(e) => row("web_app", url.to_owned(), Outcome::Error, chain(&e)),
+        Err(e) => {
+            let problem = Problem::fetch(&e);
+            row("web_app", url.to_owned(), problem.outcome, problem.detail);
+        }
     }
 }
 
