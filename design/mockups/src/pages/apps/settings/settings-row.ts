@@ -22,6 +22,8 @@ type Width = keyof typeof WIDTHS;
 
 const BOOSTS = Array.from({ length: 21 }, (_, i) => `${i * 5} %`);
 const SHARPNESS = Array.from({ length: 8 }, (_, i) => String(i + 1));
+const KELVIN = new Intl.NumberFormat("en-GB", { useGrouping: false });
+const TEMPERATURES = Array.from({ length: 38 }, (_, i) => `${KELVIN.format(2800 + i * 100)} K`);
 
 /** A card of the rows every kind of control ends in, Light behind you and Sharpness changed. */
 function rows(): Setting[] {
@@ -36,7 +38,7 @@ function rows(): Setting[] {
     stops("boost", "Boost", "Brightens the picture electronically; more adds grain. (Gain)", "brightness_high", BOOSTS, () => boost, (index) => (boost = index), { initial: () => 3 }),
     stops("sharpness", "Sharpness", "Crisper edges; too much draws bright halos.", "visibility", SHARPNESS, () => sharpness, (index) => (sharpness = index), { initial: () => 3 }),
     choice("flicker", "Room light flicker", "Stops stripes from lights on the mains: 50 Hz in Europe, 60 Hz in the Americas. (Power-line frequency)", ["Off", "50 Hz", "60 Hz"], () => flicker, (index) => (flicker = index), { initial: () => 1 }),
-    stops("temperature", "Colour temperature", "Lower looks warmer, higher looks cooler.", "thermostat", ["4600 K"], () => 0, () => {}, {
+    stops("temperature", "Colour temperature", "Lower looks warmer, higher looks cooler.", "thermostat", TEMPERATURES, () => 18, () => {}, {
       disabled: "Set by Automatic colour; turn it off to set it here. (White balance temperature)",
     }),
   ];
