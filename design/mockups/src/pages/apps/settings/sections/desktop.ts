@@ -70,7 +70,6 @@ interface Desk {
   split: number;
   followMouse: boolean;
   resizeByEdges: boolean;
-  glass: boolean;
   takeFocus: boolean;
   whereLaunched: boolean;
   marks: number;
@@ -107,7 +106,6 @@ const DEFAULTS: Desk = {
   split: 0,
   followMouse: true,
   resizeByEdges: true,
-  glass: true,
   takeFocus: true,
   whereLaunched: true,
   marks: MARKS.indexOf("Dot and dash"),
@@ -259,7 +257,6 @@ export function desktop(values: Values): SettingsSection {
             toggle("resize-edges", "Resize by the edges", "Drag a window's edge or corner to resize it.", () => desk.resizeByEdges, (on) => (desk.resizeByEdges = on), { initial: () => DEFAULTS.resizeByEdges }),
           ],
           [
-            toggle("glass", "Frosted glass", "Blurs what's behind the bar, its cards, windows and see-through terminals. Off saves power.", () => desk.glass, (on) => (desk.glass = on), { initial: () => DEFAULTS.glass }),
             toggle("take-focus", "Apps may come forward", "An app that asks for you takes the keys, its workspace shown.", () => desk.takeFocus, (on) => (desk.takeFocus = on), { initial: () => DEFAULTS.takeFocus }),
           ],
         ],

@@ -29,6 +29,8 @@ export interface Values {
   drawn: Mode;
   dayWallpaper: number;
   wallpaperMotion: number;
+  /** Frosted glass: the compositor blurs what is behind every glass surface. */
+  blur: boolean;
   /** Glass opacity's stop by night and by day, each of its own `glassSteps()`. */
   glass: [number, number];
   accentFrom: number;
@@ -77,6 +79,7 @@ export function defaults(): Values {
     drawn: "dark",
     dayWallpaper: 0,
     wallpaperMotion: 1,
+    blur: true,
     get glass(): [number, number] {
       glass ??= [glassStop("glass"), glassStop("glass_day")];
       return glass;

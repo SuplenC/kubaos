@@ -86,6 +86,7 @@ export function appearance(values: Values): SettingsSection {
             opens("night-wallpaper", "Dark mode's wallpaper", "Its colours give every screen its accent.", "gallery", () => "Shinjuku, rain"),
             opens("day-wallpaper", "Light mode's wallpaper", "Leave it and the night's serves both.", "gallery", () => (values.dayWallpaper === 0 ? "Same as dark" : "Kyoto, noon"), { unbuilt: true }),
             choice("wallpaper-motion", "Moving wallpapers", "A video plays when allowed; otherwise its still shows.", ["Always", "Plugged in", "Never"], () => values.wallpaperMotion, (index) => (values.wallpaperMotion = index), { initial: () => D.wallpaperMotion }),
+            toggle("blur", "Frosted glass", "Blurs what's behind the bar, its cards, windows and see-through terminals. Off saves power.", () => values.blur, (on) => (values.blur = on), { initial: () => D.blur }),
             stops("glass", "Glass opacity", "How much of the wallpaper shows through the bar, its cards and windows.", "wallpaper", glassSteps(byDay(values) === 1).map((each) => `${each} %`), () => values.glass[byDay(values)], (index) => {
               values.glass[byDay(values)] = index;
               showGlass(values);
