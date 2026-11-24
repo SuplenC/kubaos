@@ -61,10 +61,13 @@
   height: var(--size-control_sm);
 }
 
-/* The pane: a card as tall as the body, both contents filling it and crossfading in place. */
+/* The pane: a card as tall as the body, both contents filling it and crossfading in place. Its
+   padding is the list's beside it, `space.s12` at every side, so the two boxes hold their content
+   alike. */
 .k-menu-pane {
   flex: none;
   align-self: stretch;
+  padding: var(--space-s12);
 }
 
 .k-menu-pane > .k-card-content,

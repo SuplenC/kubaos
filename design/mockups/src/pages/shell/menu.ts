@@ -233,6 +233,7 @@ export default page<Shown>({
       { part: "Head's parts apart", token: "space-s8" },
       { part: "Footer", token: "size-control_sm" },
       { part: "Corners", token: "radius-surface" },
+      { part: "Pane's padding, as the list's", token: "space-s12" },
       { part: "Pane: symbol", token: "icon-s48" },
       { part: "Pane: an app's initial tile", token: "size-control_lg" },
       { part: "Pane: symbol to title", token: "space-s16" },
