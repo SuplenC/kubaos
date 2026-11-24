@@ -129,12 +129,14 @@
   box-sizing: border-box;
 }
 
+/* The band holds the row in its middle on whole device pixels, the odd one under it. */
 .k-screen[data-layout="bar"] .k-bar {
   top: 0;
   left: 0;
   right: 0;
   height: var(--size-bar);
-  padding: 0 var(--gap);
+  padding: round(down, calc((var(--size-bar) - var(--size-bar_row)) / 2), 1px) var(--gap)
+    round(up, calc((var(--size-bar) - var(--size-bar_row)) / 2), 1px);
 }
 
 .k-screen[data-layout="floating"] .k-bar,

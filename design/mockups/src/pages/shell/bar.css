@@ -122,7 +122,7 @@
 .shell-bar-left > :is(.shell-ws, .shell-ws-room):has(.shell-ws-slot[data-key^="end"]) + .shell-bar-divider {
   width: 0;
   background: none;
-  margin-inline: 0 calc(var(--space-s12) - var(--space-s20) / 2);
+  margin-inline: 0 round(nearest, calc(var(--space-s12) - var(--space-s20) / 2), 1px);
 }
 
 /* The title, shrinking with its room. */
