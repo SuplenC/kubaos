@@ -56,6 +56,7 @@
 // It isn't the library's `Pill`: its cells glide every frame. It has no part in `src/lib/` yet.
 
 import "./workspaces.css";
+import { centreOnPixels } from "../../lib/centre.ts";
 import type { Pinned } from "../../lib/control.ts";
 import { pin } from "../../lib/control.ts";
 import { raise } from "../../lib/elevation.ts";
@@ -492,6 +493,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     const urgent = entry.workspace === options.urgent;
     const lit = text(numberText(entry.workspace, kanji), numberStyle(kanji), urgent ? "error" : "primary");
     lit.classList.add("shell-ws-lit-number");
+    // Centred over the unlit numeral by layout, it lands on whole device pixels whatever its width,
+    // as the rolling number under it does: each time it is laid out at a size, it is put on pixels.
+    new ResizeObserver(() => {
+      if (lit.isConnected && lit.parentElement) centreOnPixels(lit.parentElement);
+    }).observe(lit);
     return lit;
   }
 
