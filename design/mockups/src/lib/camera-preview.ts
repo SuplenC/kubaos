@@ -7,6 +7,7 @@
 import "./camera-preview.css";
 import backlit from "../assets/camera/backlit.svg?url";
 import lifted from "../assets/camera/lifted.svg?url";
+import { centreOnPixels } from "./centre.ts";
 import { icon } from "./icon.ts";
 import { stack } from "./layout.ts";
 import { media } from "./media.ts";
@@ -38,6 +39,9 @@ function inUse(by: string | null): HTMLElement {
   const edge = document.createElement("span");
   edge.className = "k-preview-edge";
   box.append(edge);
+  // Its words are as wide as the app's name, so they land on whole device pixels only once the box
+  // is laid out; a page drawn after its own pass (a section in a window) would leave them between.
+  new ResizeObserver(() => centreOnPixels(box)).observe(box);
   return box;
 }
 

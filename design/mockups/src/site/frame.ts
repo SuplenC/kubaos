@@ -125,7 +125,9 @@ function walk(element: Element, at: Walk, into: FrameNode[]): void {
   if (changing) role = { role: "box" };
   const { floats, ...said } = role;
   role = said;
-  if (out || at.over) role.over = true;
+  // A sticky box keeps its place in the flow but is drawn wherever the scroll holds it, so where it
+  // is drawn says nothing of its layout: it is read as placed over its parent.
+  if (out || at.over || style.position === "sticky") role.over = true;
   if (out && floats === true) role.floats = true;
   if (scroller && role.role === "scroll") role.across = true;
   let bounds = at.space(drawn);

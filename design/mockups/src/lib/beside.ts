@@ -23,6 +23,7 @@ function pictureFor(room: number, scale: number): number {
 export function beside(main: HTMLElement, picture: HTMLElement): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-beside";
+  box.dataset.layout = "";
   main.classList.add("k-beside-main");
   const aside = document.createElement("span");
   aside.className = "k-beside-aside";
