@@ -27,6 +27,7 @@ use toml_edit::Value;
 use self::source::Found;
 use self::source::Pin;
 use crate::check::Outcome;
+use crate::check::Problem;
 use crate::check::Row;
 
 /// The architectures a pin may name, in the order `app.toml` writes them.
@@ -52,7 +53,8 @@ enum Step {
         arches: Vec<(&'static str, String, String)>,
     },
     NoSource(String),
-    Failed(String),
+    /// No verdict: its feed was down, a warning, or failed, an error.
+    Failed(Problem),
 }
 
 /// Moves the app `id`'s pins in `catalog` on to their newest releases, one row an action.
@@ -79,7 +81,15 @@ pub fn app(catalog: &Path, id: &str) -> Vec<Row> {
         .iter()
         .map(|pins| pins.as_ref().map(|pins| (pins.name.clone(), step(pins))))
         .collect();
-    let failed = steps.iter().flatten().any(|(_, step)| matches!(step, Step::Failed(_)));
+    // The worst of the failed pins': an error outranks a warning.
+    let failed = steps
+        .iter()
+        .flatten()
+        .filter_map(|(_, step)| match step {
+            Step::Failed(problem) => Some(problem.outcome),
+            _ => None,
+        })
+        .max();
     let mut rows = Vec::new();
     let mut moved = false;
     for (table, step) in actions(&mut doc).into_iter().zip(&steps) {
@@ -87,8 +97,13 @@ pub fn app(catalog: &Path, id: &str) -> Vec<Row> {
         rows.push(match step {
             Step::Current(version) => row(name, Outcome::Ok, format!("{version} is the newest")),
             Step::NoSource(why) => row(name, Outcome::Note, why.clone()),
-            Step::Failed(why) => row(name, Outcome::Error, why.clone()),
-            Step::Moved { from, to, .. } if failed => row(
+            Step::Failed(problem) => row(name, problem.outcome, problem.detail.clone()),
+            Step::Moved { from, to, .. } if failed == Some(Outcome::Warning) => row(
+                name,
+                Outcome::Note,
+                format!("{from} → {to} waits: another pin of the app couldn't be read"),
+            ),
+            Step::Moved { from, to, .. } if failed.is_some() => row(
                 name,
                 Outcome::Note,
                 format!("{from} → {to} waits: another pin of the app failed"),
@@ -161,7 +176,7 @@ fn pins(table: &Table) -> Option<Pins> {
 
 /// Each architecture's newest release, agreed on one version.
 fn step(pins: &Pins) -> Step {
-    let found: Result<Vec<_>, String> = pins
+    let found: Result<Vec<_>, Problem> = pins
         .arches
         .iter()
         .map(|(arch, url, sha256)| {
@@ -198,13 +213,15 @@ fn agree(version: &str, found: &[(&'static str, Found)]) -> Step {
             sha256,
         } = found
         else {
-            return Step::Failed(format!("{arch} has no newer release than {version}, unlike the others"));
+            return Step::Failed(Problem::error(format!(
+                "{arch} has no newer release than {version}, unlike the others"
+            )));
         };
         if to.is_some_and(|to| to != newer) {
-            return Step::Failed(format!(
+            return Step::Failed(Problem::error(format!(
                 "the architectures move to different versions, {} and {newer}",
                 to.unwrap_or_default()
-            ));
+            )));
         }
         to = Some(newer);
         arches.push((*arch, url.clone(), sha256.clone()));

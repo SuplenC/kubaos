@@ -14,11 +14,14 @@
 //!   `fetch.rs`.
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use kubaos_core::apps::version;
 
 use crate::apt;
 use crate::apt::Signed;
+use crate::check::Problem;
 use crate::check::chain;
 use crate::check::digest_for;
 use crate::fetch;
@@ -95,9 +98,10 @@ pub enum Found {
 ///
 /// # Errors
 ///
-/// A message when the vendor can't be read, its newest release has no file for the pin, or an
-/// unversioned URL serves another file than the pinned one.
-pub fn newest(pin: &Pin<'_>) -> Result<Found, String> {
+/// A [`Problem`] when the vendor can't be read, which is a warning when it is down, or an error
+/// when its newest release has no file for the pin or an unversioned URL serves another file than
+/// the pinned one.
+pub fn newest(pin: &Pin<'_>) -> Result<Found, Problem> {
     if let Some(release) = GitHubPin::parse(pin.url) {
         return release.newest(pin);
     }
@@ -143,20 +147,20 @@ impl<'a> GitHubPin<'a> {
         Some(Self { owner, repo, tag, name })
     }
 
-    fn newest(&self, pin: &Pin<'_>) -> Result<Found, String> {
-        let tag = Tag::parse(&percent_decoded(self.tag))?;
+    fn newest(&self, pin: &Pin<'_>) -> Result<Found, Problem> {
+        let tag = Tag::parse(&percent_decoded(self.tag)).map_err(Problem::error)?;
         let releases = fetch::github(&format!("repos/{}/{}/releases?per_page=100", self.owner, self.repo))
-            .map_err(|e| chain(&e))?;
+            .map_err(|e| Problem::fetch(&e))?;
         let Some(newest) = newest_tag(&releases, &tag.prefix) else {
-            return Err(format!(
+            return Err(Problem::error(format!(
                 "{}/{} has no release tagged {}<version>",
                 self.owner, self.repo, tag.prefix
-            ));
+            )));
         };
         let Some(moved) = Moved::from(pin.version, &tag.version, &newest) else {
             return Ok(Found::Current);
         };
-        let moved = moved?;
+        let moved = moved.map_err(Problem::error)?;
         let name = moved.rename(self.name);
         let tag_name = format!("{}{newest}", tag.prefix);
         let assets = releases
@@ -171,9 +175,9 @@ impl<'a> GitHubPin<'a> {
             .flatten()
             .find(|asset| asset["name"].as_str() == Some(&name))
         else {
-            return Err(format!(
+            return Err(Problem::error(format!(
                 "{tag_name} has no {name}: the release renamed or dropped the file the pin follows"
-            ));
+            )));
         };
         let spelled_prefix = self.tag.strip_suffix(&tag.version).unwrap_or(&tag.prefix);
         let url = format!(
@@ -186,7 +190,7 @@ impl<'a> GitHubPin<'a> {
             .map(str::to_ascii_lowercase);
         let sha256 = match digest {
             Some(digest) => digest,
-            None => fetch::sha256(&url).map_err(|e| chain(&e))?,
+            None => fetch::sha256(&url).map_err(|e| Problem::fetch(&e))?,
         };
         Ok(Found::Newer {
             version: moved.to,
@@ -297,9 +301,20 @@ pub fn percent_decoded(text: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-fn json(url: &str) -> Result<serde_json::Value, String> {
-    let body = fetch::get(url).map_err(|e| chain(&e))?;
-    serde_json::from_slice(&body).map_err(|e| format!("{url}: {e}"))
+/// A vendor's JSON feed, read once a run: the bump asks for it once for each architecture of a
+/// pin. One that doesn't read as JSON is an error, not an outage: the vendor answered.
+fn json(url: &str) -> Result<serde_json::Value, Problem> {
+    static FEEDS: Mutex<BTreeMap<String, serde_json::Value>> = Mutex::new(BTreeMap::new());
+    if let Some(known) = FEEDS.lock().expect("feeds mutex poisoned").get(url) {
+        return Ok(known.clone());
+    }
+    let body = fetch::get(url).map_err(|e| Problem::fetch(&e))?;
+    let feed: serde_json::Value = serde_json::from_slice(&body).map_err(|e| Problem::error(format!("{url}: {e}")))?;
+    FEEDS
+        .lock()
+        .expect("feeds mutex poisoned")
+        .insert(url.to_owned(), feed.clone());
+    Ok(feed)
 }
 
 fn newer(pin: &Pin<'_>, version: &str) -> bool {
@@ -307,19 +322,19 @@ fn newer(pin: &Pin<'_>, version: &str) -> bool {
 }
 
 /// The sha256 the vendor gives, else the download's own.
-fn sha256_of(url: &str, given: Option<String>) -> Result<String, String> {
+fn sha256_of(url: &str, given: Option<String>) -> Result<String, Problem> {
     match given {
         Some(sha256) => Ok(sha256),
-        None => fetch::sha256(url).map_err(|e| chain(&e)),
+        None => fetch::sha256(url).map_err(|e| Problem::fetch(&e)),
     }
 }
 
-fn jetbrains_toolbox(pin: &Pin<'_>) -> Result<Found, String> {
+fn jetbrains_toolbox(pin: &Pin<'_>) -> Result<Found, Problem> {
     let releases = json(JETBRAINS_TOOLBOX_API)?;
     let release = &releases["TBA"][0];
     let version = release["build"]
         .as_str()
-        .ok_or_else(|| "JetBrains' release API names no Toolbox build".to_owned())?;
+        .ok_or_else(|| Problem::error("JetBrains' release API names no Toolbox build"))?;
     if !newer(pin, version) {
         return Ok(Found::Current);
     }
@@ -327,7 +342,7 @@ fn jetbrains_toolbox(pin: &Pin<'_>) -> Result<Found, String> {
     let download = &release["downloads"][key];
     let url = download["link"]
         .as_str()
-        .ok_or_else(|| format!("Toolbox {version} has no {key} download"))?;
+        .ok_or_else(|| Problem::error(format!("Toolbox {version} has no {key} download")))?;
     let file = url.rsplit('/').next().unwrap_or(url);
     let given = download["checksumLink"]
         .as_str()
@@ -340,10 +355,10 @@ fn jetbrains_toolbox(pin: &Pin<'_>) -> Result<Found, String> {
     })
 }
 
-fn android_studio(pin: &Pin<'_>) -> Result<Found, String> {
+fn android_studio(pin: &Pin<'_>) -> Result<Found, Problem> {
     let list = json(ANDROID_STUDIO_RELEASES)?;
     let Some(release) = newest_android_studio(&list) else {
-        return Err("Android Studio's release list has no stable release".to_owned());
+        return Err(Problem::error("Android Studio's release list has no stable release"));
     };
     let version = release["version"].as_str().unwrap_or_default();
     if !newer(pin, version) {
@@ -358,11 +373,11 @@ fn android_studio(pin: &Pin<'_>) -> Result<Found, String> {
                 .as_str()
                 .is_some_and(|link| link.ends_with("-linux.tar.gz"))
         })
-        .ok_or_else(|| format!("Android Studio {version} has no Linux download"))?;
+        .ok_or_else(|| Problem::error(format!("Android Studio {version} has no Linux download")))?;
     let link = download["link"].as_str().unwrap_or_default();
     let (_, path) = link
         .split_once("/android/studio/ide-zips/")
-        .ok_or_else(|| format!("Android Studio's download {link} isn't under ide-zips/"))?;
+        .ok_or_else(|| Problem::error(format!("Android Studio's download {link} isn't under ide-zips/")))?;
     let url = format!("{ANDROID_STUDIO}{path}");
     let given = download["checksum"]
         .as_str()
@@ -394,10 +409,12 @@ pub fn newest_android_studio(list: &serde_json::Value) -> Option<&serde_json::Va
         })
 }
 
-fn proton_pass(pin: &Pin<'_>) -> Result<Found, String> {
+fn proton_pass(pin: &Pin<'_>) -> Result<Found, Problem> {
     let feed = json(PROTON_PASS_RELEASES)?;
     let Some((version, url)) = newest_proton_pass(&feed) else {
-        return Err("Proton Pass's feed has no stable release out to everyone with a .deb".to_owned());
+        return Err(Problem::error(
+            "Proton Pass's feed has no stable release out to everyone with a .deb",
+        ));
     };
     if !newer(pin, &version) {
         return Ok(Found::Current);
@@ -430,22 +447,22 @@ pub fn newest_proton_pass(feed: &serde_json::Value) -> Option<(String, String)> 
         .max_by(|(a, _), (b, _)| version::compare(a, b))
 }
 
-fn blender(pin: &Pin<'_>) -> Result<Found, String> {
-    let index = fetch::get(BLENDER).map_err(|e| chain(&e))?;
+fn blender(pin: &Pin<'_>) -> Result<Found, Problem> {
+    let index = fetch::get(BLENDER).map_err(|e| Problem::fetch(&e))?;
     let series = links(&String::from_utf8_lossy(&index))
         .filter_map(|link| link.strip_prefix("Blender")?.strip_suffix('/'))
         .filter(|series| version::is_version(series))
         .max_by(|a, b| version::compare(a, b))
         .map(str::to_owned)
-        .ok_or_else(|| format!("{BLENDER} lists no Blender series"))?;
+        .ok_or_else(|| Problem::error(format!("{BLENDER} lists no Blender series")))?;
     let folder = format!("{BLENDER}Blender{series}/");
-    let listing = fetch::get(&folder).map_err(|e| chain(&e))?;
+    let listing = fetch::get(&folder).map_err(|e| Problem::fetch(&e))?;
     let name = pin.url.rsplit('/').next().unwrap_or(pin.url);
     let (before, after) = name
         .split_once(pin.version)
-        .ok_or_else(|| format!("{name} doesn't hold its version, {}", pin.version))?;
+        .ok_or_else(|| Problem::error(format!("{name} doesn't hold its version, {}", pin.version)))?;
     let version = newest_file(&String::from_utf8_lossy(&listing), before, after)
-        .ok_or_else(|| format!("{folder} has no {before}<version>{after}"))?;
+        .ok_or_else(|| Problem::error(format!("{folder} has no {before}<version>{after}")))?;
     if !newer(pin, &version) {
         return Ok(Found::Current);
     }
@@ -457,19 +474,20 @@ fn blender(pin: &Pin<'_>) -> Result<Found, String> {
     })
 }
 
-fn helm(pin: &Pin<'_>) -> Result<Found, String> {
-    let releases = fetch::github(HELM_RELEASES).map_err(|e| chain(&e))?;
-    let newest = newest_tag(&releases, "v").ok_or_else(|| "helm/helm has no release tagged v<version>".to_owned())?;
+fn helm(pin: &Pin<'_>) -> Result<Found, Problem> {
+    let releases = fetch::github(HELM_RELEASES).map_err(|e| Problem::fetch(&e))?;
+    let newest =
+        newest_tag(&releases, "v").ok_or_else(|| Problem::error("helm/helm has no release tagged v<version>"))?;
     let Some(url) = helm_download(pin, &newest) else {
         return Ok(Found::Current);
     };
-    let url = url?;
+    let url = url.map_err(Problem::error)?;
     let name = url.rsplit('/').next().unwrap_or(&url);
-    let sums = fetch::get(&format!("{url}.sha256sum")).map_err(|e| chain(&e))?;
+    let sums = fetch::get(&format!("{url}.sha256sum")).map_err(|e| Problem::fetch(&e))?;
     let signature = helm_signature(&releases, &newest, name)
-        .map(|asc| fetch::get(asc).map_err(|e| chain(&e)))
+        .map(|asc| fetch::get(asc).map_err(|e| Problem::fetch(&e)))
         .transpose()?;
-    let sha256 = helm_sha256(&sums, signature.as_deref(), name)?;
+    let sha256 = helm_sha256(&sums, signature.as_deref(), name).map_err(Problem::error)?;
     Ok(Found::Newer {
         version: newest,
         url,
@@ -561,15 +579,15 @@ fn links(html: &str) -> impl Iterator<Item = &str> {
 
 /// A URL with no version in it serves whatever is newest, so all a check can say is whether that
 /// is still the pinned file.
-fn unversioned(pin: &Pin<'_>) -> Result<Found, String> {
-    let served = fetch::sha256(pin.url).map_err(|e| chain(&e))?;
+fn unversioned(pin: &Pin<'_>) -> Result<Found, Problem> {
+    let served = fetch::sha256(pin.url).map_err(|e| Problem::fetch(&e))?;
     if served == pin.sha256 {
         return Ok(Found::Current);
     }
-    Err(format!(
+    Err(Problem::error(format!(
         "it serves another file now, sha256 {served}: its URL names no version, so the new version and \
          sha256 are pinned by hand"
-    ))
+    )))
 }
 
 #[cfg(test)]

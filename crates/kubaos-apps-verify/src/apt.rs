@@ -28,18 +28,15 @@ use sha2::Digest as _;
 use sha2::Sha256;
 
 use crate::fetch;
+use crate::fetch::Class;
 use crate::fetch::FetchError;
 
 /// A repository that couldn't be read or doesn't check out.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AptError {
-    #[error("fetching {url}")]
-    Fetch {
-        url: String,
-        #[source]
-        source: FetchError,
-    },
+    #[error(transparent)]
+    Fetch(FetchError),
     #[error("running gpg")]
     Gpg(#[source] io::Error),
     #[error("gpg: {0}")]
@@ -49,9 +46,12 @@ pub enum AptError {
 }
 
 impl AptError {
-    fn fetch(url: &str) -> impl FnOnce(FetchError) -> Self {
-        let url = url.to_owned();
-        move |source| Self::Fetch { url, source }
+    /// Whether the repository was out of reach, or its answer or the check is at fault.
+    pub fn class(&self) -> Class {
+        match self {
+            Self::Fetch(e) => e.class(),
+            _ => Class::Failure,
+        }
     }
 }
 
@@ -403,7 +403,7 @@ fn packages(dists: &str, release: &Release, base: &str, arch: &str) -> Result<BT
         return Err(AptError::Invalid(format!("the suite lists no {base} index")));
     };
     let url = release.url(dists, &path);
-    let body = fetch::get(&url).map_err(AptError::fetch(&url))?;
+    let body = fetch::get(&url).map_err(AptError::Fetch)?;
     let got = fetch::hex(&Sha256::digest(&body));
     if release.sha256.get(&path) != Some(&got) {
         return Err(AptError::Invalid(format!(
@@ -423,7 +423,8 @@ fn packages(dists: &str, release: &Release, base: &str, arch: &str) -> Result<BT
 }
 
 /// Fetches `InRelease` from `dists` and verifies it with `keys`; for a suite with none, `Release`
-/// and its `Release.gpg`, as apt does.
+/// and then its `Release.gpg`, as apt does. An `InRelease` that is down is reported as it is,
+/// without looking for the others.
 ///
 /// # Errors
 ///
@@ -432,13 +433,17 @@ pub fn release(dists: &str, keys: &[u8]) -> Result<(Verified, Release), AptError
     let url = format!("{dists}/InRelease");
     let verified = match fetch::get(&url) {
         Ok(inrelease) => verify(keys, Signed::Inline(&inrelease))?,
+        // A suite that is down serves no `Release` either; asking costs another round of tries.
+        Err(down) if down.class() == Class::Outage => return Err(AptError::Fetch(down)),
         Err(missing) => {
-            let detached = format!("{dists}/Release");
-            let signature = format!("{detached}.gpg");
-            // The InRelease's error is the one to report when the suite has neither.
-            let (Ok(release), Ok(signature)) = (fetch::get(&detached), fetch::get(&signature)) else {
-                return Err(AptError::fetch(&url)(missing));
+            // The InRelease's error is the one to report when the suite has neither, unless the
+            // `Release` was down; a missing `Release.gpg` beside a `Release` is its own error.
+            let release = match fetch::get(&format!("{dists}/Release")) {
+                Ok(release) => release,
+                Err(down) if down.class() == Class::Outage => return Err(AptError::Fetch(down)),
+                Err(_) => return Err(AptError::Fetch(missing)),
             };
+            let signature = fetch::get(&format!("{dists}/Release.gpg")).map_err(AptError::Fetch)?;
             verify(
                 keys,
                 Signed::Detached {
@@ -458,7 +463,7 @@ pub fn release(dists: &str, keys: &[u8]) -> Result<(Verified, Release), AptError
 ///
 /// [`AptError::Fetch`] when it can't be fetched.
 pub fn key(url: &str) -> Result<Vec<u8>, AptError> {
-    fetch::get(url).map_err(AptError::fetch(url))
+    fetch::get(url).map_err(AptError::Fetch)
 }
 
 #[cfg(test)]
