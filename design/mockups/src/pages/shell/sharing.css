@@ -353,9 +353,9 @@
 /* A map of the desk, a draft part: as wide as the card, never taller than a three-line row, its
    screens in their real places on whole pixels, each parted from the next by the thin stroke. It
    stands in a room as wide as the card, centred in it, its width, height and place rounded to
-   whole pixels so the card's lines under it stay on them. It is its boxes' container, so their
-   corners scale with its width: each corner's share of the desk's width (`--screen-corner`,
-   `--window-corner`) times the map's. */
+   whole pixels so the card's lines under it stay on them. Its screens are square, as a screen is;
+   it is its windows' container, so their corner scales with its width: the corner's share of the
+   desk's width (`--window-corner`) times the map's. */
 .share-map-room {
   container-type: inline-size;
   display: block;
@@ -381,7 +381,6 @@
   top: round(nearest, calc(var(--y) * 1% + var(--map-gap)), 1px);
   width: round(nearest, calc(var(--w) * 1% - 2 * var(--map-gap)), 1px);
   height: round(nearest, calc(var(--h) * 1% - 2 * var(--map-gap)), 1px);
-  border-radius: max(var(--radius-small), calc(var(--screen-corner) * 100cqw));
   background: var(--color-surface_container_highest);
 }
 

@@ -588,8 +588,7 @@ export function shareMap(desk: readonly DeskScreen[], shared: MapShare): HTMLEle
   const map = document.createElement("span");
   map.className = "share-map";
   map.style.setProperty("--map-ratio", String(wide / tall));
-  // Each corner's share of the desk's width, which the stylesheet scales by the map's own.
-  map.style.setProperty("--screen-corner", String(role("surface").px! / wide));
+  // A window's corner as a share of the desk's width, which the stylesheet scales by the map's own.
   map.style.setProperty("--window-corner", String(windowCorner().px! / wide));
   // Each box's place and size as a share of what holds it, which the CSS turns into lengths.
   const placed = (element: HTMLElement, x: number, y: number, width: number, height: number, ofWidth: number, ofHeight: number) => {
