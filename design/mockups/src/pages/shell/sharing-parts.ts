@@ -361,14 +361,23 @@ function place(element: HTMLElement, rect: Rect, room: Room): void {
 }
 
 /**
+ * `count` equal tracks in whole device pixels, as a grid splits its room in the builds: each its
+ * share rounded down, the last taking what is left.
+ */
+function deskTracks(count: number): string {
+  if (count <= 1) return "minmax(0, 1fr)";
+  return `repeat(${count - 1}, round(down, calc((100% - ${count - 1} * var(--gap)) / ${count}), 1px)) minmax(0, 1fr)`;
+}
+
+/**
  * Makes `desk` the screen's tiling: a grid of `columns` by `rows` equal tracks on the desktop under
  * the bar, `size.gap` apart and in from the screen's edges and the bar, as Hyprland's gaps; each
  * window names its lines.
  */
 export function tiling(desk: HTMLElement, columns: number, rows: number): HTMLElement {
   desk.className = "share-desk";
-  desk.style.setProperty("--desk-columns", String(columns));
-  desk.style.setProperty("--desk-rows", String(rows));
+  desk.style.setProperty("--desk-columns", deskTracks(columns));
+  desk.style.setProperty("--desk-rows", deskTracks(rows));
   return desk;
 }
 

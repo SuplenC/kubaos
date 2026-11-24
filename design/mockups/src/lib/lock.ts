@@ -315,6 +315,7 @@ export function lock(options: LockOptions): Lock {
   const windows = document.createElement("span");
   windows.className = "k-lock-windows";
   windows.append(...(options.windows ?? []));
+  windows.style.setProperty("--windows", String(Math.max(1, options.windows?.length ?? 1)));
   const dim = element.querySelector(".k-screen-dim")!;
 
   const digits = text(time, "clock_rest");

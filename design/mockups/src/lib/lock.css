@@ -170,16 +170,21 @@
 }
 
 /* A window of the still: an app's window on the shell's glass, as `glassWindow` draws one, its
-   corner a window's (`--corner`, `radius.surface`). */
+   corner a window's (`--corner`, `radius.surface`). The row splits in whole device pixels, each
+   window its share rounded down and the last taking what is left. */
 .k-lock-window {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 round(down, calc((100% - (var(--windows, 1) - 1) * var(--gap)) / var(--windows, 1)), 1px);
   flex-direction: column;
   gap: var(--space-s8);
   box-sizing: border-box;
   min-width: 0;
   padding: var(--space-s16);
   border-radius: var(--corner);
+}
+
+.k-lock-window:last-child {
+  flex: 1 1 0;
 }
 
 /* The bar's band slides straight up out of the screen and back, its items riding on it. */
