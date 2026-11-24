@@ -24,7 +24,7 @@ export default page<Shown>({
   code: { unbuilt: "kubaos-settings: not built yet" },
   from: ["sidebar-page", "list", "tabs", "slider", "select", "field", "switch", "banner", "keycap"],
   stage: {
-    live: liveWindow,
+    live: (mode) => liveWindow({ values: { drawn: mode } }),
     hint: "type “lock”, Enter; hold a reset",
     daylight: true,
   },

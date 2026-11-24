@@ -167,7 +167,7 @@ function statePicks(states: States<State>, focus: Focus | DoesntApply): Pick[] {
  * each state `states` shows.
  */
 export function stagePicks(spec: Stage, states?: { readonly states: States<State>; readonly focus: Focus | DoesntApply }, picked: readonly number[] = []): Pick[] {
-  return [{ name: "Live", hint: `live · ${spec.hint}`, draw: () => [spec.switches ? spec.switches.live(picked) : spec.live()] }, ...(states ? statePicks(states.states, states.focus) : [])];
+  return [{ name: "Live", hint: `live · ${spec.hint}`, draw: (mode) => [spec.switches ? spec.switches.live(picked) : spec.live(mode)] }, ...(states ? statePicks(states.states, states.focus) : [])];
 }
 
 /** The stage for `spec`; with `states`, the bar's chips pin each of them. */

@@ -48,7 +48,7 @@ export default page<Shown>({
   code: { unbuilt: "kubaos-settings: not built yet" },
   from: ["sidebar-page", "list", "tabs", "slider", "select", "switch", "colour-picker", "banner", "keycap", "button", "icon-button"],
   stage: {
-    live: () => liveWindow({ section: APPEARANCE }),
+    live: (mode) => liveWindow({ section: APPEARANCE, values: { drawn: mode } }),
     hint: "pick Light; hold a reset to put it back",
     daylight: true,
   },
