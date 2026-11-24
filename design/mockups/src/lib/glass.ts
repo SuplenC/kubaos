@@ -7,7 +7,9 @@
 // `size.gap` either side. Hovered it shows dimmer, `primary` at `opacity.track_lit`, fading in over
 // `short` on `standard` and travelling from item to item the same way; pressed it goes to full
 // brightness while the item's content dips to `scale.press_dip` over `micro`; while the item's card
-// is open the screen's own light lies there (`sheet.ts`). Near a rounded end it stays straight and
+// is open the screen's own light lies there (`sheet.ts`). A control that opens nothing (`hovers`: a
+// layout switch, Keep awake, a player's buttons) shows the same dim rail hovered, and only that:
+// never full brightness, never the open item's light. Near a rounded end it stays straight and
 // stops where the curve begins. The workspaces and the Command menu button take none.
 
 import "./glass.css";
@@ -54,6 +56,12 @@ export function opens<T extends HTMLElement>(item: T): T {
   return item;
 }
 
+/** Marks `item` as a control that opens nothing: the edge light answers the pointer on it dimly. */
+export function hovers<T extends HTMLElement>(item: T): T {
+  item.dataset.hovers = "";
+  return item;
+}
+
 /** Where the light under `item` runs, in `host`'s own pixels: its ends and the line it lies on. */
 export interface Stretch {
   readonly from: number;
@@ -89,11 +97,12 @@ function place(light: HTMLElement, at: Stretch): void {
 }
 
 /**
- * The pointer's edge light over every item marked `opens` inside `host`, a positioned element round
- * the bar's glass: one light, which comes in under the item the pointer is on, travels to the next
- * one, goes to full brightness while the item is pressed, and goes when the pointer leaves. An
- * item whose card is open (`data-card-open`) already has its light and takes none. A pinned item
- * (`data-pinned` hover or pressed, on it or a part of it) shows its light still, once it is laid out.
+ * The pointer's edge light over every item marked `opens` or `hovers` inside `host`, a positioned
+ * element round the bar's glass: one light, which comes in under the item the pointer is on, travels
+ * to the next one, goes to full brightness while an `opens` item is pressed, and goes when the
+ * pointer leaves. An item whose card is open (`data-card-open`) already has its light and takes
+ * none. A pinned item (`data-pinned` hover or pressed, on it or a part of it) shows its light still,
+ * once it is laid out.
  */
 export function edgeRail(host: HTMLElement): HTMLElement {
   const light = edgeLight();
@@ -124,7 +133,7 @@ export function edgeRail(host: HTMLElement): HTMLElement {
     light.dataset.shown = "";
   };
   const itemOf = (target: EventTarget | null) => {
-    const item = target instanceof Element ? target.closest<HTMLElement>("[data-opens]") : null;
+    const item = target instanceof Element ? target.closest<HTMLElement>("[data-opens], [data-hovers]") : null;
     return item && host.contains(item) && !item.hasAttribute("data-card-open") ? item : null;
   };
   host.addEventListener("pointerover", (event) => show(itemOf(event.target)));
@@ -133,7 +142,7 @@ export function edgeRail(host: HTMLElement): HTMLElement {
     const item = itemOf(event.target);
     if (!item || event.button !== 0) return;
     show(item);
-    light.dataset.pressed = "";
+    if (item.hasAttribute("data-opens")) light.dataset.pressed = "";
   });
   const release = () => delete light.dataset.pressed;
   host.addEventListener("pointerup", release);
@@ -145,7 +154,7 @@ export function edgeRail(host: HTMLElement): HTMLElement {
 
   // A pinned item shows its light as a still once it is on the page and laid out.
   const settle = (tries: number) => {
-    const pinned = host.querySelector<HTMLElement>('[data-opens]:is([data-pinned="hover"], [data-pinned="pressed"], :has([data-pinned="hover"], [data-pinned="pressed"]))');
+    const pinned = host.querySelector<HTMLElement>(':is([data-opens], [data-hovers]):is([data-pinned="hover"], [data-pinned="pressed"], :has([data-pinned="hover"], [data-pinned="pressed"]))');
     if (!pinned) return;
     if (!host.isConnected || host.offsetWidth === 0) {
       if (tries > 0) requestAnimationFrame(() => settle(tries - 1));
@@ -153,7 +162,7 @@ export function edgeRail(host: HTMLElement): HTMLElement {
     }
     show(pinned);
     light.removeAttribute("data-travel");
-    light.toggleAttribute("data-pressed", pinned.matches('[data-pinned="pressed"], :has([data-pinned="pressed"])'));
+    light.toggleAttribute("data-pressed", pinned.matches('[data-opens]:is([data-pinned="pressed"], :has([data-pinned="pressed"]))'));
   };
   requestAnimationFrame(() => settle(300));
   // The bar's layout moves as it settles (fonts, a card's swap): the light keeps to its item.

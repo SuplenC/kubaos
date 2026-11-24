@@ -10,6 +10,7 @@
 
 import "./bar.css";
 import { badgedIcon } from "../../lib/badge.ts";
+import { hovers, opens } from "../../lib/glass.ts";
 import { icon } from "../../lib/icon.ts";
 import { smallInitial } from "../../lib/icon-tile.ts";
 import { withHint } from "../../lib/hint.ts";
@@ -237,10 +238,12 @@ export function makeNowPlaying(options: PlayingOptions = {}): NowPlaying {
   const pinnedOf = (part: PlayingPart) => (options.pinned?.part === part ? { pinned: options.pinned.state } : {});
   const icon_ = pillCircle(appPicture(active), { label: `Players: ${active.app}`, ...pinnedOf("icon"), ...(options.onIcon ? { onPress: options.onIcon } : {}) });
   icon_.setAttribute("aria-haspopup", "menu");
+  opens(icon_);
   const playGlyph = () => glyph(playing ? "pause" : "play_arrow", "primary");
   const play = pillCircle(playGlyph(), { label: playing ? "Pause" : "Play", filled: true, ...pinnedOf("play"), ...(options.onPlay ? { onPress: options.onPlay } : {}) });
   const previous = pillCircle(glyph("skip_previous", "on_surface_variant"), { label: "Previous", ...pinnedOf("previous"), ...(options.onPrevious ? { onPress: options.onPrevious } : {}) });
   const next = pillCircle(glyph("skip_next", "on_surface_variant"), { label: "Next", ...pinnedOf("next"), ...(options.onNext ? { onPress: options.onNext } : {}) });
+  for (const control of [previous, play, next]) hovers(control);
   const words: Marquee = marquee({
     parts: songParts(options.song ?? SONG),
     room: "now_playing",

@@ -22,7 +22,7 @@
 
 import { pin, type Pinned } from "./control.ts";
 import { focusRing, type Tone } from "./focus.ts";
-import { opens } from "./glass.ts";
+import { hovers, opens } from "./glass.ts";
 import { withHint } from "./hint.ts";
 import { row } from "./layout.ts";
 import { probe } from "./probe.ts";
@@ -110,6 +110,7 @@ export function makePill(options: PillOptions): Pill {
   element.toggleAttribute("data-lone", options.lone);
   element.toggleAttribute("data-capsule", CAPSULED.has(options.tone ?? "neutral"));
   if (options.opens) opens(element);
+  else if (options.interactive) hovers(element);
   element.style.setProperty("--fill", tone.fill);
   element.style.setProperty("--fill-hover", tone.hover);
   element.style.setProperty("--fill-pressed", tone.pressed);
