@@ -169,8 +169,8 @@
   scale: 1;
 }
 
-/* A window of the still: the desktop plane's, as the Elevation page draws one, its corner a
-   window's (`--corner`, `radius.surface`). */
+/* A window of the still: an app's window on the shell's glass, as `glassWindow` draws one, its
+   corner a window's (`--corner`, `radius.surface`). */
 .k-lock-window {
   display: flex;
   flex: 1 1 0;
@@ -180,10 +180,6 @@
   min-width: 0;
   padding: var(--space-s16);
   border-radius: var(--corner);
-  background: var(--color-surface);
-  box-shadow:
-    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
-    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
 }
 
 /* The bar's band slides straight up out of the screen and back, its items riding on it. */

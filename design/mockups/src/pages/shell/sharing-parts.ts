@@ -24,7 +24,8 @@ import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
 import { button } from "../../lib/button.ts";
 import { card } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
-import { focusRing, windowRing } from "../../lib/focus.ts";
+import { focusRing } from "../../lib/focus.ts";
+import { glass } from "../../lib/glass.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { filling, inset, row, stack } from "../../lib/layout.ts";
@@ -390,18 +391,19 @@ export interface DeskWindowOptions extends Placed {
 }
 
 /**
- * Draft part, proposed: an app's window on the desktop, as Hyprland draws it: `surface`, its corner
- * `radius.surface`, its app's tile and title, its border and the tube of the window that
- * has the keyboard (`windowRing`), the window border the thin stroke wide. The Focus page draws
- * one of its own; this would be the library's, for every desktop scene.
+ * Draft part, proposed: an app's window on the desktop, on the shell's glass as `glassWindow` draws
+ * one: no border of the compositor's, the glass's edge and shadow, its corner `radius.surface`, its
+ * app's tile and title, and the lit tube of the window that has the keyboard on the glass's edge. A
+ * full-screen window lies flush with the screen's edges, keeping only the glass's shadow. This
+ * would be the library's, for every desktop scene.
  */
 /** A window's corner on the desktop: the surface radius. */
 const windowCorner = () => role("surface");
 
 export function deskWindow(options: DeskWindowOptions): HTMLElement {
   const corner = options.full ? { css: "0px" } : windowCorner();
-  const drawn = document.createElement("span");
-  drawn.className = "share-window";
+  const drawn = glass(document.createElement("span"), options.full ?? false);
+  drawn.classList.add("share-window");
   drawn.style.setProperty("--corner", corner.css);
   drawn.style.gridColumn = options.column;
   drawn.style.gridRow = options.row;
@@ -409,7 +411,7 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
   // A window's title varies, cut with an ellipsis where it runs past the window.
   drawn.append(row("s8", "centre", tile, declare(clamped(options.title, "body_strong", "on_surface"), { variable: true })));
   const ring = focusRing(drawn, "surface", options.shared ? "sharing" : "accent", false);
-  windowRing(ring, "stroke-thin", corner.css);
+  ring.style.setProperty("--corner", corner.css);
   // The violet border, the on-air mark, is always there and shows while the window is shared
   // (`data-shared`), whether or not it has the keyboard: picking lights a window by that attribute.
   const border = document.createElement("span");

@@ -16,6 +16,7 @@ import towerPlate from "../../assets/lock/tokyo-tower-blue-hour-plate.webp?url";
 import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
 import type { Words } from "../../lib/content.ts";
 import { setValue } from "../../lib/field.ts";
+import { glass } from "../../lib/glass.ts";
 import { KICKER, type Kicker, type Lock, lock, lockField, type Moment, type Phase, TIME, type Wallpaper } from "../../lib/lock.ts";
 import { stack } from "../../lib/layout.ts";
 import { role } from "../../lib/radius.ts";
@@ -86,8 +87,8 @@ export interface Drawn {
 }
 
 /**
- * The desktop's windows the lock's still shows: two tiled side by side, each the desktop plane's
- * window with its name and a line.
+ * The desktop's windows the lock's still shows: two tiled side by side, each an app's window on the
+ * glass with its name and a line.
  */
 function windows(): HTMLElement[] {
   const corner = role("surface");
@@ -95,8 +96,8 @@ function windows(): HTMLElement[] {
     ["Files", "~/Projects/kubaos"],
     ["Terminal", "cargo build --release"],
   ].map(([title, line]) => {
-    const drawn = document.createElement("span");
-    drawn.className = "k-lock-window";
+    const drawn = glass(document.createElement("span"));
+    drawn.classList.add("k-lock-window");
     drawn.style.setProperty("--corner", corner.css);
     drawn.append(text(title ?? "", "body_strong", "on_surface"), text(line ?? "", "small", "on_surface_variant"));
     return drawn;

@@ -16,6 +16,7 @@ import { button } from "../../lib/button.ts";
 import { buttonBar } from "../../lib/button-bar.ts";
 import { chip } from "../../lib/chip.ts";
 import { emptyState } from "../../lib/empty-state.ts";
+import { glass } from "../../lib/glass.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { list } from "../../lib/list.ts";
@@ -304,8 +305,8 @@ function stills(): HTMLElement {
     { title: "Files", line: "~/Pictures/Wallpapers", left: "56%", top: "30%", width: "40%", height: "56%" },
   ];
   for (const place of places) {
-    const drawn = document.createElement("span");
-    drawn.className = "k-lock-window gl-window";
+    const drawn = glass(document.createElement("span"));
+    drawn.classList.add("k-lock-window", "gl-window");
     drawn.style.setProperty("--corner", corner.css);
     Object.assign(drawn.style, { left: place.left, top: place.top, width: place.width, height: place.height });
     drawn.append(text(place.title, "body_strong", "on_surface"), text(place.line, "small", "on_surface_variant"));

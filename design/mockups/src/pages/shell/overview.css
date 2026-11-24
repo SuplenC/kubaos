@@ -269,11 +269,7 @@
   overflow: hidden;
   /* The corner its miniature gives it (`.ov-ws-desk`); a window's on the desktop where it has none. */
   border-radius: var(--ov-corner, var(--radius-surface));
-  background: var(--color-surface);
   transform: scale(var(--ov-shrink));
-  box-shadow:
-    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
-    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
   transition:
     --ov-tx var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-ty var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -290,12 +286,13 @@
   z-index: 1;
 }
 
-/* The focused window's neon tube, as Hyprland draws the active border. */
+/* The focused window's lit tube on the glass's edge, as `glassWindow` draws the active window's:
+   `focus.tube` of `primary_core` by night, `primary` by day. */
 .ov-win[data-focused]::after {
   content: "";
   position: absolute;
   inset: 0;
-  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary);
+  border: max(1px, round(nearest, var(--focus-tube), 1px)) solid color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%));
   border-radius: inherit;
   pointer-events: none;
 }

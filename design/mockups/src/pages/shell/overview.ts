@@ -436,7 +436,7 @@ export default page<Shown>({
       { part: "Window corners, on the desktop", token: "radius-surface" },
       { part: "Window corners, in a miniature", token: "radius-control" },
       { part: "Window gaps", token: "space-s8" },
-      { part: "A floating window's shadow", token: "shadow-panel-blur" },
+      { part: "A window's shadow", token: "shadow-glass-blur" },
       { part: "Wallpaper blur", token: "size-lock_blur" },
       { part: "Slit between two", token: "space-s4" },
       { part: "A carried window, of its miniature", token: "scale-carried" },

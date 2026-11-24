@@ -74,12 +74,11 @@
   min-height: 0;
   padding: var(--space-s16);
   border-radius: var(--corner);
-  background: var(--color-surface);
 }
 
-/* A shared window's border: `sharing_line`, the window border's width, over the neutral border,
-   shown while the window is shared or its Share pill is pointed at, whether or not it has the
-   keyboard. The tube, while it has it, burns over it. */
+/* A shared window's border: `sharing_line`, the tube's width, over the glass's edge, shown while
+   the window is shared or its Share pill is pointed at, whether or not it has the keyboard. The
+   tube, while it has it, burns over it. */
 .share-border {
   position: absolute;
   inset: 0;

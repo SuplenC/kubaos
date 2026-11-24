@@ -613,7 +613,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     let element = winEls.get(id);
     if (element) return element;
     const win = desk.windows.get(id)!;
-    element = span("ov-win", face(win));
+    element = glass(span("ov-win", face(win)));
     element.dataset.window = id;
     element.dataset.app = win.app;
     element.toggleAttribute("data-floating", win.float !== undefined);

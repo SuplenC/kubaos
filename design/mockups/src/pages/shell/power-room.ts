@@ -18,6 +18,7 @@ import { button } from "../../lib/button.ts";
 import { chip } from "../../lib/chip.ts";
 import { type Pinned, pin } from "../../lib/control.ts";
 import { focusRing } from "../../lib/focus.ts";
+import { glass } from "../../lib/glass.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { filling, row, stack } from "../../lib/layout.ts";
@@ -458,8 +459,8 @@ function sayFor(say: HTMLElement, index: number, situation: Situation, words?: s
 
 function windowOf(shown: Shown, index: number): HTMLElement {
   const corner = role("surface");
-  const drawn = document.createElement("span");
-  drawn.className = "k-lock-window power-window";
+  const drawn = glass(document.createElement("span"));
+  drawn.classList.add("k-lock-window", "power-window");
   drawn.dataset.at = String(index);
   drawn.style.setProperty("--corner", corner.css);
   drawn.append(row("s8", "centre", icon(shown.glyph, "var(--type-small-icon)", "var(--color-on_surface_variant)"), text(shown.title, "body_strong", "on_surface")), text(shown.line, "small", "on_surface_variant"));
