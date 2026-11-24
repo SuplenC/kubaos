@@ -55,7 +55,6 @@ fn radii_are_roles_not_numbers() {
         "Radius::Control => Some(12),",
         "Radius::Content => Some(16),",
         "Radius::Surface => Some(24),",
-        "Radius::Card => Some(32),",
     ] {
         assert!(module.contains(role), "{role}");
     }

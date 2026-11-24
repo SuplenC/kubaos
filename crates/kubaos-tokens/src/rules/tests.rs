@@ -110,13 +110,13 @@ fn a_radius_role_off_the_grid_is_refused() {
 }
 
 #[test]
-fn radius_roles_grow_from_small_to_card() {
+fn radius_roles_grow_from_small_to_surface() {
     let found = violations(|t| set(t, &["radius"], "control", 28));
 
     assert_eq!(
         found,
         [Violation::NotAscending {
-            token: "radius.small, row, control, content, surface, card".into()
+            token: "radius.small, row, control, content, surface".into()
         }]
     );
 }

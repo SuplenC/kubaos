@@ -218,7 +218,7 @@ export default page<State>({
       { part: "The items' row", token: "size-bar_row" },
       { part: "Every gap", token: "size-gap" },
       { part: "A window's corner", token: "radius-surface" },
-      { part: "A card's corners", token: "radius-card" },
+      { part: "A card's corners", token: "radius-surface" },
       { part: "Glass shadow's drop", token: "shadow-glass-y" },
       { part: "Glass shadow's blur", token: "shadow-glass-blur" },
     ],

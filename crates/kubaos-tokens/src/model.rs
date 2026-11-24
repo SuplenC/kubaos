@@ -193,8 +193,6 @@ pub struct Radii {
     pub content: u16,
     /// The shell's big surfaces.
     pub surface: u16,
-    /// A card on the glass, detached from the bar.
-    pub card: u16,
     /// Whether there is a pill radius, half the shape's shorter side.
     pub full: bool,
 }

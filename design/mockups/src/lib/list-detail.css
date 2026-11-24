@@ -21,14 +21,14 @@
   initial-value: 0;
 }
 
-/* The Command menu's panel: the shell's glass (`glass.css`) at a card's corner, `space.s16` inside,
-   so the pane's corners, `radius.content`, run concentric with its own. */
+/* The Command menu's panel: the shell's glass (`glass.css`) at a card's corner, `radius.surface`,
+   `space.s16` inside. */
 .k-command {
   position: relative;
   display: flex;
   box-sizing: border-box;
   padding: var(--space-s16);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-surface);
   outline: none;
   translate: 0 calc(round(nearest, var(--menu-drop) * var(--space-s8), 1px) * -1);
 }

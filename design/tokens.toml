@@ -182,11 +182,9 @@ control = 12
 # A step softer than a surface's 24, so a box inside reads as
 # a part of what holds it, not a second window.
 content = 16
-# The shell's big surfaces alone: a panel, a window, the screen frame.
+# The shell's big surfaces: a window and every card on the glass (a panel, the Command menu, the
+# power menu, the share picker, the OSD), one corner for all of them.
 surface = 24
-# A card on the glass: a panel detached from the bar, the clock's card. Concentric with the content
-# boxes inside it, `content` 16 in at its padding of 16.
-card = 32
 # Pills and circles: switches, icon buttons, sliders, avatars,
 # badges.
 full = true

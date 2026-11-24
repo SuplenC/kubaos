@@ -209,7 +209,7 @@ export default page<"rest" | "selected" | "empty" | "error" | "loading">({
       { part: "A Result's row", token: "size-row_two_line" },
       { part: "Field", token: "size-control_md" },
       { part: "Menu's footer", token: "size-control_sm" },
-      { part: "Menu's corners", token: "radius-card" },
+      { part: "Menu's corners", token: "radius-surface" },
       { part: "Kōbō: header → list", token: "space-s20" },
       { part: "Kōbō: head, words, actions", token: "space-s24" },
     ],

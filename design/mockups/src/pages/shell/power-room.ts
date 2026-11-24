@@ -526,8 +526,7 @@ function build(options: RoomOptions): Built {
   tilesRow.classList.add("power-tiles");
   const content = stack("s16", "start", slot, say, tilesRow);
   content.classList.add("power-content");
-  // Its corner is concentric with the tiles': theirs and the content's padding.
-  const rising = sheet({ content, edge: "bottom", reveal: 0, rounding: "calc(var(--radius-control) + var(--space-s16))" });
+  const rising = sheet({ content, edge: "bottom", reveal: 0 });
   for (const part of rising.parts) part.classList.add("power-sheet");
   hang(made.screen, rising);
 

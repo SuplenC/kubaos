@@ -987,9 +987,8 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     onRegion: () => handlers.onLight?.({ kind: "region", screen: index }),
     onCancel: () => handlers.onCancel?.(),
   });
-  // The bar's card stands over the middle of this screen's bottom edge, its corner concentric with
-  // its buttons': theirs and its padding.
-  const barSheet = sheet({ content: bar, edge: "bottom", rounding: "calc(var(--radius-control) + var(--space-s16))" });
+  // The bar's card stands over the middle of this screen's bottom edge.
+  const barSheet = sheet({ content: bar, edge: "bottom" });
   hang(made, barSheet);
   const shut = options.arrive ? liven(barSheet, false) : undefined;
   const screenButton = bar.querySelector<HTMLElement>(".share-pick-screen")!;

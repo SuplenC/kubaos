@@ -11,7 +11,7 @@
 //
 // A card opens `size.gap` under the bar, centred under the bar item that opened it and stopped
 // `size.gap` from the screen's sides; one with no item stands at the right, or in the middle for
-// the clock's. It is its content's size, its corners `radius.card`, and it grows no further than
+// the clock's. It is its content's size, its corners `radius.surface`, and it grows no further than
 // `size.gap` above the screen's bottom, where its content scrolls. Opening, `--reveal` goes 0 to 1
 // over `long` on `emphasized_decel`: the card fades in as it settles `space.s8` down into place;
 // closing, back over `medium` on `emphasized_accel`. The item under which it opened carries the edge
@@ -142,11 +142,6 @@ export interface SheetOptions {
   readonly corner?: boolean;
   /** How far further down it starts (a length's CSS): a stack under another card. */
   readonly start?: string;
-  /**
-   * Its corners (a length's CSS) when what it holds is not a card's content boxes: concentric with
-   * its own controls, their radius and its content's padding. `radius.card` otherwise.
-   */
-  readonly rounding?: string;
 }
 
 /** A card: its glass for the glass layer, and its content's box for the layer above. */
@@ -189,7 +184,6 @@ export function sheet(options: SheetOptions): Sheet {
     part.dataset.edge = edge;
     if (options.start !== undefined && edge === "top") part.style.setProperty("--sheet-start", options.start);
     if (options.reveal !== undefined) part.style.setProperty("--reveal", String(options.reveal));
-    if (options.rounding !== undefined) part.style.setProperty("--sheet-corner", options.rounding);
   }
   let under: Element | null = options.under ?? null;
   let lit: Element | null = options.lit ?? null;

@@ -174,7 +174,7 @@ export default page<Shown>({
       { part: "Symbol", token: "icon-s24" },
       { part: "Bar's height", token: "size-progress" },
       { part: "Level's line", token: "type-body_strong-line" },
-      { part: "Corners", token: "radius-card" },
+      { part: "Corners", token: "radius-surface" },
       { part: "Above the bottom edge", token: "size-gap" },
     ],
     reflow: doesntApply("one size, centred `size.gap` above the focused screen's bottom."),

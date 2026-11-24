@@ -194,7 +194,7 @@ export default page({
       { part: "Scroll's reach past its sides", token: "focus-far" },
       { part: "Body's thumb", token: "size-scrollbar" },
       { part: "Card to bar, edges", token: "size-gap" },
-      { part: "The card's corners", token: "radius-card" },
+      { part: "The card's corners", token: "radius-surface" },
       { part: "Shadow's drop", token: "shadow-glass-y" },
       { part: "Shadow's blur", token: "shadow-glass-blur" },
       { part: "A twin's slide", token: "space-s24" },

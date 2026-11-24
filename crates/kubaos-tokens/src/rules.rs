@@ -398,7 +398,6 @@ fn check_on_grid(tokens: &Tokens, found: &mut Vec<Violation>) {
         ("control", radius.control),
         ("content", radius.content),
         ("surface", radius.surface),
-        ("card", radius.card),
     ] {
         on_grid(format!("radius.{role}"), value);
     }
@@ -455,10 +454,10 @@ fn check_on_grid(tokens: &Tokens, found: &mut Vec<Violation>) {
 /// Each scale smallest first.
 fn check_ascending(tokens: &Tokens, found: &mut Vec<Violation>) {
     let radius = &tokens.radius;
-    let roles = [radius.small, radius.row, radius.control, radius.content, radius.surface, radius.card];
+    let roles = [radius.small, radius.row, radius.control, radius.content, radius.surface];
     for (table, values) in [
         ("space.values", &tokens.space.values),
-        ("radius.small, row, control, content, surface, card", &roles.to_vec()),
+        ("radius.small, row, control, content, surface", &roles.to_vec()),
         ("icon.sizes", &tokens.icon.sizes),
         ("rules.font_sizes", &tokens.rules.font_sizes),
     ] {

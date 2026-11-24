@@ -232,7 +232,7 @@ export default page<Shown>({
       { part: "Field, head's row", token: "size-control_md" },
       { part: "Head's parts apart", token: "space-s8" },
       { part: "Footer", token: "size-control_sm" },
-      { part: "Corners", token: "radius-card" },
+      { part: "Corners", token: "radius-surface" },
       { part: "Pane: symbol", token: "icon-s48" },
       { part: "Pane: an app's initial tile", token: "size-control_lg" },
       { part: "Pane: symbol to title", token: "space-s16" },

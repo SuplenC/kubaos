@@ -133,7 +133,6 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.length("radius-control", radius.control);
     out.length("radius-content", radius.content);
     out.length("radius-surface", radius.surface);
-    out.length("radius-card", radius.card);
     if radius.full {
         out.var("radius-full", "9999px");
     }

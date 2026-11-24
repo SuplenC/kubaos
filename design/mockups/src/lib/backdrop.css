@@ -118,5 +118,5 @@
   width: var(--panel-width);
   height: calc(100% - var(--panel-margin, var(--space-s32)) - var(--panel-foot));
   --panel-foot: var(--space-s12);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-surface);
 }
