@@ -150,6 +150,24 @@ const LOOK_ITEMS: readonly Item[] = [
   settingItem("Workspace marks", "Settings › Desktop › Workspaces · numbers, dots or dashes", "computer", ["workspaces", "numbers", "kanji", "dots", "dashes"], () => "Dot and dash", () => "Dot and dash"),
 ];
 
+/** A camera setting's Item: its place in Settings › Camera, its value the built-in camera's own default. */
+const cameraItem = (title: string, sub: string, what: string, keywords: readonly string[], value: string) =>
+  settingItem(title, `Settings › Camera › ${sub} · ${what}`, "video", ["camera", "webcam", ...keywords], () => value, () => value);
+
+/** Camera's Items: the page, then each of its settings, found by “camera” or the setting's own words. */
+const CAMERA_ITEMS: readonly Item[] = [
+  { title: "Settings: Camera", subtitle: "Light, sharpness, colour and flicker, beside the picture", extension: "kubaos", symbol: "video", keywords: ["camera", "webcam", "picture"], actions: [{ title: "Open in Settings", keys: "↵" }] },
+  cameraItem("Light behind you", "Picture", "lifts your face against a window", ["backlight", "compensation"], "Off"),
+  cameraItem("Sharpness", "Picture", "crisper edges or softer", ["sharp", "soft", "focus"], "4"),
+  cameraItem("Automatic colour", "Picture", "matches the room's light", ["white balance", "auto"], "On"),
+  cameraItem("Colour temperature", "Picture", "warmer or cooler", ["white balance", "kelvin"], "4600 K"),
+  cameraItem("Automatic exposure", "Fine-tuning", "follows the light in the room", ["exposure", "auto"], "On"),
+  cameraItem("Exposure time", "Fine-tuning", "brighter or less blur", ["exposure", "shutter"], "1/60 s"),
+  cameraItem("Brighter in dim light", "Fine-tuning", "fewer frames when it's dark", ["exposure priority", "dark"], "Off"),
+  cameraItem("Boost", "Fine-tuning", "brighter, with more grain", ["gain", "brightness"], "0 %"),
+  cameraItem("Room light flicker", "Fine-tuning", "stops stripes from mains lights", ["power line", "frequency", "50 hz", "60 hz", "anti-flicker"], "50 Hz"),
+];
+
 /** The shots' Items, in the Daemon's order. */
 export const ITEMS: readonly Item[] = [
   { title: "Files", subtitle: "Access and organize files", extension: "apps", picture: plate },
@@ -168,6 +186,7 @@ export const ITEMS: readonly Item[] = [
   { title: "Design specimen", subtitle: "Every token and component, live", extension: "kubaos" },
   ...CLOCK_ITEMS,
   ...LOOK_ITEMS,
+  ...CAMERA_ITEMS,
 ];
 
 /** What the Action panel lists for every shot Result: the Item's own, then two Contributed. */
