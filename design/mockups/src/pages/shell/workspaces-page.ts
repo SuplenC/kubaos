@@ -1,7 +1,7 @@
 // The Workspaces page: `config/quickshell/modules/bar/Workspaces.qml`. This screen's workspaces in
 // groups, flat on the bar's glass, each a mark in a fixed cell (the marks a setting), the shown
-// one's lit; each group's `+` and a borrowed group's name while the pointer is on them or the
-// Overview is up; a workspace carried to another place, and the right-click menu.
+// one's lit; each group's `+` and a borrowed group's name while the pointer is on them; a
+// workspace carried to another place, and the right-click menu.
 
 import type { Words } from "../../lib/content.ts";
 import { rollingMidway } from "../../lib/rolling-number.ts";
@@ -181,9 +181,8 @@ export default page<State>({
     switches: {
       each: [
         { label: "Marks", choices: ["Dot and dash", "Numbers", "Kanji", "Only current", "Dots", "Dashes"] },
-        { label: "Overview", choices: ["Down", "Up"] },
       ],
-      live: ([form, overview]) => workspaces({ groups: LIVE, live: true, urgent: 3, ...FORMS[form ?? 0]!.options, overview: overview === 1 }),
+      live: ([form]) => workspaces({ groups: LIVE, live: true, urgent: 3, ...FORMS[form ?? 0]!.options }),
     },
     hint: "click or scroll; drag one; right-click one",
     daylight: true,
@@ -196,7 +195,6 @@ export default page<State>({
     { name: "One group", for: "the screen's own", sample: () => workspaces({ groups: SHOTS_GROUPS.slice(0, 1) }) },
     { name: "Borrowed, at rest", for: "a stronger hairline before and after it", sample: () => workspaces() },
     { name: "Borrowed, unnamed", for: "the hairlines alone, even under the pointer", sample: () => workspaces({ groups: UNNAMED, pinned: "hover" }) },
-    { name: "The Overview up", for: "every `+` and the name, as under the pointer", sample: () => workspaces({ groups: LIVE, overview: true }) },
   ],
   sizes: doesntApply("one row, `size.bar_row`; fixed cells, `size.ws_cell`."),
   groups: [

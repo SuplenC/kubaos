@@ -1,4 +1,4 @@
-/* The Overview (`overview-parts.ts`): each screen's desktop, its bar staying in place and its
+/* The Overview (`overview-parts.ts`): each screen's desktop, its bar sliding up out and its
    wallpaper blurred and dimmed as the lock's is, and over it the miniatures of every workspace the
    screen holds. Every place is a registered custom property that glides: a change sets the new
    value and its timing (`--ov-pt` and the rest), and the transition runs from wherever the element
@@ -23,6 +23,7 @@
 @property --ov-fly { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-arrive { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-veil { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --ov-aside { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-cover { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-plus-tint { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
@@ -79,14 +80,23 @@
   transition: --ov-veil var(--ov-vt, 0s) var(--ov-ve, linear);
 }
 
-/* The bar stays over the screen's own desktop, which flies over the other workspaces at `z-index`
-   1: the layer holding it makes no stacking context of its own. */
+/* The bar, back in place as the Overview closes, lies over the screen's own desktop, which flies
+   over the other workspaces at `z-index` 1: the layer holding it makes no stacking context of its
+   own. */
 .ov-screen > .k-screen-over {
   z-index: 1;
 }
 
 .ov-screen[data-open] .k-screen-over {
   pointer-events: none;
+}
+
+/* No bar while the Overview is up: it slides up off the screen's top as it opens, by as far as it
+   reaches down, fading as it goes, and back as it closes, in every layout. */
+.ov-screen .k-bar {
+  translate: 0 calc(-1 * var(--ov-aside) * var(--bar-reach));
+  opacity: calc(1 - var(--ov-aside));
+  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
 }
 
 .ov-screen[data-open] .k-bar {

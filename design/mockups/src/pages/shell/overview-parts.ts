@@ -332,8 +332,6 @@ interface ScreenView {
   readonly bar: HTMLElement;
   /** What blurs and dims as it opens: the wallpaper. */
   readonly veiled: readonly HTMLElement[];
-  /** The bar's workspaces part, which shows its add buttons and borrowed groups' names while the Overview is up. */
-  readonly workspaces: HTMLElement | null;
   layout: Layout;
 }
 
@@ -555,8 +553,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       if (!open && event.target instanceof Element && event.target.closest(".shell-ws")) setOpen(true);
     });
     const veiled = [element.querySelector<HTMLElement>(".k-screen-wallpaper")!];
-    const workspaces = bar.querySelector<HTMLElement>(".shell-ws");
-    return { screen, size: { w, h }, at: { x: 0, y: 0 }, element, layer, bar, veiled, workspaces, layout: arrange(w, h, []) };
+    return { screen, size: { w, h }, at: { x: 0, y: 0 }, element, layer, bar, veiled, layout: arrange(w, h, []) };
   }
 
   for (const screen of screensDrawn()) views.push(makeView(screen));
@@ -1122,7 +1119,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         part.style.setProperty("--ov-ve", settling ? "var(--easing-standard_decel)" : "var(--easing-standard)");
         part.style.setProperty("--ov-veil", isOpen ? "1" : "0");
       }
-      each.workspaces?.toggleAttribute("data-overview", isOpen);
+      // The bar slides up out of the way as the Overview opens, and back as it closes.
+      each.bar.style.setProperty("--ov-vt", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : isOpen || settling ? "var(--motion-medium)" : "var(--motion-long)");
+      each.bar.style.setProperty("--ov-ve", settling ? "var(--easing-standard_decel)" : isOpen ? "var(--easing-emphasized_accel)" : "var(--easing-emphasized_decel)");
+      each.bar.style.setProperty("--ov-aside", isOpen ? "1" : "0");
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
         for (const [k, id] of section.items.entries()) {
@@ -1198,7 +1198,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         part.style.setProperty("--ov-vt", "0s");
         part.style.setProperty("--ov-veil", at);
       }
-      each.workspaces?.toggleAttribute("data-overview", swiping > 0);
+      each.bar.style.setProperty("--ov-vt", "0s");
+      each.bar.style.setProperty("--ov-aside", at);
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
         for (const [k, id] of section.items.entries()) {

@@ -14,8 +14,7 @@
 }
 
 /* How far the extras show, 0 to 1: the add buttons and a borrowed group's name (and in Numbers'
-   "only the current one", the other numbers), there while the pointer is on the workspaces or the
-   Overview is up. Their room opens over `long` on `emphasized_decel` (`--ws-extras`), and they fade
+   "only the current one", the other numbers), there while the pointer is on the workspaces. Their room opens over `long` on `emphasized_decel` (`--ws-extras`), and they fade
    on `standard` (`--ws-extras-shown`), as the bar's entries glide. */
 @property --ws-extras {
   syntax: "<number>";
@@ -44,7 +43,7 @@
     --ws-extras-shown var(--motion-long) var(--easing-standard);
 }
 
-.shell-ws:is(:hover, [data-overview], [data-pinned="hover"], [data-pinned="pressed"], [data-carrying]),
+.shell-ws:is(:hover, [data-pinned="hover"], [data-pinned="pressed"], [data-carrying]),
 .shell-ws-room:has(> .shell-ws-menu) > .shell-ws {
   --ws-extras: 1;
   --ws-extras-shown: 1;

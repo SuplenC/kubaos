@@ -7,8 +7,8 @@
 // screen holds is borrowed: a stronger hairline before and after it, its name first in `label`,
 // `secondary`. A group's workspaces are numbered from 1 with no gap, and a group with fewer than
 // ten ends in its `+`: a faint `add` in `outline` at `opacity.placeholder`. The `+` and a borrowed
-// group's name show only while the pointer is on the workspaces, or the Overview is up. Clicking a
-// `+` adds a workspace at the next number and shows it; it stays, empty, until it is deleted.
+// group's name show only while the pointer is on the workspaces. Clicking a `+` adds a workspace
+// at the next number and shows it; it stays, empty, until it is deleted.
 //
 // The shown workspace sits on the indicator, `primary` at the full radius, between the tints and
 // the cells. Every change of shape glides: an entry grows in or shrinks out, its width over `long`
@@ -126,11 +126,6 @@ export interface WorkspacesOptions {
   readonly onlyCurrent?: boolean;
   /** A workspace asking for attention, by id: its mark lit in `error`. */
   readonly urgent?: number;
-  /**
-   * The Overview is up: the add buttons and a borrowed group's name show as while the pointer is
-   * on the workspaces. On a drawn element, `setOverview` switches it.
-   */
-  readonly overview?: boolean;
   /** Clicks and the wheel move the shown workspace, a group's `+` adds one; a drag reorders, a right click opens the menu. */
   readonly live?: boolean;
   readonly pinned?: Pinned;
@@ -303,15 +298,6 @@ function inkInset(marks: Marks, kanji: boolean): string {
   return `calc(${room} * var(--px))`;
 }
 
-/**
- * Says the Overview is up, or down, to a drawn workspaces part (what `workspaces` returned): its
- * add buttons and a borrowed group's name come and go as for the pointer.
- */
-export function setOverview(drawn: HTMLElement, up: boolean): void {
-  const part = drawn.matches(".shell-ws") ? drawn : drawn.querySelector<HTMLElement>(".shell-ws");
-  part?.toggleAttribute("data-overview", up);
-}
-
 export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   const marks = options.marks ?? "dotdash";
   const kanji = marks === "numbers" && (options.kanji ?? false);
@@ -331,7 +317,6 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   element.dataset.hot = "";
   element.dataset.marks = marks;
   element.toggleAttribute("data-only-current", marks === "numbers" && (options.onlyCurrent ?? false));
-  element.toggleAttribute("data-overview", options.overview ?? false);
   element.style.setProperty("--ws-ink", inkInset(marks, kanji));
   pin(element, options.pinned);
   const cells = document.createElement("span");
