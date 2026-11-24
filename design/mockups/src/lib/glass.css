@@ -1,6 +1,6 @@
 /* The shell's glass (`lib/glass.ts`): one material for the bar, its cards and every other surface
-   that floats over the desktop. `surface` at the glass setting over the compositor's blur, a
-   highlight inside its top edge, a ring inside its whole edge and the glass's two shadows. The
+   that floats over the desktop. `surface` at the glass setting over the compositor's blur, by night
+   a highlight inside its top edge, a ring inside its whole edge and the glass's two shadows. The
    blur is a backdrop filter, the mockups' stand-in for the compositor's: an ancestor with a filter,
    a mask or an opacity under 1 would become what it blurs, so nothing holding glass carries one.
 
@@ -15,6 +15,8 @@
     var(--glass-setting, calc(var(--opacity-glass) + (var(--opacity-glass_day) - var(--opacity-glass)) * var(--day))),
     1
   );
+  /* By day the highlight would read as a dark seam along the top edge, so only the night has one. */
+  --glass-highlight: calc(var(--opacity-glass_highlight) * (1 - var(--day)));
   --glass-ring: color-mix(
     in srgb,
     rgb(from var(--color-on_surface) r g b / var(--opacity-glass_ring)),
@@ -29,7 +31,7 @@
   background: rgb(from var(--color-surface) r g b / var(--glass-alpha));
   backdrop-filter: var(--glass-filter);
   box-shadow:
-    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--opacity-glass_highlight)),
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--glass-highlight)),
     inset 0 0 0 var(--stroke-hairline_device_px) var(--glass-ring),
     var(--glass-shadow);
 }
@@ -43,7 +45,7 @@
   background: color-mix(in srgb, var(--glass-from), rgb(from var(--color-surface) r g b / var(--glass-alpha)) calc(var(--glass-rise-by) * 100%));
   backdrop-filter: var(--glass-blur, none);
   box-shadow:
-    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / calc(var(--opacity-glass_highlight) * var(--glass-rise-by))),
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / calc(var(--glass-highlight) * var(--glass-rise-by))),
     inset 0 0 0 var(--stroke-hairline_device_px) color-mix(in srgb, var(--glass-ring), transparent calc((1 - var(--glass-rise-by)) * 100%)),
     0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-glass-opacity) * var(--glass-rise-by))),
     0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-glass_contact-opacity) * var(--glass-rise-by)));
@@ -74,7 +76,7 @@
   z-index: 10;
   border-radius: inherit;
   box-shadow:
-    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--opacity-glass_highlight)),
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--glass-highlight)),
     inset 0 0 0 var(--stroke-hairline_device_px) var(--glass-ring);
   pointer-events: none;
 }
@@ -88,7 +90,7 @@
 
 .k-glass-window[data-active]::after {
   box-shadow:
-    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--opacity-glass_highlight)),
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--glass-highlight)),
     inset 0 0 0 var(--focus-tube) color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%));
 }
 

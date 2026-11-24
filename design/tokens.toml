@@ -960,7 +960,8 @@ glass_floor = 0.73
 glass_floor_day = 0.80
 # The glass's edge by night: a 1 px highlight inside its top edge, `on_surface` at
 # `glass_highlight`, and a 1 px ring inside its whole edge, `on_surface` at `glass_ring`. By day the
-# ring is the soft hairline, `outline_variant` at `outline_soft`.
+# ring is the soft hairline, `outline_variant` at `outline_soft`, and there is no highlight: it would
+# read as a dark seam along the top edge.
 glass_highlight = 0.12
 glass_ring = 0.07
 # The hairline between the bar's groups, `on_surface` at `bar_divider`; round a borrowed workspace
