@@ -24,7 +24,7 @@ export interface MediaOptions {
   /** The corner its place gives it: the control radius in a picker, the row radius in a card. */
   readonly corner: Corner;
   /** The `[aspect]` token its box keeps. */
-  readonly aspect?: "wallpaper";
+  readonly aspect?: "wallpaper" | "camera";
   /** A line under it, `small` in `on_surface_variant`, `space.s8` below, wrapping in its width. */
   readonly caption?: string;
   readonly dimmed?: boolean;

@@ -1,0 +1,46 @@
+/* A column with a picture beside it (`lib/beside.ts`). The room is the container the picture's
+   width is worked out from: 40% of it between `beside_picture_least` and `beside_picture_most`, or
+   all the column leaves past `beside_controls_most`, whichever is more. */
+.k-beside {
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  align-items: flex-start;
+  gap: var(--space-s24);
+  container-type: inline-size;
+}
+
+.k-beside > .k-beside-main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The picture stays in view as the column scrolls, at the lead line the page's headings land on. */
+.k-beside > .k-beside-aside {
+  position: sticky;
+  top: var(--space-s32);
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: round(
+    max(clamp(var(--size-beside_picture_least), 40cqw, var(--size-beside_picture_most)), 100cqw - var(--size-beside_controls_most) - var(--space-s24)),
+    1px
+  );
+}
+
+/* Too narrow for both: the picture above the column, at its least, scrolling with the page. */
+.k-beside[data-above] {
+  flex-direction: column;
+  gap: var(--space-s32);
+}
+
+.k-beside[data-above] > .k-beside-aside {
+  order: -1;
+  position: static;
+  width: var(--size-beside_picture_least);
+}
+
+.k-beside[data-above] > .k-beside-main {
+  flex: none;
+  align-self: stretch;
+}

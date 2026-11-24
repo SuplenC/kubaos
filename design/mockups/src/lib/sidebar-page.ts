@@ -69,6 +69,11 @@ export interface Section {
   readonly trailing?: () => HTMLElement;
   /** A region of its own in place of the sub-sections' wells, below the header: CanvasPage. */
   readonly region?: (host: RegionHost) => HTMLElement;
+  /**
+   * Its page takes the pane's whole width, past `size.canvas_wide`: a region that holds its rows
+   * to a width of its own and puts a picture beside them (`lib/beside.ts`).
+   */
+  readonly wide?: true;
 }
 
 /** The window's outline: Home's words, then its sections. */
@@ -634,10 +639,12 @@ export function sidebarPage(options: SidebarPageOptions): HTMLElement {
     if (current === -1) {
       rise.replaceChildren(homePage());
       pane.dataset.home = "";
+      delete pane.dataset.wide;
       return;
     }
     delete pane.dataset.home;
     const each = sections[current]!;
+    pane.toggleAttribute("data-wide", each.wide === true);
     const head = header({ accent: each.accent, title: each.title, subtitle: each.lede, ...(each.trailing ? { trailing: each.trailing() } : {}) });
     const host: RegionHost = {
       rename: (index, title) => {

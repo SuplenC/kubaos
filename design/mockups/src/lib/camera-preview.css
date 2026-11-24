@@ -1,0 +1,37 @@
+/* A camera's live picture (`lib/camera-preview.ts`): as wide as its room, `aspect.camera` of it tall
+   down to the grid, as `Media` is. */
+.k-preview {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  align-self: stretch;
+  container-type: inline-size;
+}
+
+/* Another app has the camera: the same box, the well's sunken fill and soft hairline, its words
+   centred in it. */
+.k-preview-busy {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100cqw;
+  height: round(down, calc(100cqw / (var(--aspect))), var(--grid));
+  padding-inline: var(--space-s16);
+  border-radius: var(--radius-content);
+  background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
+}
+
+.k-preview-edge {
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--sunken-line);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.k-preview-busy > .k-stack {
+  min-width: 0;
+  max-width: 100%;
+}
