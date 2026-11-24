@@ -100,21 +100,21 @@
    the mark `size.bar_mark_air` from the hairline, the hairline `size.bar_start` from the first
    workspace's mark (`--ws-ink`, how far inside its cell the mark's ink starts). In Islands the
    button is a round island of its own, and the workspaces' island starts `size.bar_start` from
-   their first mark. */
+   their first mark. Set by eye, each lands on the nearest whole device pixel. */
 .shell-bar-left > .shell-cmd:first-child {
-  margin-inline-start: calc(var(--size-bar_start) - (var(--size-bar_row) - var(--size-bar_mark)) / 2 - var(--bar-pad));
+  margin-inline-start: round(nearest, calc(var(--size-bar_start) - (var(--size-bar_row) - var(--size-bar_mark)) / 2 - var(--bar-pad)), 1px);
 }
 
 .shell-bar-left > .shell-cmd + .shell-bar-divider {
-  margin-inline: calc(var(--size-bar_mark_air) - (var(--size-bar_row) - var(--size-bar_mark)) / 2) 0;
+  margin-inline: round(nearest, calc(var(--size-bar_mark_air) - (var(--size-bar_row) - var(--size-bar_mark)) / 2), 1px) 0;
 }
 
 .shell-bar-left > .shell-cmd + .shell-bar-divider + :is(.shell-ws, .shell-ws-room) {
-  margin-inline-start: calc(var(--size-bar_start) - var(--ws-ink, 0px));
+  margin-inline-start: round(nearest, calc(var(--size-bar_start) - var(--ws-ink, 0px)), 1px);
 }
 
 .k-bar-island > .shell-bar-left > :is(.shell-ws, .shell-ws-room):first-child {
-  margin-inline-start: calc(var(--size-bar_start) - var(--ws-ink, 0px) - var(--bar-pad));
+  margin-inline-start: round(nearest, calc(var(--size-bar_start) - var(--ws-ink, 0px) - var(--bar-pad)), 1px);
 }
 
 /* Workspaces ending in a borrowed group end in its own hairline: the bar's after it stands down,
