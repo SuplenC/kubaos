@@ -116,3 +116,56 @@ fn each_app_gets_the_code_it_would_exit_with_alone() {
 
     assert_eq!(codes(&rows), "moved 0\ndown 3\nfailed 1\n");
 }
+
+#[test]
+fn one_apps_panic_is_its_error_row_and_keeps_the_others_rows() {
+    let row = |app: &Folder| Row {
+        app: app.id.clone(),
+        check: "bump",
+        subject: "x".to_owned(),
+        outcome: Outcome::Moved,
+        detail: String::new(),
+    };
+    let catalog = Catalog::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps")).unwrap();
+    let apps: Vec<&Folder> = catalog.apps().iter().take(3).collect();
+    let broken = apps[1].id.clone();
+
+    let rows = side_by_side(&apps, |app| {
+        assert!(app.id != broken, "a feed shape the bump didn't expect");
+        vec![row(app)]
+    });
+
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[1].app, broken);
+    assert_eq!(rows[1].outcome, Outcome::Error);
+    assert!(
+        rows[1].detail.contains("a feed shape the bump didn't expect"),
+        "{}",
+        rows[1].detail
+    );
+    assert_eq!(rows[0].outcome, Outcome::Moved);
+    assert_eq!(rows[2].outcome, Outcome::Moved);
+    assert_eq!(exit_code(&rows[..1], true), 0);
+}
+
+#[test]
+fn an_app_named_twice_is_refused() {
+    assert!(args(&["--bump", "t3-code", "t3-code"]).is_err());
+    assert!(args(&["docker", "firefox", "docker"]).is_err());
+}
+
+#[test]
+fn a_detail_of_several_lines_is_one_line_of_the_table() {
+    let rows = [Row {
+        app: "tool".to_owned(),
+        check: "bump",
+        subject: "x".to_owned(),
+        outcome: Outcome::Error,
+        detail: "first\nsecond\r\nthird".to_owned(),
+    }];
+
+    let text = table(&rows);
+
+    assert_eq!(text.lines().count(), 2);
+    assert!(text.lines().nth(1).unwrap().starts_with("tool "));
+}

@@ -12,6 +12,7 @@
 //!
 //! - What is checked against what, and how a class is reported: the checks' modules.
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::env;
 use std::fmt::Write as _;
@@ -24,6 +25,7 @@ use std::process::ExitStatus;
 use std::process::Output;
 use std::process::Stdio;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
@@ -96,6 +98,30 @@ pub fn tries() -> usize {
     RETRY.tries as usize
 }
 
+/// How long a run may fetch: no fetch starts once this long has passed since the run's first, and
+/// one in flight is cut at it, an outage either way. The `apps verify` job has 30 minutes, of which
+/// its checkout, nix and the build take up to about 8 with cold caches; whatever the outages, the
+/// run's fetching ends by this, with a margin. A healthy run of the whole catalog takes 2 to 4.
+const DEADLINE: Duration = if cfg!(test) {
+    Duration::from_mins(10)
+} else {
+    Duration::from_mins(18)
+};
+
+/// When the run's first fetch started, which [`DEADLINE`] counts from.
+static RUN_START: OnceLock<Instant> = OnceLock::new();
+
+/// How long the run may still fetch.
+fn run_left() -> Duration {
+    DEADLINE.saturating_sub(RUN_START.get_or_init(Instant::now).elapsed())
+}
+
+/// The seconds a try may take of `max_time` with `left` of the run, none when the run's time is
+/// spent; at least a second, as curl takes whole seconds.
+fn capped(max_time: u64, left: Duration) -> Option<u64> {
+    (!left.is_zero()).then(|| max_time.min(left.as_secs().max(1)))
+}
+
 /// The hosts that were out of reach on every try this run: a later fetch from one is an outage at
 /// once, so a host that drops packets costs its tries once, not once a URL.
 static DOWN: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
@@ -160,6 +186,9 @@ pub enum Cause {
     /// The host was out of reach on every try of an earlier fetch this run.
     #[error("{0} was out of reach earlier in this run; not tried again")]
     HostDown(String),
+    /// The run's time for fetching was spent before this fetch could start.
+    #[error("the run's time for fetching was spent; not tried")]
+    Late,
 }
 
 impl Cause {
@@ -167,7 +196,7 @@ impl Cause {
         match self {
             Self::Status(status) if *status == 429 || (500..600).contains(status) => Class::Outage,
             Self::Curl { exit: Some(exit), .. } if curl_outage(*exit) => Class::Outage,
-            Self::HostDown(_) => Class::Outage,
+            Self::HostDown(_) | Self::Late => Class::Outage,
             _ => Class::Failure,
         }
     }
@@ -292,9 +321,11 @@ fn tried<T>(url: &str, max_time: u64, mut once: impl FnMut(u64) -> Result<T, Cau
     if DOWN.lock().expect("down hosts mutex poisoned").contains(host) {
         return Err(FetchError::new(url, Cause::HostDown(host.to_owned())));
     }
+    let Some(mut this_try) = capped(max_time, run_left()) else {
+        return Err(FetchError::new(url, Cause::Late));
+    };
     let start = Instant::now();
     let mut timeouts = 0;
-    let mut this_try = max_time;
     let mut next = 2;
     loop {
         let cause = match once(this_try) {
@@ -309,9 +340,12 @@ fn tried<T>(url: &str, max_time: u64, mut once: impl FnMut(u64) -> Result<T, Cau
             }
             return Err(FetchError::new(url, cause));
         };
+        let Some(in_run) = capped(max_time, run_left().saturating_sub(wait)) else {
+            return Err(FetchError::new(url, cause));
+        };
         thread::sleep(wait);
         let left = RETRY.budget.saturating_sub(elapsed + wait).as_secs().max(1);
-        this_try = max_time.min(left);
+        this_try = in_run.min(left);
         next += 1;
     }
 }
@@ -437,6 +471,20 @@ pub fn status(url: &str) -> Result<Answer, FetchError> {
 ///
 /// [`FetchError`] when curl can't run, GitHub answers with an error, or the answer isn't JSON.
 pub fn github(path: &str) -> Result<serde_json::Value, FetchError> {
+    // The bump asks for one repository's releases once for each architecture of a pin.
+    static ANSWERS: Mutex<BTreeMap<String, serde_json::Value>> = Mutex::new(BTreeMap::new());
+    if let Some(known) = ANSWERS.lock().expect("GitHub answers mutex poisoned").get(path) {
+        return Ok(known.clone());
+    }
+    let answer = github_uncached(path)?;
+    ANSWERS
+        .lock()
+        .expect("GitHub answers mutex poisoned")
+        .insert(path.to_owned(), answer.clone());
+    Ok(answer)
+}
+
+fn github_uncached(path: &str) -> Result<serde_json::Value, FetchError> {
     let url = format!("https://api.github.com/{path}");
     let token = env::var("GITHUB_TOKEN").ok().filter(|token| !token.is_empty());
     tried(&url, MAX_TIME, |max_time| {

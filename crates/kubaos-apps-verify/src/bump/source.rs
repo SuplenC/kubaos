@@ -14,6 +14,8 @@
 //!   `fetch.rs`.
 
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use kubaos_core::apps::version;
 
@@ -299,11 +301,20 @@ pub fn percent_decoded(text: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// A vendor's JSON feed. One that doesn't read as JSON is an error, not an outage: the vendor
-/// answered.
+/// A vendor's JSON feed, read once a run: the bump asks for it once for each architecture of a
+/// pin. One that doesn't read as JSON is an error, not an outage: the vendor answered.
 fn json(url: &str) -> Result<serde_json::Value, Problem> {
+    static FEEDS: Mutex<BTreeMap<String, serde_json::Value>> = Mutex::new(BTreeMap::new());
+    if let Some(known) = FEEDS.lock().expect("feeds mutex poisoned").get(url) {
+        return Ok(known.clone());
+    }
     let body = fetch::get(url).map_err(|e| Problem::fetch(&e))?;
-    serde_json::from_slice(&body).map_err(|e| Problem::error(format!("{url}: {e}")))
+    let feed: serde_json::Value = serde_json::from_slice(&body).map_err(|e| Problem::error(format!("{url}: {e}")))?;
+    FEEDS
+        .lock()
+        .expect("feeds mutex poisoned")
+        .insert(url.to_owned(), feed.clone());
+    Ok(feed)
 }
 
 fn newer(pin: &Pin<'_>, version: &str) -> bool {

@@ -230,3 +230,12 @@ fn a_web_apps_status_is_its_answer_and_a_down_one_is_an_outage() {
     assert_eq!(down.requests(), RETRY.tries as usize);
     assert_eq!(status(&looping.url("/")).unwrap_err().class(), Class::Outage);
 }
+
+#[test]
+fn a_try_is_cut_at_the_runs_deadline_and_none_starts_after_it() {
+    assert_eq!(capped(900, Duration::from_mins(10)), Some(600));
+    assert_eq!(capped(60, Duration::from_mins(10)), Some(60));
+    assert_eq!(capped(900, Duration::from_millis(300)), Some(1));
+    assert_eq!(capped(900, Duration::ZERO), None);
+    assert_eq!(Cause::Late.class(), Class::Outage);
+}

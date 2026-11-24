@@ -20,8 +20,10 @@
 //! timeout, a name that doesn't resolve, a refused or broken connection, a failed TLS handshake) is
 //! a warning: its row says `WARN`, GitHub Actions shows it as an annotation, and the run passes, as
 //! the catalog may well be right. A fetch gets 7 tries within 3 minutes, a timeout 2, and a host
-//! out of reach at connect time isn't tried again in the run. It installs nothing and reads no
-//! apt, dpkg or gpg state of the machine's: keys are checked in a gpg home of their own.
+//! out of reach at connect time isn't tried again in the run; no fetch starts 18 minutes after the
+//! run's first. An app whose checks panic is an error row, the others' rows kept. It installs
+//! nothing and reads no apt, dpkg or gpg state of the machine's: keys are checked in a gpg home of
+//! their own.
 //!
 //! `--changed BASE` checks the apps whose folder changed since the merge base with BASE, and the
 //! apps whose vendor repository changed (`system/packages.toml`, a sources file). There an outage
@@ -56,6 +58,7 @@ mod fetch;
 #[cfg(test)]
 mod stub;
 
+use std::any::Any;
 use std::collections::BTreeSet;
 use std::env;
 use std::fmt::Write as _;
@@ -124,6 +127,7 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Option<Args>, String>
             "--bump" => parsed.bump = true,
             "--codes" => parsed.codes = Some(PathBuf::from(value("--codes")?)),
             flag if flag.starts_with('-') => return Err(format!("unknown flag {flag}")),
+            _ if parsed.ids.contains(&arg) => return Err(format!("{arg} is named twice")),
             _ => parsed.ids.push(arg),
         }
     }
@@ -292,12 +296,29 @@ fn run(args: &Args) -> Result<Vec<Row>, Usage> {
 /// side.
 fn side_by_side(apps: &[&Folder], each: impl Fn(&Folder) -> Vec<Row> + Sync) -> Vec<Row> {
     thread::scope(|scope| {
-        let running: Vec<_> = apps.iter().map(|app| scope.spawn(|| each(app))).collect();
+        let running: Vec<_> = apps.iter().map(|app| (app, scope.spawn(|| each(app)))).collect();
         running
             .into_iter()
-            .flat_map(|rows| rows.join().expect("an app's checks panicked"))
+            .flat_map(|(app, rows)| rows.join().unwrap_or_else(|panic| vec![panicked(app, panic.as_ref())]))
             .collect()
     })
+}
+
+/// The error row of an app whose checks panicked, so the other apps' rows, and their pull requests
+/// and issues, still come through.
+fn panicked(app: &Folder, panic: &(dyn Any + Send)) -> Row {
+    let message = panic
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("no message");
+    Row {
+        app: app.id.clone(),
+        check: "panic",
+        subject: app.id.clone(),
+        outcome: Outcome::Error,
+        detail: format!("its checks stopped: {message}"),
+    }
 }
 
 /// The merge base of `base` and `HEAD`; none when git finds none, as in a shallow clone.
@@ -358,18 +379,21 @@ fn touched<'a>(paths: &str, catalog: &'a Catalog) -> Vec<&'a Folder> {
 }
 
 /// The rows as a table, its columns as wide as their widest cell, each cell of the last column
-/// left whole.
+/// left whole. A row is one line, its detail's line breaks made spaces, so `test/apps-bump/run`
+/// can take an app's rows by their first word.
 fn table(rows: &[Row]) -> String {
     let header = ["APP", "CHECK", "WHAT", "RESULT", "DETAIL"];
+    let details: Vec<String> = rows.iter().map(|row| row.detail.replace(['\r', '\n'], " ")).collect();
     let cells: Vec<[&str; 5]> = rows
         .iter()
-        .map(|row| {
+        .zip(&details)
+        .map(|(row, detail)| {
             [
                 row.app.as_str(),
                 row.check,
                 row.subject.as_str(),
                 row.outcome.word(),
-                row.detail.as_str(),
+                detail.as_str(),
             ]
         })
         .collect();
