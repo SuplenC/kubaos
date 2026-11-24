@@ -145,7 +145,7 @@ const glassNow = () => `${Math.round(number("opacity-glass") * 100)} %`;
 
 /** The desktop's look as Items: the glass, the bar's layout and the workspaces' marks, each at its default. */
 const LOOK_ITEMS: readonly Item[] = [
-  settingItem("Glass opacity", "Settings › Appearance › Wallpaper · how much of the wallpaper shows through", "wallpaper", ["glass", "opacity", "transparency", "blur"], glassNow, glassNow),
+  settingItem("Glass opacity", "Settings › Appearance › Wallpaper · how much shows through", "wallpaper", ["glass", "opacity", "transparency", "blur"], glassNow, glassNow),
   settingItem("Bar layout", "Settings › Desktop › Bar · a band, a floating strip or islands", "computer", ["bar", "floating", "islands", "layout"], () => "Bar", () => "Bar"),
   settingItem("Workspace marks", "Settings › Desktop › Workspaces · numbers, dots or dashes", "computer", ["workspaces", "numbers", "kanji", "dots", "dashes"], () => "Dot and dash", () => "Dot and dash"),
 ];
