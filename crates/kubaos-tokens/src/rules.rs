@@ -377,8 +377,8 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     check_ordered_pairs(tokens, found);
 }
 
-/// Every length a multiple of `rules.grid`, but the sizes `rules.off_grid` names, which must be
-/// sizes.
+/// Every length a multiple of `rules.grid`, but the sizes and shadows `rules.off_grid` names,
+/// which must be sizes or shadows.
 fn check_on_grid(tokens: &Tokens, found: &mut Vec<Violation>) {
     let grid = tokens.rules.grid;
     let mut on_grid = |token: String, value: u16| {
@@ -417,6 +417,9 @@ fn check_on_grid(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     }
     for (name, shadow) in &tokens.shadow {
+        if tokens.rules.off_grid.contains(&format!("shadow.{name}")) {
+            continue;
+        }
         on_grid(format!("shadow.{name}.y"), shadow.y);
         on_grid(format!("shadow.{name}.blur"), shadow.blur);
     }
@@ -435,7 +438,10 @@ fn check_on_grid(tokens: &Tokens, found: &mut Vec<Violation>) {
     for listed in &tokens.rules.off_grid {
         let known = listed
             .strip_prefix("size.")
-            .is_some_and(|name| tokens.size.contains_key(name));
+            .is_some_and(|name| tokens.size.contains_key(name))
+            || listed
+                .strip_prefix("shadow.")
+                .is_some_and(|name| tokens.shadow.contains_key(name));
         if !known {
             found.push(Violation::UnknownName {
                 token: "rules.off_grid".into(),

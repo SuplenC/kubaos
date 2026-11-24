@@ -1,6 +1,6 @@
 // The Lock page: `docs/design/components/lock.md` is its full reference. At rest, the wallpaper
-// and its clock with the city in front of the digits; awake, the frame closed in and the
-// password's sheet up; always in the wallpaper's own night scheme.
+// and its clock with the city in front of the digits; awake, the picture blurred and the
+// password's field alone at its bottom; always in the wallpaper's own night scheme.
 
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { fromAwake, fromAwakeReduced, locking, lockingReduced, ON, reducedRest, resting, touching, touchingReduced, waking, wakingReduced } from "./lock-moves.ts";
@@ -9,8 +9,8 @@ import { windowSize } from "../../site/settings.ts";
 import { DATES, FINGER_ERROR, kickerFor, LOCK_ERROR, liveLock, PURPLE_HOUR, SHIBUYA, still, TIMES, TOWER, twelveHour, twoScreens } from "./locks.ts";
 
 /**
- * A lock drawn still, wrapped so a move can reach its root: the frame's number is set there. Its
- * sheet shows `moment`, seen or not.
+ * A lock drawn still, wrapped so a move can reach its root: the bar's number is set there. Its
+ * field shows `moment`, seen or not.
  */
 function held(phase: "rest" | "awake" | "desktop", wallpaper = PURPLE_HOUR, moment: Moment = "rest"): () => HTMLElement {
   return () => {
@@ -26,7 +26,7 @@ const ON_SHIBUYA = "the lock on Shibuya";
 
 const WAKES: Move = {
   name: "Waking",
-  what: "The frame slides in over `long`, the picture blurs and dims, the clock lifts, the sheet rises.",
+  what: "The picture blurs and dims over `long`, the clock lifts, the field rises.",
   tracks: waking(),
   reduced: wakingReduced(),
   back: "cuts",
@@ -37,7 +37,7 @@ const WAKES: Move = {
 
 const RESTS: Move = {
   name: "Going back to rest",
-  what: "Esc, or 20 s idle: the sheet sinks, the frame slides out, the clock flies home.",
+  what: "Esc, or 20 s idle: the field sinks, the clock flies home.",
   tracks: resting(ON),
   reduced: reducedRest(),
   back: "cuts",
@@ -68,7 +68,7 @@ const LOCKS_BARE: Move = {
 
 const UNLOCKS: Move = {
   name: "Unlocking with the password",
-  what: "The lock opens, the sheet sinks, and the clock flies into the bar's time: about 0.8 s.",
+  what: "The lock opens, the field sinks, and the clock flies into the bar's time: about 0.8 s.",
   tracks: [
     { part: "the field's lock", on: ON, target: ".k-lock-shut", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the field's open lock", on: ON, target: ".k-lock-open", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
@@ -109,7 +109,7 @@ const READER_SHAKE = "the reader's mark's shake";
 
 const MISSES: Move = {
   name: "A finger not recognised",
-  what: "It wakes as Waking does, the sheet showing the miss, the reader's mark shaking in `error`.",
+  what: "It wakes as Waking does, the field showing the miss, the reader's mark shaking in `error`.",
   tracks: [
     ...waking(),
     { part: READER, on: ON, target: ".k-lock-reader", property: "--lock-reader-missed", from: 0, to: 1, duration: "short", cue: "short", curve: "standard" },
@@ -140,7 +140,7 @@ const KNOWN_AWAKE: Move = {
 
 type Shown = "rest" | "loading" | "error";
 
-/** A state of the sheet after a finger: its miss is an unknown finger, not a wrong password. */
+/** A state of the field after a finger: its miss is an unknown finger, not a wrong password. */
 const byFinger = (state: Shown) => (state === "error" ? "unknown" : state);
 
 function reflow(): HTMLElement {
@@ -151,7 +151,7 @@ export default page({
   level: "templates",
   slug: "lock",
   title: "Lock",
-  lede: "The lock screen: a clock the city stands in front of, then the frame and the password's sheet.",
+  lede: "The lock screen: a clock the city stands in front of, then the password's field.",
   code: { unbuilt: "QML Lock: not built yet" },
   stage: {
     live: () => liveLock(),
@@ -162,14 +162,14 @@ export default page({
     { name: "Rest, a cut-out", for: "Shinjuku: the skyline clips the digits", sample: () => still({ phase: "rest", wallpaper: PURPLE_HOUR }) },
     { name: "Rest, a dark sky", for: "Tokyo Tower: centred like the rest", sample: () => still({ phase: "rest", wallpaper: TOWER }) },
     { name: "Rest, no cut-out", for: "Shibuya, as a picture of your own", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
-    { name: "Awake", for: "frame in, picture blurred, the sheet up", sample: () => still({ phase: "awake", wallpaper: PURPLE_HOUR }) },
+    { name: "Awake", for: "picture blurred, the field up", sample: () => still({ phase: "awake", wallpaper: PURPLE_HOUR }) },
     { name: "Awake, no cut-out", for: "Shibuya, in its own night scheme", sample: () => still({ phase: "awake", wallpaper: SHIBUYA }) },
     { name: "12-hour clock", for: "the meridiem at the kicker's end", sample: () => twelveHour("rest") },
     { name: "12-hour clock, awake", for: "the same, awake", sample: () => twelveHour("awake") },
     { name: "The desktop's still", for: "what locking and unlocking play on", sample: () => still({ phase: "desktop" }) },
     { name: "Two screens", for: "only the pointer's screen wakes", sample: twoScreens },
   ],
-  sizes: doesntApply("as large as its screen; the sheet is `size.panel` wide."),
+  sizes: doesntApply("as large as its screen; the field's room is `size.panel` wide."),
   states: {
     shown: ["rest", "loading", "error"],
     absent: {
@@ -223,7 +223,7 @@ export default page({
     samples: nonEmpty([
       { name: "At rest", for: "clock, kicker gap, halo", sample: () => still({ phase: "rest" }) },
       { name: "At rest, no cut-out", for: "the halo over signs", sample: () => still({ phase: "rest", wallpaper: SHIBUYA }) },
-      { name: "Awake", for: "frame, awake clock, sheet", sample: () => still({ phase: "awake" }) },
+      { name: "Awake", for: "awake clock, field", sample: () => still({ phase: "awake" }) },
       { name: "The desktop's still", for: "bar band, bar clock, windows", sample: () => still({ phase: "desktop" }) },
     ]),
     measures: [
@@ -242,15 +242,15 @@ export default page({
       { part: "Halo, round the word", token: "size-halo" },
       { part: "Kicker's baseline → cap top, now", token: "scale-lock_date_gap" },
       { part: "The same, portrait", token: "scale-lock_date_gap_portrait" },
-      { part: "Sheet top, foot", token: "space-s16" },
+      { part: "Field room top, foot", token: "space-s16" },
       { part: "Clock → screen edge", token: "space-s32" },
       { part: "Bar band", token: "size-bar" },
       { part: "Bar time", token: "type-body-size" },
-      { part: "Awake frame", token: "space-s8" },
-      { part: "Sheet width", token: "size-panel" },
+      { part: "Field room → bottom", token: "size-gap" },
+      { part: "Field room width", token: "size-panel" },
       { part: "Field", token: "size-control_md" },
       { part: "Field marks' inset", token: "space-s12" },
-      { part: "Fillets, sheet corners", token: "radius-surface" },
+      { part: "Field shadow", token: "shadow-glass-blur" },
       { part: "Awake blur", token: "size-lock_blur" },
     ],
     reflow: {

@@ -144,7 +144,8 @@ export default page<Shown>({
     ]),
     measures: [
       { part: "Width: half the panel", token: "space-s4" },
-      { part: "Clear of footer rule and edge", token: "space-s12" },
+      { part: "Clear of the footer's rule", token: "space-s12" },
+      { part: "Clear of the edge", token: "space-s16" },
       { part: "Popover's padding", token: "space-s4" },
       { part: "An entry", token: "size-control_sm" },
       { part: "Entry's inset", token: "space-s8" },

@@ -1,54 +1,97 @@
-// A panel growing out of an inner edge of the screen frame: `kubaos-ui`'s `sheet::sheet`,
-// `KubaOS.Components`' `Sheet` (`docs/design/components/sheet.md`), on a screen with its frame.
+// The desktop and the cards floating over it: `kubaos-ui`'s `sheet::sheet`, `KubaOS.Components`'
+// `Sheet` (`docs/design/components/sheet.md`), on a screen with no frame round it.
 //
-// The frame and every sheet are one surface: their fills are opaque `surface` inside one layer
-// drawn at `opacity.frame`, so where a sheet meets the frame, or covers its rounded inner corner,
-// the glass never doubles up, and the layer casts `shadow.panel` once. A sheet's content sits
-// above that layer at full opacity, in a box the same size as its surface.
+// The screen is its wallpaper, the bar along its top in one of three layouts, and the cards. The
+// bar and every card are the shell's glass (`glass.ts`), each its own surface over the desktop; the
+// desktop never dims under a card. The layouts hold the same items in a row `size.bar_row` tall:
+// Bar, a band `size.bar` tall touching the top edge, full width; Floating, one strip
+// `size.bar_strip` tall `size.gap` from the top and the sides; Islands, its groups each a strip of
+// their own, as far from the edges. Everything else on the desktop keeps `size.gap` from the
+// screen's edges, from the bar and from each other.
 //
-// A sheet hangs from the frame's top edge. Where it meets the edge it curves into it through a
-// concave fillet of the surface radius, the frame's own inner corner, and its far corners take
-// the surface radius; one flush with the frame's right edge curves into that edge below it
-// instead. Its depth is `--reveal` of its content's height: opening, `--reveal` goes 0 to 1 over
-// `long` on `emphasized_decel`, the content riding on its far edge so it slides out from under the
-// frame, and fading in a beat after the surface moves, from a fifth of the way to three quarters;
-// closing, it goes back over `medium` on `emphasized_accel`. The fillets and corners shrink with
-// the depth, so a sheet starting at nothing grows smoothly out of a flat edge.
+// A card opens `size.gap` under the bar, centred under the bar item that opened it and stopped
+// `size.gap` from the screen's sides; one with no item stands at the right, or in the middle for
+// the clock's. It is its content's size, its corners `radius.surface`, and it grows no further than
+// `size.gap` above the screen's bottom, where its content scrolls. Opening, `--reveal` goes 0 to 1
+// over `long` on `emphasized_decel`: the card fades in as it settles `space.s8` down into place;
+// closing, back over `medium` on `emphasized_accel`. The item under which it opened carries the edge
+// light along the bar's lower edge, echoed along the card's top edge between its corners.
 
 import "./sheet.css";
+import { edgeLight, edgeRail, glass, stretchUnder } from "./glass.ts";
 import { probe } from "./probe.ts";
 import { durationMs, length, raw } from "./tokens.ts";
 import { settings } from "../site/settings.ts";
+
+/** How the bar lies along the screen's top: a band, one floating strip, or a strip per group. */
+export type BarLayout = "bar" | "floating" | "islands";
+
+/** The layouts, the setting's default first. */
+export const BAR_LAYOUTS: readonly BarLayout[] = ["bar", "floating", "islands"];
 
 export interface ScreenOptions {
   /** Its size, a length's CSS each: a screen of the toolbar's window size, or a sample's room. */
   readonly width: string;
   readonly height: string;
-  /** The wallpaper behind the frame. */
+  /** The desktop's wallpaper. */
   readonly wallpaper: string;
   /** What the bar shows, laid along it. */
   readonly bar?: readonly Element[];
+  /** How the bar lies: `bar`, the setting's default, unless the sample shows another. */
+  readonly layout?: BarLayout;
   /**
-   * How far the desktop dims while something is open over it: a panel's `opacity.panel_scrim`, or
-   * a dialog's darker `opacity.scrim`, as the power menu asks what to do with the session.
+   * A dialog's dim over the desktop while something is open over it, `scrim` at `opacity.scrim`,
+   * as the power menu asks what to do with the session. A card never dims it.
    */
-  readonly dim?: "panel" | "dialog";
+  readonly dim?: "dialog";
 }
 
-/** A screen: its wallpaper, the frame's glass layer and the layer above it for what sits on the glass. */
+/** A screen: its wallpaper, the layer of the cards' glass, and the layer above it. */
 export interface Screen {
   readonly element: HTMLElement;
-  /** The layer drawn at the frame's glass: the frame, then each sheet's surface. */
+  /** The layer the cards' glass lies in. */
   readonly glass: HTMLElement;
-  /** The layer above it, at full opacity: the bar's content and each sheet's content. */
+  /** The layer above it: the bar, and each card's content. */
   readonly over: HTMLElement;
 }
 
+/**
+ * The bar's islands: a row of groups (the bar's left, its clock and its right) takes a strip each,
+ * and a bar of loose items takes one strip round them all. An item of a group marked
+ * `data-own-island` (the Command menu button) is a small round island of its own before its
+ * group's, which needs no hairline after it: the hairline there goes.
+ */
+function islands(items: readonly Element[]): Element[] {
+  const island = (...held: Element[]) => {
+    const element = glass(document.createElement("span"));
+    element.className += " k-bar-island";
+    element.append(...held);
+    return element;
+  };
+  const split = (group: Element) => {
+    const own = [...group.children].filter((child) => child.hasAttribute("data-own-island"));
+    if (own.length === 0) return island(group);
+    for (const each of own) if (each.nextElementSibling?.classList.contains("shell-bar-divider")) each.nextElementSibling.remove();
+    const pair = document.createElement("span");
+    pair.className = "k-bar-islands";
+    pair.append(...own.map((each) => island(each)), island(group));
+    return pair;
+  };
+  const only = items.length === 1 ? items[0]! : null;
+  if (only?.classList.contains("shell-bar-row")) {
+    only.replaceChildren(...[...only.children].map(split));
+    return [only];
+  }
+  return items.length ? [island(...items)] : [];
+}
+
 export function screen(options: ScreenOptions): Screen {
+  const layout = options.layout ?? "bar";
   const element = document.createElement("span");
   element.className = "k-screen";
   // A whole screen: a motion player draws it as it is laid out.
   element.dataset.whole = "";
+  element.dataset.layout = layout;
   element.style.setProperty("--screen-width", options.width);
   element.style.setProperty("--screen-height", options.height);
   const picture = document.createElement("img");
@@ -58,106 +101,159 @@ export function screen(options: ScreenOptions): Screen {
   const dim = document.createElement("span");
   dim.className = "k-screen-dim";
   if (options.dim === "dialog") element.dataset.dim = "dialog";
-  const glass = document.createElement("span");
-  glass.className = "k-screen-glass";
-  const frame = document.createElement("span");
-  frame.className = "k-frame";
-  glass.append(frame);
+  const glassLayer = document.createElement("span");
+  glassLayer.className = "k-screen-glass";
   const over = document.createElement("span");
   over.className = "k-screen-over";
   const bar = document.createElement("span");
   bar.className = "k-bar";
-  bar.append(...(options.bar ?? []));
-  over.append(bar);
-  element.append(picture, dim, glass, over);
-  return { element, glass, over };
+  if (layout === "islands") bar.append(...islands(options.bar ?? []));
+  else {
+    glass(bar, layout === "bar");
+    bar.append(...(options.bar ?? []));
+  }
+  const light = edgeLight();
+  light.classList.add("k-bar-light");
+  over.append(bar, light);
+  edgeRail(over);
+  element.append(picture, dim, glassLayer, over);
+  return { element, glass: glassLayer, over };
 }
 
-/** The frame's edge a sheet grows out of. */
+/** Where a card stands: under the bar, or above the screen's bottom edge. */
 export type Edge = "right" | "top" | "bottom";
 
 export interface SheetOptions {
   /** What it holds, which keeps its own padding: a PanelPage. */
   readonly content: HTMLElement;
   /**
-   * The right edge, hanging from the bar, as the system monitor, the notifications and the control
-   * center do; or the middle of the top or the bottom edge, as the clock and the wallpaper picker.
+   * Under the bar (`right` and `top`), or `size.gap` above the screen's bottom edge, centred
+   * (`bottom`). Under the bar with no `under` item, a `right` card stands at the screen's right and
+   * a `top` one in its middle, as the clock's.
    */
   readonly edge: Edge;
+  /** The bar item it opened from: it centres under it, and the edge light lies under it. */
+  readonly under?: Element;
+  /** Where the edge light lies instead, a part of `under`: the half of the clock whose view is open. */
+  readonly lit?: Element;
   /** How far open it is drawn, 0 to 1: a picture of it opening. */
   readonly reveal?: number;
-  /**
-   * On the top edge, hung from the frame's top right corner rather than the edge's middle, flush
-   * with the right edge: the popup stack and the bell's peek.
-   */
+  /** Under the bar at the screen's right, as the popup stack and the bell's peek stand. */
   readonly corner?: boolean;
-  /**
-   * On the right edge, how far below the bar it starts (a length's CSS), rather than hanging from it:
-   * a stack under another panel. It then meets the right edge through a fillet at both ends.
-   */
+  /** How far further down it starts (a length's CSS): a stack under another card. */
   readonly start?: string;
 }
 
-/** A sheet: its surface for the glass layer, and its content's box for the layer above. */
+/** A card: its glass for the glass layer, and its content's box for the layer above. */
 export interface Sheet {
   readonly surface: HTMLElement;
   readonly box: HTMLElement;
-  /** Both, which a move of the sheet animates together. */
+  /** Both, which a move of the card animates together. */
   readonly parts: readonly HTMLElement[];
+  /** Puts the card under another bar item, or none; it moves there as its settings say. */
+  readonly anchor: (item: Element | null) => void;
+  /** Puts the edge light under `item`, a part of the card's item, or back under the whole item: none. */
+  readonly light: (item: Element | null) => void;
+}
+
+/** What each card does once it is hung on a screen: follows the screen's size and its bar's. */
+const placers = new WeakMap<HTMLElement, (on: Screen) => void>();
+
+/** `element`'s left and right edges in `on`'s own pixels, whatever zoom the page is drawn at. */
+function edgesIn(element: Element, on: HTMLElement): [number, number] {
+  const outer = on.getBoundingClientRect();
+  const inner = element.getBoundingClientRect();
+  const zoom = on.offsetWidth ? outer.width / on.offsetWidth : 1;
+  return [(inner.left - outer.left) / zoom, (inner.right - outer.left) / zoom];
 }
 
 export function sheet(options: SheetOptions): Sheet {
-  const surface = document.createElement("span");
-  surface.className = "k-sheet-surface k-sheet-part";
+  const surface = glass(document.createElement("span"));
+  surface.classList.add("k-sheet-surface", "k-sheet-part");
   const box = document.createElement("span");
   box.className = "k-sheet k-sheet-part";
   const rider = document.createElement("span");
   rider.className = "k-sheet-rider";
   rider.append(options.content);
-  box.append(rider);
+  const echo = edgeLight();
+  echo.classList.add("k-sheet-echo");
+  box.append(rider, echo);
   const parts = [surface, box];
+  const edge = options.edge === "bottom" ? "bottom" : "top";
   for (const part of parts) {
-    part.dataset.edge = options.edge;
-    part.toggleAttribute("data-corner", options.corner === true && options.edge === "top");
-    if (options.start !== undefined && options.edge === "right") {
-      part.dataset.start = "";
-      part.style.setProperty("--sheet-start", options.start);
-    }
+    part.dataset.edge = edge;
+    if (options.start !== undefined && edge === "top") part.style.setProperty("--sheet-start", options.start);
     if (options.reveal !== undefined) part.style.setProperty("--reveal", String(options.reveal));
   }
-  // The sheet's depth and its span along the edge are its content's size, which only layout knows,
-  // and a right-edge sheet as tall as the frame's room is flush with its bottom edge too.
-  const measure = () => {
-    const [along, away] = options.edge === "right" ? [rider.offsetHeight, rider.offsetWidth] : [rider.offsetWidth, rider.offsetHeight];
-    const holder = box.parentElement;
-    // The frame's side, read back as the gap the box keeps from the screen's right edge.
-    const side = holder ? holder.clientWidth - box.offsetLeft - box.offsetWidth : 0;
-    const room = holder ? holder.clientHeight - box.offsetTop - side : Number.POSITIVE_INFINITY;
-    const flush = options.edge === "right" && along >= room - 0.5;
+  let under: Element | null = options.under ?? null;
+  let lit: Element | null = options.lit ?? null;
+  // The card's size is its content's, and its place its item's, which only layout knows.
+  const place = () => {
+    const room = box.closest<HTMLElement>(".k-screen");
+    const width = room?.clientWidth ?? 0;
+    const edges = room && under ? edgesIn(under, room) : null;
+    const centre = edges ? (edges[0] + edges[1]) / 2 : options.edge === "right" || options.corner ? width : width / 2;
     for (const part of parts) {
-      part.style.setProperty("--sheet-depth", `${away}px`);
-      part.style.setProperty("--sheet-span", `${along}px`);
-      part.toggleAttribute("data-flush-end", flush);
+      part.style.setProperty("--sheet-span", `${rider.offsetWidth}px`);
+      part.style.setProperty("--sheet-depth", `${rider.offsetHeight}px`);
+      part.style.setProperty("--card-centre", `${centre}px`);
     }
+    const shining = lit ?? under;
+    if (room && edges && shining) {
+      // The light stops where its glass's rounded end begins to curve: the item's edges are
+      // pulled in as far, so the light and its echo both end there.
+      const gap = length("size-gap") * settings().scale;
+      const [start, end] = edgesIn(shining, room);
+      const stretch = stretchUnder(shining, room, gap);
+      room.style.setProperty("--item-start", `${stretch ? Math.max(start, stretch.from + gap) : start}px`);
+      room.style.setProperty("--item-end", `${stretch ? Math.min(end, stretch.to - gap) : end}px`);
+    }
+    // The item under an open card says so: the pointer's light leaves it to the card's.
+    const open = !box.hasAttribute("data-live") || box.hasAttribute("data-shown");
+    for (const item of room?.querySelectorAll("[data-card-open]") ?? []) if (item !== shining || !open) item.removeAttribute("data-card-open");
+    if (shining instanceof HTMLElement && open) shining.dataset.cardOpen = "";
+    box.toggleAttribute("data-under", edges !== null);
+    room?.toggleAttribute("data-lit", edges !== null);
   };
-  new ResizeObserver(measure).observe(rider);
+  const watch = new ResizeObserver(place);
+  watch.observe(rider);
+  new MutationObserver(place).observe(box, { attributes: true, attributeFilter: ["data-shown"] });
+  placers.set(box, (room) => {
+    watch.observe(room.element);
+    const bar = room.over.querySelector(".k-bar");
+    if (bar) watch.observe(bar);
+    place();
+  });
   probe(box, { role: "component", name: "Sheet", variant: "", fixed: { width: false, height: false, holds: true } });
-  return { surface, box, parts };
+  const anchor = (item: Element | null) => {
+    under = item;
+    lit = null;
+    place();
+  };
+  const light = (item: Element | null) => {
+    lit = item;
+    place();
+  };
+  return { surface, box, parts, anchor, light };
 }
 
-/** `sheet` placed on `on`: its surface into the glass layer, its content above it. */
+/** `sheet` placed on `on`: its glass into the glass layer, its content above it. */
 export function hang(on: Screen, each: Sheet): void {
   on.glass.append(each.surface);
   on.over.append(each.box);
+  const reveal = each.box.style.getPropertyValue("--reveal");
+  if (reveal !== "") on.element.style.setProperty("--light-shown", reveal);
+  placers.get(each.box)?.(on);
 }
 
-/** One of a set of twin panels: what it holds, and where its button is along the bar. */
 export interface Twin {
   readonly content: HTMLElement;
   /** Its button's place along the bar against its twins': a lower one is further left. */
   readonly side: number;
   /** Puts the keyboard where it lands as the panel opens: its first thing to do. */
   readonly land?: () => void;
+  /** The bar item that opens it, which the card stands under. */
+  readonly under?: Element;
 }
 
 /** Twins sharing one sheet, and what opens, swaps and closes them. */
@@ -202,13 +298,15 @@ export function swapViews(leaving: HTMLElement | null, arriving: HTMLElement, to
 }
 
 /**
- * Twins on `on`'s right edge: one asked for while another is open takes the surface over where it
- * is, and only the content changes. The old content slides `space.s24` away from the new one's
- * button and fades over `micro`; the new one slides in from its button's side over `short`,
- * `duration.swap_lag` later, and fades in over `duration.swap_fade` once the old is gone. Asked for
- * again before the new content has begun to show, the old one turns back from where it is over
- * `short`. A third asked for mid-swap takes over from the one arriving, and the one still leaving
- * goes at once. With reduce motion the content swaps at once.
+ * Twins under the bar sharing one card: one asked for while another is open takes the card over,
+ * which moves and resizes to its place under the new item over `long` on `emphasized_decel`, while
+ * the edge light travels with it, its leading edge over `medium` and its trailing one over `long`.
+ * The old content slides `space.s24` away from the new one's button and fades over `micro`; the new
+ * one slides in from its button's side over `short`, `duration.swap_lag` later, and fades in over
+ * `duration.swap_fade` once the old is gone. Asked for again before the new content has begun to
+ * show, the old one turns back from where it is over `short`. A third asked for mid-swap takes over
+ * from the one arriving, and the one still leaving goes at once. With reduce motion the content
+ * swaps at once.
  */
 export function twins(on: Screen, panels: readonly Twin[]): Twins {
   const shared = sheet({ content: document.createElement("span"), edge: "right" });
@@ -221,6 +319,16 @@ export function twins(on: Screen, panels: readonly Twin[]): Twins {
   let leaving: { index: number; element: HTMLElement } | null = null;
   let started = 0;
   let moving: Animation[] = [];
+  let travelling = 0;
+
+  /** The card and the light travelling to `index`'s item, toward the side its button is on. */
+  function travel(index: number, toward: number): void {
+    window.clearTimeout(travelling);
+    on.element.dataset.toward = toward < 0 ? "left" : "right";
+    on.element.dataset.swapping = "";
+    shared.anchor(panels[index]!.under ?? null);
+    travelling = window.setTimeout(() => delete on.element.dataset.swapping, ms("long"));
+  }
 
   function settleSwap(): void {
     for (const each of moving) each.cancel();
@@ -238,6 +346,7 @@ export function twins(on: Screen, panels: readonly Twin[]): Twins {
     content.removeAttribute("data-leaving");
     rider.replaceChildren(content);
     current = index;
+    shared.anchor(panels[index]!.under ?? null);
     on.element.dataset.open = "";
     for (const part of shared.parts) part.dataset.shown = "";
     // The size is settled before it can ease: a sheet opening takes its content's size at once.
@@ -268,6 +377,7 @@ export function twins(on: Screen, panels: readonly Twin[]): Twins {
       rider.querySelector(":scope > :not([data-leaving])")?.remove();
       back.removeAttribute("data-leaving");
       leaving = null;
+      travel(to, panels[to]!.side - panels[from]!.side);
       current = to;
       const decel = raw("easing-emphasized_decel");
       const standard = raw("easing-standard");
@@ -280,11 +390,12 @@ export function twins(on: Screen, panels: readonly Twin[]): Twins {
       return;
     }
     settleSwap();
+    const toward = Math.sign(panels[to]!.side - panels[from]!.side);
+    travel(to, toward);
     if (settings().reduced) {
       show(to);
       return;
     }
-    const toward = Math.sign(panels[to]!.side - panels[from]!.side);
     const old = panels[from]!.content;
     old.dataset.leaving = "";
     const arriving = panels[to]!.content;

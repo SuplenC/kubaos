@@ -1,19 +1,20 @@
 // A group in the bar: `KubaOS.Components`' `Pill` (`docs/design/components/pill.md`), the shell's
-// alone. A pill `size.control_sm` tall at the full radius on `surface_container`, its content a row
-// `space.s8` apart centred on device pixels, `space.s12` at each end between the curve and the
-// content (`space.s8` round a lone symbol). A pill of its own tone takes a fill and an ink together.
+// alone. An item lying flat on the bar's glass, `size.bar_row` tall, its content a row `space.s8`
+// apart centred on device pixels, with no ends of its own (`space.s4` round a lone symbol). The
+// symbols and words carry its colour. Only what must be seen across the room (a recording, the
+// screen shared, the camera in use) sits in a small filled capsule inside the glass,
+// `size.bar_capsule` tall at the full radius on its meaning's container, `space.s8` at each end.
 //
 // An interactive pill takes the pointer and is a control in the state model (`.k-control` in
-// `lib.css`): it is never a stop for Tab, so a panel's keyboard focus never wanders into the bar,
-// and the pointer only ever gives it the quiet hover, no line and no glow. Hovered, its fill is a
-// step lighter, pressed a step further: a neutral pill climbs the container ladder
-// (`surface_container_high`, then `_highest`), and one of its own tone takes the state layer over
-// its fill (`opacity.hover`, then `opacity.press` of `on_surface`). Its name shows in a hint under
-// it while the pointer is on it. When its content changes,
-// what stays (the same element, or an equal one) keeps its place, solid, and moves with the change;
-// what leaves fades out as its room closes and what arrives fades in as its room opens, over
-// `medium` on `standard_decel`, so the pill's width eases with them. Inside a symbol and its value,
-// only the part that differs fades. Reduce motion changes it at once, with no fade.
+// `lib.css`): it is never a stop for Tab, so a panel's keyboard focus never wanders into the bar.
+// One that opens a card or a menu (`opens`) answers the pointer with the bar's edge light
+// (`glass.ts`): the rail dimmer under it hovered, full pressed. Pressed, its content dips to
+// `scale.press_dip`; a capsule's fill takes the state layer (`opacity.hover`, then `opacity.press`
+// of `on_surface`). Its name shows in a hint under it while the pointer is on it. When its content
+// changes, what stays (the same element, or an equal one) keeps its place, solid, and moves with
+// the change; what leaves fades out as its room closes and what arrives fades in as its room
+// opens, over `medium` on `standard_decel`, so the pill's width eases with them. Inside a symbol
+// and its value, only the part that differs fades. Reduce motion changes it at once, with no fade.
 //
 // A symbol and its own value (a reading, a battery's share, a count down) are one thing in the row:
 // `space.s4` apart, the value straight after its symbol (`paired`). Room a value is held to, so its
@@ -21,6 +22,7 @@
 
 import { pin, type Pinned } from "./control.ts";
 import { focusRing, type Tone } from "./focus.ts";
+import { hovers, opens } from "./glass.ts";
 import { withHint } from "./hint.ts";
 import { row } from "./layout.ts";
 import { probe } from "./probe.ts";
@@ -29,12 +31,14 @@ import { settings } from "../site/settings.ts";
 
 /**
  * A pill's tone: the bar's own, a screen recording's, the live preview's cold tint, or what is on
- * air, each on its meaning's container as a recording is, so it is found at a glance: the screen
- * shared on `sharing_container`, and the camera in use on `error_container`, red as a recording.
+ * air. The bar's own and the preview's lie flat, their symbols in their colours; a recording, the
+ * screen shared and the camera in use sit in a capsule on their meaning's container, found at a
+ * glance: the screen shared on `sharing_container`, the camera on `error_container`, red as a
+ * recording.
  */
 export type PillTone = "neutral" | "recording" | "preview" | "sharing" | "camera";
 
-/** A pill's colours: its fill at rest, hovered and pressed, its ink, and the tone its tube lights in. */
+/** A capsule's colours: its fill at rest, hovered and pressed, its ink, and the tone its tube lights in. */
 interface Fill {
   readonly fill: string;
   readonly hover: string;
@@ -49,25 +53,25 @@ const layered = (fill: string, opacity: "hover" | "press") => `color-mix(in srgb
 /** A tone's fill and ink, its steps the state layer over the fill. */
 const toned = (fill: string, ink: string, tone: Tone): Fill => ({ fill, hover: layered(fill, "hover"), pressed: layered(fill, "press"), ink, tone });
 
+/** Flat on the glass: no fill at rest or under the pointer, which the edge light answers. */
+const flat = (ink: string, tone: Tone): Fill => ({ fill: "transparent", hover: "transparent", pressed: "transparent", ink, tone });
+
 const FILLS: Record<PillTone, Fill> = {
-  neutral: {
-    fill: "var(--color-surface_container)",
-    hover: "var(--color-surface_container_high)",
-    pressed: "var(--color-surface_container_highest)",
-    ink: "var(--color-on_surface)",
-    tone: "accent",
-  },
+  neutral: flat("var(--color-on_surface)", "accent"),
   recording: toned("var(--color-error_container)", "var(--color-on_error_container)", "error"),
-  preview: toned("rgb(from var(--color-cold) r g b / var(--opacity-tint))", "var(--color-cold)", "cold"),
+  preview: flat("var(--color-cold)", "cold"),
   sharing: toned("var(--color-sharing_container)", "var(--color-on_sharing_container)", "sharing"),
   camera: toned("var(--color-error_container)", "var(--color-on_error_container)", "recording"),
 };
 
+/** The tones drawn in a capsule inside the glass. */
+const CAPSULED: ReadonlySet<PillTone> = new Set(["recording", "sharing", "camera"]);
+
 export interface PillOptions {
   readonly content: readonly Element[];
-  /** A lone symbol: `space.s8` at each end instead of `space.s12`. */
+  /** A lone symbol: `space.s4` at each end, the room the edge light measures it by. */
   readonly lone: boolean;
-  /** The room at each end, as QML's `padding`, where a pill sets its own: the tray's `space.s4`. */
+  /** The room at each end, as QML's `padding`, where a pill sets its own. */
   readonly end?: string;
   /** The gap between its content, as QML's `spacing`, where a pill sets its own: `space.s4`, `space.s12`. */
   readonly gap?: string | 0;
@@ -77,6 +81,8 @@ export interface PillOptions {
   /** Its name, in a hint under it while the pointer is on it. */
   readonly tooltip?: string;
   readonly pinned?: Pinned;
+  /** It opens a card or a menu: the bar's edge light answers the pointer on it. */
+  readonly opens?: boolean;
 }
 
 export interface Pill {
@@ -102,13 +108,16 @@ export function makePill(options: PillOptions): Pill {
   const element = document.createElement("span");
   element.className = "k-pill";
   element.toggleAttribute("data-lone", options.lone);
+  element.toggleAttribute("data-capsule", CAPSULED.has(options.tone ?? "neutral"));
+  if (options.opens) opens(element);
+  else if (options.interactive) hovers(element);
   element.style.setProperty("--fill", tone.fill);
   element.style.setProperty("--fill-hover", tone.hover);
   element.style.setProperty("--fill-pressed", tone.pressed);
   element.style.setProperty("--ink", tone.ink);
   if (options.end !== undefined) element.style.setProperty("--end", `var(--space-${options.end})`);
   const clip = document.createElement("span");
-  clip.className = "k-pill-clip";
+  clip.className = "k-pill-clip k-bar-dip";
   const line = row(options.gap ?? "s8", "centre", ...options.content);
   clip.append(line);
   element.append(clip);

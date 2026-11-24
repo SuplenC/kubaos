@@ -1,19 +1,17 @@
-/* A screen with its frame and the sheets growing out of it (`lib/sheet.ts`). The frame is the bar
-   along the top, `size.bar` tall, and `space.s8` down the sides and along the bottom, its inner
-   corners at the surface radius. The frame and the sheets' surfaces are opaque `surface` inside one
-   layer at `opacity.frame`, which casts `shadow.panel` once; what sits on them is in the layer above
-   at full opacity. While a panel is open the desktop under the layer is dimmed by `scrim` at
-   `opacity.panel_scrim`, or at a dialog's darker `opacity.scrim` (the power menu), fading over
-   `medium` on `standard`. */
+/* The desktop with no frame round it, its bar in one of three layouts, and the cards floating over
+   it (`lib/sheet.ts`). The bar and each card are the shell's glass (`glass.css`), every one its own
+   surface, so no layer holding them carries an opacity or a filter. Everything floating keeps
+   `size.gap` from the screen's edges and from each other, rounded to whole device pixels. */
 
-/* How far a sheet is open, 0 to 1: its depth is this share of its content's. */
+/* How far a card is open, 0 to 1: it fades in that far, as far down from `space.s8` above its
+   place. */
 @property --reveal {
   syntax: "<number>";
   inherits: true;
   initial-value: 1;
 }
 
-/* How far a sheet's content is moved sideways in a twin swap, in `space.s24`s, and how much of it
+/* How far a card's content is moved sideways in a twin swap, in `space.s24`s, and how much of it
    shows. */
 @property --swap-shift {
   syntax: "<number>";
@@ -33,302 +31,7 @@
   initial-value: 0;
 }
 
-.k-screen {
-  position: relative;
-  display: block;
-  flex: none;
-  width: var(--screen-width);
-  height: var(--screen-height);
-  overflow: hidden;
-  background: var(--color-surface_container_lowest);
-  --frame-top: var(--size-bar);
-  --frame-side: var(--space-s8);
-  /* The room a sheet hanging from the bar has before it reaches the frame's bottom edge. */
-  --sheet-room: calc(var(--screen-height) - var(--frame-top) - var(--frame-side));
-}
-
-.k-screen-wallpaper {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.k-screen-dim {
-  position: absolute;
-  inset: 0;
-  display: block;
-  background: rgb(from var(--color-scrim) r g b / calc(var(--screen-dim, var(--opacity-panel_scrim)) * var(--panel-dim)));
-  transition: --panel-dim var(--motion-medium) var(--easing-standard);
-}
-
-/* A dialog over the desktop (the power menu) dims it as a dialog does, darker than a panel. */
-.k-screen[data-dim="dialog"] {
-  --screen-dim: var(--opacity-scrim);
-}
-
-.k-screen[data-open] > .k-screen-dim {
-  --panel-dim: 1;
-}
-
-.k-screen-glass {
-  position: absolute;
-  inset: 0;
-  display: block;
-  opacity: var(--opacity-frame);
-  filter: drop-shadow(0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity)));
-  pointer-events: none;
-}
-
-.k-screen-over {
-  position: absolute;
-  inset: 0;
-  display: block;
-  pointer-events: none;
-}
-
-.k-screen-over > * {
-  pointer-events: auto;
-}
-
-/* The frame: the screen less a rounded inner rectangle, the bar at its top. The hole is a box with
-   its corners at the surface radius, and the frame its spread, which follows those corners. */
-.k-frame {
-  position: absolute;
-  inset: var(--frame-top) var(--frame-side) var(--frame-side);
-  display: block;
-  border-radius: var(--radius-surface);
-  box-shadow: 0 0 0 calc(var(--screen-width) + var(--screen-height)) var(--color-surface);
-}
-
-.k-bar {
-  position: absolute;
-  top: 0;
-  left: var(--frame-side);
-  right: var(--frame-side);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-s8);
-  height: var(--frame-top);
-}
-
-/* A sheet's surface and its content's box: as wide and as deep as each other, its depth `--reveal`
-   of its content's. The fillets and the far corners shrink with the depth: a base fillet to half
-   of it, one into a perpendicular edge to all of it, a far corner to half of it and of its span. */
-.k-sheet-part {
-  position: absolute;
-  display: block;
-  box-sizing: border-box;
-  --sheet-open: calc(var(--reveal) * var(--sheet-depth, 0px));
-  --sheet-flare: var(--radius-surface);
-  --sheet-base: min(var(--sheet-flare), var(--sheet-open) / 2);
-  --sheet-into: min(var(--sheet-flare), var(--sheet-open));
-  --sheet-far: min(var(--radius-surface), var(--sheet-open) / 2, var(--sheet-span, 0px) / 2);
-}
-
-.k-sheet-part[data-edge="right"] {
-  top: var(--frame-top);
-  right: var(--frame-side);
-  width: var(--sheet-open);
-  height: var(--sheet-span, 0px);
-}
-
-.k-sheet-part[data-edge="top"] {
-  top: var(--frame-top);
-  left: round(down, calc((100% - var(--sheet-span, 0px)) / 2), 1px);
-  width: var(--sheet-span, 0px);
-  height: var(--sheet-open);
-}
-
-.k-sheet-part[data-edge="bottom"] {
-  bottom: var(--frame-side);
-  left: round(down, calc((100% - var(--sheet-span, 0px)) / 2), 1px);
-  width: var(--sheet-span, 0px);
-  height: var(--sheet-open);
-}
-
-.k-sheet-surface {
-  background: var(--color-surface);
-}
-
-.k-sheet-surface[data-edge="right"] {
-  border-radius: 0 0 0 var(--sheet-far);
-}
-
-.k-sheet-surface[data-edge="right"][data-flush-end] {
-  border-radius: 0;
-}
-
-.k-sheet-surface[data-edge="top"] {
-  border-radius: 0 0 var(--sheet-far) var(--sheet-far);
-}
-
-.k-sheet-surface[data-edge="bottom"] {
-  border-radius: var(--sheet-far) var(--sheet-far) 0 0;
-}
-
-/* The fillets, each a corner of `surface` with a concave curve: the room outside an ellipse
-   centred at the corner away from both edges it meets. */
-.k-sheet-surface::before,
-.k-sheet-surface::after {
-  content: "";
-  position: absolute;
-  display: block;
-  background: var(--color-surface);
-}
-
-/* A right-edge sheet meets the bar at its start: it curves into it beyond its far side. */
-.k-sheet-surface[data-edge="right"]::before {
-  top: 0;
-  right: 100%;
-  width: var(--sheet-into);
-  height: var(--sheet-flare);
-  mask: radial-gradient(var(--sheet-into) var(--sheet-flare) at 0 100%, transparent 100%, #000 calc(100% + 1px));
-}
-
-/* Its end, short of the frame's bottom: a base fillet into the right edge, under it. */
-.k-sheet-surface[data-edge="right"]::after {
-  top: 100%;
-  right: 0;
-  width: var(--sheet-base);
-  height: var(--sheet-flare);
-  mask: radial-gradient(var(--sheet-base) var(--sheet-flare) at 0 100%, transparent 100%, #000 calc(100% + 1px));
-}
-
-/* Its end, flush with the frame's bottom edge: it curves into it beyond its far side. */
-.k-sheet-surface[data-edge="right"][data-flush-end]::after {
-  top: auto;
-  bottom: 0;
-  right: 100%;
-  width: var(--sheet-into);
-  height: var(--sheet-flare);
-  mask: radial-gradient(var(--sheet-into) var(--sheet-flare) at 0 0, transparent 100%, #000 calc(100% + 1px));
-}
-
-/* A sheet on the top edge: a base fillet into it at either end. */
-.k-sheet-surface[data-edge="top"]::before {
-  top: 0;
-  right: 100%;
-  width: var(--sheet-flare);
-  height: var(--sheet-base);
-  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 0 100%, transparent 100%, #000 calc(100% + 1px));
-}
-
-.k-sheet-surface[data-edge="top"]::after {
-  top: 0;
-  left: 100%;
-  width: var(--sheet-flare);
-  height: var(--sheet-base);
-  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 100% 100%, transparent 100%, #000 calc(100% + 1px));
-}
-
-/* A sheet on the bottom edge, the same turned over. */
-.k-sheet-surface[data-edge="bottom"]::before {
-  bottom: 0;
-  right: 100%;
-  width: var(--sheet-flare);
-  height: var(--sheet-base);
-  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 0 0, transparent 100%, #000 calc(100% + 1px));
-}
-
-.k-sheet-surface[data-edge="bottom"]::after {
-  bottom: 0;
-  left: 100%;
-  width: var(--sheet-flare);
-  height: var(--sheet-base);
-  mask: radial-gradient(var(--sheet-flare) var(--sheet-base) at 100% 0, transparent 100%, #000 calc(100% + 1px));
-}
-
-/* A corner sheet: on the top edge, flush with the right edge. It curves into the top edge at its
-   start and into the right edge under it, through a fillet that grows with its depth, as one into a
-   perpendicular edge does; its one far corner is the bottom left. */
-.k-sheet-part[data-edge="top"][data-corner] {
-  left: auto;
-  right: var(--frame-side);
-}
-
-.k-sheet-surface[data-edge="top"][data-corner] {
-  border-radius: 0 0 0 var(--sheet-far);
-}
-
-.k-sheet-surface[data-edge="top"][data-corner]::after {
-  top: 100%;
-  left: auto;
-  right: 0;
-  width: var(--sheet-flare);
-  height: var(--sheet-into);
-  mask: radial-gradient(var(--sheet-flare) var(--sheet-into) at 0 100%, transparent 100%, #000 calc(100% + 1px));
-}
-
-/* A right-edge sheet starting below the bar, under another panel: both its ends are short of a
-   perpendicular edge, so each meets the right edge through a base fillet, and both far corners round. */
-.k-sheet-part[data-edge="right"][data-start] {
-  top: calc(var(--frame-top) + var(--sheet-start));
-}
-
-.k-sheet-surface[data-edge="right"][data-start] {
-  border-radius: var(--sheet-far) 0 0 var(--sheet-far);
-}
-
-.k-sheet-surface[data-edge="right"][data-start]::before {
-  top: auto;
-  bottom: 100%;
-  right: 0;
-  width: var(--sheet-base);
-  height: var(--sheet-flare);
-  mask: radial-gradient(var(--sheet-base) var(--sheet-flare) at 0 0, transparent 100%, #000 calc(100% + 1px));
-}
-
-/* The content's box cuts what isn't out yet; its content rides on the far edge, so it slides out
-   from under the frame, and fades in a beat after the surface moves: from a fifth of the way open
-   to three quarters. */
-.k-sheet {
-  /* Once it is fully open its clip lets go, reaching the whole screen past its edge, so what its
-     content draws outside it shows whole: a lit control's glow, a hint or a tooltip over a button
-     in its top row. Off a screen of the library's, the reach is a glow's. While it opens, and while
-     twins swap their content, it cuts at its edge, so nothing sliding shows past it. A clip path,
-     not `overflow: clip` with an `overflow-clip-margin`: Chromium drops that margin to 0 for any
-     `calc()`. */
-  clip-path: inset(calc(-1 * max(var(--focus-far), var(--screen-width, 0px) + var(--screen-height, 0px)) * clamp(0, (var(--reveal) - 0.999) * 1000, 1)));
-}
-
-.k-sheet:has(> .k-sheet-rider > [data-leaving]) {
-  clip-path: inset(0);
-}
-
-.k-sheet-rider {
-  position: absolute;
-  display: flex;
-  opacity: calc(clamp(0, (var(--reveal) - 0.2) / 0.55, 1));
-}
-
-.k-sheet[data-edge="right"] > .k-sheet-rider {
-  top: 0;
-  left: 0;
-}
-
-.k-sheet[data-edge="top"] > .k-sheet-rider {
-  bottom: 0;
-  left: 0;
-}
-
-.k-sheet[data-edge="bottom"] > .k-sheet-rider {
-  top: 0;
-  left: 0;
-}
-
-/* The content in a twin swap: moved `--swap-shift` of `space.s24` sideways, `--swap-presence` of it shown. */
-.k-sheet-rider > * {
-  translate: round(nearest, calc(var(--swap-shift) * var(--space-s24)), 1px) 0;
-  opacity: var(--swap-presence);
-}
-
-/* A live sheet: shut until shown. It opens over `long` on `emphasized_decel` and shuts over
-   `medium` on `emphasized_accel`; once open, a change of its content's size settles over `medium`
-   on `standard_decel`, as a list reordering does. */
+/* A card's size, its content's, and the middle it stands under: registered, so each eases. */
 @property --sheet-span {
   syntax: "<length>";
   inherits: false;
@@ -341,9 +44,259 @@
   initial-value: 0px;
 }
 
+@property --card-centre {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* The bar item whose card is open, its edges along the screen: where the edge light lies. */
+@property --item-start {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --item-end {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+.k-screen {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--screen-width);
+  height: var(--screen-height);
+  overflow: hidden;
+  background: var(--color-surface_container_lowest);
+  --gap: round(nearest, var(--size-gap), 1px);
+  /* The bar's lower edge, and where the desktop under it starts: a card's top, a window's. */
+  --bar-reach: calc(var(--gap) + var(--size-bar_strip));
+  --desk-top: calc(var(--bar-reach) + var(--gap));
+  /* The room a card under the bar has before it reaches `size.gap` above the screen's bottom. */
+  --sheet-room: calc(var(--screen-height) - var(--desk-top) - var(--gap));
+}
+
+.k-screen[data-layout="bar"] {
+  --bar-reach: var(--size-bar);
+}
+
+.k-screen-wallpaper {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A dialog's dim, the power menu's: `scrim` at `opacity.scrim`, fading over `medium` on
+   `standard`. A card never dims the desktop. */
+.k-screen-dim {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: rgb(from var(--color-scrim) r g b / calc(var(--opacity-scrim) * var(--panel-dim)));
+  transition: --panel-dim var(--motion-medium) var(--easing-standard);
+}
+
+.k-screen[data-open][data-dim="dialog"] > .k-screen-dim {
+  --panel-dim: 1;
+}
+
+.k-screen-glass,
+.k-screen-over {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+.k-screen-over > * {
+  pointer-events: auto;
+}
+
+/* The bar: its items in a row along it, a band in the Bar layout, a strip in Floating, the
+   strips of its groups in Islands. */
+.k-bar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-s8);
+  box-sizing: border-box;
+}
+
+/* The band holds the row in its middle on whole device pixels, the odd one under it. */
+.k-screen[data-layout="bar"] .k-bar {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--size-bar);
+  padding: round(down, calc((var(--size-bar) - var(--size-bar_row)) / 2), 1px) var(--gap)
+    round(up, calc((var(--size-bar) - var(--size-bar_row)) / 2), 1px);
+}
+
+.k-screen[data-layout="floating"] .k-bar,
+.k-screen[data-layout="islands"] .k-bar {
+  top: var(--gap);
+  left: var(--gap);
+  right: var(--gap);
+  height: var(--size-bar_strip);
+}
+
+.k-screen[data-layout="floating"] .k-bar {
+  padding: 0 var(--space-s4);
+  border-radius: var(--radius-full);
+}
+
+.k-screen[data-layout="islands"] .k-bar {
+  gap: var(--gap);
+}
+
+/* An island with a small round one before it, as the Command menu button's: `size.gap` apart. */
+.k-bar-islands {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--gap);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.k-bar-islands > .k-bar-island:last-child {
+  flex: 0 1 auto;
+}
+
+.k-bar-island {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-s8);
+  box-sizing: border-box;
+  min-width: 0;
+  height: var(--size-bar_strip);
+  padding: 0 var(--space-s4);
+  border-radius: var(--radius-full);
+}
+
+/* The edge light under the item whose card is open: along the bar's lower edge, the item's width
+   and `size.gap` either side. It shows as far as the card is open; in a swap it travels with the
+   card, its leading edge over `medium` and its trailing one over `long`, on `emphasized_decel`. */
+.k-bar-light {
+  bottom: calc(100% - var(--bar-reach));
+  left: calc(var(--item-start) - var(--gap));
+  width: calc(var(--item-end) - var(--item-start) + 2 * var(--gap));
+  opacity: 0;
+  transition: opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-screen[data-lit] .k-bar-light {
+  opacity: var(--light-shown, 1);
+  transition: opacity var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-screen[data-lit]:has(> .k-screen-over > .k-sheet[data-live]:not([data-shown])) .k-bar-light {
+  opacity: 0;
+  transition: opacity var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-screen[data-swapping][data-toward="right"] {
+  transition:
+    --item-end var(--motion-medium) var(--easing-emphasized_decel),
+    --item-start var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-screen[data-swapping][data-toward="left"] {
+  transition:
+    --item-start var(--motion-medium) var(--easing-emphasized_decel),
+    --item-end var(--motion-long) var(--easing-emphasized_decel);
+}
+
+/* A card's glass and its content's box: the same box, `size.gap` under the bar (or above the
+   screen's bottom), centred under its item and stopped `size.gap` from the screen's sides, its
+   corners `radius.surface`, as an app window's. Opening, it fades in as it comes down `space.s8`
+   into place. */
+.k-sheet-part {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  /* Its left edge and width, unregistered so they reach the echo inside it as lengths. */
+  --card-width: var(--sheet-span);
+  --card-x: clamp(
+    var(--gap),
+    round(down, calc(var(--card-centre) - var(--sheet-span) / 2), 1px),
+    var(--screen-width) - var(--gap) - var(--sheet-span)
+  );
+  top: calc(var(--desk-top) + var(--sheet-start, 0px));
+  left: var(--card-x);
+  width: var(--sheet-span);
+  height: var(--sheet-depth);
+  border-radius: var(--radius-surface);
+  opacity: var(--reveal);
+  translate: 0 round(nearest, calc((var(--reveal) - 1) * var(--space-s8)), 1px);
+}
+
+.k-sheet-part[data-edge="bottom"] {
+  top: auto;
+  bottom: var(--gap);
+  translate: 0 round(nearest, calc((1 - var(--reveal)) * var(--space-s8)), 1px);
+}
+
+/* The content's box cuts to the card's corners while it opens and while twins swap their
+   content, so nothing sliding shows past it. Once it is open its clip lets go, reaching the whole
+   screen past its edge, so what its content draws outside it shows whole: a lit control's glow, a
+   hint or a tooltip over a button in its top row. A clip path, not `overflow: clip` with an
+   `overflow-clip-margin`: Chromium drops that margin to 0 for any `calc()`. */
+.k-sheet {
+  clip-path: inset(calc(-1 * max(var(--focus-far), var(--screen-width, 0px) + var(--screen-height, 0px)) * clamp(0, (var(--reveal) - 0.999) * 1000, 1)) round var(--radius-surface));
+}
+
+.k-sheet:has(> .k-sheet-rider > [data-leaving]) {
+  clip-path: inset(0 round var(--radius-surface));
+}
+
+.k-sheet-rider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+}
+
+/* The echo of the edge light along the card's top edge: under its item, `size.gap` either side,
+   and never into the card's rounded corners. */
+.k-sheet-echo {
+  top: 0;
+  display: none;
+}
+
+.k-sheet[data-under] > .k-sheet-echo {
+  display: block;
+  --echo-from: max(var(--item-start) - var(--gap), var(--card-x) + var(--radius-surface));
+  --echo-to: min(var(--item-end) + var(--gap), var(--card-x) + var(--card-width) - var(--radius-surface));
+  left: calc(var(--echo-from) - var(--card-x));
+  width: max(0px, calc(var(--echo-to) - var(--echo-from)));
+}
+
+/* The content in a twin swap: moved `--swap-shift` of `space.s24` sideways, `--swap-presence` of it shown. */
+.k-sheet-rider > * {
+  translate: round(nearest, calc(var(--swap-shift) * var(--space-s24)), 1px) 0;
+  opacity: var(--swap-presence);
+}
+
+/* A live card: shut until shown. It opens over `long` on `emphasized_decel` and shuts over
+   `medium` on `emphasized_accel`; once open, a change of its content's size settles over `medium`
+   on `standard_decel`, as a list reordering does, and a swap moves and resizes it over `long` on
+   `emphasized_decel`. */
 .k-sheet-part[data-live] {
   --reveal: 0;
   transition: --reveal var(--motion-medium) var(--easing-emphasized_accel);
+}
+
+.k-sheet[data-live]:not([data-shown]) {
+  pointer-events: none;
 }
 
 .k-sheet-part[data-live][data-shown] {
@@ -355,7 +308,16 @@
   transition:
     --reveal var(--motion-long) var(--easing-emphasized_decel),
     --sheet-span var(--motion-medium) var(--easing-standard_decel),
-    --sheet-depth var(--motion-medium) var(--easing-standard_decel);
+    --sheet-depth var(--motion-medium) var(--easing-standard_decel),
+    --card-centre var(--motion-medium) var(--easing-standard_decel);
+}
+
+.k-screen[data-swapping] .k-sheet-part[data-live][data-shown][data-settled] {
+  transition:
+    --reveal var(--motion-long) var(--easing-emphasized_decel),
+    --sheet-span var(--motion-long) var(--easing-emphasized_decel),
+    --sheet-depth var(--motion-long) var(--easing-emphasized_decel),
+    --card-centre var(--motion-long) var(--easing-emphasized_decel);
 }
 
 /* The content leaving in a swap: laid over the arriving one, taking no press. */

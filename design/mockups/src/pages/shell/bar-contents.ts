@@ -4,14 +4,14 @@
 
 import type { Words } from "../../lib/content.ts";
 import type { Shown } from "../../lib/control.ts";
-import { row } from "../../lib/layout.ts";
 import { makePill, pillChanging } from "../../lib/pill.ts";
 import { text } from "../../lib/text.ts";
-import { hovers, press, pillSwap } from "../../site/moves.ts";
+import { pillSwap } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 import {
   bellPill,
   BRANCH,
+  onGlass,
   clockPill,
   idlePill,
   keyboardPill,
@@ -48,14 +48,23 @@ const ROWS: readonly { name: string; make: (state: Shown) => HTMLElement }[] = [
 
 const LAYOUT: Words = { short: "US", long: "PL-prog" };
 
-/** Every pill side by side, as the bar's right end lays them out, and the clock. */
+/** The clock with its card open on `view`: the capsule filled, the edge light under that half. */
+function clockOpen(view: "clock" | "weather"): HTMLElement {
+  const clock = clockPill({ open: view });
+  const strip = onGlass(clock);
+  const half = clock.querySelector<HTMLElement>(view === "weather" ? ".k-clock-pill-weather" : ".k-clock-pill-when");
+  half?.setAttribute("data-pinned", "pressed");
+  return strip;
+}
+
+/** Every pill side by side on a piece of the glass, as the bar lays them out, and the clock. */
 function all(state: Shown = "rest"): HTMLElement {
-  return row("s8", "centre", ...ROWS.map(({ make }) => make(state)));
+  return onGlass(...ROWS.map(({ make }) => make(state)));
 }
 
 /** The system monitor, which offers Hide on a right click until the pointer leaves. */
 function liveSysmon(): HTMLElement {
-  const made = makePill({ content: sysmonContent(), lone: false, gap: "s8", interactive: true, tooltip: "CPU 37%  ·  61 °C  ·  RAM 11.2 GB of 15.6 GB" });
+  const made = makePill({ content: sysmonContent(), lone: false, gap: "s8", interactive: true, opens: true, tooltip: "CPU 37%  ·  61 °C  ·  RAM 11.2 GB of 15.6 GB" });
   let offering = false;
   made.element.addEventListener("contextmenu", (event) => {
     event.preventDefault();
@@ -83,54 +92,56 @@ function liveLayout(): HTMLElement {
 }
 
 function live(): HTMLElement {
-  return row("s8", "centre", previewPill(), idlePill(), proxyPill(), liveLayout(), updatePill(), clockPill(), morePill(), liveSysmon(), rimPill(), bellPill(), statusPill());
+  return onGlass(previewPill(), idlePill(), proxyPill(), liveLayout(), updatePill(), clockPill(), morePill(), liveSysmon(), rimPill(), bellPill(), statusPill());
 }
 
-const SYSMON_SAMPLE = () => sysmonPill({ readings: READINGS.slice(0, 2) });
+const SYSMON_SAMPLE = () => onGlass(sysmonPill({ readings: READINGS.slice(0, 2) }));
 
 export default page<State>({
   level: "shell",
   slug: "bar-contents",
   title: "Bar contents",
-  lede: "The pills the bar carries, each built from Pill: clock, status, bell, ⋯, system monitor, layout, Keep awake, Proxy, update, preview.",
+  lede: "The items the bar carries, flat on its glass: clock, status, bell, ⋯, system monitor, layout, Keep awake, Proxy, update, preview.",
   code: { qml: "Clock, Status, Bell, KeyboardLayout, IdleIndicator, ProxyIndicator, UpdateIndicator, PreviewIndicator, SysmonPill" },
   from: ["pill"],
   stage: { live, hint: "point at one; click US; right-click the monitor", daylight: true },
   variants: [
-    { name: "Clock", for: "seal, date, the time's `primary` capsule, weather", sample: () => clockPill() },
-    { name: "Clock, no home city", for: "no weather", sample: () => clockPill({ weather: false }) },
-    { name: "Status", for: "power, network, Bluetooth, battery", sample: () => statusPill() },
-    { name: "Status, wired desktop", for: "no Bluetooth, no battery", sample: () => statusPill({ net: "lan", bluetooth: null, battery: null }) },
-    { name: "Status, battery low", for: "the battery in `error`", sample: () => statusPill({ battery: { percent: 8, low: true } }) },
-    { name: "Status, charging", for: "the battery in `primary`", sample: () => statusPill({ battery: { percent: 64, charging: true } }) },
-    { name: "Bell", for: "while there is a notification, all read", sample: () => bellPill() },
-    { name: "Bell, unread", for: "the accent's dot while anything is unread", sample: () => bellPill(false, "rest", true) },
-    { name: "Bell, Do not disturb", for: "crossed out; the dot still says unread", sample: () => bellPill(true, "rest", true) },
-    { name: "Bell, nothing unread", for: "its hint says so; no peek", sample: () => quietBell("hovered") },
-    { name: "Keyboard layout", for: "two layouts or more", sample: () => keyboardPill() },
-    { name: "Proxy", for: "on: a locked shield, `tertiary`", sample: () => proxyPill() },
-    { name: "Proxy failing", for: "a key with the error dot", sample: () => proxyPill(true) },
-    { name: "Update, a release", for: "a dot", sample: () => updatePill() },
-    { name: "Update, security", for: "counted", sample: () => updatePill(3) },
-    { name: "Live preview", for: "its symbol on the cold tint, the branch in its hint", sample: () => previewPill() },
-    { name: "More", for: "⋯, a new symbol: tray apps, update, preview", sample: () => morePill() },
-    { name: "System monitor, numbers", for: "the default", sample: () => sysmonPill() },
-    { name: "System monitor, bars", for: "a compact Meter each", sample: () => sysmonPill({ style: "bars" }) },
-    { name: "System monitor, sparklines", for: "the last minute each", sample: () => sysmonPill({ style: "sparklines" }) },
-    { name: "Close to a limit", for: "symbol and words in `warning`", sample: () => sysmonPill({ readings: [READINGS[0]!, { ...READINGS[2]!, text: "82°", level: 1 }] }) },
-    { name: "Past a limit, a full disk", for: "`error`, and a red drive", sample: () => sysmonPill({ readings: [{ ...READINGS[0]!, text: "97%", level: 2 }, READINGS[1]!], fullDisk: true }) },
-    { name: "Offering Hide", for: "a right click, until the pointer leaves", sample: () => sysmonPill({ offering: true, state: "hovered" }) },
-    { name: "System monitor, compact", for: "CPU rim, RAM, temperature: all `primary` at ease", sample: () => rimPill() },
-    { name: "Compact, RAM near its limit", for: "its ring in `warning`", sample: () => rimPill([LOADS[0]!, { share: 0.88, level: 1 }, LOADS[2]!]) },
-    { name: "Compact, CPU past its limit", for: "the rim in `error`", sample: () => rimPill([{ share: 0.97, level: 2 }, LOADS[1]!, LOADS[2]!]) },
-    { name: "Status, shedding", for: "the share gone, then symbols from the left", sample: () => shedStatus({ shed: 3 }) },
-    { name: "Clock, compacting", for: "weather and date gone, the seal kept", sample: () => clockPill({ date: "none", weather: false }) },
-    { name: "Clock while recording", for: "recording merged in: its colours, its dot leading", sample: () => clockPill({ seal: false, date: "none", weather: false, recording: true }) },
+    { name: "Clock", for: "seal, date, time, weather, flat at rest", sample: () => onGlass(clockPill()) },
+    { name: "Clock, its calendar open", for: "the time in its `primary` capsule; the light under the time", sample: () => clockOpen("clock") },
+    { name: "Clock, its weather open", for: "the capsule; the light under the weather", sample: () => clockOpen("weather") },
+    { name: "Clock, no home city", for: "no weather", sample: () => onGlass(clockPill({ weather: false })) },
+    { name: "Status", for: "power, network, Bluetooth, battery", sample: () => onGlass(statusPill()) },
+    { name: "Status, wired desktop", for: "no Bluetooth, no battery", sample: () => onGlass(statusPill({ net: "lan", bluetooth: null, battery: null })) },
+    { name: "Status, battery low", for: "the battery in `error`", sample: () => onGlass(statusPill({ battery: { percent: 8, low: true } })) },
+    { name: "Status, charging", for: "the battery in `primary`", sample: () => onGlass(statusPill({ battery: { percent: 64, charging: true } })) },
+    { name: "Bell", for: "while there is a notification, all read", sample: () => onGlass(bellPill()) },
+    { name: "Bell, unread", for: "the accent's dot while anything is unread", sample: () => onGlass(bellPill(false, "rest", true)) },
+    { name: "Bell, Do not disturb", for: "crossed out; the dot still says unread", sample: () => onGlass(bellPill(true, "rest", true)) },
+    { name: "Bell, nothing unread", for: "its hint says so; no peek", sample: () => onGlass(quietBell("hovered")) },
+    { name: "Keyboard layout", for: "two layouts or more", sample: () => onGlass(keyboardPill()) },
+    { name: "Proxy", for: "on: a locked shield, `tertiary`", sample: () => onGlass(proxyPill()) },
+    { name: "Proxy failing", for: "a key with the error dot", sample: () => onGlass(proxyPill(true)) },
+    { name: "Update, a release", for: "a dot", sample: () => onGlass(updatePill()) },
+    { name: "Update, security", for: "counted", sample: () => onGlass(updatePill(3)) },
+    { name: "Live preview", for: "its symbol in `cold`, flat; the branch in its hint", sample: () => onGlass(previewPill()) },
+    { name: "More", for: "⋯, a new symbol: tray apps, update, preview", sample: () => onGlass(morePill()) },
+    { name: "System monitor, numbers", for: "the default", sample: () => onGlass(sysmonPill()) },
+    { name: "System monitor, bars", for: "a compact Meter each", sample: () => onGlass(sysmonPill({ style: "bars" })) },
+    { name: "System monitor, sparklines", for: "the last minute each", sample: () => onGlass(sysmonPill({ style: "sparklines" })) },
+    { name: "Close to a limit", for: "symbol and words in `warning`", sample: () => onGlass(sysmonPill({ readings: [READINGS[0]!, { ...READINGS[2]!, text: "82°", level: 1 }] })) },
+    { name: "Past a limit, a full disk", for: "`error`, and a red drive", sample: () => onGlass(sysmonPill({ readings: [{ ...READINGS[0]!, text: "97%", level: 2 }, READINGS[1]!], fullDisk: true })) },
+    { name: "Offering Hide", for: "a right click, until the pointer leaves", sample: () => onGlass(sysmonPill({ offering: true, state: "hovered" })) },
+    { name: "System monitor, compact", for: "CPU rim, RAM, temperature: all `primary` at ease", sample: () => onGlass(rimPill()) },
+    { name: "Compact, RAM near its limit", for: "its ring in `warning`", sample: () => onGlass(rimPill([LOADS[0]!, { share: 0.88, level: 1 }, LOADS[2]!])) },
+    { name: "Compact, CPU past its limit", for: "the rim in `error`", sample: () => onGlass(rimPill([{ share: 0.97, level: 2 }, LOADS[1]!, LOADS[2]!])) },
+    { name: "Status, shedding", for: "the share gone, then symbols from the left", sample: () => onGlass(shedStatus({ shed: 3 })) },
+    { name: "Clock, compacting", for: "weather and date gone, the seal kept", sample: () => onGlass(clockPill({ date: "none", weather: false })) },
+    { name: "Clock while recording", for: "recording merged in: its colours, its dot leading", sample: () => onGlass(clockPill({ seal: false, date: "none", weather: false, recording: true })) },
   ],
   sizes: [
-    { name: "Symbols and words", for: "`space.s12` ends, `space.s8` gaps", sample: () => statusPill() },
-    { name: "A lone symbol", for: "`space.s8` round it: bell, Proxy, update", sample: () => bellPill() },
-    { name: "Compact system monitor", for: "a `size.control_sm` circle, rings edge to edge", sample: () => rimPill() },
+    { name: "Symbols and words", for: "`space.s12` ends, `space.s8` gaps", sample: () => onGlass(statusPill()) },
+    { name: "A lone symbol", for: "`space.s8` round it: bell, Proxy, update", sample: () => onGlass(bellPill()) },
+    { name: "Compact system monitor", for: "a `size.control_sm` circle, rings edge to edge", sample: () => onGlass(rimPill()) },
     { name: "System monitor", for: "`space.s8` between readings", sample: SYSMON_SAMPLE },
   ],
   states: {
@@ -143,11 +154,11 @@ export default page<State>({
       empty: "a pill with nothing to show is gone",
       error: "in its content: Variants' failing and past-limit rows",
     },
-    rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => make(state) }))),
+    rows: nonEmpty(ROWS.map(({ name, make }) => ({ name, cell: (state: State) => onGlass(make(state)) }))),
     looks: {
-      rest: "`surface_container`, content in its roles; rings `primary`",
-      hovered: "a step on: `surface_container_high`, or its tone's state layer",
-      pressed: "fill a step past hover; no line, no glow",
+      rest: "flat on the glass, content in its roles; rings `primary`",
+      hovered: "an opener's edge light, `opacity.track_lit`; its hint",
+      pressed: "its content dips; the edge light full",
     },
   },
   focus: doesntApply("the bar takes no keyboard focus, so a pill never lights its tube."),
@@ -158,9 +169,9 @@ export default page<State>({
     ],
     missingPicture: doesntApply("its symbols are KubaOS Symbols, always there."),
     counts: [
-      { name: "One reading", for: "the system monitor at its least", sample: () => sysmonPill({ readings: READINGS.slice(0, 1) }) },
-      { name: "Three readings", for: "CPU, RAM, temperature", sample: () => sysmonPill() },
-      { name: "Status at its least", for: "power, network", sample: () => statusPill({ bluetooth: null, battery: null }) },
+      { name: "One reading", for: "the system monitor at its least", sample: () => onGlass(sysmonPill({ readings: READINGS.slice(0, 1) })) },
+      { name: "Three readings", for: "CPU, RAM, temperature", sample: () => onGlass(sysmonPill()) },
+      { name: "Status at its least", for: "power, network", sample: () => onGlass(statusPill({ bluetooth: null, battery: null })) },
     ],
   },
   motion: {
@@ -174,18 +185,18 @@ export default page<State>({
         back: "plays",
         sample: () => pillChanging({ lone: false, gap: "s8" }, sysmonContent(), sysmonContent({ offering: true })),
       },
-      { name: "Hovered", what: "The pointer onto it: its fill a step on over `short`.", tracks: hovers(".k-pill", "every pill", 0, 1), reduced: "same", back: "cuts", sample: () => all() },
-      { name: "Back to rest", what: "The pointer off: back to rest over `short`.", tracks: hovers(".k-pill", "every pill", 1, 0), reduced: "same", back: "cuts", sample: () => all("hovered") },
-      { name: "Pressed", what: "Over `micro` its fill goes a step past hovered, with no line and no glow.", tracks: press(".k-pill", "every pill"), reduced: "same", back: "plays", sample: () => all("hovered") },
+      { name: "Hovered", what: "The pointer onto an opener: the edge light comes in under it over `short`.", tracks: [{ part: "the edge light", on: "the pill under the pointer", target: ".k-edge-hover", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }], reduced: "same", back: "cuts", sample: () => all("hovered") },
+      { name: "Back to rest", what: "The pointer off: the light goes over `short`.", tracks: [{ part: "the edge light", on: "the pill it leaves", target: ".k-edge-hover", property: "opacity", from: 1, to: 0, duration: "short", curve: "standard" }], reduced: "same", back: "cuts", sample: () => all("hovered") },
+      { name: "Pressed", what: "Over `micro` its content dips and the edge light goes to full.", tracks: [{ part: "the content", on: "the pill pressed", target: ".k-bar-dip", property: "scale", from: 1, to: { scale: "press_dip" }, duration: "micro", curve: "standard" }, { part: "the edge light", on: "the pill pressed", target: ".k-edge-hover", property: "--rail-lit", from: 0, to: 1, duration: "micro", curve: "standard" }], reduced: "same", back: "plays", sample: () => all("hovered") },
     ],
   },
   keyboard: doesntApply("never a stop for Tab; SUPER+SHIFT+Space switches the layout, the rest are Command menu Items."),
   measures: {
     samples: nonEmpty([
-      { name: "Clock", for: "seal, date, capsule, weather", sample: () => clockPill() },
-      { name: "Status", for: "symbols, battery's gap", sample: () => statusPill() },
+      { name: "Clock", for: "seal, date, capsule, weather", sample: () => onGlass(clockPill()) },
+      { name: "Status", for: "symbols, battery's gap", sample: () => onGlass(statusPill()) },
       { name: "System monitor", for: "readings, their gaps", sample: SYSMON_SAMPLE },
-      { name: "Bars", for: "a compact meter", sample: () => sysmonPill({ style: "bars", readings: READINGS.slice(0, 1) }) },
+      { name: "Bars", for: "a compact meter", sample: () => onGlass(sysmonPill({ style: "bars", readings: READINGS.slice(0, 1) })) },
     ]),
     measures: [
       { part: "Height", token: "size-control_sm" },

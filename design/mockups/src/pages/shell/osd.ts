@@ -1,6 +1,6 @@
-// The OSD (`config/quickshell/modules/osd/Osd.qml`): the volume or the brightness as a strip rising
-// out of the bottom edge of the focused screen while the keys change it: its symbol, a progress
-// bar and the level. It takes no keyboard and dims nothing.
+// The OSD (`config/quickshell/modules/osd/Osd.qml`): the volume or the brightness on a glass card
+// at the bottom centre of the focused screen, `size.gap` above its edge, while the keys change it:
+// its symbol, a progress bar and the level. It takes no keyboard and dims nothing.
 
 import { icon } from "../../lib/icon.ts";
 import { fill, filling, inset, row } from "../../lib/layout.ts";
@@ -33,7 +33,7 @@ function figure(level: Level): HTMLElement {
   return room;
 }
 
-/** The strip: the symbol in `primary`, the bar across the rest, the level; `space.s16` inside, `size.rail` wide. */
+/** The card's content: the symbol in `primary`, the bar across the rest, the level; `space.s16` inside, `size.rail` wide. */
 export function osd(level: Level): HTMLElement {
   const bar = filling(progressBar({ fraction: level.muted ? 0 : level.value }));
   const strip = inset(row("s12", "centre", icon(symbolOf(level), "var(--icon-s24)", "var(--color-primary)"), bar, figure(level)), "s16", "s16");
@@ -42,7 +42,7 @@ export function osd(level: Level): HTMLElement {
 }
 
 function shot(level: Level, reveal?: number): HTMLElement {
-  return hung(osd(level), { edge: "bottom", corner: true, ...(reveal !== undefined ? { reveal } : {}) }).screen.element;
+  return hung(osd(level), { edge: "bottom", height: "var(--size-app_min_height)", ...(reveal !== undefined ? { reveal } : {}) }).screen.element;
 }
 
 const VOLUME: Level = { kind: "volume", value: 0.62 };
@@ -52,7 +52,7 @@ const BRIGHTNESS: Level = { kind: "brightness", value: 0.8 };
 function live(): HTMLElement {
   let level: Level = VOLUME;
   let content = osd(level);
-  const made = hung(content, { edge: "bottom", corner: true });
+  const made = hung(content, { edge: "bottom", height: "var(--size-app_min_height)" });
   const room = made.screen.element;
   const set = liven(made.sheet, true);
   room.tabIndex = 0;
@@ -81,11 +81,11 @@ function live(): HTMLElement {
   return room;
 }
 
-const STRIP = "the strip";
+const STRIP = "the card";
 
 const ARRIVING: Move = {
   name: "Arriving",
-  what: "A volume or brightness key: the strip rises from the bottom edge.",
+  what: "A volume or brightness key: the card fades in as it rises `space.s8` into place.",
   tracks: [{ part: STRIP, on: "the OSD", target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }],
   reduced: [{ part: STRIP, on: "the OSD", target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
@@ -94,7 +94,7 @@ const ARRIVING: Move = {
 
 const LEAVING: Move = {
   name: "Leaving",
-  what: "A beat after the last key: the strip sinks back into the edge.",
+  what: "A beat after the last key: the card sinks `space.s8` as it fades out.",
   tracks: [{ part: STRIP, on: "the OSD", target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
   reduced: [{ part: STRIP, on: "the OSD", target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
   back: "cuts",
@@ -121,7 +121,7 @@ export default page<Shown>({
   level: "shell",
   slug: "osd",
   title: "OSD",
-  lede: "The volume or the brightness as it changes: a strip rising from the bottom edge.",
+  lede: "The volume or the brightness as it changes: a glass card at the bottom centre.",
   code: { qml: "Osd" },
   from: ["panel-page", "progress-bar"],
   stage: { live, hint: "click it; ↑ ↓ volume, b brightness, m mute", daylight: true },
@@ -174,8 +174,9 @@ export default page<Shown>({
       { part: "Symbol", token: "icon-s24" },
       { part: "Bar's height", token: "size-progress" },
       { part: "Level's line", token: "type-body_strong-line" },
-      { part: "Corners, fillets", token: "radius-surface" },
+      { part: "Corners", token: "radius-surface" },
+      { part: "Above the bottom edge", token: "size-gap" },
     ],
-    reflow: doesntApply("one size, centred on the focused screen's bottom edge."),
+    reflow: doesntApply("one size, centred `size.gap` above the focused screen's bottom."),
   },
 });

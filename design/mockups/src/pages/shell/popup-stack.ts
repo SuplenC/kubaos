@@ -1,13 +1,14 @@
 // The PopupStack page: `docs/design/components/popup-stack.md`, the shell's `Popups.qml`,
-// `ToastList.qml`, `PopupHold.qml` and `PopupsBelow.qml` today. New notifications on a corner sheet in
-// the frame's top right, each a two-line NotificationPopup with its own time, one per app; a critical
-// one as today's full card, and critical ones under a panel that covers the corner.
+// `ToastList.qml`, `PopupHold.qml` and `PopupsBelow.qml` today. New notifications as toasts under the
+// bell, each a two-line NotificationPopup on its own glass with its own time, one per app; a critical
+// one as today's full card. With a card open at the bell's end they stand beside it toward the
+// middle; the Notifications card opening takes them in.
 
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import type { PopupNote } from "../../lib/notification-popup.ts";
 import { ANIA, BATTERY, BUILD, CRITICAL, KUBA_TWO, MARCO, OLA, UPDATE } from "../notifications.ts";
-import { belowOnScreen, popupStackOnScreen } from "./notification-parts.ts";
+import { besideOnScreen, popupStackOnScreen } from "./notification-parts.ts";
 
 type Shown = "rest" | "lit" | "selected" | "open";
 
@@ -26,15 +27,15 @@ const ON = "the newest popup";
 
 const ARRIVES: Move = {
   name: "A popup arrives",
-  what: "It slides in from the right as it fades in; the others make room under it.",
+  what: "It drops `space.s8` into place as it fades in; the others make room under it.",
   tracks: [
-    { part: "the slide", on: ON, target: INNER, property: "--slide-by", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
-    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the drop", on: ON, target: INNER, property: "--toast-drop", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 0, to: 1, duration: "medium", curve: "standard_decel" },
   ],
   reduced: [
     { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 0, to: 1, duration: "instant", curve: "linear" },
-    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => still(SETTLED),
@@ -45,11 +46,11 @@ const DISMISSED: Move = {
   what: "× or Delete: it slides out to the right, then those below close the gap.",
   tracks: [
     { part: "the slide", on: ON, target: INNER, property: "--slide-by", from: 0, to: 2, duration: "medium", curve: "emphasized_accel" },
-    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
+    { part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
     { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "medium", cue: "medium", curve: "standard_decel" },
   ],
   reduced: [
-    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
+    { part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 1, to: 0, duration: "short", curve: "standard_accel" },
     { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
   ],
   back: "cuts",
@@ -61,13 +62,25 @@ const TIME_UP: Move = {
   what: "It slides up as it fades, and those below close the gap at once.",
   tracks: [
     { part: "the rise", on: ON, target: INNER, property: "--rise", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
-    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
+    { part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 1, to: 0, duration: "medium", curve: "standard_accel" },
     { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "medium", curve: "standard_decel" },
   ],
   reduced: [
-    { part: "the fade", on: ON, target: INNER, property: "opacity", from: 1, to: 0, duration: "short", curve: "standard_accel" },
+    { part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 1, to: 0, duration: "short", curve: "standard_accel" },
     { part: "its room", on: ON, target: STACK, property: "--slot-open", from: 1, to: 0, duration: "instant", cue: "short", curve: "linear" },
   ],
+  back: "cuts",
+  sample: () => still(SETTLED),
+};
+
+const TAKEN: Move = {
+  name: "Taken into the card",
+  what: "The bell opens Notifications: each popup drops `space.s48` into it as it fades.",
+  tracks: [
+    { part: "the drop", on: ON, target: INNER, property: "--toast-taken", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
+    { part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
+  ],
+  reduced: [{ part: "the fade", on: ON, target: INNER, property: "--toast-shown", from: 1, to: 0, duration: "short", curve: "standard_accel" }],
   back: "cuts",
   sample: () => still(SETTLED),
 };
@@ -83,11 +96,11 @@ export default page<Shown>({
   level: "shell",
   slug: "popup-stack",
   title: "PopupStack",
-  lede: "New notifications in the frame's top right corner, two lines each, each leaving when its time is up.",
+  lede: "Toasts under the bell, each on its own glass, leaving when its time is up.",
   code: { qml: "PopupStack", unbuilt: "QML: still Popups and ToastList" },
   stage: {
     live: () => popupStackOnScreen({ schedule: BURST }),
-    hint: "point at one to hold all; click opens; × or Delete",
+    hint: "point to hold; click opens; the bell takes them in",
     daylight: true,
   },
   variants: [
@@ -96,7 +109,9 @@ export default page<Shown>({
     { name: "Several from one app", for: "Slack's three: the count, the newest's words", sample: () => still([{ ...MARCO, count: 3 }]) },
     { name: "One opened", for: "its card in place; its time held", sample: () => still(SETTLED, { open: 1 }) },
     { name: "Critical among them", for: "today's full card, no timer", sample: () => still([CRITICAL, { ...MARCO, count: 3 }, BUILD]) },
-    { name: "Critical under a panel", for: "under an open panel; its pill toggles it", sample: () => belowOnScreen([[CRITICAL]], true) },
+    { name: "In Floating", for: "under the bell, `size.gap` under the strip", sample: () => still(SETTLED.slice(0, 2), { layout: "floating" }) },
+    { name: "In Islands", for: "under the bell, `size.gap` under its island", sample: () => still(SETTLED.slice(0, 2), { layout: "islands" }) },
+    { name: "Beside an open card", for: "`size.gap` beside it; its pill toggles it", sample: () => besideOnScreen([BUILD, OLA], true) },
   ],
   sizes: doesntApply("`size.panel` wide; as tall as its popups."),
   states: {
@@ -105,7 +120,7 @@ export default page<Shown>({
       pressed: "a press opens a popup",
       disabled: "shown or gone",
       loading: "a popup arrives whole",
-      empty: "no popups: the corner closes, or the peek shows",
+      empty: "no popups: nothing under the bell",
       error: "a critical popup is a variant",
     },
     rows: [{ name: "Four apps", cell: (state) => IN_STATE(state) }],
@@ -121,14 +136,14 @@ export default page<Shown>({
     text: doesntApply("its words are its popups'."),
     missingPicture: doesntApply("its popups show their app's symbol, never an image."),
     counts: [
-      { name: "None", for: "the corner closes", sample: () => popupStackOnScreen({ notes: [] }) },
+      { name: "None", for: "nothing under the bell", sample: () => popupStackOnScreen({ notes: [] }) },
       { name: "One", for: "one popup", sample: () => still([BUILD]) },
       { name: "Five apps", for: "one each, newest first", sample: () => still([UPDATE, BATTERY, { ...MARCO, count: 3 }, SIGNAL, BUILD], { remaining: [1, 0.9, 0.7, 0.5, 0.3] }) },
     ],
   },
   motion: {
     arrives: [ARRIVES],
-    leaves: [DISMISSED, TIME_UP],
+    leaves: [DISMISSED, TIME_UP, TAKEN],
     between: powerMoves(() => still([BUILD])),
   },
   keyboard: {
@@ -145,12 +160,14 @@ export default page<Shown>({
     samples: nonEmpty([{ name: "Four apps", for: "padding, gap, width", sample: () => still(SETTLED) }]),
     measures: [
       { part: "Width", token: "size-panel" },
-      { part: "In from the sheet's edges", token: "space-s8" },
+      { part: "Under the bar, from the edges", token: "size-gap" },
       { part: "Between popups", token: "space-s4" },
-      { part: "Slide in, one step", token: "space-s64" },
+      { part: "Drop in", token: "space-s8" },
+      { part: "Slide out, one step", token: "space-s64" },
+      { part: "Drop into the card", token: "space-s48" },
       { part: "Rise when its time is up", token: "space-s24" },
       { part: "Time left's line", token: "stroke-thin" },
     ],
-    reflow: doesntApply("it keeps its corner and `size.panel` on every screen."),
+    reflow: doesntApply("under the bell, `size.panel` wide, on every screen."),
   },
 });

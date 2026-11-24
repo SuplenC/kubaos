@@ -70,8 +70,8 @@ const GROUP_NAME: Words = { short: "Studio", long: "Living room television" };
 const parts = (selector: string): string => `${selector}, ${selector} > .ov-ws-desk`;
 
 const OPENING_TRACKS: [Track<"standard" | "emphasized_decel" | "emphasized_accel">, ...Track<"standard" | "emphasized_decel" | "emphasized_accel">[]] = [
-  { part: "the frame and bar", on: "every screen", target: ".k-screen-glass, .k-frame, .k-bar", property: "--ov-aside", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
   { part: "the wallpaper's blur and dim", on: "every screen", target: ".ov-screen > .k-screen-wallpaper", property: "--ov-veil", from: 0, to: 1, duration: "long", curve: "standard" },
+  { part: "the bar", on: "every screen", target: ".k-bar", property: "--ov-aside", from: 0, to: 1, duration: "medium", curve: "emphasized_accel" },
   { part: "the shown workspace", on: "its screen", target: parts('.ov-ws[data-rank="home"]'), property: "--ov-fly", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
   { part: "its neighbours", on: "one place away", target: parts('.ov-ws[data-rank="1"]'), property: "--ov-arrive", from: 0, to: 1, duration: "long", cue: "swap_lag", curve: "emphasized_decel" },
   { part: "two places away", on: "the next", target: parts('.ov-ws[data-rank="2"]'), property: "--ov-arrive", from: 0, to: 1, duration: "long", cue: "micro", curve: "emphasized_decel" },
@@ -80,11 +80,11 @@ const OPENING_TRACKS: [Track<"standard" | "emphasized_decel" | "emphasized_accel
 
 const OPENING: Move = {
   name: "Opening",
-  what: "The desktop shrinks into its miniature as the others arrive a `swap_lag` apart; the frame steps aside.",
+  what: "The desktop shrinks into its miniature as the others arrive a `swap_lag` apart; the bar slides up out.",
   tracks: OPENING_TRACKS,
   reduced: [
-    { part: "the frame and bar", on: "every screen", target: ".k-screen-glass, .k-frame, .k-bar", property: "--ov-aside", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the wallpaper's blur and dim", on: "every screen", target: ".ov-screen > .k-screen-wallpaper", property: "--ov-veil", from: 0, to: 1, duration: "short", curve: "standard" },
+    { part: "the bar", on: "every screen", target: ".k-bar", property: "--ov-aside", from: 0, to: 1, duration: "short", curve: "standard" },
     { part: "the shown workspace", on: "its place", target: parts('.ov-ws[data-rank="home"]'), property: "--ov-fly", from: 0, to: 0, duration: "instant", curve: "standard" },
     { part: "every miniature", on: "a fade", target: `${parts(".ov-ws")}, .ov-plus, .ov-label`, property: "--ov-arrive", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
@@ -94,17 +94,17 @@ const OPENING: Move = {
 
 const CLOSING: Move = {
   name: "Closing into a workspace",
-  what: "The chosen miniature grows into the screen; the others fall back and fade; the frame comes back.",
+  what: "The chosen miniature grows into the screen; the others fall back and fade; the bar slides back.",
   tracks: [
     { part: "the chosen workspace", on: "its screen", target: parts('.ov-ws[data-rank="home"]'), property: "--ov-fly", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
     { part: "the others", on: "every screen", target: `${parts('.ov-ws:not([data-rank="home"])')}, .ov-plus, .ov-label`, property: "--ov-arrive", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
     { part: "the wallpaper's blur and dim", on: "every screen", target: ".ov-screen > .k-screen-wallpaper", property: "--ov-veil", from: 1, to: 0, duration: "long", curve: "standard" },
-    { part: "the frame and bar", on: "every screen", target: ".k-screen-glass, .k-frame, .k-bar", property: "--ov-aside", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
+    { part: "the bar", on: "every screen", target: ".k-bar", property: "--ov-aside", from: 1, to: 0, duration: "long", curve: "emphasized_decel" },
   ],
   reduced: [
     { part: "every miniature", on: "a fade", target: `${parts(".ov-ws:not([data-rank=\"home\"])")}, .ov-plus, .ov-label`, property: "--ov-arrive", from: 1, to: 0, duration: "short", curve: "standard" },
     { part: "the wallpaper's blur and dim", on: "every screen", target: ".ov-screen > .k-screen-wallpaper", property: "--ov-veil", from: 1, to: 0, duration: "short", curve: "standard" },
-    { part: "the frame and bar", on: "every screen", target: ".k-screen-glass, .k-frame, .k-bar", property: "--ov-aside", from: 1, to: 0, duration: "short", curve: "standard" },
+    { part: "the bar", on: "every screen", target: ".k-bar", property: "--ov-aside", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => still(),
@@ -138,8 +138,8 @@ const ARRIVES: Move = {
 function swiped(opening: boolean): [Track<"linear">, ...Track<"linear">[]] {
   const [from, to] = opening ? [0, 1] : [1, 0];
   return [
-    { part: "the frame and bar", on: "every screen", target: ".k-screen-glass, .k-frame, .k-bar", property: "--ov-aside", from, to, duration: "long", curve: "linear" },
     { part: "the wallpaper's blur and dim", on: "every screen", target: ".ov-screen > .k-screen-wallpaper", property: "--ov-veil", from, to, duration: "long", curve: "linear" },
+    { part: "the bar", on: "every screen", target: ".k-bar", property: "--ov-aside", from, to, duration: "long", curve: "linear" },
     { part: "the shown workspace", on: "its screen", target: parts('.ov-ws[data-rank="home"]'), property: "--ov-fly", from: to, to: from, duration: "long", curve: "linear" },
     { part: "every other miniature", on: "slots and names too", target: `${parts('.ov-ws:not([data-rank="home"])')}, .ov-plus, .ov-label`, property: "--ov-arrive", from, to, duration: "long", curve: "linear" },
   ];
@@ -441,7 +441,7 @@ export default page<Shown>({
       { part: "Window corners, on the desktop", token: "radius-surface" },
       { part: "Window corners, in a miniature", token: "radius-control" },
       { part: "Window gaps", token: "space-s8" },
-      { part: "A floating window's shadow", token: "shadow-panel-blur" },
+      { part: "A window's shadow", token: "shadow-glass-blur" },
       { part: "Wallpaper blur", token: "size-lock_blur" },
       { part: "Slit between two", token: "space-s4" },
       { part: "A carried window, of its miniature", token: "scale-carried" },

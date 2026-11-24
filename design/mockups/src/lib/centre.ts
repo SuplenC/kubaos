@@ -130,6 +130,21 @@ export function centreOnPixels(...roots: ParentNode[]): void {
   const startOf = (element: Element, axis: Axis) => (axis === "x" ? rectOf(element).left : rectOf(element).top) * perCss;
   const off = (element: Element, axis: Axis, from: Element) => !whole(startOf(element, axis) - startOf(from, axis));
 
+  // A pressed bar item's content dips (`glass.css`): a moment's drawing, not layout, so the pass
+  // measures it at rest, as it would have centred it before the press.
+  const dips = [
+    ...new Set(
+      roots.flatMap((root) => [
+        ...(root instanceof Element ? [root.closest<HTMLElement>(".k-bar-dip")].filter((dip) => dip !== null) : []),
+        ...root.querySelectorAll<HTMLElement>(".k-bar-dip"),
+      ]),
+    ),
+  ].filter((dip) => getComputedStyle(dip).scale !== "none");
+  for (const dip of dips) {
+    dip.style.transition = "none";
+    dip.style.scale = "none";
+  }
+
   const planned = new Map<HTMLElement, Partial<Record<Side, number>>>();
   // What each box, or each line along its main axis, was centred along already in this pass.
   const looked = new WeakMap<Element, Set<string>>();
@@ -169,6 +184,11 @@ export function centreOnPixels(...roots: ParentNode[]): void {
     }
     corrections.set(carrier, had);
   }
+
+  // The dip comes back as it was, with no move: its scale is settled before its transition returns.
+  for (const dip of dips) dip.style.scale = "";
+  for (const dip of dips) void getComputedStyle(dip).scale;
+  for (const dip of dips) dip.style.transition = "";
 
   function plan(box: HTMLElement, axis: Axis): void {
     let parent = box.parentElement;

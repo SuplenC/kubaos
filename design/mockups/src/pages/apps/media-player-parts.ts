@@ -12,6 +12,7 @@
 // playlist's sidebar) changes in place, so nothing flickers, starts its motion over or drops the
 // pointer's hover.
 
+import { glass, glassWindow } from "../../lib/glass.ts";
 import "./media-player.css";
 import { centreOnPixels } from "../../lib/centre.ts";
 import { errorBlock } from "../../lib/error-block.ts";
@@ -658,8 +659,8 @@ function controller(state: PlayerState, hooks: Hooks): Built {
   const position = state.position ?? 0;
   const many = (state.count ?? 1) > 1;
   const at = state.index ?? 0;
-  const box = document.createElement("span");
-  box.className = "mp-controller";
+  const box = glass(document.createElement("span"));
+  box.classList.add("mp-controller");
 
   const bar = filling(seekBar(file));
   moveBar(bar, file, position, state.buffered ?? position);
@@ -779,8 +780,8 @@ const playlistUpdates = new WeakMap<Element, (state: PlayerState) => void>();
  */
 function sidebar(state: PlayerState, take: (index: number) => void): HTMLElement {
   const files = state.list ?? PLAYLIST;
-  const side = document.createElement("span");
-  side.className = "mp-sidebar";
+  const side = glass(document.createElement("span"));
+  side.classList.add("mp-sidebar");
   const count = text(`${(state.index ?? 0) + 1} of ${state.count ?? files.length}`, "small", "on_surface_variant");
   const head = row("s8", "centre", text("Playlist", "subheading"), count);
   head.classList.add("mp-sidebar-head");
@@ -871,8 +872,8 @@ function song(file: MediaFile): HTMLElement {
 
 /** The play or pause symbol that blooms in the picture's middle as a press starts or stops it. */
 function bloom(): HTMLElement {
-  const disc = document.createElement("span");
-  disc.className = "mp-bloom";
+  const disc = glass(document.createElement("span"));
+  disc.classList.add("mp-bloom");
   disc.append(icon("play_arrow", "var(--icon-s48)", "var(--color-on_surface)"), icon("pause", "var(--icon-s48)", "var(--color-on_surface)"));
   return disc;
 }
@@ -935,8 +936,8 @@ const STRUCTURE = new Set<keyof PlayerState>(["file", "error", "buffering", "cou
  */
 export function player(initial: PlayerState, hooks: Hooks = {}): Player {
   let state = initial;
-  const root = document.createElement("span");
-  root.className = "mp-window";
+  const root = glassWindow(document.createElement("span"), true);
+  root.classList.add("mp-window");
   root.dataset.mode = "dark";
   let rung = 0;
   let built: Built | null = null;
@@ -1029,7 +1030,9 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
       if ((state.count ?? 1) > 1) {
         const corner = document.createElement("span");
         corner.className = "mp-corner";
-        corner.append(playlistButton());
+        const pill = glass(document.createElement("span"));
+        pill.classList.add("mp-corner-glass");
+        corner.append(pill, playlistButton());
         screen.append(corner);
       }
       if ((state.count ?? 1) > 1) screen.append(sidebar(state, (index) => take(index)));

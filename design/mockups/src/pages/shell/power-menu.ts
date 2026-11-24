@@ -1,5 +1,5 @@
-// The power menu, "Leaving the room" (`power-room.ts` draws it): the desktop steps back, a sheet of
-// five tiles rises from the frame's bottom edge, and the action you're on plays out on the desktop
+// The power menu, "Leaving the room" (`power-room.ts` draws it): the desktop steps back, a card of
+// five tiles rises `size.gap` above the screen's bottom edge, and the action you're on plays out on the desktop
 // before you commit. It opens from the control center's Power, the bar having none.
 
 import type { Words } from "../../lib/content.ts";
@@ -36,7 +36,7 @@ const UNSAVED = { unsaved: true, update: true };
 
 const open = (at: number, more: Parameters<typeof room>[0] = {}) => () => room({ open: true, at, ...more });
 
-/** A room wrapped, so a move's player reaches its root: the frame's and the lights' numbers are set there. */
+/** A room wrapped, so a move's player reaches its root: the bar's and the lights' numbers are set there. */
 const held = (made: () => HTMLElement) => () => {
   const box = document.createElement("span");
   box.className = "power-held";
@@ -46,7 +46,7 @@ const held = (made: () => HTMLElement) => () => {
 
 const OPENING: Move = {
   name: "Opening",
-  what: "The frame closes in, the picture pushes in, the windows step back, the sheet rises: all over `long`.",
+  what: "The picture pushes in, the windows step back, the card rises: all over `long`.",
   tracks: opening(),
   reduced: openingReduced(),
   back: "cuts",
@@ -55,7 +55,7 @@ const OPENING: Move = {
 
 const CLOSING: Move = {
   name: "Closing",
-  what: "Esc or a press outside: the sheet sinks and the frame opens out over `medium`; the desktop comes forward.",
+  what: "Esc or a press outside: the card sinks over `medium`; the desktop comes forward.",
   tracks: closing(),
   reduced: closingReduced(),
   back: "cuts",
@@ -130,7 +130,7 @@ const GOES_DOWN: Move = {
 
 const LOGS_OUT: Move = {
   name: "Log out, held",
-  what: "The windows, the sheet, the frame and the bar go as the room goes dark, over `medium`.",
+  what: "The windows, the card and the bar go as the room goes dark, over `medium`.",
   tracks: loggingOut(),
   reduced: loggingOut(true),
   back: "cuts",
@@ -148,7 +148,7 @@ const SLEEPS: Move = {
 
 const LOCKS: Move = {
   name: "Lock",
-  what: "From its look: the sheet sinks, the frame slides out, the clock goes home behind the city.",
+  what: "From its look: the card sinks, the clock goes home behind the city.",
   tracks: locking(),
   reduced: locking(true),
   back: "cuts",
@@ -176,7 +176,7 @@ export default page<Shown>({
   level: "shell",
   slug: "power-menu",
   title: "Power menu",
-  lede: "Leaving the room: five tiles on a sheet at the bottom edge, each action played on the desktop first.",
+  lede: "Leaving the room: five tiles on a card at the bottom, each action played on the desktop first.",
   code: { unbuilt: "QML PowerMenu: old design" },
   from: ["lock", "panel-page", "tooltip", "chip", "banner"],
   stage: { live: () => room({ live: true }), hint: "click to open; arrows move; hold Enter", daylight: true },
@@ -199,7 +199,7 @@ export default page<Shown>({
     { name: "Locked", for: "Lock taken: the lock at rest", sample: () => room({ locked: true }) },
     { name: "Its way in", for: "the control center's Power, lit", sample: () => onScreen(controlCenter({ powerLit: "lit" })) },
   ],
-  sizes: doesntApply("one size: five `size.power_tile` tiles, the sheet as wide as they are."),
+  sizes: doesntApply("one size: five `size.power_tile` tiles, the card as wide as they are."),
   states: {
     shown: ["rest", "lit", "pressed"],
     absent: {
@@ -261,12 +261,12 @@ export default page<Shown>({
   },
   measures: {
     samples: nonEmpty([
-      { name: "Shut down, looked at", for: "the frame, the sheet, the tiles", sample: open(SHUTDOWN) },
+      { name: "Shut down, looked at", for: "the card, the tiles", sample: open(SHUTDOWN) },
       { name: "Apps that won't quit", for: "the blocker in the sheet", sample: open(SHUTDOWN, { blocked: true, situation: UNSAVED }) },
       { name: "Gone dark, the sign lit", for: "the sign's place", sample: () => room({ dark: { sign: 0 } }) },
     ]),
     measures: [
-      { part: "Frame, closed in", token: "space-s32" },
+      { part: "Card above the bottom", token: "size-gap" },
       { part: "Sheet's padding", token: "space-s16" },
       { part: "Blocker, line, tiles apart", token: "space-s16" },
       { part: "Line to its facts", token: "space-s8" },
@@ -279,10 +279,10 @@ export default page<Shown>({
       { part: "Symbol", token: "icon-s24" },
       { part: "Tiles apart", token: "space-s8" },
       { part: "Tile's corner", token: "radius-control" },
-      { part: "Sheet's corners, fillets", token: "radius-surface" },
+      { part: "Card's corner, less padding", token: "radius-control" },
       { part: "A leaving window's drop", token: "space-s64" },
       { part: "The blocker's rise", token: "space-s24" },
     ],
-    reflow: doesntApply("the sheet keeps its size, centred on the bottom edge, on any screen."),
+    reflow: doesntApply("the card keeps its size, centred over the bottom edge, on any screen."),
   },
 });

@@ -13,6 +13,7 @@
 import type { Words } from "../lib/content.ts";
 import type { Tone } from "../lib/focus.ts";
 import type { ColourPath } from "./recolour.ts";
+import type { Mode } from "./settings.ts";
 
 /** A name: a variant's, a part's, a row's. A few words. */
 export type Label = string;
@@ -434,7 +435,8 @@ export interface Switches {
  * sample fits half the stage, else one under the other.
  */
 export interface Stage {
-  readonly live: Sample;
+  /** The live sample, drawn in each pane's mode: a part whose values differ by night and by day reads its pane's. */
+  readonly live: (mode: Mode) => Element;
   /** The worlds Live can be drawn in, each a row of chips in the bar while Live is shown. */
   readonly switches?: Switches;
   /** How to try the live sample, a few words: click it, or Tab and ↓. */

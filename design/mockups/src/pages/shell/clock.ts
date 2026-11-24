@@ -25,14 +25,12 @@ const ON = "the clock popup";
 
 const OPENING: Move = {
   name: "Opening",
-  what: "The bar's time or temperature, Super+C or a Command menu Item: the sheet grows down from the top edge.",
+  what: "The bar's time or temperature, Super+C or a Command menu Item: the card comes down under the clock.",
   tracks: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(),
@@ -43,11 +41,9 @@ const CLOSING: Move = {
   what: "Esc, a press outside or the clock: the sheet goes back up.",
   tracks: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(),

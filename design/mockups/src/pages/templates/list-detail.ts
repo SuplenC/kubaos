@@ -201,7 +201,8 @@ export default page<"rest" | "selected" | "empty" | "error" | "loading">({
       { name: "Kōbō's setup", for: "the side and the card's page", sample: () => framed(setup(), "var(--size-app_min_width)", "var(--size-app_min_height)") },
     ]),
     measures: [
-      { part: "Menu's padding, gaps; Kōbō's chip", token: "space-s12" },
+      { part: "Menu's padding", token: "space-s16" },
+      { part: "Menu's gaps; Kōbō's chip", token: "space-s12" },
       { part: "Menu's least; Kōbō's side's most", token: "size-column" },
       { part: "With a rail, shows the pane", token: "size-dialog" },
       { part: "Pane's least width", token: "size-rail" },

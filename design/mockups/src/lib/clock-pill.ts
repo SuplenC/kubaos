@@ -1,12 +1,17 @@
-// The bar's clock, the ClockPill, a DRAFT part (`docs/design/components/clock-pill.md`): the weekday's seal
-// (its kanji on a disc of `cold`), the date plain, the time in a flat capsule of `primary`, and the
-// weather plain like the date. The capsule is the screen's exact middle and the pill is laid out
-// round it. Recording merged in, the pill and its capsule take the recording's colours and its dot
-// leads. The bar draws it, and the Lock draws it in its bar for the rest clock to fly into.
+// The bar's clock, the ClockPill, a DRAFT part (`docs/design/components/clock-pill.md`), flat on the
+// glass like every other item: the weekday's seal (its kanji on a disc of `cold`), the date, the
+// time, and the weather. It is two press targets: the time's half (seal, date, time) opens the
+// calendar, the weather's the weather view, and the edge light lies under the half the pointer is
+// on, or the half whose view is open. While its card is open the time sits in a filled capsule of
+// `primary`, `size.bar_capsule` tall, coming in over `short` on `standard`; at rest it is plain.
+// The capsule's place is the screen's exact middle and the pill is laid out round it. Recording
+// merged in, the capsule stays filled in the recording's colours and its dot leads. The bar draws
+// it, and the Lock draws it in its bar for the rest clock to fly into.
 
 import "./clock-pill.css";
 import { centreOnPixels, forgetCentring } from "./centre.ts";
-import { type Shown, stateOptions } from "./control.ts";
+import { pin, type Shown, stateOptions } from "./control.ts";
+import { opens } from "./glass.ts";
 import { icon } from "./icon.ts";
 import { widestTime } from "./lock.ts";
 import { paired, pill } from "./pill.ts";
@@ -38,13 +43,37 @@ export interface ClockPillOptions {
   readonly twelve?: boolean;
   /** A press target, lit by the pointer as the bar's pills are; false for a picture of one. */
   readonly interactive?: boolean;
+  /** The pointer's state, on the time's half. */
   readonly state?: Shown;
+  /** Its card open on the calendar (the time's half) or the weather: the capsule filled. */
+  readonly open?: "clock" | "weather";
 }
 
-/** The pill, and its time: the words the Lock's clock lands on. */
+/** The pill, its time (the words the Lock's clock lands on), and its two halves, which a card stands under. */
 export interface ClockPill {
   readonly element: HTMLElement;
   readonly time: HTMLElement;
+  /** The time's half: the seal, the date and the time. */
+  readonly when: HTMLElement;
+  /** The weather's half, where the pill has one. */
+  readonly weather: HTMLElement | null;
+}
+
+/** Fills the clock's capsule, its card open on `view`, or empties it: none. */
+export function setClockOpen(pill: HTMLElement, view: "clock" | "weather" | null): void {
+  if (view) pill.dataset.open = view;
+  else delete pill.dataset.open;
+  const capsule = pill.querySelector<HTMLElement>(".k-clock-pill-capsule");
+  if (capsule) filled(capsule, view !== null || pill.hasAttribute("data-recording"));
+}
+
+/**
+ * A filled capsule is a box the row spaces, its edge `space.s8` from its neighbours; an empty one
+ * gives its room back to them and is no box at all, only the time in it.
+ */
+function filled(capsule: HTMLElement, on: boolean): void {
+  if (on) probe(capsule, { role: "box" });
+  else delete capsule.dataset.probe;
 }
 
 /**
@@ -80,35 +109,47 @@ export function clockPill(options: ClockPillOptions): ClockPill {
     const seal = document.createElement("span");
     seal.className = "k-clock-pill-seal";
     seal.append(text(words.kanji, "accent", recording ? "error_container" : "on_cold"));
+    // The disc is the part the row spaces, not the kanji inside it.
+    probe(seal, { role: "box" });
     parts.push(around(seal, false));
   }
   const date = options.date ?? "full";
   if (date !== "none") parts.push(around(text(date === "full" ? words.date : words.day, "body", ink("on_surface_variant")), true));
   const capsule = document.createElement("span");
   capsule.className = "k-clock-pill-capsule";
-  const time = slotted(words.time, recording ? "on_error" : "on_primary", options.twelve ?? false);
+  const time = slotted(words.time, recording ? "on_error" : "on_surface", options.twelve ?? false);
+  // Its ink turns with the capsule's fill: the plain words' at rest, `on_primary` filled.
+  if (!recording) time.style.color = "var(--clock-ink)";
   capsule.append(time);
   parts.push(capsule);
-  if ((options.weather ?? true) && words.weather) {
-    const weather = paired(icon(words.weather.symbol, "var(--icon-s16)", `var(--color-${ink("on_surface_variant")})`), text(words.weather.temperature, "body", ink("on_surface_variant")));
-    weather.classList.add("k-clock-pill-weather");
-    parts.push(around(weather, true));
-  }
   const interactive = options.interactive ?? true;
+  const when = document.createElement("span");
+  when.className = "k-clock-pill-when";
+  when.append(...parts);
+  let weather: HTMLElement | null = null;
+  if ((options.weather ?? true) && words.weather) {
+    weather = paired(icon(words.weather.symbol, "var(--icon-s16)", `var(--color-${ink("on_surface_variant")})`), text(words.weather.temperature, "body", ink("on_surface_variant")));
+    weather.classList.add("k-clock-pill-weather");
+    around(weather, true);
+  }
+  if (interactive) {
+    for (const half of [when, weather]) if (half) opens(half);
+    pin(when, stateOptions(options.state ?? "rest").pinned);
+  }
   const element = pill({
-    content: parts,
+    content: weather ? [when, weather] : [when],
     lone: false,
-    end: "s4",
-    ...(recording ? { tone: "recording" as const } : {}),
-    ...(interactive ? { interactive: true, tooltip: recording ? `Recording. ${words.whole}` : words.whole, ...stateOptions(options.state ?? "rest") } : {}),
+    ...(interactive ? { interactive: true, tooltip: recording ? `Recording. ${words.whole}` : words.whole } : {}),
   });
   element.classList.add("k-clock-pill");
   element.toggleAttribute("data-recording", recording);
+  if (options.open) element.dataset.open = options.open;
+  filled(capsule, options.open !== undefined || recording);
   // A component of its own, not one of the bar's pills: its parts are its own, and its variants
   // are the parts it shows.
   probe(element, { role: "component", name: "ClockPill", variant: variant((options.seal ?? true) && "seal", date !== "none" && `date ${date}`, parts.some((part) => part.classList.contains("k-clock-pill-weather")) && "weather", recording && "recording"), fixed: { width: false, height: true } });
   centreCapsule(element);
-  return { element, time };
+  return { element, time, when, weather };
 }
 
 /** Where the capsule's middle sits in `pill`, from its left, in the viewport's pixels. */

@@ -25,14 +25,15 @@
   transition: --recede var(--motion-medium) var(--easing-standard_decel);
 }
 
-/* The popup stack and the peek: `size.panel` wide, `space.s8` inside. */
+/* The peek: `size.panel` wide, its groups `space.s8` apart and `space.s16` inside, so its cards'
+   corners run concentric with the card's. */
 .k-notif-stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-s8);
   box-sizing: border-box;
   width: var(--size-panel);
-  padding: var(--space-s8);
+  padding: var(--space-s16);
 }
 
 .k-notif-stack > .k-notif-arriving {
@@ -101,8 +102,12 @@
   animation: k-notif-fade-out var(--motion-short) var(--easing-standard_accel) both;
 }
 
-/* The popup stack: its popups `space.s4` apart, `space.s8` in from the sheet's edges. Each sits in a
-   slot whose room opens as it arrives and closes as it leaves, so those below make and close the gap. */
+/* The toasts (the popup stack): a column `size.panel` wide, `size.gap` under the bar, centred under
+   the bell and stopped `size.gap` from the screen's sides as a card is; with a card open at that end
+   it stands `size.gap` beside the card toward the middle, moving there as the card does. Each
+   popup is a glass of its own, `space.s4` under the one before. It sits in a slot whose room opens
+   as it arrives and closes as it leaves, so those below make and close the gap; the slot cuts only
+   while its room moves, so a settled popup's shadow shows whole. */
 @property --slot-open {
   syntax: "<number>";
   inherits: false;
@@ -115,20 +120,64 @@
   initial-value: 0;
 }
 
-.k-popup-stack {
+/* How far a toast still has to drop into place, 1 where it starts `space.s8` up and 0 in place. */
+@property --toast-drop {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How far a toast has dropped into the Notifications card taking it, in `space.s48`s. */
+@property --toast-taken {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* How much of a toast shows. Its glass fades, not the slot holding it: a glass under an ancestor
+   with an opacity would blur nothing behind it. */
+@property --toast-shown {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+.k-toasts {
+  position: absolute;
+  top: var(--desk-top);
+  left: clamp(
+    var(--gap),
+    round(down, calc(var(--toast-centre, 0px) - var(--size-panel) / 2), 1px),
+    var(--screen-width) - var(--gap) - var(--size-panel)
+  );
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   width: var(--size-panel);
-  padding: var(--space-s8) var(--space-s8) var(--space-s4);
+}
+
+/* It glides only between under the bell and beside a card: placed, or measured again, it stands
+   where it goes at once, so it is never caught on its way there. */
+.k-toasts[data-glide] {
+  transition: left var(--motion-long) var(--easing-emphasized_decel);
+}
+
+.k-toasts[data-beside] {
+  left: round(down, calc(var(--beside-x, 0px) - var(--gap) - var(--size-panel)), 1px);
+}
+
+[data-reduced] .k-toasts {
+  transition: none;
 }
 
 .k-popup-slot {
   display: block;
   height: round(nearest, calc(var(--slot-h, 0px) * var(--slot-open)), 1px);
-  overflow-y: clip;
-  overflow-x: visible;
   transition: --slot-open var(--motion-medium) var(--easing-standard_decel);
+}
+
+.k-popup-slot:is([data-shut], [data-moving]) {
+  overflow-y: clip;
 }
 
 .k-popup-slot[data-shut] {
@@ -138,7 +187,13 @@
 .k-popup-inner {
   display: block;
   padding-bottom: var(--space-s4);
-  translate: calc(var(--space-s64) * var(--slide-by)) calc(-1 * var(--space-s24) * var(--rise));
+  translate:
+    calc(var(--space-s64) * var(--slide-by))
+    round(nearest, calc(var(--space-s48) * var(--toast-taken) - var(--space-s24) * var(--rise) - var(--space-s8) * var(--toast-drop)), 1px);
+}
+
+.k-popup-inner > * {
+  opacity: var(--toast-shown);
 }
 
 /* Leaving, it isn't cut by its slot: it rises or slides over the room it gives back. */
@@ -146,22 +201,32 @@
   overflow: visible;
 }
 
+/* Arriving, it drops `space.s8` into place over `long` on `emphasized_decel` as it fades in over
+   `short`. */
 .k-popup-in {
   animation:
-    k-notif-slide-in var(--motion-long) var(--easing-emphasized_decel) both,
-    k-notif-fade-in var(--motion-short) var(--easing-standard) both;
+    k-toast-drop-in var(--motion-long) var(--easing-emphasized_decel) both,
+    k-toast-fade-in var(--motion-short) var(--easing-standard) both;
 }
 
 .k-popup-out-side {
   animation:
     k-notif-slide-out var(--motion-medium) var(--easing-emphasized_accel) both,
-    k-notif-fade-out var(--motion-medium) var(--easing-standard_accel) both;
+    k-toast-fade-out var(--motion-medium) var(--easing-standard_accel) both;
 }
 
 .k-popup-out-up {
   animation:
     k-popup-rise var(--motion-medium) var(--easing-emphasized_accel) both,
-    k-notif-fade-out var(--motion-medium) var(--easing-standard_accel) both;
+    k-toast-fade-out var(--motion-medium) var(--easing-standard_accel) both;
+}
+
+/* The Notifications card opening while it is up: it drops `space.s48` into the card as it fades,
+   over `medium` on `emphasized_accel`. */
+.k-popup-taken {
+  animation:
+    k-toast-taken var(--motion-medium) var(--easing-emphasized_accel) both,
+    k-toast-fade-out var(--motion-medium) var(--easing-emphasized_accel) both;
 }
 
 @keyframes k-popup-rise {
@@ -170,13 +235,37 @@
   }
 }
 
-/* With reduce motion each only fades, over `short`, and the gap closes at once. */
-[data-reduced] .k-popup-in {
-  animation: k-notif-fade-in var(--motion-short) var(--easing-standard) both;
+@keyframes k-toast-drop-in {
+  from {
+    --toast-drop: 1;
+  }
 }
 
-[data-reduced] :is(.k-popup-out-side, .k-popup-out-up) {
-  animation: k-notif-fade-out var(--motion-short) var(--easing-standard_accel) both;
+@keyframes k-toast-taken {
+  to {
+    --toast-taken: 1;
+  }
+}
+
+@keyframes k-toast-fade-in {
+  from {
+    --toast-shown: 0;
+  }
+}
+
+@keyframes k-toast-fade-out {
+  to {
+    --toast-shown: 0;
+  }
+}
+
+/* With reduce motion each only fades, over `short`, and the gap closes at once. */
+[data-reduced] .k-popup-in {
+  animation: k-toast-fade-in var(--motion-short) var(--easing-standard) both;
+}
+
+[data-reduced] :is(.k-popup-out-side, .k-popup-out-up, .k-popup-taken) {
+  animation: k-toast-fade-out var(--motion-short) var(--easing-standard_accel) both;
 }
 
 [data-reduced] .k-popup-slot {

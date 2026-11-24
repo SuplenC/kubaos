@@ -1,12 +1,13 @@
-// The power menu, "Leaving the room": the desktop steps back as the frame closes in, a sheet rises
-// from the middle of the frame's bottom edge holding what the action you're on does and five tiles,
+// The power menu, "Leaving the room": the desktop steps back, a card rises `size.gap` above the
+// middle of the screen's bottom edge holding what the action you're on does and five tiles,
 // and that action plays out on the desktop itself before you commit. Lock and Suspend act at once;
 // Log out, Restart and Shut down are held. Once Restart or Shut down is held to the end the room
 // goes dark with the boot splash's sign already lit over it, and the sign goes out a group of tubes
 // at a time, the last first, as the splash does on the way down (`kubaos.script`).
 //
-// The room is the Lock's desktop (`lib/lock.ts`): its picture, its frame, its bar and its windows,
-// moved by the Lock's own numbers, and a library Sheet on the bottom edge. Every move here is data,
+// The room is the Lock's desktop (`lib/lock.ts`): its picture, its bar and its windows, moved by
+// the Lock's own numbers, and a library Sheet, a detached glass card, over the bottom edge. The bar
+// stays above the room's lights: they go down over the desktop alone. Every move here is data,
 // tracks the page's players play, and the live room plays the same tracks from wherever the room
 // stands, so what the recipe says and what you try never disagree.
 
@@ -17,13 +18,14 @@ import { button } from "../../lib/button.ts";
 import { chip } from "../../lib/chip.ts";
 import { type Pinned, pin } from "../../lib/control.ts";
 import { focusRing } from "../../lib/focus.ts";
+import { glass } from "../../lib/glass.ts";
 import { icon } from "../../lib/icon.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { filling, row, stack } from "../../lib/layout.ts";
 import { lock } from "../../lib/lock.ts";
 import { paintNight } from "../../lib/lock-tint.ts";
 import { progressBar, setProgress } from "../../lib/progress.ts";
-import { nested, role } from "../../lib/radius.ts";
+import { role } from "../../lib/radius.ts";
 import { hang, sheet } from "../../lib/sheet.ts";
 import { text } from "../../lib/text.ts";
 import { floatingTooltip, keyTooltip } from "../../lib/tooltip.ts";
@@ -153,7 +155,6 @@ const BAR_TIME = ".k-lock-bar-time";
 const AROUND = ".k-lock-bar-clock .k-clock-pill-around";
 const KICKER = ".k-lock-kicker";
 const BAR = ".k-bar";
-const FRAME = ".k-frame";
 const SPLASH = ".power-splash";
 const BLACK = ".power-black";
 const ART = SIGN;
@@ -174,10 +175,9 @@ function track(part: string, target: string, property: string, from: Track["from
   return { part, on: ROOM, target, property, from, to, duration, curve, ...cue(...at) };
 }
 
-/** Opening: the frame closes in, the picture pushes in, the windows step back and the sheet rises. */
+/** Opening: the picture pushes in, the windows step back and the sheet rises. */
 export function opening(): NonEmpty<Eased> {
   return [
-    track("the frame closing in", R, "--power-closein", 0, 1, "long", "emphasized_decel"),
     track("the push", R, "--push", 0, 1, "long", "emphasized_decel"),
     track("the windows stepping back", WINDOWS_BOX, "scale", 1, { scale: "behind" }, "long", "emphasized_decel"),
     track("the sheet", SHEET, "--reveal", 0, 1, "long", "emphasized_decel"),
@@ -188,11 +188,10 @@ export function openingReduced(): NonEmpty<Eased> {
   return [track("the sheet", SHEET, "--reveal", 0, 1, "instant", "standard"), track("the sheet's fade", SHEET, "opacity", 0, 1, "short", "standard")];
 }
 
-/** Closing: the sheet sinks and the frame opens out, and the desktop comes forward again. */
+/** Closing: the sheet sinks, and the desktop comes forward again. */
 export function closing(): NonEmpty<Eased> {
   return [
     track("the sheet", SHEET, "--reveal", 1, 0, "medium", "emphasized_accel"),
-    track("the frame closing in", R, "--power-closein", 1, 0, "medium", "emphasized_accel"),
     track("the push", R, "--push", 1, 0, "long", "emphasized_decel"),
     track("the windows stepping back", WINDOWS_BOX, "scale", { scale: "behind" }, 1, "long", "emphasized_decel"),
   ];
@@ -272,13 +271,11 @@ export function unpreviewing(reduced = false): Eased[] {
 
 /**
  * Restart, looked at: the lights cycle, out and back on, over and over, every two `scene`s and a
- * `long`. One cycle: the frame, then the bar a `micro` after, fade down with the room, hold a
- * `long`, and come back up.
+ * `long`. One cycle: the bar, a `micro` after the room, fades down with it, holds a `long`, and
+ * comes back up.
  */
 export function cycling(): NonEmpty<Eased> {
   return [
-    track("the frame", FRAME, "opacity", 1, { opacity: "power_cycle_glass" }, "medium", "standard"),
-    track("the frame", FRAME, "opacity", { opacity: "power_cycle_glass" }, 1, "medium", "standard", "long", "medium"),
     track("the bar", BAR, "opacity", 1, { opacity: "power_cycle_glass" }, "medium", "standard", "micro"),
     track("the bar", BAR, "opacity", { opacity: "power_cycle_glass" }, 1, "medium", "standard", "long", "medium", "micro"),
     track("the lights", R, "--power-dark", 0, { opacity: "power_cycle" }, "medium", "standard"),
@@ -327,7 +324,6 @@ function darkening(duration: Duration, curve: Easing, from: Track["from"]): Ease
     track("the sheet's fade", SHEET, "opacity", 1, 0, duration, curve),
     track("the lights", R, "--power-dark", from, 1, duration, "standard"),
     track("the bar", BAR, "opacity", 1, 0, duration, "standard"),
-    track("the frame", FRAME, "opacity", 1, 0, duration, "standard"),
   ];
 }
 
@@ -365,7 +361,7 @@ export function goingDownReduced(index: number): NonEmpty<Eased> {
   ] as unknown as NonEmpty<Eased>;
 }
 
-/** Log out, held to the end: the windows, the sheet, the frame and the bar go as the room goes dark. */
+/** Log out, held to the end: the windows, the sheet and the bar go as the room goes dark. */
 export function loggingOut(reduced = false): NonEmpty<Eased> {
   return [...darkening(reduced ? "short" : "medium", reduced ? "standard" : "emphasized_accel", 0), track("the black", BLACK, "opacity", 0, 1, "instant", "standard", reduced ? "short" : "medium"), track("the splash", SPLASH, "opacity", 0, 1, "instant", "standard", reduced ? "short" : "medium"), track("the sign", ART, "opacity", 1, 0, "instant", "standard")] as unknown as NonEmpty<Eased>;
 }
@@ -383,14 +379,13 @@ export function suspending(reduced = false): NonEmpty<Eased> {
 }
 
 /**
- * Lock, from its look: the sheet sinks with the frame, the blur and the dim clear, and the clock
+ * Lock, from its look: the sheet sinks, the blur and the dim clear, and the clock
  * goes the rest of the way home, behind the city, its kicker coming in: the Lock's going back to rest.
  */
 export function locking(reduced = false): NonEmpty<Eased> {
-  if (reduced) return [...reducedRest(ON), track("the frame closing in", R, "--power-closein", 1, 0, "instant", "standard", "short")] as unknown as NonEmpty<Eased>;
+  if (reduced) return reducedRest(ON);
   return [
     ...resting(ON),
-    track("the frame closing in", R, "--power-closein", 1, 0, "medium", "emphasized_accel"),
     track("the kicker", KICKER, "opacity", 0, 1, "short", "standard", "medium"),
     track("the clock's depth", CLOCK, "--clock-above", 1, 0, "instant", "standard", "long"),
   ];
@@ -463,9 +458,9 @@ function sayFor(say: HTMLElement, index: number, situation: Situation, words?: s
 }
 
 function windowOf(shown: Shown, index: number): HTMLElement {
-  const corner = nested(role("surface"), "s8");
-  const drawn = document.createElement("span");
-  drawn.className = "k-lock-window power-window";
+  const corner = role("surface");
+  const drawn = glass(document.createElement("span"));
+  drawn.classList.add("k-lock-window", "power-window");
   drawn.dataset.at = String(index);
   drawn.style.setProperty("--corner", corner.css);
   drawn.append(row("s8", "centre", icon(shown.glyph, "var(--type-small-icon)", "var(--color-on_surface_variant)"), text(shown.title, "body_strong", "on_surface")), text(shown.line, "small", "on_surface_variant"));
@@ -494,7 +489,7 @@ function tileOfAction(action: Action, name: string): HTMLButtonElement {
 function build(options: RoomOptions): Built {
   const situation = options.situation ?? CALM;
   const names = options.names ?? ACTIONS.map((each) => each.name);
-  const made = lock({ ...SCREEN, wallpaper: PURPLE_HOUR, phase: "desktop", bar: barButtons(false), windows: WINDOWS.map(windowOf), sheet: false });
+  const made = lock({ ...SCREEN, wallpaper: PURPLE_HOUR, phase: "desktop", bar: barButtons(false), windows: WINDOWS.map(windowOf), entry: false });
   const element = made.element;
   element.classList.add("power-room");
   element.style.setProperty("--splash-scale", String(SPLASH_SCALE));
@@ -548,10 +543,8 @@ function build(options: RoomOptions): Built {
 
 /** Every number the room moves, as it stands on the desktop at rest with the menu shut. */
 const REST: readonly (readonly [string, string, number | string])[] = [
-  [R, "--framed", 1],
   [R, "--barred", 1],
   [R, "--push", 0],
-  [R, "--power-closein", 0],
   [R, "--power-dark", 0],
   [BLURRED, "--wake", 0],
   [DIMMED, "--panel-dim", 0],
@@ -568,7 +561,6 @@ const REST: readonly (readonly [string, string, number | string])[] = [
   [".power-window", "--power-gone", 0],
   [".power-window", "--power-refuse", 0],
   [BAR, "opacity", 1],
-  [FRAME, "opacity", 1],
   [SHEET, "--reveal", 0],
   [SHEET, "opacity", 1],
   [".power-tile", "--power-held", 0],
@@ -626,7 +618,7 @@ export function room(options: RoomOptions = {}): HTMLElement {
       tile.dataset.on = "";
       pin(tile, options.pinned);
       if (options.played !== false) settle(element, previewing(at, situation));
-      if (at === RESTART && options.played !== false) settle(element, [0, 2, 4].map((i) => cycling()[i]!));
+      if (at === RESTART && options.played !== false) settle(element, [0, 2].map((i) => cycling()[i]!));
       if (options.held !== undefined) {
         tile.dataset.keyed = "";
         tile.style.setProperty("--power-held", String(options.held));

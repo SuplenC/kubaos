@@ -1,0 +1,161 @@
+/* The shell's glass (`lib/glass.ts`): one material for the bar, its cards and every other surface
+   that floats over the desktop. `surface` at the glass setting over the compositor's blur, by night
+   a highlight inside its top edge, a ring inside its whole edge and the glass's two shadows. The
+   blur is a backdrop filter, the mockups' stand-in for the compositor's: an ancestor with a filter,
+   a mask or an opacity under 1 would become what it blurs, so nothing holding glass carries one.
+
+   The setting is `--glass-setting`, a share up to 1 that a screen may set for every glass on it,
+   held to its floor: `opacity.glass_floor` by night, `opacity.glass_floor_day` by day. Unset, it is
+   `opacity.glass` by night and `opacity.glass_day` by day. */
+.k-glass,
+.k-glass-rise {
+  --glass-filter: blur(var(--size-glass_blur)) saturate(var(--scale-glass_saturate));
+  --glass-alpha: clamp(
+    calc(var(--opacity-glass_floor) + (var(--opacity-glass_floor_day) - var(--opacity-glass_floor)) * var(--day)),
+    var(--glass-setting, calc(var(--opacity-glass) + (var(--opacity-glass_day) - var(--opacity-glass)) * var(--day))),
+    1
+  );
+  /* By day the highlight would read as a dark seam along the top edge, so only the night has one. */
+  --glass-highlight: calc(var(--opacity-glass_highlight) * (1 - var(--day)));
+  --glass-ring: color-mix(
+    in srgb,
+    rgb(from var(--color-on_surface) r g b / var(--opacity-glass_ring)),
+    rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft)) calc(var(--day) * 100%)
+  );
+  --glass-shadow:
+    0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass-opacity)),
+    0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass_contact-opacity));
+}
+
+.k-glass {
+  background: rgb(from var(--color-surface) r g b / var(--glass-alpha));
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--glass-highlight)),
+    inset 0 0 0 var(--stroke-hairline_device_px) var(--glass-ring),
+    var(--glass-shadow);
+}
+
+/* A part that turns to glass as it opens out of a control (a select's list): `--glass-rise`, 0 to
+   1, takes it from its own fill, `--glass-from`, to the glass, its edge and shadow coming up with
+   it. It blurs what is behind it only while its owner sets `--glass-blur` to `--glass-filter`, open,
+   so a shut control costs no blur. */
+.k-glass-rise {
+  --glass-rise-by: var(--glass-rise, 0);
+  background: color-mix(in srgb, var(--glass-from), rgb(from var(--color-surface) r g b / var(--glass-alpha)) calc(var(--glass-rise-by) * 100%));
+  backdrop-filter: var(--glass-blur, none);
+  box-shadow:
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / calc(var(--glass-highlight) * var(--glass-rise-by))),
+    inset 0 0 0 var(--stroke-hairline_device_px) color-mix(in srgb, var(--glass-ring), transparent calc((1 - var(--glass-rise-by)) * 100%)),
+    0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-glass-opacity) * var(--glass-rise-by))),
+    0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / calc(var(--shadow-glass_contact-opacity) * var(--glass-rise-by)));
+}
+
+/* Glass flush with the screen's edges, the Bar layout's band: an edge of its own would draw a line
+   along the screen's, so it keeps only its shadow. */
+.k-glass[data-flush] {
+  box-shadow: var(--glass-shadow);
+}
+
+/* An app's window (`glassWindow`): the glass is its surface, at the surface radius, with no border
+   of the compositor's; its content draws no fill of its own under its words. Its edge lies over
+   its content, as the compositor draws it over what the app draws: the glass's highlight and ring,
+   or on the active window its tube in the ring's place, `focus.tube` of `primary_core` with the
+   focus glow by night, `primary` with no glow by day. */
+.k-glass-window {
+  position: relative;
+  border-radius: var(--radius-surface);
+  overflow: hidden;
+  box-shadow: var(--glass-shadow);
+}
+
+.k-glass-window::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--glass-highlight)),
+    inset 0 0 0 var(--stroke-hairline_device_px) var(--glass-ring);
+  pointer-events: none;
+}
+
+.k-glass-window[data-active] {
+  box-shadow:
+    0 0 var(--focus-near) rgb(from var(--color-primary) r g b / calc(var(--focus-near_opacity) * (1 - var(--day)))),
+    0 0 var(--focus-far) rgb(from var(--color-primary) r g b / calc(var(--focus-far_opacity) * (1 - var(--day)))),
+    var(--glass-shadow);
+}
+
+.k-glass-window[data-active]::after {
+  box-shadow:
+    inset 0 var(--stroke-hairline_device_px) 0 rgb(from var(--color-on_surface) r g b / var(--glass-highlight)),
+    inset 0 0 0 var(--focus-tube) color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%));
+}
+
+/* The edge light: the Tabs' lit rail without its unlit rail, `primary_core` with the content glow
+   by night, `primary` a step thicker with no glow by day. It lies under the bar item whose card is
+   open, and its echo along the top edge of that card. */
+.k-edge-light {
+  position: absolute;
+  display: block;
+  height: max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px));
+  background: color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%));
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * (1 - var(--day)))));
+  pointer-events: none;
+}
+
+/* The pointer's edge light (`edgeRail`): its lower edge on the glass's, from `--rail-from` as wide
+   as `--rail-width`, in its host's pixels. Hovered, the rail dimmer: `primary` at
+   `opacity.track_lit`, with no glow, by night and by day; it comes in over `short` on `standard` and
+   travels from item to item the same way. Pressed, the lit rail's full brightness over `micro`. */
+.k-edge-hover {
+  --rail-lit: 0;
+  top: calc(var(--rail-edge, 0px) - max(1px, round(nearest, calc(var(--tabs-rail) + (var(--tabs-rail_day) - var(--tabs-rail)) * var(--day)), 1px)));
+  left: round(nearest, var(--rail-from, 0px), 1px);
+  width: round(nearest, var(--rail-width, 0px), 1px);
+  opacity: 0;
+  background: color-mix(
+    in srgb,
+    rgb(from var(--color-primary) r g b / var(--opacity-track_lit)),
+    color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%)) calc(var(--rail-lit) * 100%)
+  );
+  filter: drop-shadow(0 0 var(--focus-content_near) rgb(from var(--color-primary) r g b / calc(var(--focus-content_glow) * (1 - var(--day)) * var(--rail-lit))));
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    --rail-lit var(--motion-micro) var(--easing-standard);
+}
+
+.k-edge-hover[data-shown] {
+  opacity: 1;
+}
+
+.k-edge-hover[data-travel] {
+  transition:
+    opacity var(--motion-short) var(--easing-standard),
+    --rail-lit var(--motion-micro) var(--easing-standard),
+    left var(--motion-short) var(--easing-standard),
+    width var(--motion-short) var(--easing-standard);
+}
+
+.k-edge-hover[data-pressed] {
+  --rail-lit: 1;
+}
+
+@property --rail-lit {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+/* A bar item that opens something, pressed: its content dips to `scale.press_dip` over `micro`, as
+   the Command menu button's mark does. Every item draws its content in `.k-bar-dip`. */
+.k-bar-dip {
+  transition: scale var(--motion-micro) var(--easing-standard);
+}
+
+/* Only the item's own content: `:active` holds for every ancestor of what is pressed too. */
+:is(.k-pill, .shell-cmd):is(:active, [data-pinned="pressed"]) > .k-bar-dip {
+  scale: var(--scale-press_dip);
+}

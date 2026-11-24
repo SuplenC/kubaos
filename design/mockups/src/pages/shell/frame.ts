@@ -1,141 +1,232 @@
-// The Frame page: `config/quickshell/modules/frame/Frame.qml`. The screen's frame: the bar along the
-// top and `space.s8` down the other edges, its inner corners at the surface radius, one glass with
-// every panel, which retracts under a fullscreen window and dims the desktop under an open panel.
+// The Desktop page: the screen with no frame round it (`config/quickshell/modules/frame/Frame.qml`
+// draws today's frame). The bar lies on the glass in one of three layouts, a setting: Bar, a band
+// touching the top edge; Floating, one strip `size.gap` from the edges; Islands, a strip per group.
+// Each panel is a detached card under the item that opens it, and the desktop never dims. A window
+// maximised keeps `size.gap` from the bar and the screen's edges in every layout; a window full
+// screen is the whole screen, the bar hidden until the pointer touches the top edge.
 
 import "./frame.css";
-import { hang, sheet } from "../../lib/sheet.ts";
+import { type BarLayout, BAR_LAYOUTS, twins } from "../../lib/sheet.ts";
 import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { WINDOWS, windowSize } from "../../site/settings.ts";
-import { system } from "../templates/panels.ts";
+import { controlCenter, notifications, system } from "../templates/panels.ts";
+import { audioPanel } from "./audio-parts.ts";
 import { barScreen, logicalWidth } from "./bar-parts.ts";
+import { deskWindow, FIREFOX, tiling } from "./sharing-parts.ts";
 
 type State = "rest" | "open";
 
-const LAPTOP = WINDOWS[2]!;
+/** One window on the desktop: maximised, tiled alone; or full screen, the bar hidden. */
+type Shown = "maximised" | "full";
 
-interface FrameOptions {
+const LAPTOP = WINDOWS[2]!;
+const LAYOUT_NAMES = ["Bar", "Floating", "Islands"] as const;
+
+interface DesktopOptions {
+  readonly layout?: BarLayout;
   readonly width?: string;
   readonly height?: string;
-  readonly fullscreen?: boolean;
-  /** How far shown, 0 to 1: a picture of it on its way. */
-  readonly revealed?: number;
-  readonly open?: boolean;
+  /** The twin whose card is open: 0 the system monitor, 1 audio, 2 the bell, 3 status. */
+  readonly open?: number;
+  /** Its buttons open, swap and close the cards. */
   readonly live?: boolean;
+  /** One window on it, maximised or full screen. */
+  readonly window?: Shown;
+  /** Full screen, the bar slid back in, as the pointer on the top edge has it. */
+  readonly peek?: boolean;
 }
 
-function frame(options: FrameOptions = {}): HTMLElement {
-  // A laptop's screen: the narrowest the everyday bar fits without its pills meeting the clock.
-  const shown = barScreen(logicalWidth(options.width ?? LAPTOP.width), options.height ?? LAPTOP.height);
-  const element = shown.element;
-  element.classList.add("shell-frame");
-  element.toggleAttribute("data-fullscreen", options.fullscreen ?? false);
-  if (options.revealed !== undefined) element.style.setProperty("--revealed", String(options.revealed));
-  if (options.open) {
-    element.dataset.open = "";
-    hang(shown, sheet({ content: system().element, edge: "right" }));
-  }
-  if (options.live) {
-    element.dataset.live = "";
-    element.addEventListener("click", (event) => {
-      if ((event.target as Element).closest(".k-bar")) return;
-      element.toggleAttribute("data-fullscreen");
-    });
-  }
-  return element;
+/**
+ * The one window, under the bar and the cards: tiled alone `size.gap` from the bar and the edges,
+ * or the whole screen. Full screen, the pointer touching the top edge slides the bar back in, and
+ * leaving the bar slides it out.
+ */
+function withWindow(room: HTMLElement, shown: Shown, peek: boolean, live: boolean): void {
+  const full = shown === "full";
+  const desk = tiling(document.createElement("span"), 1, 1);
+  desk.append(deskWindow({ app: FIREFOX, title: FIREFOX.titles[0]!, column: "1", row: "1", focused: true, full }));
+  room.querySelector(".k-screen-wallpaper")!.after(desk);
+  if (!full) return;
+  room.dataset.full = "";
+  room.toggleAttribute("data-peek", peek);
+  if (!live) return;
+  const edge = document.createElement("span");
+  edge.className = "desktop-edge";
+  edge.addEventListener("pointerenter", () => room.toggleAttribute("data-peek", true));
+  room.querySelector(".k-screen-over")!.append(edge);
+  room.querySelector(".k-bar")!.addEventListener("pointerleave", (event) => {
+    if ((event as PointerEvent).relatedTarget !== edge) room.toggleAttribute("data-peek", false);
+  });
 }
 
-const RETRACTS: Move = {
-  name: "Retracting",
-  what: "A window goes fullscreen with no panel open: the frame goes to nothing over `medium` on `emphasized_accel`.",
-  tracks: [{ part: "the frame", on: "the frame", target: ".shell-frame", property: "--revealed", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
-  reduced: "same",
+/** The desktop in `layout`, the cards of the bar's four panel items on it, one open or none. */
+function desktop(options: DesktopOptions = {}): HTMLElement {
+  const room = barScreen(logicalWidth(options.width ?? LAPTOP.width), options.height ?? LAPTOP.height, options.layout ? { layout: options.layout } : {});
+  const right = room.element.querySelector(".shell-bar-right");
+  // The end's last four items, past the hairlines between its groups.
+  const items = right ? [...right.children].filter((child) => !child.classList.contains("shell-bar-divider")).slice(-4) : [];
+  const audio = audioPanel();
+  const contents = [system().element, audio.element, notifications().element, controlCenter().element];
+  const set = twins(
+    room,
+    contents.map((content, side) => ({ content, side, ...(items[side] ? { under: items[side] } : {}), ...(side === 1 ? { land: audio.land } : {}) })),
+  );
+  if (options.open !== undefined) {
+    const shown = options.open;
+    requestAnimationFrame(() => set.toggle(shown));
+  }
+  if (options.live) items.forEach((item, index) => item.addEventListener("click", () => set.toggle(index)));
+  if (options.window) withWindow(room.element, options.window, options.peek ?? false, options.live ?? false);
+  return room.element;
+}
+
+const ON = "the system monitor";
+
+const OPENS: Move = {
+  name: "A card opens",
+  what: "Its item: the card fades in as it comes down `space.s8` into place, and the light lights.",
+  tracks: [{ part: "the card", on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }],
+  reduced: [{ part: "the card", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
-  sample: () => frame(),
+  sample: () => desktop({ open: 0 }),
 };
 
-const RETURNS: Move = {
-  name: "Coming back",
-  what: "The window leaves fullscreen, or a panel opens: the frame comes back over `long` on `emphasized_decel`.",
-  tracks: [{ part: "the frame", on: "the frame", target: ".shell-frame", property: "--revealed", from: 0, to: 1, duration: "long", curve: "emphasized_decel" }],
-  reduced: "same",
+const PEEKS: Move = {
+  name: "The bar, full screen",
+  what: "The pointer on the top edge: the bar slides in over the window.",
+  tracks: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 0, to: 1, duration: "medium", curve: "emphasized_decel" }],
+  reduced: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 0, to: 1, duration: "short", curve: "emphasized_decel" }],
   back: "cuts",
-  sample: () => frame({ fullscreen: true }),
+  sample: () => desktop({ window: "full" }),
 };
 
-const DIMS: Move = {
-  name: "The desktop dims",
-  what: "A panel opens: `scrim` fades to `opacity.panel_scrim` over `medium` on `standard`.",
-  tracks: [{ part: "the dim", on: "the desktop", target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" }],
-  reduced: "same",
-  back: "plays",
-  sample: () => frame({ open: true }),
+const HIDES: Move = {
+  name: "The bar hides again",
+  what: "The pointer leaves the bar: it slides out above the screen.",
+  tracks: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
+  reduced: [{ part: "the bar", on: "full screen", target: ".k-bar", property: "--desktop-peek", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
+  back: "cuts",
+  sample: () => desktop({ window: "full", peek: true }),
+};
+
+const WINDOWS_SHOWN: readonly (Shown | undefined)[] = [undefined, "maximised", "full"];
+
+const CLOSES: Move = {
+  name: "A card closes",
+  what: "Esc, a press outside, or its item: the card rises `space.s8` as it fades out.",
+  tracks: [{ part: "the card", on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" }],
+  reduced: [{ part: "the card", on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" }],
+  back: "cuts",
+  sample: () => desktop({ open: 0 }),
 };
 
 export default page<State>({
   level: "shell",
   slug: "frame",
-  title: "Frame",
-  lede: "The screen's frame: the bar on top, a thin edge round the rest, one glass with every panel.",
+  title: "Desktop",
+  lede: "No frame: the bar on the glass in three layouts, each panel a card under its item.",
   code: { qml: "Frame" },
-  stage: { live: () => frame({ width: LAPTOP.width, height: LAPTOP.height, live: true }), hint: "click the desktop: a window goes fullscreen", daylight: true },
+  stage: {
+    live: () => desktop({ live: true }),
+    switches: {
+      each: [
+        { label: "Bar layout", choices: ["Bar", "Floating", "Islands"] },
+        { label: "Window", choices: ["None", "Maximised", "Full screen"] },
+      ],
+      live: ([layout, shown]) => {
+        const window = WINDOWS_SHOWN[shown ?? 0];
+        return desktop({ layout: BAR_LAYOUTS[layout ?? 0]!, live: true, ...(window ? { window } : {}) });
+      },
+    },
+    hint: "click the monitor, audio, bell or status; full screen, the top edge",
+    daylight: true,
+  },
   variants: [
-    { name: "Shown", for: "the desktop, windows tiled inside it", sample: () => frame() },
-    { name: "A panel open", for: "one glass with the frame; the desktop dims", sample: () => frame({ open: true }) },
-    { name: "Retracted", for: "a fullscreen window and no panel", sample: () => frame({ fullscreen: true }) },
-    { name: "Half way", for: "the reveal at a half", sample: () => frame({ revealed: 0.5 }) },
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: LAYOUT_NAMES[index]!,
+      for: layout === "bar" ? "a band touching the top edge; the default" : layout === "floating" ? "one strip `size.gap` from the edges" : "a strip per group",
+      sample: () => desktop({ layout }),
+    })),
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: `${LAYOUT_NAMES[index]!}, a card open`,
+      for: "`size.gap` under the bar, under its item",
+      sample: () => desktop({ layout, open: 1 }),
+    })),
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: `${LAYOUT_NAMES[index]!}, maximised`,
+      for: "`size.gap` from the bar and the edges",
+      sample: () => desktop({ layout, window: "maximised" }),
+    })),
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: `${LAYOUT_NAMES[index]!}, full screen`,
+      for: "the whole screen, the bar hidden",
+      sample: () => desktop({ layout, window: "full" }),
+    })),
+    ...BAR_LAYOUTS.map((layout, index) => ({
+      name: `${LAYOUT_NAMES[index]!}, full screen, top edge`,
+      for: "the bar slid in over the window",
+      sample: () => desktop({ layout, window: "full", peek: true }),
+    })),
   ],
-  sizes: doesntApply("its edges are tokens at every screen size: the reflow shows them."),
+  sizes: doesntApply("its gaps are tokens at every screen size: the reflow shows them."),
   states: {
     shown: ["rest", "open"],
     absent: {
-      lit: "takes no pointer; its bar's pills light",
-      pressed: "a click on it does nothing",
-      disabled: "always there, or retracted",
+      lit: "takes no pointer; its bar's items light",
+      pressed: "a click on the desktop closes a card",
+      disabled: "always there",
       selected: "nothing to pick",
       loading: "drawn with the shell",
       empty: "the bar always has its clock",
       error: "nothing it can fail at",
     },
-    rows: nonEmpty([{ name: "The frame", cell: (state: State) => frame({ open: state === "open" }) }]),
+    rows: nonEmpty(BAR_LAYOUTS.map((layout, index) => ({ name: LAYOUT_NAMES[index]!, cell: (state: State) => desktop({ layout, ...(state === "open" ? { open: 0 } : {}) }) }))),
     looks: {
-      rest: "`surface` at `opacity.frame`, `shadow.panel` once",
-      open: "the panel joins the glass; `scrim` at `opacity.panel_scrim`",
+      rest: "the bar on the glass, nothing dimmed",
+      open: "a card under its item, the light lit",
     },
   },
-  focus: doesntApply("no line of its own; a panel's controls light inside it."),
+  focus: doesntApply("no line of its own; a card's controls light inside it."),
   content: {
     text: doesntApply("no words of its own; the bar's are the Bar page's."),
-    missingPicture: doesntApply("the wallpaper is always there; the frame draws none."),
-    counts: doesntApply("one frame per screen."),
+    missingPicture: doesntApply("the wallpaper is always there; the desktop draws none."),
+    counts: doesntApply("one desktop per screen."),
   },
   motion: {
-    arrives: [RETURNS],
-    leaves: [RETRACTS],
-    between: [DIMS, ...powerMoves(() => frame())],
+    arrives: [OPENS],
+    leaves: [CLOSES],
+    between: [PEEKS, HIDES, ...powerMoves(() => desktop({ open: 0 }))],
   },
   keyboard: {
-    keys: [{ keys: ["Esc"], does: "closes the open panel" }],
-    order: "The frame takes no Tab; an open panel holds the keyboard on its screen.",
-    lands: "A panel closing gives the keyboard back to the window.",
+    keys: [
+      { keys: ["Esc"], does: "closes the open card" },
+      { keys: ["Super+F"], does: "the window full screen, and back" },
+      { keys: ["Super+Alt+F"], does: "the window maximised, and back" },
+    ],
+    order: "The desktop takes no Tab; an open card holds the keyboard on its screen.",
+    lands: "A card closing gives the keyboard back to the window.",
   },
   measures: {
     samples: nonEmpty([
-      { name: "Shown", for: "the bar, the sides, the corners", sample: () => frame() },
-      { name: "A panel open", for: "the panel against the frame", sample: () => frame({ open: true }) },
+      ...BAR_LAYOUTS.map((layout, index) => ({ name: LAYOUT_NAMES[index]!, for: "the bar and a card under it", sample: () => desktop({ layout, open: 1 }) })),
+      ...BAR_LAYOUTS.map((layout, index) => ({ name: `${LAYOUT_NAMES[index]!}, maximised`, for: "the window's gaps", sample: () => desktop({ layout, window: "maximised" }) })),
     ]),
     measures: [
-      { part: "Top, the bar", token: "size-bar" },
-      { part: "Sides and foot", token: "space-s8" },
-      { part: "Inner corners", token: "radius-surface" },
-      { part: "Shadow's drop", token: "shadow-panel-y" },
-      { part: "Shadow's blur", token: "shadow-panel-blur" },
+      { part: "Band, the Bar layout", token: "size-bar" },
+      { part: "A strip", token: "size-bar_strip" },
+      { part: "The items' row", token: "size-bar_row" },
+      { part: "Every gap", token: "size-gap" },
+      { part: "A window's corner", token: "radius-surface" },
+      { part: "A card's corners", token: "radius-surface" },
+      { part: "Glass shadow's drop", token: "shadow-glass-y" },
+      { part: "Glass shadow's blur", token: "shadow-glass-blur" },
     ],
     reflow: {
-      note: "The edges keep their tokens at every size; the bar's middle stays centred.",
+      note: "The gaps keep their tokens at every size; a card stops `size.gap` from the edges.",
       sample: () => {
         const size = windowSize();
-        return frame({ width: size.width, height: size.height });
+        return desktop({ width: size.width, height: size.height, open: 3 });
       },
     },
   },

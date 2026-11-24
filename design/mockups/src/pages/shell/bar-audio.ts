@@ -27,13 +27,13 @@ import {
   type Song,
   songParts,
 } from "./bar-audio-parts.ts";
-import { bellPill, statusPill } from "./bar-parts.ts";
+import { bellPill, onGlass, statusPill } from "./bar-parts.ts";
 
 type State = "rest" | "hovered" | "pressed" | "open";
 
 /** The bar's right end: the mute pill, the bell, status. */
 function end(mute: MuteOptions = {}): HTMLElement {
-  return row("s8", "centre", mutePill(mute), bellPill(), statusPill());
+  return onGlass(mutePill(mute), bellPill(), statusPill());
 }
 
 /** Opens the Audio panel's page, as a press on a side with no device opens the panel. */
@@ -201,7 +201,7 @@ const PLAYING_MOVES: readonly Move[] = [
     tracks: [{ part: "the words", on: "a song past its room", target: ".k-marquee", property: "--marquee-x", from: 0, to: 1, duration: "marquee_pace", cue: "marquee_hold", curve: "linear" }],
     reduced: [{ part: "the words", on: "a song past its room", target: ".k-marquee", property: "--marquee-x", from: 0, to: 0, duration: "instant", curve: "linear" }],
     back: "cuts",
-    sample: () => nowPlaying({ song: LONG_SONG, scrolled: 0 }),
+    sample: () => onGlass(nowPlaying({ song: LONG_SONG, scrolled: 0 })),
   },
   {
     name: "Paused mid-scroll",
@@ -209,7 +209,7 @@ const PLAYING_MOVES: readonly Move[] = [
     tracks: [{ part: "the words", on: "a song past its room", target: ".k-marquee", property: "--marquee-x", from: 3, to: 0, duration: "medium", curve: "standard" }],
     reduced: "same",
     back: "cuts",
-    sample: () => nowPlaying({ song: LONG_SONG, scrolled: 3, playing: false }),
+    sample: () => onGlass(nowPlaying({ song: LONG_SONG, scrolled: 3, playing: false })),
   },
   {
     name: "Folding",
@@ -233,7 +233,7 @@ const FIVE: readonly Player[] = [...PLAYERS, LONG_PLAYER, { app: "mpv" }];
 /** A row's cell: the mute pill or now playing, pinned on its first circle, or open. */
 function muteCell(state: State): HTMLElement {
   if (state === "open") return panelShot({ device: HEADSET });
-  return state === "rest" ? mutePill({ input: { recording: true } }) : mutePill({ input: { recording: true }, pinned: { side: "output", state: state === "hovered" ? "hover" : state } });
+  return onGlass(state === "rest" ? mutePill({ input: { recording: true } }) : mutePill({ input: { recording: true }, pinned: { side: "output", state: state === "hovered" ? "hover" : state } }));
 }
 
 function playingCell(players: readonly Player[], folded = false): (state: State) => HTMLElement {
@@ -249,27 +249,27 @@ export default page<State>({
   from: ["pill", "badged-icon", "menu", "popover", "marquee"],
   stage: { live, hint: "click, wheel, right-click; ⏮ ⏭ change the song", daylight: true },
   variants: [
-    { name: "Both live", for: "each symbol `on_surface_variant`", sample: () => mutePill() },
-    { name: "Output muted", for: "crossed, in `error`", sample: () => mutePill({ output: { muted: true } }) },
-    { name: "Mic muted", for: "crossed, in `error`", sample: () => mutePill({ input: { muted: true } }) },
-    { name: "Both muted", for: "both crossed", sample: () => mutePill({ output: { muted: true }, input: { muted: true } }) },
-    { name: "An app recording", for: "the microphone's dot on the mic", sample: () => mutePill({ input: { recording: true } }) },
-    { name: "Recording, mic muted", for: "crossed; no dot, nothing is heard", sample: () => mutePill({ input: { recording: true, muted: true } }) },
-    { name: "Output low", for: "its symbol by the level", sample: () => mutePill({ level: 0.2 }) },
+    { name: "Both live", for: "each symbol `on_surface_variant`", sample: () => onGlass(mutePill()) },
+    { name: "Output muted", for: "crossed, in `error`", sample: () => onGlass(mutePill({ output: { muted: true } })) },
+    { name: "Mic muted", for: "crossed, in `error`", sample: () => onGlass(mutePill({ input: { muted: true } })) },
+    { name: "Both muted", for: "both crossed", sample: () => onGlass(mutePill({ output: { muted: true }, input: { muted: true } })) },
+    { name: "An app recording", for: "the microphone's dot on the mic", sample: () => onGlass(mutePill({ input: { recording: true } })) },
+    { name: "Recording, mic muted", for: "crossed; no dot, nothing is heard", sample: () => onGlass(mutePill({ input: { recording: true, muted: true } })) },
+    { name: "Output low", for: "its symbol by the level", sample: () => onGlass(mutePill({ level: 0.2 })) },
     { name: "No output device", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ output: { missing: true }, pinned: { side: "output", state: "hover" }, onPanel: toPanel }, HINTS.noOutput) },
     { name: "No mic", for: "crossed, as muted; a press opens the panel", sample: () => hinted({ input: { missing: true }, pinned: { side: "input", state: "hover" }, onPanel: toPanel }, HINTS.noMic) },
     { name: "Volume's hint", for: "hovered: where the output stands", sample: () => hinted({ pinned: { side: "output", state: "hover" } }, HINTS.volume("62%")) },
     { name: "Mic muted, its hint", for: "hovered: the mic's side, muted", sample: () => hinted({ input: { muted: true }, pinned: { side: "input", state: "hover" } }, HINTS.micMuted) },
-    { name: "Playing", for: "pause on the accent's fill", sample: () => nowPlaying() },
-    { name: "Paused", for: "play on the fill; the words hold still", sample: () => nowPlaying({ playing: false, song: LONG_SONG }) },
-    { name: "A long song", for: "scrolling in its fixed room", sample: () => nowPlaying({ song: LONG_SONG }) },
-    { name: "A long song, mid-scroll", for: "cut at both ends, both faded", sample: () => nowPlaying({ song: LONG_SONG, scrolled: 3 }) },
+    { name: "Playing", for: "pause in `primary`", sample: () => onGlass(nowPlaying()) },
+    { name: "Paused", for: "play in `primary`; the words hold still", sample: () => onGlass(nowPlaying({ playing: false, song: LONG_SONG })) },
+    { name: "A long song", for: "scrolling in its fixed room", sample: () => onGlass(nowPlaying({ song: LONG_SONG })) },
+    { name: "A long song, mid-scroll", for: "cut at both ends, both faded", sample: () => onGlass(nowPlaying({ song: LONG_SONG, scrolled: 3 })) },
     { name: "The right's end", for: "mute, bell, status", sample: () => end({ input: { recording: true } }) },
   ],
   sizes: [
-    { name: "Now playing, wide", for: "icon, the song's room, the controls", sample: () => nowPlaying() },
-    { name: "Now playing, folded", for: "a narrow bar: icon and the controls", sample: () => nowPlaying({ folded: true }) },
-    { name: "Mute pill", for: "one size: two circles", sample: () => mutePill() },
+    { name: "Now playing, wide", for: "icon, the song's room, the controls", sample: () => onGlass(nowPlaying()) },
+    { name: "Now playing, folded", for: "a narrow bar: icon and the controls", sample: () => onGlass(nowPlaying({ folded: true })) },
+    { name: "Mute pill", for: "one size: two circles", sample: () => onGlass(mutePill()) },
   ],
   states: {
     shown: ["rest", "hovered", "pressed", "open"],
@@ -321,11 +321,11 @@ export default page<State>({
     between: [
       {
         name: "Lit",
-        what: "The pointer onto a circle: its state layer fades in over `short` on `standard`.",
-        tracks: [{ part: "the state layer", on: "the output", target: ".shell-pill-item:first-child", property: "--hovered", from: 0, to: 1, duration: "short", curve: "standard" }],
+        what: "The pointer onto the mute pill: the edge light comes in under it over `short` on `standard`.",
+        tracks: [{ part: "the edge light", on: "the mute pill", target: ".k-edge-hover", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
-        sample: () => mutePill(),
+        sample: () => onGlass(mutePill()),
       },
       ...PLAYING_MOVES,
       ...powerMoves(() => nowPlayingOpen()),
@@ -343,14 +343,14 @@ export default page<State>({
   },
   measures: {
     samples: nonEmpty([
-      { name: "Mute pill", for: "circles, their gap, the ends", sample: () => mutePill({ input: { recording: true } }) },
-      { name: "Now playing, wide", for: "the song's room between the circles", sample: () => nowPlaying() },
-      { name: "Now playing, folded", for: "four circles", sample: () => nowPlaying({ folded: true }) },
+      { name: "Mute pill", for: "circles, their gap, the ends", sample: () => onGlass(mutePill({ input: { recording: true } })) },
+      { name: "Now playing, wide", for: "the song's room between the circles", sample: () => onGlass(nowPlaying()) },
+      { name: "Now playing, folded", for: "four circles", sample: () => onGlass(nowPlaying({ folded: true })) },
       { name: "The players Menu", for: "under the icon", sample: () => nowPlayingOpen() },
       { name: "The Menu alone", for: "its rows", sample: () => playersMenu().card },
     ]),
     measures: [
-      { part: "Height", token: "size-control_sm" },
+      { part: "Height", token: "size-bar_row" },
       { part: "Ends, between circles", token: "space-s4" },
       { part: "Circle", token: "size-chip" },
       { part: "Song's room", token: "size-now_playing" },

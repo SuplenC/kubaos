@@ -1,23 +1,20 @@
 /* Kōbō's first boot (`setup-room.ts`): what its room adds to the installer's (`kobo.css`), the
    window a card opened alone is, and the card pages' own parts. */
 
-/* A card opened alone: Kōbō's glass panel at the window's size and corner, its active tube round it
-   (outside the glass, which cuts what lies on it to its corner), its rail on the glass. */
+/* A card opened alone: the shell's glass window (`glassWindow`), active, its rail on the glass. */
 .setup-window {
-  position: relative;
   display: block;
   box-sizing: border-box;
   flex: none;
   width: var(--setup-window-width);
   height: var(--setup-window-height);
-  border-radius: var(--corner);
   outline: none;
-  isolation: isolate;
 }
 
-.setup-window > .k-glass-panel {
+.setup-window-body {
   position: absolute;
   inset: 0;
+  display: flex;
   border-radius: inherit;
 }
 
@@ -411,11 +408,11 @@
 }
 
 /* The page under the menu has no compositor to blur it, and the shell's own menu page draws it on a
-   solid screen: here the frame keeps its `opacity.frame` fill over an opaque plate of the surface
-   it is drawn on, so nothing of the page reads through. */
+   solid screen: here the glass keeps its fill over an opaque plate of the surface it is drawn on,
+   so nothing of the page reads through. */
 .setup-kotodama-at .k-command {
   background:
-    linear-gradient(rgb(from var(--color-surface) r g b / var(--opacity-frame)), rgb(from var(--color-surface) r g b / var(--opacity-frame))),
+    linear-gradient(rgb(from var(--color-surface) r g b / var(--glass-alpha)), rgb(from var(--color-surface) r g b / var(--glass-alpha))),
     var(--color-surface);
 }
 

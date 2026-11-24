@@ -1,4 +1,4 @@
-/* The Overview (`overview-parts.ts`): each screen's desktop, its frame stepping aside and its
+/* The Overview (`overview-parts.ts`): each screen's desktop, its bar sliding up out and its
    wallpaper blurred and dimmed as the lock's is, and over it the miniatures of every workspace the
    screen holds. Every place is a registered custom property that glides: a change sets the new
    value and its timing (`--ov-pt` and the rest), and the transition runs from wherever the element
@@ -80,26 +80,23 @@
   transition: --ov-veil var(--ov-vt, 0s) var(--ov-ve, linear);
 }
 
-/* The frame steps aside: its hole grows past the screen's edges, and the bar slides up out. */
-.ov-screen .k-frame {
-  inset: calc(var(--frame-top) - var(--ov-aside) * (var(--frame-top) + var(--radius-surface)))
-    calc(var(--frame-side) - var(--ov-aside) * (var(--frame-side) + var(--radius-surface)));
-  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
-}
-
-.ov-screen .k-screen-glass {
-  opacity: calc(var(--opacity-frame) * (1 - var(--ov-aside)));
-  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
-}
-
-.ov-screen .k-bar {
-  translate: 0 calc(-1 * var(--ov-aside) * var(--frame-top));
-  opacity: calc(1 - var(--ov-aside));
-  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
+/* The bar, back in place as the Overview closes, lies over the screen's own desktop, which flies
+   over the other workspaces at `z-index` 1: the layer holding it makes no stacking context of its
+   own. */
+.ov-screen > .k-screen-over {
+  z-index: 1;
 }
 
 .ov-screen[data-open] .k-screen-over {
   pointer-events: none;
+}
+
+/* No bar while the Overview is up: it slides up off the screen's top as it opens, by as far as it
+   reaches down, fading as it goes, and back as it closes, in every layout. */
+.ov-screen .k-bar {
+  translate: 0 calc(-1 * var(--ov-aside) * var(--bar-reach));
+  opacity: calc(1 - var(--ov-aside));
+  transition: --ov-aside var(--ov-vt, 0s) var(--ov-ve, linear);
 }
 
 .ov-screen[data-open] .k-bar {
@@ -174,15 +171,15 @@
   transform-origin: 0 0;
   scale: calc(var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly));
   border-radius: calc(var(--radius-control) * (1 - var(--ov-fly)) / (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly)));
-  /* Its windows' corner, in their own pixels, as the system nests a window in the frame: the
-     miniature's own corner less the windows' gap at its scale, as it is drawn now, flying or not;
-     never less than a window's on the desktop, `radius.surface` less `space.s8`, which it takes once
+  /* Its windows' corner, in their own pixels: the miniature's own corner less the windows'
+     `size.gap` at its scale, as it is drawn now, flying or not; never less than a window's on the
+     desktop, `radius.surface`, which it takes once
      the miniature is the whole screen. Set here, where the miniature's scale is known, and read by
      every window on it, which then scales it with itself. */
   --ov-corner: max(
-    calc(var(--radius-surface) - var(--space-s8)),
+    var(--radius-surface),
     calc(
-      (var(--radius-control) * (1 - var(--ov-fly)) - var(--space-s8) * (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))) /
+      (var(--radius-control) * (1 - var(--ov-fly)) - var(--size-gap) * (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))) /
         (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))
     )
   );
@@ -232,8 +229,8 @@
     --ov-cover var(--ov-ct, 0s) var(--easing-standard);
 }
 
-/* A number on the frame's glass, as the bar draws its workspaces on its own pill: it reads on any
-   picture, by night and by day. The screen's shown one sits on the indicator. */
+/* A number on the shell's glass (`lib/glass.ts`): it reads on any picture, by night and by day.
+   The screen's shown one sits on the indicator, which carries no glass edge. */
 .ov-ws-number {
   display: flex;
   align-items: center;
@@ -241,11 +238,11 @@
   width: var(--size-chip);
   height: var(--size-chip);
   border-radius: var(--radius-full);
-  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
 }
 
-.ov-ws-number[data-shown] {
+.ov-ws-number.k-glass[data-shown] {
   background: var(--color-primary);
+  box-shadow: var(--glass-shadow);
 }
 
 .ov:not([data-open]) .ov-ws:not([data-shown-here]),
@@ -266,8 +263,8 @@
 
 /* ── A window ────────────────────────────────────────────────────────────────────────────────── */
 
-/* At its tile on its desktop; carried, where its pose puts it. Its corner is the frame's less the
-   gap round it, as Hyprland rounds it. */
+/* At its tile on its desktop; carried, where its pose puts it. Its corner is a window's,
+   `radius.surface`, as Hyprland rounds it. */
 .ov-win {
   position: absolute;
   left: 0;
@@ -281,12 +278,8 @@
   transform-origin: var(--ov-gx) var(--ov-gy);
   overflow: hidden;
   /* The corner its miniature gives it (`.ov-ws-desk`); a window's on the desktop where it has none. */
-  border-radius: var(--ov-corner, calc(var(--radius-surface) - var(--space-s8)));
-  background: var(--color-surface);
+  border-radius: var(--ov-corner, var(--radius-surface));
   transform: scale(var(--ov-shrink));
-  box-shadow:
-    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border)),
-    0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--opacity-window_shadow));
   transition:
     --ov-tx var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-ty var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -303,12 +296,13 @@
   z-index: 1;
 }
 
-/* The focused window's neon tube, as Hyprland draws the active border. */
+/* The focused window's lit tube on the glass's edge, as `glassWindow` draws the active window's:
+   `focus.tube` of `primary_core` by night, `primary` by day. */
 .ov-win[data-focused]::after {
   content: "";
   position: absolute;
   inset: 0;
-  border: max(1px, round(nearest, var(--stroke-thin), 1px)) solid var(--color-primary);
+  border: max(1px, round(nearest, var(--focus-tube), 1px)) solid color-mix(in srgb, var(--color-primary_core), var(--color-primary) calc(var(--day) * 100%));
   border-radius: inherit;
   pointer-events: none;
 }
@@ -323,8 +317,8 @@
    rule as `.ov-ws-desk`'s: carried, in the tile it sits in, landing, or waiting in the slot. */
 .ov-win:is([data-lifted], [data-landing]) {
   --ov-corner: max(
-    calc(var(--radius-surface) - var(--space-s8)),
-    calc((var(--radius-control) - var(--space-s8) * var(--ov-sx)) / var(--ov-sx))
+    var(--radius-surface),
+    calc((var(--radius-control) - var(--size-gap) * var(--ov-sx)) / var(--ov-sx))
   );
 }
 
@@ -393,7 +387,7 @@
     opacity var(--motion-short) var(--easing-standard);
 }
 
-/* The new-workspace slot reads on any picture: on the frame's glass, as the numbers are, its line
+/* The new-workspace slot reads on any picture: on the shell's glass, as the numbers are, its line
    and its plus in `outline` and `on_surface_variant`. While something is carried it is lit, its
    line and plus in the primary over a primary tint, at `opacity.tint`, and deeper, at
    `opacity.selection`, as the place proposed; each change over `short`. Under the pointer with
@@ -403,10 +397,6 @@
   --ov-plus-ink: var(--color-on_surface_variant);
   --ov-plus-line: var(--color-outline);
   --ov-plus-wash: var(--color-primary);
-  background:
-    linear-gradient(rgb(from var(--ov-plus-wash) r g b / var(--ov-plus-tint)) 0 0),
-    rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
-  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--ov-plus-line);
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
@@ -416,6 +406,16 @@
     --ov-plus-tint var(--motion-short) var(--easing-standard),
     box-shadow var(--motion-short) var(--easing-standard),
     opacity var(--motion-short) var(--easing-standard);
+}
+
+/* Its tint over the glass's fill, and its line in place of the glass's ring. */
+.ov-plus.k-glass {
+  background:
+    linear-gradient(rgb(from var(--ov-plus-wash) r g b / var(--ov-plus-tint)) 0 0),
+    rgb(from var(--color-surface) r g b / var(--glass-alpha));
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--ov-plus-line),
+    var(--glass-shadow);
 }
 
 .ov-plus > .k-icon {
@@ -454,7 +454,6 @@
   height: var(--size-chip);
   padding: 0 var(--space-s8);
   border-radius: var(--radius-full);
-  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
   translate: var(--ov-x) var(--ov-y);
   opacity: var(--ov-arrive);
   transition:
@@ -530,7 +529,7 @@
 
 /* ── The tip and the delete slot ─────────────────────────────────────────────────────────────── */
 
-/* The tip on the frame's glass, as the numbers are, so its line reads on any picture: centred down
+/* The tip on the shell's glass, as the numbers are, so its line reads on any picture: centred down
    the bottom margin, under every miniature. It comes and goes with the miniatures. */
 .ov-tip {
   position: absolute;
@@ -539,7 +538,6 @@
   display: block;
   padding: var(--space-s4) var(--space-s12);
   border-radius: var(--radius-control);
-  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
   translate: var(--ov-x) calc(var(--ov-y) + var(--space-s16) * var(--ov-sink));
   opacity: 0;
   transition: opacity var(--motion-medium) var(--easing-standard);
@@ -579,7 +577,7 @@
   pointer-events: none;
 }
 
-/* The delete slot: on the frame's glass at the miniatures' radius, what it holds with `space.s16`
+/* The delete slot: on the shell's glass at the miniatures' radius, what it holds with `space.s16`
    round it on all four sides (`slotBox`), a workspace's shape while empty, in the corner while something
    is carried or waits in it. It rises `space.s24` into place and fades in over `medium`, and leaves
    the same way, faster. It takes the shape of what it holds by its box, never by scaling, so its
@@ -601,12 +599,6 @@
   width: var(--ov-w);
   height: var(--ov-h);
   border-radius: var(--radius-control);
-  /* `--ov-red` is how much Danger warms the glass, `--ov-solid` how far it is solid Danger. */
-  background: color-mix(
-    in srgb,
-    var(--color-burn_error) calc(var(--ov-solid) * 100%),
-    color-mix(in srgb, rgb(from var(--color-burn_error) r g b / var(--ov-red)), rgb(from var(--color-surface_container) r g b / var(--opacity-frame)))
-  );
   --ov-slot-ink: color-mix(in srgb, var(--color-on_burn_error) calc(var(--ov-solid) * 100%), var(--color-burn_error));
   translate: var(--ov-x) calc(var(--ov-y) + var(--space-s24));
   opacity: 0;
@@ -614,6 +606,17 @@
   transition:
     translate var(--motion-short) var(--easing-emphasized_accel),
     opacity var(--motion-short) var(--easing-emphasized_accel);
+}
+
+/* `--ov-red` is how much Danger warms the glass's fill, `--ov-solid` how far it is solid Danger.
+   Its line is its own ring, so the glass keeps only its shadow. */
+.ov-bin.k-glass {
+  background: color-mix(
+    in srgb,
+    var(--color-burn_error) calc(var(--ov-solid) * 100%),
+    color-mix(in srgb, rgb(from var(--color-burn_error) r g b / var(--ov-red)), rgb(from var(--color-surface) r g b / var(--glass-alpha)))
+  );
+  box-shadow: var(--glass-shadow);
 }
 
 .ov-bin[data-shown] {

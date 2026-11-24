@@ -6,7 +6,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `menu::popover`; QML `Popover`.
 
-The floating surface a menu sits on: `surface_container`, raised to the ladder's step 2 (its shadow and rim), at the control radius (12). Holding a menu it is 4 inside, so its items take 12 − 4 = 8, the row radius, and run parallel to its corners; holding words of its own it is 12 inside. It floats over the window at its anchor (a tray icon, the pointer), a menu's width (240, `menu`); `kubaos-ui` draws one where it is laid out. It fades in over `short` on `emphasized_decel` and out over `micro` on `emphasized_accel`.
+The floating surface a menu sits on: the shell's glass (`docs/DESIGN.md`, "Elevation"), the ladder's step 2, at the control radius (12). *Not built yet: both libraries draw it on `surface_container` with step 2's shadow and rim; the mockups draw the glass.* Holding a menu it is 4 inside, so its items take 12 − 4 = 8, the row radius, and run parallel to its corners; holding words of its own it is 12 inside. It floats over the window at its anchor (a tray icon, the pointer), a menu's width (240, `menu`); `kubaos-ui` draws one where it is laid out. It fades in over `short` on `emphasized_decel` and out over `micro` on `emphasized_accel`.
 
 A popover's menu and a select's open list (`select.md`) are one build, the rule for every raised list ([DESIGN.md, "Radii"](../../DESIGN.md#radii-by-role)): 12 corners and 4 inside, rows 32 tall at the row radius (8) and 8 inside, so their words start 12 from the surface's edge, and a hairline between groups inset to the words.
 

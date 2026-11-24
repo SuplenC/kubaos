@@ -30,6 +30,7 @@ import { clamped, text } from "../../lib/text.ts";
 import { cubic, durationMs } from "../../lib/tokens.ts";
 import { type CardSky, carry, cityCard, cityRow, type HomeState, homeWeatherCard, MOST_CITIES, type WeatherCard, weatherBanner, type WeatherBannerOptions } from "../../lib/weather-card.ts";
 import { settings } from "../../site/settings.ts";
+import { setClockOpen } from "../../lib/clock-pill.ts";
 import { barScreen, EVERYDAY } from "./bar-parts.ts";
 import { TALL } from "./control-center-parts.ts";
 import { type City, CITIES, CONDITIONS, clockOf, dayName, dayRange, degrees, HOME, hourOf, hoursOf, offsetOf, readingsOf, symbolOf, tilesOf, UPDATED } from "./weather-data.ts";
@@ -303,6 +304,11 @@ export interface ClockPopup {
   toWeather(whose: Whose): void;
   /** Back to the clock view. */
   toClock(): void;
+  /**
+   * Called as the card starts turning to `view`, from inside it or from the bar: the bar's light
+   * moves to that half of the clock.
+   */
+  onTurn: ((view: "clock" | "weather") => void) | null;
 }
 
 /** One part's move, running forwards from its first keyframe to its last, held at both ends. */
@@ -396,6 +402,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
   function go(to: Whose, from: WeatherCard | null): void {
     if (busy || !shown.element.isConnected) return;
     whose = to;
+    popup.onTurn?.("weather");
     const clock = shown;
     const weather = freshWeather(to);
     body.append(weather.element);
@@ -409,6 +416,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
 
   function back(): void {
     if (busy) return;
+    popup.onTurn?.("clock");
     const weather = shown as View & { readonly banner: WeatherCard };
     const clock = freshClock();
     body.prepend(clock.element);
@@ -428,7 +436,7 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     body.append(shown.element);
   }
 
-  return {
+  const popup: ClockPopup = {
     element: box,
     toWeather: (to) => {
       if (shown.rows[0]?.classList.contains("ck-top")) go(to, shown.cardOf(to));
@@ -436,7 +444,9 @@ export function clockPopupOf(options: ClockOptions = {}): ClockPopup {
     toClock: () => {
       if (!shown.rows[0]?.classList.contains("ck-top")) back();
     },
+    onTurn: null,
   };
+  return popup;
 }
 
 /** The popup's content alone. */
@@ -446,17 +456,36 @@ export function clockPopup(options: ClockOptions = {}): HTMLElement {
 
 /**
  * A screen `width` logical pixels wide, its bar given way as that width needs, the popup open on
- * the top edge. Live, the bar's time turns the popup to the clock and its temperature to home's
- * weather.
+ * the top edge, centred under the clock, its capsule filled and the edge light under the half that
+ * is open: the time's for the clock view, the weather's for the weather view. Live, the bar's time
+ * turns the popup to the clock and its temperature to home's weather, and the light travels to that
+ * half, its leading edge over `medium` and its trailing one over `long`.
  */
 export function clockOnScreen(options: ClockOptions = {}, width = 1440, height = TALL, reveal?: number): HTMLElement {
   const room = barScreen(width, height, { content: { ...EVERYDAY, ...(options.home === "no city" ? { noHome: true } : {}) } });
   room.element.dataset.open = "";
   const popup = clockPopupOf(options);
-  hang(room, sheet({ content: popup.element, edge: "top", ...(reveal !== undefined ? { reveal } : {}) }));
-  if (options.live) {
+  const clock = room.element.querySelector<HTMLElement>(".k-clock-pill");
+  const halfOf = (view: "clock" | "weather") => clock?.querySelector(view === "weather" ? ".k-clock-pill-weather" : ".k-clock-pill-when") ?? null;
+  const view = options.view ?? "clock";
+  if (clock) setClockOpen(clock, view);
+  const card = sheet({ content: popup.element, edge: "top", ...(clock ? { under: clock } : {}), ...(halfOf(view) ? { lit: halfOf(view)! } : {}), ...(reveal !== undefined ? { reveal } : {}) });
+  hang(room, card);
+  if (options.live && clock) {
+    let travelling = 0;
+    const turn = (to: "clock" | "weather") => {
+      if (clock.dataset.open === to) return;
+      window.clearTimeout(travelling);
+      room.element.dataset.toward = to === "weather" ? "right" : "left";
+      room.element.dataset.swapping = "";
+      travelling = window.setTimeout(() => delete room.element.dataset.swapping, ms("long"));
+      setClockOpen(clock, to);
+      card.light(halfOf(to));
+    };
+    // The card says when it turns, whether a press inside it or on the bar turned it.
+    popup.onTurn = turn;
     // The pill's weather opens home's weather; anywhere else on the pill opens the clock.
-    room.element.querySelector(".k-clock-pill")?.addEventListener("click", (event) => {
+    clock.addEventListener("click", (event) => {
       if ((event.target as Element).closest(".k-clock-pill-weather")) popup.toWeather("home");
       else popup.toClock();
     });

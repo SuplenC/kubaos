@@ -25,14 +25,12 @@ const ON = "the system monitor";
 
 const OPENING: Move = {
   name: "Opening",
-  what: "Its pill or the Command menu: the sheet grows from the right edge on the last detailed sample.",
+  what: "Its pill or the Command menu: the card comes down under it on the last detailed sample.",
   tracks: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(),
@@ -43,11 +41,9 @@ const CLOSING: Move = {
   what: "Esc, a press outside, its pill or btop: the sheet goes back, the sample held still.",
   tracks: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => shot(),
@@ -94,7 +90,7 @@ export default page<Shown>({
   level: "shell",
   slug: "sysmon",
   title: "System monitor",
-  lede: "The right-edge sheet of readings: a card each, then the busiest processes, opened from its bar pill.",
+  lede: "The card of readings under its bar pill: a card each, then the busiest processes.",
   code: { qml: "SysmonPanel" },
   from: nonEmpty(["panel-page", "card", "meter", "sparkline", "table", "tabs", "slider", "skeleton", "tooltip"]),
   stage: { live, hint: "point at btop or ⓘ; scroll to the processes", daylight: true },
@@ -165,7 +161,7 @@ export default page<Shown>({
       { part: "Info button", token: "size-control_sm" },
     ],
     reflow: {
-      note: "It keeps `size.panel` and runs from the bar to the frame's foot; the body scrolls.",
+      note: "It keeps `size.panel` and runs down to `size.gap` above the screen's foot; the body scrolls.",
       sample: () => shot({}, SHORT),
     },
   },

@@ -1767,13 +1767,11 @@ body {
   bottom: calc(var(--space-s16) + var(--size-control_sm) + var(--space-s8));
 }
 
-/* The shell: the bar along the top and a panel growing out of it `space.s8` in from the edge,
-   both glass at `opacity.frame`, casting `shadow.panel` over the window and the wallpaper alike. */
+/* The shell: the bar along the top, the Bar layout's band, and a card `size.gap` under it, both
+   the shell's glass (`lib/glass.ts`), which draws their fill, edge and shadow. */
 .f-elev-bar,
 .f-elev-panel {
   position: absolute;
-  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
-  background: rgb(from var(--color-surface_container) r g b / var(--opacity-frame));
 }
 
 .f-elev-bar {
@@ -1785,14 +1783,12 @@ body {
   padding-inline: var(--space-s16);
 }
 
-/* The panel's body is `surface_container`, so a card on it takes the role above. */
 .f-elev-panel {
-  --card-fill: var(--color-surface_container_high);
   display: flex;
   flex-direction: column;
   gap: var(--space-s16);
-  right: var(--space-s8);
-  top: calc(var(--size-bar) + var(--space-s8));
+  right: var(--size-gap);
+  top: calc(var(--size-bar) + var(--size-gap));
   width: var(--size-panel);
   box-sizing: border-box;
   padding: var(--space-s16);
@@ -1828,7 +1824,9 @@ body {
   padding-inline: var(--space-s8);
   border-radius: var(--radius-small);
   background: var(--color-surface_container);
-  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+  box-shadow:
+    0 var(--shadow-glass-y) var(--shadow-glass-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass-opacity)),
+    0 var(--shadow-glass_contact-y) var(--shadow-glass_contact-blur) rgb(from var(--color-shadow) r g b / var(--shadow-glass_contact-opacity));
 }
 
 .f-elev-slab-lock {

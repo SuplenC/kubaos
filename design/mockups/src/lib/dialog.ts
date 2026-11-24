@@ -1,8 +1,8 @@
 // A question over a dimmed screen: `kubaos-ui`'s `dialog::dialog`, `dialog::prompt` and
 // `dialog::scrim`, `KubaOS.Components`' `Dialog` and `Scrim` (`docs/design/components/dialog.md`).
 //
-// The dialog is `size.dialog` wide, `space.s24` inside on every side, at the content radius, raised
-// to the ladder's step 3 (`lib/elevation.ts`). Everything in it starts on that one content edge: a
+// The dialog is `size.dialog` wide, `space.s24` inside on every side, at the content radius, on the
+// shell's glass (`lib/glass.ts`), the ladder's step 3 (`lib/elevation.ts`). Everything in it starts on that one content edge: a
 // 24 symbol (`heading`'s) beside a `heading` title on one row, the `body` `space.s12` under them,
 // what it lists or asks for (a labelled field) `space.s16` under the body, each across the whole
 // width, and its button bar (`lib/button-bar.ts`) `space.s24` under the last, Cancel's label on
@@ -40,7 +40,7 @@
 
 import { iconInLine } from "./button.ts";
 import { type Action, buttonBar, type Tone } from "./button-bar.ts";
-import { raise } from "./elevation.ts";
+import { glass } from "./glass.ts";
 import { iconTile } from "./icon-tile.ts";
 import { divider, filling, gap, row, stack } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
@@ -119,8 +119,9 @@ function stops(element: HTMLElement): HTMLElement[] {
 
 export function dialog(options: DialogOptions): Dialog {
   const danger = options.tone === "Danger";
-  const surface = raise(document.createElement("span"), 3);
-  surface.className += " k-dialog";
+  const surface = glass(document.createElement("span"));
+  surface.classList.add("k-dialog");
+  surface.dataset.step = "3";
   surface.setAttribute("role", danger ? "alertdialog" : "dialog");
   surface.setAttribute("aria-modal", "true");
   surface.toggleAttribute("data-danger", danger);

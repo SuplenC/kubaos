@@ -550,16 +550,17 @@ export function alone(content: HTMLElement, height = "calc(6 * var(--size-row_tw
   return box;
 }
 
-/** The screen's corner a panel is drawn in: the panel and the frame round it. */
+/** The screen's corner a panel is drawn in: the panel and the room beside it. */
 export const CORNER = "calc(var(--size-panel) + var(--space-s64) + var(--space-s8))";
 /** The shots' screen height, 1000 logical pixels: `size.app_height` and the rest. */
 export const TALL = "calc(var(--size-app_min_height) * 2 + var(--space-s40))";
 
 /** The panel open on the right edge of a screen corner, under the bar's panel pills, drawn still. */
 export function onScreen(panel: HTMLElement, height = TALL, reveal?: number): HTMLElement {
-  const room = screen({ width: CORNER, height, wallpaper, bar: [sysmonPill(), bellPill(), statusPill()] });
+  const opener = statusPill();
+  const room = screen({ width: CORNER, height, wallpaper, bar: [sysmonPill(), bellPill(), opener] });
   room.element.dataset.open = "";
-  hang(room, sheet({ content: panel, edge: "right", ...(reveal !== undefined ? { reveal } : {}) }));
+  hang(room, sheet({ content: panel, edge: "right", under: opener, ...(reveal !== undefined ? { reveal } : {}) }));
   return room.element;
 }
 

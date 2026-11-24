@@ -13,14 +13,14 @@
   pointer-events: none;
 }
 
-/* The picking bar, on its Sheet in the middle of the frame's bottom edge: one row, as wide as its
-   content, never wider than the screen less the frame and the Sheet's fillets on both sides. */
+/* The picking bar, on its card above the screen's bottom edge: one row, as wide as its content,
+   never wider than the screen less `size.gap` on both sides. */
 .share-pick-bar {
   box-sizing: border-box;
-  max-width: calc(var(--screen-width) - 2 * (var(--frame-side) + var(--radius-surface)));
+  max-width: calc(var(--screen-width) - 2 * var(--gap));
 }
 
-/* Drawing a region, the frame and the bar's Sheet stay over the drawing's dim, Region held pressed. */
+/* Drawing a region, the bar and the bar's card stay over the drawing's dim, Region held pressed. */
 .k-screen.share-screen[data-drawing] > :is(.k-screen-glass, .k-screen-over) {
   z-index: 4;
 }
@@ -54,15 +54,16 @@
 }
 
 /* A window on the desktop: draft part, proposed. */
-/* The screen's tiling: the room inside the frame, `space.s8` in from it and between the windows,
-   as Hyprland's gaps, split into equal tracks; it fills whatever size the screen is drawn at. */
+/* The screen's tiling: the desktop under the bar, `size.gap` in from the screen's edges and the
+   bar and between the windows, as Hyprland's gaps, split into equal tracks; it fills whatever size
+   the screen is drawn at. */
 .share-desk {
   position: absolute;
-  inset: calc(var(--frame-top) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8)) calc(var(--frame-side) + var(--space-s8));
+  inset: var(--desk-top) var(--gap) var(--gap);
   display: grid;
-  grid-template-columns: repeat(var(--desk-columns, 1), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--desk-rows, 1), minmax(0, 1fr));
-  gap: var(--space-s8);
+  grid-template-columns: var(--desk-columns, minmax(0, 1fr));
+  grid-template-rows: var(--desk-rows, minmax(0, 1fr));
+  gap: var(--gap);
 }
 
 .share-window {
@@ -73,12 +74,11 @@
   min-height: 0;
   padding: var(--space-s16);
   border-radius: var(--corner);
-  background: var(--color-surface);
 }
 
-/* A shared window's border: `sharing_line`, the window border's width, over the neutral border,
-   shown while the window is shared or its Share pill is pointed at, whether or not it has the
-   keyboard. The tube, while it has it, burns over it. */
+/* A shared window's border: `sharing_line`, the tube's width, over the glass's edge, shown while
+   the window is shared or its Share pill is pointed at, whether or not it has the keyboard. The
+   tube, while it has it, burns over it. */
 .share-border {
   position: absolute;
   inset: 0;
@@ -353,9 +353,9 @@
 /* A map of the desk, a draft part: as wide as the card, never taller than a three-line row, its
    screens in their real places on whole pixels, each parted from the next by the thin stroke. It
    stands in a room as wide as the card, centred in it, its width, height and place rounded to
-   whole pixels so the card's lines under it stay on them. It is its boxes' container, so their
-   corners scale with its width: each corner's share of the desk's width (`--screen-corner`,
-   `--window-corner`) times the map's. */
+   whole pixels so the card's lines under it stay on them. Its screens are square, as a screen is;
+   it is its windows' container, so their corner scales with its width: the corner's share of the
+   desk's width (`--window-corner`) times the map's. */
 .share-map-room {
   container-type: inline-size;
   display: block;
@@ -381,7 +381,6 @@
   top: round(nearest, calc(var(--y) * 1% + var(--map-gap)), 1px);
   width: round(nearest, calc(var(--w) * 1% - 2 * var(--map-gap)), 1px);
   height: round(nearest, calc(var(--h) * 1% - 2 * var(--map-gap)), 1px);
-  border-radius: max(var(--radius-small), calc(var(--screen-corner) * 100cqw));
   background: var(--color-surface_container_highest);
 }
 

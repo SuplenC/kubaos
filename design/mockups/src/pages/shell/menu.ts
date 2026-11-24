@@ -6,6 +6,7 @@ import type { Words } from "../../lib/content.ts";
 import { field } from "../../lib/field.ts";
 import { row, stack, within } from "../../lib/layout.ts";
 import { menuOnScreen } from "../../lib/list-detail.ts";
+import { wallpaper } from "./bar-parts.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { type Move, nonEmpty, page } from "../../site/page.ts";
 import { windowSize } from "../../site/settings.ts";
@@ -52,7 +53,7 @@ const titled = (title: string): Item[] => [{ ...ITEMS[0]!, title }, ...ITEMS.sli
 /** The menu on a screen of the toolbar's window size, both ways: its rows and place follow the height. */
 function atWindow(): HTMLElement {
   const size = windowSize();
-  const room = within(size.width, menuOnScreen({ results: results("fi"), query: "fi" }));
+  const room = within(size.width, menuOnScreen({ results: results("fi"), query: "fi" }, wallpaper));
   room.style.height = size.height;
   return room;
 }
@@ -135,6 +136,8 @@ export default page<Shown>({
     { name: "Jobs running", for: "each job under the field, its bar", sample: () => panel({ under: jobs(JOBS) }) },
     { name: "An unavailable Result", for: "dimmed, why in its subtitle's place", sample: () => panel({ query: "su" }) },
     { name: "The clock's Items", for: "wea: the weather's, each its answer at the row's end", sample: () => panel({ query: "wea", results: results("wea") }) },
+    { name: "A setting's Item", for: "glass: its value the answer, back to the default an Action", sample: () => panel({ query: "glass", results: results("glass") }) },
+    { name: "Workspace marks Item", for: "marks: the workspaces' marks, its value the answer", sample: () => panel({ query: "marks", results: results("marks") }) },
   ],
   sizes: [
     { name: "Full HD", for: "half the screen, 9 rows, the pane", sample: () => panel({ screen: "full" }) },
@@ -219,7 +222,8 @@ export default page<Shown>({
       { name: "Jobs", for: "the jobs' rows and bars", sample: () => small({ under: jobs(JOBS) }) },
     ]),
     measures: [
-      { part: "Padding, between parts", token: "space-s12" },
+      { part: "Padding", token: "space-s16" },
+      { part: "Between parts", token: "space-s12" },
       { part: "Least width", token: "size-column" },
       { part: "With a rail, shows the pane", token: "size-dialog" },
       { part: "Pane's least width", token: "size-rail" },
@@ -229,6 +233,7 @@ export default page<Shown>({
       { part: "Head's parts apart", token: "space-s8" },
       { part: "Footer", token: "size-control_sm" },
       { part: "Corners", token: "radius-surface" },
+      { part: "Pane's padding, as the list's", token: "space-s12" },
       { part: "Pane: symbol", token: "icon-s48" },
       { part: "Pane: an app's initial tile", token: "size-control_lg" },
       { part: "Pane: symbol to title", token: "space-s16" },
@@ -237,7 +242,7 @@ export default page<Shown>({
     ],
     reflow: {
       note: "Half the screen, one column to two; 8 to 14 rows for two thirds of its height; the pane from 736 wide.",
-      sample: () => within(windowSize().width, menuOnScreen({ results: results("fi"), query: "fi" })),
+      sample: () => within(windowSize().width, menuOnScreen({ results: results("fi"), query: "fi" }, wallpaper)),
     },
   },
 });

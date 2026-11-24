@@ -775,9 +775,10 @@ export function audioBar(mute: MuteOptions = {}): Element[] {
 
 /** The panel open on a screen's corner, under the bar, drawn still unless `reveal` says how far open. */
 export function onScreen(panel: HTMLElement, height = TALL, reveal?: number, mute: MuteOptions = {}): HTMLElement {
-  const room = screen({ width: CORNER, height, wallpaper, bar: audioBar(mute) });
+  const bar = audioBar(mute);
+  const room = screen({ width: CORNER, height, wallpaper, bar });
   room.element.dataset.open = "";
-  hang(room, sheet({ content: panel, edge: "right", ...(reveal !== undefined ? { reveal } : {}) }));
+  hang(room, sheet({ content: panel, edge: "right", under: bar[1]!, ...(reveal !== undefined ? { reveal } : {}) }));
   return room.element;
 }
 

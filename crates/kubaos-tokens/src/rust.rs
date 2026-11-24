@@ -370,15 +370,37 @@ fn size_off_grid(out: &mut Writer, tokens: &Tokens) {
         .collect();
     out.blank();
     out.line("impl Size {");
-    out.line("    /// Whether it may leave the grid: a mark centred on a point that moves with a value.");
+    out.line(
+        "    /// Whether it may leave the grid: a mark centred on a moving point, a blur, or a measure set by eye.",
+    );
     out.line("    pub const fn off_grid(self) -> bool {");
     if off_grid.is_empty() {
         out.line("        false");
     } else {
-        out.line(format!("        matches!(self, {})", off_grid.join(" | ")));
+        matches_any(out, &off_grid);
     }
     out.line("    }");
     out.line("}");
+}
+
+/// `matches!(self, A | B)` in a `const fn`'s body, laid out as rustfmt lays it once it passes the
+/// line width: the variants one to a line.
+fn matches_any(out: &mut Writer, variants: &[String]) {
+    let one_line = format!("        matches!(self, {})", variants.join(" | "));
+    if one_line.chars().count() <= 120 {
+        out.line(one_line);
+        return;
+    }
+    out.line("        matches!(");
+    out.line("            self,");
+    for (index, variant) in variants.iter().enumerate() {
+        if index == 0 {
+            out.line(format!("            {variant}"));
+        } else {
+            out.line(format!("                | {variant}"));
+        }
+    }
+    out.line("        )");
 }
 
 fn container(out: &mut Writer, tokens: &Tokens) {
@@ -621,7 +643,7 @@ fn tabular(out: &mut Writer, styles: &[(&String, &TypeStyle)]) {
     if tabular.is_empty() {
         out.line("        false");
     } else {
-        out.line(format!("        matches!(self, {})", tabular.join(" | ")));
+        matches_any(out, &tabular);
     }
     out.line("    }");
 }

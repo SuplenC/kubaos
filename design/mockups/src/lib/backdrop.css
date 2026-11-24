@@ -62,10 +62,6 @@
   display: block;
 }
 
-.k-backdrop-scrim[data-scrim="glass"] {
-  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
-}
-
 .k-backdrop-scrim[data-scrim="dim"] {
   background: rgb(from var(--color-scrim) r g b / var(--opacity-scrim));
 }
@@ -98,9 +94,9 @@
   display: none;
 }
 
-/* The words of a thing in the middle are centred under one another; a dialog, a glass panel and
-   the questions on glass keep their own. */
-.k-backdrop-thing > :not(.k-dialog, .k-glass-panel, .k-step-rail-page) .k-text[data-wrapped] {
+/* The words of a thing in the middle are centred under one another; a dialog and the questions on
+   glass keep their own. */
+.k-backdrop-thing > :not(.k-dialog, .k-step-rail-page) .k-text[data-wrapped] {
   text-align: center;
 }
 
@@ -110,48 +106,17 @@
   max-height: calc(var(--backdrop-height) - 2 * var(--space-s48));
 }
 
-/* A glass panel, and the flow of questions on glass, fill the screen less the margin, no wider
-   than a rail and two columns with `space.s40` beside each, centred on whole device pixels. The
-   questions on glass stand only `space.s12` off the screen's foot (`--panel-foot`): their footer
-   band's buttons and the rail's foot sit low, and the page's body takes the height. */
-.k-backdrop-thing:has(> .k-glass-panel),
+/* The flow of questions on glass is a card of the shell's glass (`glass.css`) at a card's corner,
+   filling the screen less the margin, no wider than a rail and two columns with `space.s40` beside
+   each, centred on whole device pixels. It stands only `space.s12` off the screen's foot
+   (`--panel-foot`): its footer band's buttons and the rail's foot sit low, and the page's body takes
+   the height. */
 .k-backdrop[data-scrim="glass"] > .k-backdrop-thing {
   --panel-width: min(calc(100% - 2 * var(--panel-margin, var(--space-s32))), calc(var(--size-rail) + 2 * var(--space-s40) + 2 * var(--size-column)));
   left: round(down, calc((100% - var(--panel-width)) / 2), 1px);
   top: var(--panel-margin, var(--space-s32));
   width: var(--panel-width);
-  height: calc(100% - var(--panel-margin, var(--space-s32)) - var(--panel-foot, var(--panel-margin, var(--space-s32))));
-}
-
-.k-backdrop[data-scrim="glass"] > .k-backdrop-thing {
+  height: calc(100% - var(--panel-margin, var(--space-s32)) - var(--panel-foot));
   --panel-foot: var(--space-s12);
-}
-
-.k-glass-panel {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  overflow: hidden;
   border-radius: var(--radius-surface);
-  background: var(--color-surface);
-  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
-}
-
-/* The blurred picture, as large as the screen and lying where it lies, seen through the panel. */
-.k-glass-picture {
-  position: absolute;
-  left: calc(-1 * var(--panel-left, 0px));
-  top: calc(-1 * var(--panel-margin, var(--space-s32)));
-  width: var(--backdrop-width);
-  height: var(--backdrop-height);
-  object-fit: cover;
-}
-
-.k-glass-body {
-  position: relative;
-  display: flex;
-  flex: 1 1 auto;
-  border-radius: inherit;
-  background: rgb(from var(--color-surface) r g b / var(--opacity-glass));
-  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--sunken-line);
 }

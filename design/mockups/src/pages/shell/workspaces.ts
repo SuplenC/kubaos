@@ -1,49 +1,52 @@
-// The bar's workspaces, as `config/quickshell/modules/bar/Workspaces.qml` draws them: a pill of its
-// own, `size.control_sm` tall on `surface_container`, `space.s4` round a row of entries. A
-// workspace is a cell `size.chip` square, its number centred, semibold (`button_small`) with
-// windows or shown, medium (`label`) empty, or its kanji in `accent`. Groups come in block order, a
-// hairline `size.chip` / 2 tall in `outline_variant` in a `space.s12` gap between them. A group
-// waiting from a desk position no screen holds is borrowed: a `secondary` tint at `opacity.tint`
-// round it, its name first in `label`, `secondary`. A group's workspaces are numbered from 1 with no
-// gap, and a group with fewer than ten ends in its `+`, a ghost: a faint `add` in `outline` at
-// `opacity.placeholder`. Clicking it adds a workspace at the next number and shows it; it stays,
-// empty, until it is deleted.
+// The bar's workspaces, flat on the bar's glass: a row of cells `size.ws_cell` wide whatever their
+// mark, so a switch moves nothing, each holding its workspace's mark (`Marks`, a setting: numbers,
+// dots, dashes, or dot and dash), the shown one's lit in its tone. A digit is `workspace_digit`, 13
+// and medium like the kanji in `accent`, one weight lit or not, with windows or empty, so nothing
+// moves as it changes; an empty workspace's is `outline`, one with windows `on_surface_variant`.
+// Groups come in block order, parted by the bar's hairline. A group waiting from a desk position no
+// screen holds is borrowed: a stronger hairline before and after it, its name first in `label`,
+// `secondary`. A group's workspaces are numbered from 1 with no gap, and a group with fewer than
+// ten ends in its `+`: a faint `add` in `outline` at `opacity.placeholder`. The `+` and a borrowed
+// group's name show only while the pointer is on the workspaces. Clicking a `+` adds a workspace
+// at the next number and shows it; it stays, empty, until it is deleted.
 //
-// The shown workspace sits on the indicator, `primary` at the full radius, between the tints and
-// the cells. Every change of shape glides: an entry grows in or shrinks out, its width over `long`
-// on `emphasized_decel`, its opacity over `long` on `standard`. A new shown workspace stretches the
-// indicator: its leading edge over `medium`, its trailing edge over `long`, both on
-// `emphasized_decel`. A number that changes rolls, as the Overview's do (`lib/rolling-number.ts`):
-// the same windows drawn at another number, a drop, a delete shifting the later ones down.
+// The shown workspace's mark is lit; switching, the leaving mark turns off over `short` and the
+// arriving one turns on `duration.swap_lag` later, a dash also narrowing and widening over `medium`.
+// Every change of the row glides: an entry grows in or shrinks out, its width over `long` on
+// `emphasized_decel` (over `medium` on `standard_decel` while a workspace is carried), its opacity
+// on `standard`; one growing in rounds its width up and one shrinking out rounds down, so the row
+// holds its width to the pixel. A number that changes rolls, as the Overview's do
+// (`lib/rolling-number.ts`): the same windows drawn at another number, a drop, a delete shifting
+// the later ones down.
 //
 // The cell under the pointer takes a neutral circle a step up the container ladder,
 // `surface_container_high`, and pressed `surface_container_highest`, fading over `short`, as any
-// control's quiet hover does; the pill itself draws no line and no glow for the pointer. The shown
-// workspace's cell takes none: it is already where you are. A `+` is a cell and takes it too.
+// control's quiet hover does, while its mark dips as every bar item's content does; the part itself
+// draws no line and no glow for the pointer. The shown workspace's cell takes none: it is already
+// where you are. A `+` is a cell and takes it too.
 //
-// A workspace, empty or not, can be carried to another place; a `+` cannot. Pressed and moved `space.s8`, it lifts
-// onto a disc raised to step 1 that eases onto the pointer over `short` on `standard`, its place
-// left as a hole, empty space a cell wide; nothing else moves. The disc is in the top layer, so
-// nothing cuts it. The numbers are the places and stay; the windows move. While it is carried there
-// is one hole: the pill as it stood, the workspace taken out and the hole put where it would land,
-// so one group gives up a slot as another takes one and the pill keeps its width. Each place is
-// hit-tested where the hole would stand there, with the Overview's magnet (`lib/magnet.ts`) on it:
-// in a magnet the hole moves there, the cells between slide over and the disc snaps onto it, each
-// over `medium` on `standard_decel`, the disc's number rolling to the one it would get there, so it
-// lands already right; between magnets the hole stays and the disc follows the hand;
-// off the pill the hole goes home. Over another group, that group takes a `primary` outline; over a
-// group's ghost, the hole is its last place; over a full group, ten already, the disc dims to
-// `opacity.locked` and the hole is home, as the Overview refuses (`lib/magnet.ts`'s `refuse`).
-// Let go, the disc flies into the hole over `medium` on `emphasized_decel`. A slide moves a slot's content, never its piece of a group's tint, so the
-// tint stays one band, and a slot going out stays in its group. The shown workspace is where its
-// windows are, so the indicator follows them, gliding within a group. Carried itself, the shown
-// workspace's place is a hole like any other's: the indicator narrows out of its place as it lifts
-// and widens into its new one as it lands, never crossing a rule, a gap or a name.
-// Nothing in the pill is selected by a press or a drag.
+// A workspace, empty or not, can be carried to another place; a `+` cannot. Pressed and moved
+// `space.s8`, it lifts onto a disc raised to step 1, its number on it whatever the marks, that
+// eases onto the pointer over `short` on `standard`, its place left as a hole, empty space a cell
+// wide; nothing else moves. The disc is in the top layer, so nothing cuts it. The numbers are the
+// places and stay; the windows move. While it is carried there is one hole: the row as it stood,
+// the workspace taken out and the hole put where it would land, so one group gives up a slot as
+// another takes one and the row keeps its width. Each place is hit-tested where the hole would
+// stand there, with the Overview's magnet (`lib/magnet.ts`) on it: in a magnet the hole moves
+// there, the cells between slide over and the disc snaps onto it, each over `medium` on
+// `standard_decel`, the disc's number rolling to the one it would get there, so it lands already
+// right; between magnets the hole stays and the disc follows the hand; off the part the hole goes
+// home. Over another group, that group takes a `primary` outline, each slot drawing its piece;
+// over a group's ghost, the hole is its last place; over a full group, ten already, the disc dims
+// to `opacity.locked` and the hole is home, as the Overview refuses (`lib/magnet.ts`'s `refuse`).
+// Let go, the disc flies into the hole over `medium` on `emphasized_decel`. A slide moves a slot's
+// content, never its piece of a group's outline, so the outline stays whole, and a slot going out
+// stays in its group. Carried itself, the shown workspace's place is a hole like any other's, and
+// its mark is lit in the cell it lands in. Nothing in the part is selected by a press or a drag.
 //
 // A right click opens its menu (`lib/menu.ts`) on a popover under it, the workspace it is for marked
-// by a circle of `primary` at `opacity.tint` behind its number, fading over `short` on `standard`
-// (none on the shown one, already on the indicator): on a workspace, its own
+// by a circle of `primary` at `opacity.tint` behind its mark, fading over `short` on `standard`
+// (none on the shown one, already lit): on a workspace, its own
 // actions under "Workspace N", then its group's under "This group"; on a group's name or its ghost,
 // the group's alone, under its name. The deletes are held. Delete group closes every window in the
 // group: the screen's own group keeps one empty workspace and never goes; a borrowed group goes
@@ -53,6 +56,7 @@
 // It isn't the library's `Pill`: its cells glide every frame. It has no part in `src/lib/` yet.
 
 import "./workspaces.css";
+import { centreOnPixels } from "../../lib/centre.ts";
 import type { Pinned } from "../../lib/control.ts";
 import { pin } from "../../lib/control.ts";
 import { raise } from "../../lib/elevation.ts";
@@ -61,9 +65,9 @@ import { icon } from "../../lib/icon.ts";
 import { withHint } from "../../lib/hint.ts";
 import { catchShare, caught, type Rect, refuse, type Zone, zoneOf } from "../../lib/magnet.ts";
 import { type MenuEntry, type MenuItemSpec, menu } from "../../lib/menu.ts";
-import { probe } from "../../lib/probe.ts";
+import { declare, probe } from "../../lib/probe.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
-import { advance, text, type TypeStyle } from "../../lib/text.ts";
+import { advance, clamped, text, type TypeStyle } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { cubic, durationMs, length } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
@@ -104,11 +108,27 @@ export interface MenuPin {
   readonly holding?: number;
 }
 
+/**
+ * How a workspace is marked, a personalisation setting: its number (digits or kanji, all of them
+ * or only the shown one's), a dot, a dash, or a dot that the shown one stretches into a dash.
+ */
+export type Marks = "numbers" | "dots" | "dashes" | "dotdash";
+
+/** The marks, the setting's default first. */
+export const MARKS: readonly Marks[] = ["dotdash", "numbers", "dots", "dashes"];
+
 export interface WorkspacesOptions {
   readonly groups?: readonly Group[];
   /** The shown workspace's id. */
   readonly active?: number;
+  /** The marks: Dot and dash unless given. */
+  readonly marks?: Marks;
+  /** Numbers in kanji rather than digits. */
   readonly kanji?: boolean;
+  /** Numbers: only the shown workspace's at rest, the rest while the pointer is on them. */
+  readonly onlyCurrent?: boolean;
+  /** A workspace asking for attention, by id: its mark lit in `error`. */
+  readonly urgent?: number;
   /** Clicks and the wheel move the shown workspace, a group's `+` adds one; a drag reorders, a right click opens the menu. */
   readonly live?: boolean;
   readonly pinned?: Pinned;
@@ -184,9 +204,9 @@ function numberText(id: number, kanji: boolean): string {
   return kanji ? KANJI[slotOf(id) - 1]! : String(slotOf(id));
 }
 
-function numberStyle(strong: boolean, kanji: boolean): TypeStyle {
-  if (kanji) return "accent";
-  return strong ? "button_small" : "label";
+/** A numeral's style: one for every digit, lit or not, with windows or empty, so none moves as it changes. */
+function numberStyle(kanji: boolean): TypeStyle {
+  return kanji ? "accent" : "workspace_digit";
 }
 
 /** The key of group `block`'s `+`. */
@@ -207,14 +227,16 @@ function entriesOf(bands: readonly Band[], held: string | null, taking: number |
     const takes = band.block === taking;
     const ends = plus(band);
     const first = band.block * 10 + 1;
-    if (index > 0) result.push({ ...blank, key: `gap${band.block}`, kind: "gap", block: band.block });
+    // A borrowed group is set off by a stronger hairline before it and after it.
+    if (index > 0) result.push({ ...blank, key: `gap${band.block}`, kind: "gap", block: band.block, borrowed: band.borrowed || (bands[index - 1]?.borrowed ?? false) });
     if (name !== "") result.push({ ...blank, key: `label${band.block}`, kind: "label", block: band.block, workspace: first, space: band.spaces[0]?.key ?? "", borrowed: true, head: true, label: name, taking: takes });
     band.spaces.forEach((space, at) => {
       // A slot's key is its windows' in its group: carried to another group, it leaves one and
-      // grows in the other, never sliding across the rule with the tint it is drawn on.
+      // grows in the other, never sliding across the rule between the groups.
       result.push({ key: `${space.key}@${band.block}`, kind: space.key === held ? "hole" : "cell", block: band.block, workspace: space.id, space: space.key, borrowed: band.borrowed, head: at === 0 && name === "", tail: at === band.spaces.length - 1 && !ends, label: "", occupied: space.occupied, taking: takes });
     });
     if (ends) result.push({ key: plusKey(band.block), kind: "ghost", block: band.block, workspace: first + band.spaces.length, space: plusKey(band.block), borrowed: band.borrowed, head: band.spaces.length === 0 && name === "", tail: true, label: "", occupied: false, taking: takes });
+    if (band.borrowed && index === bands.length - 1) result.push({ ...blank, key: `end${band.block}`, kind: "gap", block: band.block, borrowed: true });
   });
   return result;
 }
@@ -231,7 +253,7 @@ function cssPx(name: string): number {
 
 /** The room a cell leaves before its number, which it centres. */
 function numberRoom(id: number, kanji: boolean): number {
-  return (px("size-chip") - advance(numberStyle(true, kanji), numberText(id, kanji))) / 2;
+  return (px("size-ws_cell") - advance(numberStyle(kanji), numberText(id, kanji))) / 2;
 }
 
 /** An entry's width in logical pixels, as `widthOf`. */
@@ -241,7 +263,7 @@ function widthOf(entry: Entry, kanji: boolean): number {
     const name = Math.min(advance("label", entry.label), px("space-s48") * 2);
     return Math.round(2 * inset + name - numberRoom(entry.workspace, kanji));
   }
-  return entry.kind === "gap" ? px("space-s12") : px("size-chip");
+  return entry.kind === "gap" ? px("space-s20") : px("size-ws_cell");
 }
 
 /** The duration token `name` in milliseconds under the speed setting, nothing with reduce motion. */
@@ -267,8 +289,21 @@ function landingOf(bands: readonly Band[], key: string): Landing | null {
   return null;
 }
 
+/**
+ * How far inside its cell the first workspace's mark starts, as a length's CSS: the bar spaces its
+ * start from the mark's ink, not the cell's edge. A numeral's is its advance's, the one figure the
+ * layout can't express.
+ */
+function inkInset(marks: Marks, kanji: boolean): string {
+  if (marks === "dashes") return "calc((var(--size-ws_cell) - var(--size-ws_dash)) / 2)";
+  if (marks !== "numbers") return "calc((var(--size-ws_cell) - var(--size-ws_dot)) / 2)";
+  const room = (px("size-ws_cell") - advance(numberStyle(kanji), numberText(1, kanji))) / 2;
+  return `calc(${room} * var(--px))`;
+}
+
 export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
-  const kanji = options.kanji ?? false;
+  const marks = options.marks ?? "dotdash";
+  const kanji = marks === "numbers" && (options.kanji ?? false);
   let mint = 0;
   const fresh = () => `n${mint++}`;
   let active = `w${options.active ?? 2}`;
@@ -283,16 +318,15 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   const element = document.createElement("span");
   element.className = "shell-ws k-control";
   element.dataset.hot = "";
-  element.style.setProperty("--fill", "var(--color-surface_container)");
-  element.style.setProperty("--ink", "var(--color-on_surface)");
+  element.dataset.marks = marks;
+  element.toggleAttribute("data-only-current", marks === "numbers" && (options.onlyCurrent ?? false));
+  element.style.setProperty("--ws-ink", inkInset(marks, kanji));
   pin(element, options.pinned);
   const cells = document.createElement("span");
   cells.className = "shell-ws-cells";
-  const indicator = document.createElement("span");
-  indicator.className = "shell-ws-indicator";
   const content = document.createElement("span");
   content.className = "shell-ws-row shell-ws-content";
-  cells.append(indicator, content);
+  cells.append(content);
   element.append(cells);
   focusRing(element, "full", "accent", false);
   if (options.pinned) withHint(element, "Workspaces");
@@ -361,7 +395,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   };
 
   /**
-   * One entry's slot: its piece of the tint and the drop outline behind, and its content. A cell's
+   * One entry's slot: its piece of the drop outline behind, and its content. A cell's
    * number that stood at `was` for the same windows rolls from it to its own.
    */
   function slot(entry: Entry, was?: number): HTMLElement {
@@ -378,11 +412,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       made.toggleAttribute("data-tail", entry.tail);
       box.append(made);
     };
-    if (entry.borrowed) piece("shell-ws-tint");
     if (entry.taking) piece("shell-ws-drop");
     if (entry.kind === "gap") {
       const rule = document.createElement("span");
       rule.className = "shell-ws-rule";
+      rule.toggleAttribute("data-strong", entry.borrowed);
       box.append(rule);
       return box;
     }
@@ -394,7 +428,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       });
     }
     if (entry.kind === "label") {
-      const name = text(entry.label, "label", "secondary");
+      // A name that varies: cut with an ellipsis at the slot's widest, `space.s48` twice.
+      const name = declare(clamped(entry.label, "label", "secondary"), { variable: true });
       name.classList.add("shell-ws-name");
       name.style.setProperty("--inset", String(Math.round(numberRoom(entry.workspace, kanji))));
       box.append(name);
@@ -409,15 +444,23 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     }
     const cell = document.createElement("span");
     cell.className = "shell-ws-cell";
+    cell.dataset.space = entry.space;
     cell.toggleAttribute("data-shown", entry.space === active);
+    cell.toggleAttribute("data-urgent", entry.kind === "cell" && entry.workspace === options.urgent && entry.space !== active);
+    cell.toggleAttribute("data-occupied", entry.occupied);
     cell.toggleAttribute("data-pointer", entry.workspace === pointer);
     cell.toggleAttribute("data-ghost", entry.kind === "ghost");
     if (entry.kind === "ghost") {
       const plus = icon("add", "var(--icon-s16)", "var(--color-outline)");
       plus.classList.add("shell-ws-ghost");
       cell.append(plus);
+      // Its cell is the box the `+` is centred in, whatever marks the others show.
+      probe(cell, { role: "box" });
     } else {
-      cell.append(numberOf(entry, was));
+      const mark = document.createElement("span");
+      mark.className = "shell-ws-mark";
+      if (marks === "numbers") mark.append(numberOf(entry, was), litNumber(entry));
+      cell.append(mark);
       box.dataset.number = String(slotOf(entry.workspace));
     }
     cell.addEventListener("click", () => choose(entry.space));
@@ -430,9 +473,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    * Overview's numbers do; a kanji is set in place.
    */
   function numberOf(entry: Entry, was?: number): HTMLElement {
-    const shown = entry.space === active;
-    const style = numberStyle(shown || entry.occupied, kanji);
-    const color = shown ? "on_primary" : entry.occupied ? "on_surface" : "on_surface_variant";
+    const style = numberStyle(kanji);
+    const color = entry.occupied ? "on_surface_variant" : "outline";
     const number = document.createElement("span");
     number.className = "shell-ws-number";
     number.dataset.look = `${style} ${color}`;
@@ -444,39 +486,42 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   }
 
   /**
+   * A number's light, over it: the same numeral, `primary` (an urgent one's `error`), with its glow
+   * by night, in the unlit numeral's style. It shows as far as the cell is lit, the unlit numeral fading under it.
+   */
+  function litNumber(entry: Entry): HTMLElement {
+    const urgent = entry.workspace === options.urgent;
+    const lit = text(numberText(entry.workspace, kanji), numberStyle(kanji), urgent ? "error" : "primary");
+    lit.classList.add("shell-ws-lit-number");
+    // Centred over the unlit numeral by layout, it lands on whole device pixels whatever its width,
+    // as the rolling number under it does: each time it is laid out at a size, it is put on pixels.
+    new ResizeObserver(() => {
+      if (lit.isConnected && lit.parentElement) centreOnPixels(lit.parentElement);
+    }).observe(lit);
+    return lit;
+  }
+
+  /**
    * A workspace's number, 1 to 10, as a rolling number: its digits, or its kanji numeral (十 for
    * ten), one glyph to a slot. Every number centres on the same figure, not its own: a "1" and a
    * "2" weigh differently, and each centred on its own ink would put the numbers on different
    * baselines. One figure at least: the box is its figures', so a cell centres a 10 as it does a 1.
    */
   function numeral(value: number, style: TypeStyle, color: string): Rolling {
-    const centre = { style: numberStyle(true, kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
+    const centre = { style: numberStyle(kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
     if (!kanji) return rollingNumber({ value, widest: "0", style, color, centre });
     return rollingNumber({ value, widest: KANJI[0]!, format: (each) => KANJI[each - 1]!, figures: KANJI.join(""), style, color, centre });
-  }
-
-  /** Where the cell (or hole) of `key` starts among `entries`, in cells, or -1. */
-  function cellsTo(key: string): number {
-    let x = 0;
-    for (const entry of entries) {
-      if (entry.kind !== "gap" && entry.kind !== "label" && entry.space === key) return x / px("size-chip");
-      x += widthOf(entry, kanji);
-    }
-    return -1;
   }
 
   /** Draws the entries at once, nothing moving. */
   function draw(): void {
     entries = entriesNow();
     content.replaceChildren(...entries.map((entry) => slot(entry)));
-    const at = cellsTo(active);
-    indicator.style.setProperty("--ws-start", String(away ? at + 0.5 : at));
-    indicator.style.setProperty("--ws-end", String(away ? at + 0.5 : at + 1));
   }
 
   /** The drawn horizontal offset of `child`'s content: its box, and where a slide running on it has it. */
   function drawnLeft(child: HTMLElement): number {
-    return child.offsetLeft + (Number.parseFloat(getComputedStyle(child).getPropertyValue("--ws-slide")) || 0) * cssPx("size-chip");
+    return child.offsetLeft + (Number.parseFloat(getComputedStyle(child).getPropertyValue("--ws-slide")) || 0) * cssPx("size-ws_cell");
   }
 
   /** How far `child` is in, 0 to 1: its width's share, and its content's opacity. */
@@ -585,65 +630,12 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       // Only a workspace's slot slides, and only by whole slots: a group's name and the rule move
       // with the widths round them, and a pixel left by a slot still growing or going is no slide.
       const kind = made.dataset.kind;
-      if (kind === "label" || kind === "gap" || Math.abs(from) < cssPx("size-chip") / 2 || ms("medium") === 0) continue;
+      if (kind === "label" || kind === "gap" || Math.abs(from) < cssPx("size-ws_cell") / 2 || ms("medium") === 0) continue;
       // Its content slides out of its box, which shows it while it does.
       made.dataset.sliding = "";
       // In cells: a slide is always by whole places.
-      made.animate([{ "--ws-slide": from / cssPx("size-chip") }, { "--ws-slide": 0 }], { duration: ms("medium"), easing: easing("standard_decel") }).finished.then(() => delete made.dataset.sliding, () => {});
+      made.animate([{ "--ws-slide": from / cssPx("size-ws_cell") }, { "--ws-slide": 0 }], { duration: ms("medium"), easing: easing("standard_decel") }).finished.then(() => delete made.dataset.sliding, () => {});
     }
-  }
-
-  /** The indicator onto the shown workspace's place: its leading edge over `lead`, its trailing one over `trail`. */
-  function indicate(lead: string, trail: string, curve: string): void {
-    if (away) return;
-    const target = cellsTo(active);
-    const from = getComputedStyle(indicator);
-    const start = Number.parseFloat(from.getPropertyValue("--ws-start"));
-    const end = Number.parseFloat(from.getPropertyValue("--ws-end"));
-    if (start === target && end === target + 1) return;
-    const right = target > start;
-    indicator.style.setProperty("--ws-start", String(target));
-    indicator.style.setProperty("--ws-end", String(target + 1));
-    indicator.animate([{ "--ws-start": start }, { "--ws-start": target }], { duration: ms(right ? trail : lead), easing: easing(curve) });
-    indicator.animate([{ "--ws-end": end }, { "--ws-end": target + 1 }], { duration: ms(right ? lead : trail), easing: easing(curve) });
-  }
-
-  /**
-   * Whether the indicator has left: the shown workspace is carried, its place a hole, and the
-   * indicator is drawn on no place until it lands.
-   */
-  let away = false;
-
-  /**
-   * The indicator leaves its place, as a hole leaves a group: a circle shrinking into its middle
-   * over `medium` on `standard_decel`, where it is, crossing nothing.
-   */
-  function leave(): void {
-    if (away) return;
-    away = true;
-    const from = getComputedStyle(indicator);
-    const start = Number.parseFloat(from.getPropertyValue("--ws-start"));
-    const end = Number.parseFloat(from.getPropertyValue("--ws-end"));
-    const middle = (start + end) / 2;
-    for (const running of indicator.getAnimations()) running.cancel();
-    indicator.style.setProperty("--ws-start", String(middle));
-    indicator.style.setProperty("--ws-end", String(middle));
-    const timing = { duration: ms("medium"), easing: easing("standard_decel") };
-    indicator.animate([{ "--ws-start": start }, { "--ws-start": middle }], timing);
-    indicator.animate([{ "--ws-end": end }, { "--ws-end": middle }], timing);
-  }
-
-  /** The indicator arrives at the shown workspace's place, as a hole comes into a group: a circle growing from its middle over `medium` on `standard_decel`. */
-  function arrive(): void {
-    if (!away) return;
-    away = false;
-    const target = cellsTo(active);
-    for (const running of indicator.getAnimations()) running.cancel();
-    indicator.style.setProperty("--ws-start", String(target));
-    indicator.style.setProperty("--ws-end", String(target + 1));
-    const timing = { duration: ms("medium"), easing: easing("standard_decel") };
-    indicator.animate([{ "--ws-start": target + 0.5 }, { "--ws-start": target }], timing);
-    indicator.animate([{ "--ws-end": target + 0.5 }, { "--ws-end": target + 1 }], timing);
   }
 
   /**
@@ -658,9 +650,22 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       const made = { id: 0, key: fresh(), occupied: false };
       bands = bands.map((band) => (band === adding ? { ...band, spaces: renumber(band, [...band.spaces, made]) } : band));
       active = made.key;
-    } else active = key;
+    } else {
+      // The marks stay where they are: the leaving one turns off and the arriving one on (`light`).
+      active = key;
+      return light();
+    }
     render(false);
-    indicate("medium", "long", "emphasized_decel");
+    // A workspace just added lights as any arriving mark does, once it is drawn unlit.
+    const added = content.querySelector<HTMLElement>(`.shell-ws-cell[data-space="${active}"]`);
+    if (!added) return;
+    delete added.dataset.shown;
+    requestAnimationFrame(() => requestAnimationFrame(light));
+  }
+
+  /** Lights the shown workspace's mark and puts the others out, each fading as its CSS says. */
+  function light(): void {
+    for (const cell of content.querySelectorAll<HTMLElement>(".shell-ws-cell")) cell.toggleAttribute("data-shown", cell.dataset.space === active);
   }
 
   /** The groups changed by an action, drawn again with every change gliding. */
@@ -668,7 +673,6 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     bands = next;
     if (!bands.some((band) => band.spaces.some((space) => space.key === active))) active = bands[0]!.spaces[0]!.key;
     render(true);
-    indicate("medium", "medium", "standard_decel");
   }
 
   // ---------------------------------------------------------------- carrying --
@@ -694,7 +698,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   /** The slots of the cells, ghosts and holes `list` draws, in the pill's CSS pixels: where they stand once laid out. */
   function slotsOf(list: readonly Entry[]): { entry: Entry; box: Rect }[] {
     const scale = settings().scale;
-    const h = px("size-chip") * scale;
+    const h = px("size-ws_cell") * scale;
     let x = cells.offsetLeft;
     const result: { entry: Entry; box: Rect }[] = [];
     for (const entry of list) {
@@ -708,7 +712,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   /** Where each group's entries run on the pill, its name to its `+`, in the pill's CSS pixels. */
   function spansOf(list: readonly Entry[]): Map<number, Rect> {
     const scale = settings().scale;
-    const h = px("size-chip") * scale;
+    const h = px("size-ws_cell") * scale;
     const spans = new Map<number, Rect>();
     let x = cells.offsetLeft;
     for (const entry of list) {
@@ -803,7 +807,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function makeDisc(id: number): { disc: HTMLElement; roll: Rolling } {
     const disc = raise(document.createElement("span"), 1);
     disc.className += " shell-ws-disc";
-    const roll = numeral(slotOf(id), numberStyle(true, kanji), "on_surface");
+    const roll = numeral(slotOf(id), numberStyle(kanji), "on_surface");
     disc.append(roll.element);
     // In the top layer, the disc is never cut by the pill or by any box the pill is drawn in; it
     // stays in the pill's tree, so it is drawn in the pill's own tokens.
@@ -829,11 +833,6 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     carry = { key, from: bands, home, landing: home, snapped: false, disc, roll, landed: false, anchor: null, number };
     zoneCache = null;
     element.dataset.carrying = "";
-    // The shown workspace carried, its place is a hole like any other's: the indicator leaves it.
-    if (key === active) {
-      if (pointer) leave();
-      else away = true;
-    }
     render(false);
     base = client(holeCentre());
     discTo(carry.disc, holeCentre());
@@ -850,14 +849,13 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (slides) carry.roll?.set(landing.index + 1);
     else if (carry.roll) {
       // A still shows the disc's number as it stands there, rolled already.
-      const now = numeral(landing.index + 1, numberStyle(true, kanji), "on_surface");
+      const now = numeral(landing.index + 1, numberStyle(kanji), "on_surface");
       carry.roll.element.replaceWith(now.element);
       carry.roll = now;
     }
     bands = carried(carry.from, carry.key, landing);
     if (!slides) return draw();
     render(true);
-    indicate("medium", "medium", "standard_decel");
   }
 
   function same(a: Landing | null, b: Landing | null): boolean {
@@ -904,8 +902,6 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       carry = null;
       delete element.dataset.carrying;
       render(false);
-      if (away) arrive();
-      else indicate("medium", "medium", "standard_decel");
     };
     if (flight) flight.finished.then(done, done);
     else done();
@@ -998,8 +994,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       room.append(card);
       if (!still) list_.focus({ preventScroll: true });
     };
-    // The workspace it is for takes a light tint of primary, unless it is the shown one, already on
-    // the indicator; a group's menu marks nothing.
+    // The workspace it is for takes a light tint of primary, unless it is the shown one, already
+    // lit; a group's menu marks nothing.
     if ("workspace" in on && on.workspace !== active) {
       marked = anchor;
       anchor.dataset.menu = "";
@@ -1037,36 +1033,15 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /**
    * Closes every window in `band`, a borrowed group, and takes the whole group away: its rule, its
-   * name and its workspaces shrink out, its tint fading with them, and it is back, empty, once its
+   * name and its workspaces shrink out, and it is back, empty, once its
    * own screen is connected. Showing one of its workspaces, the screen shows its own group's first
-   * instead: the indicator shrinks out where it was as it grows in there, never crossing the group.
+   * instead, its mark lighting there.
    */
   function dropGroup(band: Band, showing: boolean): void {
     bands = bands.filter((each) => each !== band);
-    if (showing) {
-      active = bands[0]!.spaces[0]!.key;
-      echo();
-      away = true;
-    }
+    if (showing) active = bands[0]!.spaces[0]!.key;
     render(true);
     for (const gone of content.querySelectorAll<HTMLElement>(`.shell-ws-slot[data-gone][data-block="${band.block}"]`)) gone.dataset.groupGone = "";
-    if (showing) arrive();
-    else indicate("medium", "medium", "standard_decel");
-  }
-
-  /** A copy of the indicator where it stands, shrinking out into its middle as `leave` does, while the indicator itself goes elsewhere. */
-  function echo(): void {
-    const from = getComputedStyle(indicator);
-    const start = Number.parseFloat(from.getPropertyValue("--ws-start"));
-    const end = Number.parseFloat(from.getPropertyValue("--ws-end"));
-    const middle = (start + end) / 2;
-    const copy = indicator.cloneNode() as HTMLElement;
-    copy.style.setProperty("--ws-start", String(middle));
-    copy.style.setProperty("--ws-end", String(middle));
-    indicator.after(copy);
-    const timing = { duration: ms("medium"), easing: easing("standard_decel") };
-    copy.animate([{ "--ws-start": start }, { "--ws-start": middle }], timing);
-    copy.animate([{ "--ws-end": end }, { "--ws-end": middle }], timing).finished.then(() => copy.remove(), () => copy.remove());
   }
 
   /** Puts the name of group `block` up for typing over, in place. */

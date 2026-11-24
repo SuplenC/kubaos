@@ -3,7 +3,22 @@
 // alone, except the motion settings, which are the site's own (the toolbar's), so the page moves as
 // they say.
 
+import { number } from "../../../lib/tokens.ts";
 import type { Mode } from "../../../site/settings.ts";
+
+/**
+ * The glass setting's stops, a percent each, from its floor to fully opaque: `opacity.glass_floor`
+ * by night, `opacity.glass_floor_day` by day.
+ */
+export function glassSteps(byDay: boolean): number[] {
+  const floor = Math.round(number(byDay ? "opacity-glass_floor_day" : "opacity-glass_floor") * 100);
+  return Array.from({ length: 101 - floor }, (_, i) => floor + i);
+}
+
+/** The stop of the night's or the day's `glassSteps()` an opacity token names. */
+function glassStop(token: "glass" | "glass_day"): number {
+  return glassSteps(token === "glass_day").indexOf(Math.round(number(`opacity-${token}`) * 100));
+}
 
 /** Every value a window shows, as it opens: KubaOS's defaults. */
 export interface Values {
@@ -14,6 +29,10 @@ export interface Values {
   drawn: Mode;
   dayWallpaper: number;
   wallpaperMotion: number;
+  /** Frosted glass: the compositor blurs what is behind every glass surface. */
+  blur: boolean;
+  /** Glass opacity's stop by night and by day, each of its own `glassSteps()`. */
+  glass: [number, number];
   accentFrom: number;
   preset: number;
   cold: number;
@@ -52,12 +71,22 @@ export interface Values {
 }
 
 export function defaults(): Values {
+  // The tokens are read once the page's CSS is there, not as the module loads: `D` is made then.
+  let glass: [number, number] | null = null;
   return {
     mode: 0,
     switchMove: 0,
     drawn: "dark",
     dayWallpaper: 0,
     wallpaperMotion: 1,
+    blur: true,
+    get glass(): [number, number] {
+      glass ??= [glassStop("glass"), glassStop("glass_day")];
+      return glass;
+    },
+    set glass(stops: [number, number]) {
+      glass = stops;
+    },
     accentFrom: 0,
     preset: 0,
     cold: 0,

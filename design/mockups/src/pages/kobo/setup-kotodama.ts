@@ -81,7 +81,7 @@ const DEMO: Move = {
 const ANSWERS: Move = {
   name: "The ad answers",
   what: "Its reply fades in over `short` above the button, holds two `hold`s, then fades out.",
-  tracks: [{ part: "the reply", on: "the ad's button", target: ".setup-kotodama-ad-reply > .k-tooltip", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
+  tracks: [{ part: "the reply", on: "the ad's button", target: ".setup-kotodama-ad-reply > .k-tooltip", property: "--tooltip-shown", from: 0, to: 1, duration: "short", curve: "standard" }],
   reduced: "same",
   back: "cuts",
   sample: at("why-reply"),

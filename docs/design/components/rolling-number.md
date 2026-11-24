@@ -12,7 +12,7 @@ Its figures are the digits unless it is given others (`figures` in the mockups):
 
 A number can be written with marks between its figures (`format` in the mockups): a clock's colons, a minus before the time left. A mark sits in a slot as wide as its own advance, rounded up to a whole device pixel, and never rolls; the box is as wide as the widest value's figures and marks, so a clock that grows an hour keeps its place. The media player's times are clocks. *Not built yet: neither library writes marks; only the mockups do.*
 
-Its figures are centred for the mass of every figure in its own style. A number set among others on one baseline is centred for theirs instead (`centre` in the mockups: a style and the words to weigh): the bar's workspace numbers are each centred for a 0 in `button_small`, whether drawn in `button_small` or `label`, so they stand on one baseline. *Not built yet: neither library takes a centre; only the mockups do.*
+Its figures are centred for the mass of every figure in its own style. A number set among others on one baseline is centred for theirs instead (`centre` in the mockups: a style and the words to weigh): the bar's workspace digits are each centred for a 0 in `workspace_digit`, so they stand on one baseline. *Not built yet: neither library takes a centre; only the mockups do.*
 
 It isn't a control: it takes no pointer and no focus, and has no disabled, selected, loading or error state. A count that is nothing shows 0.
 

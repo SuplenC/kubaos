@@ -6,7 +6,10 @@ import { type MenuEntry, menu } from "../../lib/menu.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { powerMoves } from "../../site/moves.ts";
 import { doesntApply, nonEmpty, page } from "../../site/page.ts";
-import { TRAY, type TrayApp, trayPill } from "./bar-parts.ts";
+import { onGlass, TRAY, type TrayApp, trayPill as pillOf } from "./bar-parts.ts";
+
+/** The tray on a piece of the bar's glass, as the bar holds it. */
+const trayPill = (...args: Parameters<typeof pillOf>) => onGlass(pillOf(...args));
 
 type State = "rest" | "hovered" | "pressed" | "open";
 
@@ -110,9 +113,9 @@ export default page<State>({
       },
     ]),
     looks: {
-      rest: "pictures on the pill, no fill",
-      hovered: "`on_surface` at `opacity.hover` in its circle, its hint",
-      pressed: "the circle at `opacity.press`",
+      rest: "pictures flat on the glass",
+      hovered: "the edge light under the app, its hint",
+      pressed: "its picture dips; the edge light full",
       open: "our Menu on a popover `space.s12` under it",
     },
   },
@@ -132,11 +135,11 @@ export default page<State>({
     between: [
       {
         name: "Lit",
-        what: "The pointer onto a circle: its state layer fades in over `short` on `standard`.",
-        tracks: [{ part: "the state layer", on: "Network", target: ".shell-tray-item:nth-child(2)", property: "--hovered", from: 0, to: 1, duration: "short", curve: "standard" }],
+        what: "The pointer onto an app: the edge light comes in under it over `short` on `standard`.",
+        tracks: [{ part: "the edge light", on: "Network", target: ".k-edge-hover", property: "opacity", from: 0, to: 1, duration: "short", curve: "standard" }],
         reduced: "same",
         back: "plays",
-        sample: () => trayPill(),
+        sample: () => trayPill(TRAY, { index: 1, state: "hover" }),
       },
       ...powerMoves(() => opened(NETWORK)),
     ],
@@ -156,9 +159,9 @@ export default page<State>({
       { name: "Its menu", for: "the popover under the icon", sample: () => opened(NETWORK) },
     ]),
     measures: [
-      { part: "Height", token: "size-control_sm" },
+      { part: "Height", token: "size-bar_row" },
       { part: "Ends", token: "space-s4" },
-      { part: "Circle", token: "size-chip" },
+      { part: "An app's target", token: "size-chip" },
       { part: "Picture", token: "icon-s16" },
       { part: "Menu's width", token: "size-menu" },
       { part: "Icon to the menu", token: "space-s12" },

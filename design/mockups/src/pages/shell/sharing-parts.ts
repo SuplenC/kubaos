@@ -4,8 +4,8 @@
 // sees, never the stream.
 //
 // Picking is on the live desktop, no dialog and no dim: while a request waits the desktop works as
-// usual, each screen's frame holds a bar in the middle of its bottom edge (who asked, Share this
-// screen, Region, Cancel), and the window under the pointer offers a violet Share pill riding its
+// usual, each screen holds a bar on a glass card over the middle of its bottom edge (who asked,
+// Share this screen, Region, Cancel), and the window under the pointer offers a violet Share pill riding its
 // top border. Pointing at a way to share previews the very mark it keeps on air. Only drawing a
 // region dims the screen. The bar is Buttons, an IconTile, an IconButton and Tooltips from the
 // library. The desktop's windows, the window's Share pill, the on-air marks and the region's
@@ -24,7 +24,8 @@ import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
 import { button } from "../../lib/button.ts";
 import { card } from "../../lib/card.ts";
 import { chip } from "../../lib/chip.ts";
-import { focusRing, windowRing } from "../../lib/focus.ts";
+import { focusRing } from "../../lib/focus.ts";
+import { glass } from "../../lib/glass.ts";
 import { iconButton } from "../../lib/icon-button.ts";
 import { iconTile } from "../../lib/icon-tile.ts";
 import { filling, inset, row, stack } from "../../lib/layout.ts";
@@ -32,7 +33,7 @@ import { list } from "../../lib/list.ts";
 import { media } from "../../lib/media.ts";
 import { panelPage } from "../../lib/panel-page.ts";
 import { declare } from "../../lib/probe.ts";
-import { nested, role } from "../../lib/radius.ts";
+import { role } from "../../lib/radius.ts";
 import { hang, screen, sheet } from "../../lib/sheet.ts";
 import { tabs } from "../../lib/tabs.ts";
 import { length } from "../../lib/tokens.ts";
@@ -85,7 +86,7 @@ export interface Rect {
 
 /**
  * A window where it is tiled on its screen: its grid lines in the screen's tiling, as Hyprland
- * splits the room inside the frame, so it fills that room at any size of the screen with the same
+ * splits the desktop under the bar, so it fills that room at any size of the screen with the same
  * gaps ("1", or "1 / 3" to span two).
  */
 export interface Placed {
@@ -360,13 +361,23 @@ function place(element: HTMLElement, rect: Rect, room: Room): void {
 }
 
 /**
- * Makes `desk` the screen's tiling: a grid of `columns` by `rows` equal tracks in the room inside
- * the frame, `space.s8` apart and in from it, as Hyprland's gaps; each window names its lines.
+ * `count` equal tracks in whole device pixels, as a grid splits its room in the builds: each its
+ * share rounded down, the last taking what is left.
+ */
+function deskTracks(count: number): string {
+  if (count <= 1) return "minmax(0, 1fr)";
+  return `repeat(${count - 1}, round(down, calc((100% - ${count - 1} * var(--gap)) / ${count}), 1px)) minmax(0, 1fr)`;
+}
+
+/**
+ * Makes `desk` the screen's tiling: a grid of `columns` by `rows` equal tracks on the desktop under
+ * the bar, `size.gap` apart and in from the screen's edges and the bar, as Hyprland's gaps; each
+ * window names its lines.
  */
 export function tiling(desk: HTMLElement, columns: number, rows: number): HTMLElement {
   desk.className = "share-desk";
-  desk.style.setProperty("--desk-columns", String(columns));
-  desk.style.setProperty("--desk-rows", String(rows));
+  desk.style.setProperty("--desk-columns", deskTracks(columns));
+  desk.style.setProperty("--desk-rows", deskTracks(rows));
   return desk;
 }
 
@@ -384,21 +395,24 @@ export interface DeskWindowOptions extends Placed {
   readonly focused?: boolean;
   /** It is shared, or lit while picking: its border violet, its tube violet while it is focused. */
   readonly shared?: boolean;
+  /** Full screen: it is the whole screen, its corners square as the screen's. */
+  readonly full?: boolean;
 }
 
 /**
- * Draft part, proposed: an app's window on the desktop, as Hyprland draws it: `surface`, its corner
- * the frame's less its gap, its app's tile and title, its border and the tube of the window that
- * has the keyboard (`windowRing`), the window border the thin stroke wide. The Focus page draws
- * one of its own; this would be the library's, for every desktop scene.
+ * Draft part, proposed: an app's window on the desktop, on the shell's glass as `glassWindow` draws
+ * one: no border of the compositor's, the glass's edge and shadow, its corner `radius.surface`, its
+ * app's tile and title, and the lit tube of the window that has the keyboard on the glass's edge. A
+ * full-screen window lies flush with the screen's edges, keeping only the glass's shadow. This
+ * would be the library's, for every desktop scene.
  */
-/** A window's corner on the desktop: the frame's, the surface radius, less the gap round it. */
-const windowCorner = () => nested(role("surface"), "s8");
+/** A window's corner on the desktop: the surface radius. */
+const windowCorner = () => role("surface");
 
 export function deskWindow(options: DeskWindowOptions): HTMLElement {
-  const corner = windowCorner();
-  const drawn = document.createElement("span");
-  drawn.className = "share-window";
+  const corner = options.full ? { css: "0px" } : windowCorner();
+  const drawn = glass(document.createElement("span"), options.full ?? false);
+  drawn.classList.add("share-window");
   drawn.style.setProperty("--corner", corner.css);
   drawn.style.gridColumn = options.column;
   drawn.style.gridRow = options.row;
@@ -406,7 +420,7 @@ export function deskWindow(options: DeskWindowOptions): HTMLElement {
   // A window's title varies, cut with an ellipsis where it runs past the window.
   drawn.append(row("s8", "centre", tile, declare(clamped(options.title, "body_strong", "on_surface"), { variable: true })));
   const ring = focusRing(drawn, "surface", options.shared ? "sharing" : "accent", false);
-  windowRing(ring, "stroke-thin", corner.css);
+  ring.style.setProperty("--corner", corner.css);
   // The violet border, the on-air mark, is always there and shows while the window is shared
   // (`data-shared`), whether or not it has the keyboard: picking lights a window by that attribute.
   const border = document.createElement("span");
@@ -569,8 +583,8 @@ export interface MapShare {
 /**
  * Draft part, proposed: a map of the desk for a share's card. Every screen a rectangle in its real
  * place and proportions, the whole as wide as the card and no taller than `size.row_three_line`,
- * centred where it is narrower. Its corners are the real ones scaled with the map: a screen's the
- * frame's (the surface radius), a window's and a region's a window's, none under `radius.small`. A screen shared wears `sharing_line` with a faint `sharing` fill;
+ * centred where it is narrower. Its corners are the real ones scaled with the map: a screen's and a
+ * window's and a region's the surface radius, none under `radius.small`. A screen shared wears `sharing_line` with a faint `sharing` fill;
  * a window or a region is a solid `sharing` box at its real place and size, its screen outlined
  * quietly, and a window's screen carries the window's workspace in its top left corner, where the
  * bar shows it. Nothing else: no picture, no other window.
@@ -583,8 +597,7 @@ export function shareMap(desk: readonly DeskScreen[], shared: MapShare): HTMLEle
   const map = document.createElement("span");
   map.className = "share-map";
   map.style.setProperty("--map-ratio", String(wide / tall));
-  // Each corner's share of the desk's width, which the stylesheet scales by the map's own.
-  map.style.setProperty("--screen-corner", String(role("surface").px! / wide));
+  // A window's corner as a share of the desk's width, which the stylesheet scales by the map's own.
   map.style.setProperty("--window-corner", String(windowCorner().px! / wide));
   // Each box's place and size as a share of what holds it, which the CSS turns into lengths.
   const placed = (element: HTMLElement, x: number, y: number, width: number, height: number, ofWidth: number, ofHeight: number) => {
@@ -813,7 +826,8 @@ export interface PickingOptions {
 export type BarPinned = "screen" | "region" | "drawing" | "cancel";
 
 /**
- * The bar on one screen, which hangs on a Sheet in the middle of the frame's bottom edge, one row:
+ * The bar on one screen, on a detached glass card `size.gap` above the middle of its bottom edge,
+ * one row:
  * the asking app's icon, which names it in its Tooltip, then Share this screen and Region, Buttons
  * in the sharing colour, and Cancel, neutral, named in its Tooltip. Share this screen and Region
  * say what they do on their faces, so they take no Tooltip. It takes no keys: while a request
@@ -853,7 +867,7 @@ export function pickBar(
     region,
     floatingTooltip(cancel, tooltip(WORDS.cancel, ""), { side: "above" }),
   );
-  // What hangs on the bottom edge's Sheet: `space.s16` inside on every side, as the OSD's strip.
+  // What the bottom card holds: `space.s16` inside on every side, as the OSD's strip.
   const bar = inset(line, "s16", "s16");
   bar.classList.add("share-pick-bar");
   return bar;
@@ -983,7 +997,7 @@ function pickingScreen(monitor: Monitor, index: number, options: PickingOptions)
     onRegion: () => handlers.onLight?.({ kind: "region", screen: index }),
     onCancel: () => handlers.onCancel?.(),
   });
-  // The bar is part of the frame: its Sheet hangs in the middle of the bottom edge, on this screen's own frame.
+  // The bar's card stands over the middle of this screen's bottom edge.
   const barSheet = sheet({ content: bar, edge: "bottom" });
   hang(made, barSheet);
   const shut = options.arrive ? liven(barSheet, false) : undefined;

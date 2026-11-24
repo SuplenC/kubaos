@@ -8,6 +8,7 @@ import { paletteName } from "../../../site/recolour.ts";
 import { toDark, toLight } from "../../../site/sequences.ts";
 import { deeperMoves } from "../../templates/sidebar-turns.ts";
 import { APPEARANCE, appearance, defaults } from "./settings-data.ts";
+import { D, glassSteps } from "./settings-values.ts";
 import { settingsOf } from "./settings-parts.ts";
 import { landedOn, litOn, liveWindow, MINIMUM, sceneOf, seeded, settingsWindow } from "./settings-window.ts";
 
@@ -32,6 +33,11 @@ const UNBUILT: Variant[] = settingsOf(appearance(defaults()))
     return { name: `Not built: ${each.title}`, for: "no backend writes it yet", sample: screen(draw) };
   });
 
+/** The glass setting at `percent` by night, the day's at its default. */
+function glassAt(percent: number): [number, number] {
+  return [glassSteps(false).indexOf(percent), D.glass[1]];
+}
+
 const NEON = { dark: { theme: "neon", mode: "dark" as const }, light: { theme: "neon", mode: "light" as const } };
 
 export default page<Shown>({
@@ -42,7 +48,7 @@ export default page<Shown>({
   code: { unbuilt: "kubaos-settings: not built yet" },
   from: ["sidebar-page", "list", "tabs", "slider", "select", "switch", "colour-picker", "banner", "keycap", "button", "icon-button"],
   stage: {
-    live: () => liveWindow({ section: APPEARANCE }),
+    live: (mode) => liveWindow({ section: APPEARANCE, values: { drawn: mode } }),
     hint: "pick Light; hold a reset to put it back",
     daylight: true,
   },
@@ -54,6 +60,11 @@ export default page<Shown>({
     { name: "Accent from a preset", for: "Preset shows under it", sample: screen(() => settingsWindow(litOn(APPEARANCE, "preset", { accentFrom: 2 }))) },
     { name: "Seed colour, opened", for: "a sub-page: the picker", sample: screen(() => settingsWindow({ section: APPEARANCE, values: { accentFrom: 1, opened: "seed" } })) },
     { name: "Fine-tune colours, opened", for: "each role and its contrast", sample: screen(CELLS.disabled) },
+    { name: "Glass opacity", for: "the default, 80 % by night", sample: screen(() => settingsWindow(litOn(APPEARANCE, "glass"))) },
+    { name: "Glass opacity, changed", for: "90 %: the window's glass follows, Reset shows", sample: screen(() => settingsWindow(litOn(APPEARANCE, "glass", { glass: glassAt(90) }))) },
+    { name: "Glass opacity, lowest", for: "73 %: body text still 4.5 : 1 over white", sample: screen(() => settingsWindow(litOn(APPEARANCE, "glass", { glass: glassAt(73) }))) },
+    { name: "Glass opacity, solid", for: "100 %: nothing shows through; the edge stays", sample: screen(() => settingsWindow(litOn(APPEARANCE, "glass", { glass: glassAt(100) }))) },
+    { name: "Glass opacity by day", for: "the default, 90 %", sample: screen(() => settingsWindow(litOn(APPEARANCE, "glass", { drawn: "light" }))) },
     { name: "Motion & pointer", for: "speed, motion, flicker, pointer", sample: screen(at(3)) },
     { name: "Changed: Motion & pointer", for: "menu motion and pointer size reset beside them", sample: screen(() => settingsWindow({ section: APPEARANCE, sub: 3, values: seeded() })) },
     { name: "Its heading's Reset held halfway", for: "Motion & pointer's: the body half filled", sample: screen(() => settingsWindow({ section: APPEARANCE, sub: 3, values: seeded(), resets: { at: "sub:3", held: 0.5 } })) },

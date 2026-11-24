@@ -69,8 +69,9 @@ pub struct Rules {
     pub font_sizes: Vec<u16>,
     /// The display scales every length must land on whole device pixels at.
     pub scales: Vec<f32>,
-    /// Sizes allowed off the grid, as `size.<name>`: marks drawn centred on a point that moves
-    /// with a value, so their edges miss whole device pixels whatever their size.
+    /// Sizes and shadows allowed off the grid, as `size.<name>` or `shadow.<name>`: marks drawn
+    /// centred on a point that moves with a value, so their edges miss whole device pixels whatever
+    /// their size, a gap the compositor rounds itself, and blurs with no edge to land.
     #[serde(default)]
     pub off_grid: Vec<String>,
 }

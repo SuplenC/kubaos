@@ -5,10 +5,9 @@
 // one of three: behind words, a band of `surface` at `opacity.backdrop` across the screen, from
 // `space.s64` above the thing to `space.s64` below it, fading to nothing over those `space.s64`, so
 // the words keep 4.5:1 over any picture and the picture shows round them; behind a dialog or a
-// panel, `scrim` at `opacity.scrim` over all of it; and behind a flow of questions that is the
-// whole screen (Kōbō's), glass: the picture's blurred copy under `surface` at `opacity.glass`, the
-// thing filling the screen less its margin, no wider than a rail and two columns with `space.s40`
-// beside each.
+// panel, `scrim` at `opacity.scrim` over all of it; and for a flow of questions (Kōbō's), glass:
+// the thing is a card of the shell's glass (`lib/glass.ts`) over the picture's blurred copy, filling
+// the screen less its margin, no wider than a rail and two columns with `space.s40` beside each.
 //
 // The picture can come toward you, growing to `scale.push` round the middle of its bottom edge
 // (`--backdrop-push`), and it can go dark toward `surface_container_lowest` (`--backdrop-dark`):
@@ -21,6 +20,7 @@
 // `space.s32` above and below it, its parts marked as giving way (Kōbō's sign) go first.
 
 import "./backdrop.css";
+import { glass } from "./glass.ts";
 import { probe } from "./probe.ts";
 
 /** What lies over the picture: a band behind words, a dim behind a dialog or a panel, or glass. */
@@ -67,8 +67,8 @@ export function backdrop(options: BackdropOptions): HTMLElement {
   scrim.className = "k-backdrop-scrim";
   scrim.dataset.scrim = options.scrim;
   layers.append(scrim);
-  const thing = document.createElement("span");
-  thing.className = "k-backdrop-thing";
+  const thing = options.scrim === "glass" ? glass(document.createElement("span")) : document.createElement("span");
+  thing.classList.add("k-backdrop-thing");
   thing.append(options.content);
   element.append(...(options.under ? [options.under] : []), layers, thing);
 
@@ -91,7 +91,6 @@ interface Read {
   readonly wide: boolean;
   readonly thingWidth: number;
   readonly thingHeight: number;
-  readonly thingLeft: number;
 }
 
 function read(element: HTMLElement, thing: HTMLElement): Read {
@@ -101,12 +100,11 @@ function read(element: HTMLElement, thing: HTMLElement): Read {
     width: element.clientWidth,
     height: element.clientHeight,
     room: element.clientHeight - 2 * lengthIn(element, "space-s32"),
-    // A glass panel is `space.s32` in from the screen's edges where the screen holds two columns
+    // The questions' card is `space.s32` in from the screen's edges where the screen holds two columns
     // side by side, and `space.s16` on a narrower one, as Kōbō's is.
     wide: element.clientWidth >= 2 * lengthIn(element, "size-column"),
     thingWidth: thing.offsetWidth,
     thingHeight: thing.offsetHeight,
-    thingLeft: thing.offsetLeft,
   };
 }
 
@@ -132,9 +130,6 @@ function write(measured: Read): void {
   element.style.setProperty("--thing-x", `${Math.floor((shown.width - shown.thingWidth) / 2)}px`);
   element.style.setProperty("--thing-y", `${Math.floor((shown.height - shown.thingHeight) / 2)}px`);
   element.style.setProperty("--thing-height", `${shown.thingHeight}px`);
-  // A glass panel's blurred picture lies where the screen's does, so it is moved back by the
-  // panel's own place.
-  element.style.setProperty("--panel-left", `${shown.thingLeft}px`);
 }
 
 /**
@@ -175,24 +170,4 @@ function lengthIn(element: HTMLElement, name: string): number {
 export function givesWay<E extends HTMLElement>(part: E): E {
   part.dataset.givesWay = "";
   return part;
-}
-
-/**
- * A glass panel over the backdrop, as Kōbō's step-rail screens hold theirs: its own blurred copy
- * of the picture under `surface` at `opacity.glass`, at the surface radius, a soft hairline inside
- * its edge, casting `shadow.panel`; `space.s32` in from the screen's edges, `space.s16` on a narrow
- * one, and no wider than a rail and two columns with `space.s40` beside each.
- */
-export function glassPanel(blurred: string, ...content: Element[]): HTMLElement {
-  const panel = document.createElement("span");
-  panel.className = "k-glass-panel";
-  const picture = document.createElement("img");
-  picture.className = "k-glass-picture";
-  picture.src = blurred;
-  picture.alt = "";
-  const glass = document.createElement("span");
-  glass.className = "k-glass-body k-sunken";
-  glass.append(...content);
-  panel.append(picture, glass);
-  return panel;
 }

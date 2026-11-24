@@ -19,13 +19,12 @@ import wallpaper from "../../../../../crates/kubaos-kobo/assets/wallpaper.jpg?ur
 import blurred from "../../../../../crates/kubaos-kobo/assets/wallpaper-blur.jpg?url";
 import markSvg from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-mark.svg?raw";
 import wordmark from "../../../../../crates/kubaos-kobo/assets/logo/kubaos-wordmark.svg?raw";
-import { backdrop, glassPanel } from "../../lib/backdrop.ts";
+import { backdrop } from "../../lib/backdrop.ts";
+import { glassWindow } from "../../lib/glass.ts";
 import { button } from "../../lib/button.ts";
-import { focusRing, windowRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
 import type { KeyHint } from "../../lib/keycap.ts";
 import { gap, row, stack } from "../../lib/layout.ts";
-import { nested, role } from "../../lib/radius.ts";
 import { spinner } from "../../lib/spinner.ts";
 import { koboBrand, RECHECK, stepRailPage } from "../../lib/step-rail.ts";
 import { text, wrapped } from "../../lib/text.ts";
@@ -233,28 +232,19 @@ function firstCard(views: Views): CardId {
   return CARD_IDS.find((id) => open(CARDS[id].views[views[id]]!)) ?? CARD_IDS.find((id) => CARDS[id].views[views[id]]!.state !== "absent") ?? "yours";
 }
 
-/** How far the window lies from the screen's edges: Hyprland centres it. */
-const AWAY = { left: "calc((1280 - 1024) / 2 * var(--px))", top: "calc((800 - 680) / 2 * var(--px))" };
-
 /**
- * A card opened alone: a window on the desktop, Kōbō's glass panel at the window's size and corner,
- * the wallpaper's blurred copy lying where the wallpaper lies under it, its tube lit as the active
- * window's, as `config/hypr/looks.lua` and `focus.lua` draw it.
+ * A card opened alone: a window on the desktop, the shell's glass window (`lib/glass.ts`) at the
+ * window's size, its tube lit as the active window's.
  */
 function windowBox(): { win: HTMLElement; body: HTMLElement } {
-  const win = document.createElement("span");
-  win.className = "setup-window";
+  const win = glassWindow(document.createElement("span"), true);
+  win.classList.add("setup-window");
   win.style.setProperty("--setup-window-width", WINDOW.width);
   win.style.setProperty("--setup-window-height", WINDOW.height);
-  win.style.setProperty("--panel-left", AWAY.left);
-  win.style.setProperty("--panel-margin", AWAY.top);
-  const corner = nested(role("surface"), "s8");
-  win.style.setProperty("--corner", corner.css);
-  const glass = glassPanel(blurred);
-  win.append(glass);
-  windowRing(focusRing(win, "surface", "accent", false), "stroke-thin", corner.css);
-  win.dataset.pinned = "lit";
-  return { win, body: glass.querySelector<HTMLElement>(".k-glass-body")! };
+  const body = document.createElement("span");
+  body.className = "setup-window-body";
+  win.append(body);
+  return { win, body };
 }
 
 export function setupRoom(options: SetupOptions): HTMLElement {

@@ -6,8 +6,8 @@
 // its open list is the same at both sizes. It is a control in the state model (`.k-control` in
 // `lib.css`), lit as a field is.
 //
-// Open, the select's own box grows into its list: one surface raised to the ladder's step 2, the
-// value row where it was and the options under it, past a faint rule, or over it where the room
+// Open, the select's own box grows into its list: one surface turning to the shell's glass
+// (`lib/glass.ts`) on the ladder's step 2, the value row where it was and the options under it, past a faint rule, or over it where the room
 // below is too short. Its options are menu items (`lib/menu.ts`), at most eight in view before the
 // list scrolls. The keyboard stays on the select throughout: it moves the highlight in the list,
 // and Tab goes on from the select as from any control.
@@ -23,20 +23,20 @@
 // no box, the pick in `small` and `on_surface_variant` with a `small` chevron `space.s4` after it.
 // Under the pointer or the keyboard only the words and the chevron turn `primary_lit`, a lit Text
 // button's words, with no tube and no fill. Open, the chevron turns up and its list is a Menu built
-// in, on a popover raised to step 2 `space.s4` under the words (over them where the room below is
+// in, on a glass popover on step 2 `space.s4` under the words (over them where the room below is
 // too short), its options' words in line with the pick's; it fades in over `short` and out over
 // `micro`, as a popover does.
 //
-// A live select, open or folding, stands in the browser's top layer, over its room: a raised
+// A live select, open or folding, stands in the browser's top layer, over its room: a higher
 // stacking order counts only among its neighbours, so a later row that stacks on its own (a
 // slider's) would paint over the list, and a scrolling pane or a stage would cut it. It is placed
 // from its room's drawn box every frame it is up, at the room's scale, not by a CSS anchor, which
 // leaves out a scaled stage's transform and a moving page's.
 
 import { pin, type Pinned } from "./control.ts";
-import { raise } from "./elevation.ts";
 import { type ControlSize, VALUE_TYPE } from "./field.ts";
 import { focusRing } from "./focus.ts";
+import { glassRising } from "./glass.ts";
 import { icon } from "./icon.ts";
 import { filling, row } from "./layout.ts";
 import { menuItem } from "./menu.ts";
@@ -106,7 +106,7 @@ export function select(options: SelectOptions): HTMLElement {
   const iconOf = (index: number): string | undefined => options.icons?.[index] ?? options.icon;
   const hasIcon = Boolean(options.icons ?? options.icon);
 
-  const surface = inline ? document.createElement("span") : raise(document.createElement("span"), 2);
+  const surface = inline ? document.createElement("span") : glassRising(document.createElement("span"));
   surface.classList.add(...(inline ? ["k-select-inline"] : ["k-select", "k-sunken"]), "k-control");
   surface.setAttribute("role", "combobox");
   surface.setAttribute("aria-haspopup", "listbox");

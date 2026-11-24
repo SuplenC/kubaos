@@ -1,8 +1,8 @@
 // Picking what to share: the system's share prompt, which an app's request to share opens in place
 // of the portal's own. No dialog, no dim: while the request waits the desktop works as usual, focus
-// following the pointer, and a click on a window shares nothing. Each screen's frame grows a bar out of the middle
-// of its bottom edge (who asked, Share this screen, Region, Cancel), on the Sheet the shell's
-// attached surfaces use, the standing sign that a request waits. The window under the pointer
+// following the pointer, and a click on a window shares nothing. Each screen shows a bar over the
+// middle of its bottom edge (who asked, Share this screen, Region, Cancel), on a detached glass
+// card, a Sheet, the standing sign that a request waits. The window under the pointer
 // offers a violet Share pill riding its top border. Pointing at a way to share previews the mark
 // it keeps on air. Region alone is modal: it dims the screen for drawing. Its parts are
 // `sharing-parts.ts`'.
@@ -98,7 +98,7 @@ function livePicking(monitors: readonly Monitor[]): HTMLElement {
     if (!ALL) playShared(shown);
   };
 
-  // Cancelled, each bar sinks back into its edge, as the Sheet leaves, before the desktop is left as it was.
+  // Cancelled, each bar's card sinks and fades, as a Sheet leaves, before the desktop is left as it was.
   const cancel = () => {
     const leaving = picker;
     if (!leaving || ALL) return settled(picking({ monitors, phase: "shared", focused }));
@@ -137,7 +137,7 @@ const BARS = "the bars";
 /** The bars' Sheets: their depth, as every attached surface moves; under reduced motion, a fade. */
 const SHEETS = ".k-sheet-part";
 
-/** The bars rising out of their edges, or sinking back into them. */
+/** The bars' cards rising into place above the bottom edge, or sinking and fading. */
 function bars(on: boolean, reduced: boolean): NonEmpty<Track<Easing>> {
   const duration = reduced ? "short" : on ? "long" : "medium";
   const curve = on ? "emphasized_decel" : "emphasized_accel";
@@ -255,7 +255,7 @@ export default page<Shown>({
       { name: "Region", cell: (state: Shown) => (state === "pressed" ? one({ lit: { kind: "region", screen: 0, rect: REGION } }) : one(state === "lit" ? { barPointed: "region" } : {})) },
     ],
     looks: {
-      rest: "waiting: the desktop as usual, the bar out of its edge",
+      rest: "waiting: the desktop as usual, the bar's card up",
       lit: "pointed at: the pill shows, a line previews, twins show",
       pressed: "a share starts; Region draws; a region moves",
     },
@@ -291,7 +291,7 @@ export default page<Shown>({
   },
   motion: {
     arrives: [
-      { name: "Asked", what: "An app asks: each bar rises out of its screen's bottom edge; nothing dims.", tracks: bars(true, false), reduced: bars(true, true), back: "cuts", sample: screen(() => both()) },
+      { name: "Asked", what: "An app asks: each bar's card rises over its screen's bottom edge; nothing dims.", tracks: bars(true, false), reduced: bars(true, true), back: "cuts", sample: screen(() => both()) },
       {
         name: "Drawing a region",
         what: "Region: the screen's dim fades in over `short`, the one modal moment; letting go of the box shares it.",
@@ -301,7 +301,7 @@ export default page<Shown>({
         sample: screen(() => one({ lit: { kind: "region", screen: 0 } })),
       },
     ],
-    leaves: [{ name: "Cancelled", what: "×: each bar sinks back into its edge.", tracks: bars(false, false), reduced: bars(false, true), back: "cuts", sample: screen(() => both()) }, SHARED],
+    leaves: [{ name: "Cancelled", what: "×: each bar's card sinks and fades.", tracks: bars(false, false), reduced: bars(false, true), back: "cuts", sample: screen(() => both()) }, SHARED],
     between: [
       {
         name: "A window's pill",
@@ -359,8 +359,8 @@ export default page<Shown>({
       { name: "A shared region, near its line", for: "the band, the twin arcs, the corner", sample: screen(() => regionShared("near")) },
     ]),
     measures: [
-      { part: "Bar's padding, on its Sheet", token: "space-s16" },
-      { part: "Sheet's fillets into the edge", token: "radius-surface" },
+      { part: "Bar's padding, on its card", token: "space-s16" },
+      { part: "Card above the bottom", token: "size-gap" },
       { part: "Between the bar's parts", token: "space-s8" },
       { part: "Who asked, its tile", token: "size-control_sm" },
       { part: "Buttons", token: "size-control_sm" },

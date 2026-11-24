@@ -21,16 +21,15 @@
   initial-value: 0;
 }
 
-/* The Command menu's panel: the frame's glass, which Hyprland blurs behind, in the soft hairline. */
+/* The Command menu's panel: the shell's glass (`glass.css`) at a card's corner, `radius.surface`,
+   `space.s16` inside. */
 .k-command {
   position: relative;
   display: flex;
   box-sizing: border-box;
-  padding: var(--space-s12);
+  padding: var(--space-s16);
   border-radius: var(--radius-surface);
   outline: none;
-  background: rgb(from var(--color-surface) r g b / var(--opacity-frame));
-  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) rgb(from var(--color-outline_variant) r g b / var(--opacity-outline_soft));
   translate: 0 calc(round(nearest, var(--menu-drop) * var(--space-s8), 1px) * -1);
 }
 
@@ -55,17 +54,20 @@
 .k-menu-rule > .k-divider {
   position: absolute;
   top: 0;
-  inset-inline: calc(-1 * var(--space-s12));
+  inset-inline: calc(-1 * var(--space-s16));
 }
 
 .k-menu-footer {
   height: var(--size-control_sm);
 }
 
-/* The pane: a card as tall as the body, both contents filling it and crossfading in place. */
+/* The pane: a card as tall as the body, both contents filling it and crossfading in place. Its
+   padding is the list's beside it, `space.s12` at every side, so the two boxes hold their content
+   alike. */
 .k-menu-pane {
   flex: none;
   align-self: stretch;
+  padding: var(--space-s12);
 }
 
 .k-menu-pane > .k-card-content,
@@ -102,7 +104,8 @@
   justify-content: center;
 }
 
-/* A screen the menu opens on, its panel placed by script. */
+/* A screen the menu opens on, over the desktop's wallpaper where it is given, its panel placed by
+   script. */
 .k-menu-screen {
   position: relative;
   display: block;
@@ -110,6 +113,14 @@
   height: 100%;
   overflow: hidden;
   background: var(--color-surface_container_lowest);
+}
+
+.k-menu-wallpaper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .k-menu-screen > .k-command {
@@ -215,8 +226,8 @@
    panel's padding: the Action panel at the right, a Toast centred. */
 .k-menu-over {
   position: absolute;
-  inset-inline: var(--space-s12);
-  bottom: calc(var(--space-s12) * 3 + var(--size-control_sm));
+  inset-inline: var(--space-s16);
+  bottom: calc(var(--space-s16) + var(--space-s12) * 2 + var(--size-control_sm));
   display: flex;
   flex-direction: column;
   align-items: flex-end;

@@ -19,14 +19,12 @@ const ON = "the notifications panel";
 
 const OPENING: Move = {
   name: "Opening",
-  what: "The bell or its key: the sheet grows out of the right edge, the popups leave, the desktop dims.",
+  what: "The bell or its key: the card comes down under it, the popups leave.",
   tracks: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 0, to: 1, duration: "long", curve: "emphasized_decel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 0, to: 1, duration: "short", curve: "emphasized_decel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 0, to: 1, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => panelOnScreen(),
@@ -37,11 +35,9 @@ const CLOSING: Move = {
   what: "Esc, a press outside or the bell: everything shown is marked read as the sheet goes back.",
   tracks: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "--reveal", from: 1, to: 0, duration: "medium", curve: "emphasized_accel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "medium", curve: "standard" },
   ],
   reduced: [
     { part: "the sheet", on: ON, target: ".k-sheet-part", property: "opacity", from: 1, to: 0, duration: "short", curve: "emphasized_accel" },
-    { part: "the desktop's dim", on: ON, target: ".k-screen-dim", property: "--panel-dim", from: 1, to: 0, duration: "short", curve: "standard" },
   ],
   back: "cuts",
   sample: () => panelOnScreen(),
@@ -81,7 +77,7 @@ export default page<Shown>({
   level: "shell",
   slug: "notifications-panel",
   title: "Notifications panel",
-  lede: "Every notification, New then Earlier, one app's in a group, out of the frame's right edge.",
+  lede: "Every notification, New then Earlier, one app's in a group, on a card under the bell.",
   code: { qml: "NotificationPanel" },
   stage: {
     live,
@@ -98,7 +94,7 @@ export default page<Shown>({
     { name: "Do not disturb's card", for: "floats under its button: what turns it on", sample: () => panelOnScreen({ dndTip: true }) },
     { name: "A card's menu", for: "right-click: actions, Open, Dismiss, Clear all", sample: () => cornerOnScreen(noteMenu(BUILD, 0)) },
   ],
-  sizes: doesntApply("`size.panel` wide, from the bar to the frame's foot."),
+  sizes: doesntApply("`size.panel` wide, down to `size.gap` above the screen's foot."),
   states: {
     shown: ["rest", "lit", "open", "empty"],
     absent: {
@@ -160,7 +156,7 @@ export default page<Shown>({
       { part: "Keys from the corner", token: "space-s16" },
     ],
     reflow: {
-      note: "It keeps `size.panel` and runs from the bar to the frame's foot; the list scrolls.",
+      note: "It keeps `size.panel` and runs down to `size.gap` above the screen's foot; the list scrolls.",
       sample: () => {
         const size = windowSize();
         return panelOnScreen({}, size.height);

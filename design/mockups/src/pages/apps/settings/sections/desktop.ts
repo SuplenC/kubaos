@@ -11,6 +11,10 @@ import { choice, opens, pick, stops, toggle } from "./kit.ts";
 const GAPS = ["None", "4 px", "8 px", "16 px"] as const;
 const SPLITS = ["Right or below", "Toward the pointer", "Left or above"] as const;
 const STYLES = ["Numbers", "Bars", "Graphs"] as const;
+const LAYOUTS = ["Bar", "Floating", "Islands"] as const;
+/** The workspaces' marks in the setting's order; the shell's default is Dot and dash. */
+const MARKS = ["Numbers", "Dots", "Dashes", "Dot and dash"] as const;
+const NUMBERS = 0;
 const HOT = Array.from({ length: 7 }, (_, i) => `${70 + i * 5} °C`);
 const MEMORY = Array.from({ length: 6 }, (_, i) => `${70 + i * 5} %`);
 const DISK = ["80 %", "85 %", "90 %", "95 %", "98 %"];
@@ -66,10 +70,12 @@ interface Desk {
   split: number;
   followMouse: boolean;
   resizeByEdges: boolean;
-  glass: boolean;
   takeFocus: boolean;
   whereLaunched: boolean;
+  marks: number;
   kanji: number;
+  onlyCurrent: boolean;
+  layout: number;
   pill: boolean;
   readings: readonly Reading[];
   style: number;
@@ -96,14 +102,16 @@ interface Desk {
 
 /** KubaOS's defaults: what every reset puts back. */
 const DEFAULTS: Desk = {
-  gaps: 2,
+  gaps: 1,
   split: 0,
   followMouse: true,
   resizeByEdges: true,
-  glass: true,
   takeFocus: true,
   whereLaunched: true,
+  marks: MARKS.indexOf("Dot and dash"),
   kanji: 0,
+  onlyCurrent: false,
+  layout: 0,
   pill: true,
   readings: READINGS,
   style: 0,
@@ -243,13 +251,12 @@ export function desktop(values: Values): SettingsSection {
         body: "How they tile, and which one takes the keys.",
         wells: [
           [
-            choice("gaps", "Space between windows", "The air between tiled windows. The frame keeps its own.", GAPS, () => desk.gaps, (index) => (desk.gaps = index), { initial: () => DEFAULTS.gaps }),
+            choice("gaps", "Space between windows", "The air between tiled windows, the bar and the screen's edges.", GAPS, () => desk.gaps, (index) => (desk.gaps = index), { initial: () => DEFAULTS.gaps }),
             pick("split", "New windows open", "Where a new window goes, beside the one you're in.", SPLITS, () => desk.split, (index) => (desk.split = index), { initial: () => DEFAULTS.split }),
             toggle("follow-mouse", "Focus follows the pointer", "The window under the pointer takes the keys. Off, a click does.", () => desk.followMouse, (on) => (desk.followMouse = on), { initial: () => DEFAULTS.followMouse }),
             toggle("resize-edges", "Resize by the edges", "Drag a window's edge or corner to resize it.", () => desk.resizeByEdges, (on) => (desk.resizeByEdges = on), { initial: () => DEFAULTS.resizeByEdges }),
           ],
           [
-            toggle("glass", "Frosted glass", "Blurs what's behind the frame, panels and see-through terminals. Off saves power.", () => desk.glass, (on) => (desk.glass = on), { initial: () => DEFAULTS.glass }),
             toggle("take-focus", "Apps may come forward", "An app that asks for you takes the keys, its workspace shown.", () => desk.takeFocus, (on) => (desk.takeFocus = on), { initial: () => DEFAULTS.takeFocus }),
           ],
         ],
@@ -261,7 +268,9 @@ export function desktop(values: Values): SettingsSection {
           [
             opens("groups", "Workspace groups", "Pin a screen, and its workspaces follow it to any desk.", "groups", () => pinnedWords(Object.values(desk.pins).filter((group) => group !== 0).length), { drives: true }),
             toggle("where-launched", "Open where launched", "A slow app still opens on the workspace you started it from.", () => desk.whereLaunched, (on) => (desk.whereLaunched = on), { initial: () => DEFAULTS.whereLaunched }),
-            choice("kanji", "Workspace numbers", "How the bar writes them.", ["1 2 3", "一 二 三"], () => desk.kanji, (index) => (desk.kanji = index), { initial: () => DEFAULTS.kanji, unbuilt: true }),
+            pick("marks", "Workspace marks", "How the bar marks each workspace, and the one you're on.", MARKS, () => desk.marks, (index) => (desk.marks = index), { initial: () => DEFAULTS.marks, drives: true, unbuilt: true }),
+            choice("kanji", "Numbers in", "Digits, or kanji numerals.", ["1 2 3", "一 二 三"], () => desk.kanji, (index) => (desk.kanji = index), { initial: () => DEFAULTS.kanji, shows: () => desk.marks === NUMBERS, unbuilt: true }),
+            toggle("only-current", "Only the current one", "The other numbers show while the pointer is on them.", () => desk.onlyCurrent, (on) => (desk.onlyCurrent = on), { initial: () => DEFAULTS.onlyCurrent, shows: () => desk.marks === NUMBERS, unbuilt: true }),
           ],
         ],
       },
@@ -269,6 +278,9 @@ export function desktop(values: Values): SettingsSection {
         title: "Bar",
         body: "What sits along the top, beside the clock.",
         wells: [
+          [
+            choice("bar-layout", "Layout", "A band along the top, one floating strip, or islands.", LAYOUTS, () => desk.layout, (index) => (desk.layout = index), { initial: () => DEFAULTS.layout, unbuilt: true }),
+          ],
           [
             toggle("pill", "System monitor", "Small readings in the bar; a click opens the monitor.", () => desk.pill, (on) => (desk.pill = on), { drives: true, initial: () => DEFAULTS.pill }),
             opens("readings", "Readings", "Which it shows, in what order, and how they're drawn.", "readings", () => `${desk.readings.filter((each) => each.on).length} of ${desk.readings.length}`, { shows: () => desk.pill, drives: true }),

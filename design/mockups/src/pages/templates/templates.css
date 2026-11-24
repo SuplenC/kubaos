@@ -11,14 +11,12 @@
   padding-bottom: var(--space-s8);
 }
 
+/* An app's window: the glass's window (`glassWindow` in `lib/glass.ts`), active. */
 .t-window {
   box-sizing: border-box;
   display: flex;
   flex: none;
-  margin: var(--stroke-hairline_device_px);
-  border-radius: var(--radius-surface);
-  box-shadow: 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
-  overflow: hidden;
+  margin: var(--focus-far);
 }
 
 .t-window[data-resizes] {
