@@ -427,6 +427,7 @@ Each component has a page of its own under `design/components/`: its constructor
 
 - [Layout](design/components/layout.md): `Page`, `Container`, `Header`, `Section`, `Stack`, `Row`, `Grid`, `Split`, `Divider`, `Fill`, `Gap`, `Flow`
 - [Scroll and HeaderFade](design/components/scroll.md)
+- [Beside](design/components/beside.md)
 
 **Buttons**
 
@@ -480,6 +481,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [NotificationCard and NotificationPopup](design/components/notification-card.md)
 - [NotificationGroup](design/components/notification-group.md)
 - [Media](design/components/media.md)
+- [CameraPreview](design/components/camera-preview.md)
 - [PictureChoice](design/components/picture-choice.md)
 - [DepthPicture](design/components/depth-picture.md)
 - [WeatherSky, HomeWeatherCard, WeatherBanner, CityCard and CityRow](design/components/weather-sky.md)
@@ -651,6 +653,7 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 
 - **Every setting is a Command menu Item**, and is written to the User layer, so it can be found, changed and kept like any other. A feature ships with its Items (`CLAUDE.md`).
 - **Settings holds the system's settings, never an app's own.** What changes how the system behaves is in the Settings app; what changes how one app behaves stays in that app, in its own settings, so no kind of setting is ever half in one place and half in the other. The test for a row: does it change how the system behaves, or how one app behaves? A row about an app belongs in Settings only when what it sets is the system's behaviour toward that app: notifications are the system's, so each app's notification rules are in Settings › Notifications, as starting on login, default apps, where the system's proxy reaches and what an app may do are.
+- **A setting's row** is a two-line `ListRow` ending in its control, `size.row_two_line` tall at least: its line wraps under its name where one line would cut it, and the row grows to hold it. A control that needs more than a switch (a choice, a slider, a select, a field) is `size.menu` (240) wide at the row's end, so a page's controls line up. Its reset, a held Text sm `IconButton`, sits right beside its control while the value differs from its default, its room kept when it is gone so the control never moves. A well of rows lays them out by its own width, all at once: from `size.settings_row_one_line` (548) every row is on one line, the words beside the control; under it every row with a wide control stacks, its name and its reset on the first line, its line `space.s4` under it and its control `space.s8` under that, still at the row's end, or across the row in a well `size.settings_row_full` (360) wide or narrower. A row with a switch, a fact or a chevron never stacks, and no control ever shrinks. The rows are `space.s4` apart in a well on one line and `space.s8` apart in a stacked one. Its mockup page is Apps, Settings: Row.
 - **A Settings app**, on `kubaos-ui`, groups them: Appearance, Displays, Keyboard, Phone, Updates and the rest. *Not enforced yet:* there is no Settings app (#269).
 
 ## Terminals, boot and the rest

@@ -138,6 +138,7 @@ export default page<Shown>({
     { name: "The clock's Items", for: "wea: the weather's, each its answer at the row's end", sample: () => panel({ query: "wea", results: results("wea") }) },
     { name: "A setting's Item", for: "glass: its value the answer, back to the default an Action", sample: () => panel({ query: "glass", results: results("glass") }) },
     { name: "Workspace marks Item", for: "marks: the workspaces' marks, its value the answer", sample: () => panel({ query: "marks", results: results("marks") }) },
+    { name: "Camera's Items", for: "camera: its page, then each setting, its value the answer", sample: () => panel({ query: "camera", results: results("camera") }) },
   ],
   sizes: [
     { name: "Full HD", for: "half the screen, 9 rows, the pane", sample: () => panel({ screen: "full" }) },

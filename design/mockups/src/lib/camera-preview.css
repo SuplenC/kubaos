@@ -1,0 +1,41 @@
+/* A camera's live picture (`lib/camera-preview.ts`): as wide as its room, `aspect.camera` of it tall
+   down to the grid, as `Media` is. */
+.k-preview {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  align-self: stretch;
+  container-type: inline-size;
+}
+
+/* Another app has the camera: the same box, the well's sunken fill and soft hairline, its words
+   centred in it. Their height is the symbol, the gap and a line, so the room above them is worked
+   out here and rounded to whole device pixels, where centring would leave half of one. */
+.k-preview-busy {
+  --busy-height: round(down, calc(100cqw / (var(--aspect))), var(--grid));
+  --busy-content: calc(var(--icon-s32) + var(--space-s12) + var(--type-subheading-line));
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100cqw;
+  height: var(--busy-height);
+  padding-top: max(0px, round(down, calc((var(--busy-height) - var(--busy-content)) / 2), 1px));
+  padding-inline: var(--space-s16);
+  border-radius: var(--radius-content);
+  background: rgb(from var(--color-surface_container_low) r g b / var(--opacity-well));
+}
+
+.k-preview-edge {
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--sunken-line);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.k-preview-busy > .k-stack {
+  min-width: 0;
+  max-width: 100%;
+}

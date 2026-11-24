@@ -150,6 +150,27 @@ const LOOK_ITEMS: readonly Item[] = [
   settingItem("Workspace marks", "Settings › Desktop › Workspaces · numbers, dots or dashes", "computer", ["workspaces", "numbers", "kanji", "dots", "dashes"], () => "Dot and dash", () => "Dot and dash"),
 ];
 
+/**
+ * A camera setting's Item: Settings › Camera and a few words on it, short enough to show whole in
+ * the narrowest menu; its value the built-in camera's own default.
+ */
+const cameraItem = (title: string, what: string, keywords: readonly string[], value: string) =>
+  settingItem(title, `Settings › Camera · ${what}`, "video", ["camera", "webcam", ...keywords], () => value, () => value);
+
+/** Camera's Items: the page, then each of its settings, found by “camera” or the setting's own words. */
+const CAMERA_ITEMS: readonly Item[] = [
+  { title: "Settings: Camera", subtitle: "The picture: light, sharpness, colour", extension: "kubaos", symbol: "video", keywords: ["camera", "webcam", "picture"], actions: [{ title: "Open in Settings", keys: "↵" }] },
+  cameraItem("Light behind you", "face against a window", ["backlight", "compensation"], "Off"),
+  cameraItem("Sharpness", "crisper or softer", ["sharp", "soft", "focus"], "4"),
+  cameraItem("Automatic colour", "colour of the room", ["white balance", "auto"], "On"),
+  cameraItem("Colour temperature", "warmer or cooler", ["white balance", "kelvin"], "4600 K"),
+  cameraItem("Automatic exposure", "follows the room", ["exposure", "auto"], "On"),
+  cameraItem("Exposure time", "brighter or less blur", ["exposure", "shutter"], "1/60 s"),
+  cameraItem("Brighter in dim light", "fewer frames when dark", ["exposure priority", "dark"], "Off"),
+  cameraItem("Boost", "brighter, with grain", ["gain", "brightness"], "0 %"),
+  cameraItem("Room light flicker", "no stripes from lamps", ["power line", "frequency", "50 hz", "60 hz", "anti-flicker"], "50 Hz"),
+];
+
 /** The shots' Items, in the Daemon's order. */
 export const ITEMS: readonly Item[] = [
   { title: "Files", subtitle: "Access and organize files", extension: "apps", picture: plate },
@@ -168,6 +189,7 @@ export const ITEMS: readonly Item[] = [
   { title: "Design specimen", subtitle: "Every token and component, live", extension: "kubaos" },
   ...CLOCK_ITEMS,
   ...LOOK_ITEMS,
+  ...CAMERA_ITEMS,
 ];
 
 /** What the Action panel lists for every shot Result: the Item's own, then two Contributed. */

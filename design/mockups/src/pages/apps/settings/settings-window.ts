@@ -33,7 +33,8 @@ export interface Size {
 
 export const MINIMUM: Size = { width: "var(--size-app_min_width)", height: "var(--size-app_min_height)" };
 export const DEFAULT: Size = { width: "var(--size-app_width)", height: "var(--size-app_height)" };
-/** A laptop's screen and a 1080p one: the screens' sizes, not design values. */
+/** A window on a desktop, a laptop's screen and a 1080p one: the screens' sizes, not design values. */
+export const DESKTOP: Size = { width: "calc(1400 * var(--px))", height: "calc(900 * var(--px))" };
 export const LAPTOP: Size = { width: "calc(1280 * var(--px))", height: "calc(800 * var(--px))" };
 export const FULL_HD: Size = { width: "calc(1920 * var(--px))", height: "calc(1080 * var(--px))" };
 

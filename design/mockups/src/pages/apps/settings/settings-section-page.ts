@@ -33,6 +33,8 @@ export interface SectionPageSpec {
   readonly from?: readonly string[];
   /** The section's own measures, beside every section's. */
   readonly measures?: readonly { readonly part: string; readonly token: string }[];
+  /** Window sizes past the minimum and the default, where the section lays out differently in them. */
+  readonly sizes?: readonly Variant[];
 }
 
 /** The window on `index`'s section with `values`, still, at the default size or `size`. */
@@ -65,8 +67,9 @@ export function sectionPage(spec: SectionPageSpec): ReturnType<typeof page> {
     stage: { live: () => liveWindow({ section: spec.index, values: spec.seed }), hint: spec.hint, daylight: true },
     variants: nonEmpty([...subs, ...pages, ...spec.variants, ...unbuilt]),
     sizes: [
-      { name: "Minimum", for: "720 × 480: a name too long stacks its control", sample: screen(() => settingsWindow({ section: spec.index, values: spec.seed }, MINIMUM)) },
+      { name: "Minimum", for: "720 × 480: the wide rows stack their controls", sample: screen(() => settingsWindow({ section: spec.index, values: spec.seed }, MINIMUM)) },
       { name: "Default", for: "1120 × 720", sample: screen(rest) },
+      ...(spec.sizes ?? []),
     ],
     states: {
       shown: ["rest", "selected"],

@@ -313,8 +313,9 @@
 }
 
 /* A section's page reads in a column `size.canvas_wide` wide at most, at its start: on a wide
-   screen a name and its control stay a glance apart. Home has a column of its own. */
-.k-sp-pane:not([data-home]) .k-sp-rise > .k-page > * {
+   screen a name and its control stay a glance apart. Home has a column of its own, and a wide
+   section holds its rows to a width of its own beside a picture. */
+.k-sp-pane:not([data-home], [data-wide]) .k-sp-rise > .k-page > * {
   max-width: var(--size-canvas_wide);
 }
 

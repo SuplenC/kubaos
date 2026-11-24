@@ -1,4 +1,4 @@
-// What the Settings window holds: its thirteen sections, each in a file of its own under `sections/`,
+// What the Settings window holds: its fourteen sections, each in a file of its own under `sections/`,
 // assembled here in the sidebar's order.
 
 import type { Outline } from "../../../lib/sidebar-page.ts";
@@ -7,6 +7,7 @@ import type { Values } from "./settings-values.ts";
 import { about } from "./sections/about.ts";
 import { appearance } from "./sections/appearance.ts";
 import { apps } from "./sections/apps.ts";
+import { camera } from "./sections/camera.ts";
 import { dateTime } from "./sections/date-time.ts";
 import { desktop } from "./sections/desktop.ts";
 import { displays } from "./sections/displays.ts";
@@ -24,27 +25,28 @@ export { power } from "./sections/power.ts";
 export { defaults, type Values } from "./settings-values.ts";
 
 /** The sections, in the sidebar's order. */
-export const SECTIONS = ["About", "Appearance", "Displays", "Desktop", "Keyboard", "Mouse & touchpad", "Power", "Notifications", "Proxy", "Network", "Phone", "Date & time", "Apps"] as const;
+export const SECTIONS = ["About", "Appearance", "Displays", "Desktop", "Keyboard", "Mouse & touchpad", "Camera", "Power", "Notifications", "Proxy", "Network", "Phone", "Date & time", "Apps"] as const;
 export const ABOUT = 0;
 export const APPEARANCE = 1;
 export const DISPLAYS = 2;
 export const DESKTOP = 3;
 export const KEYBOARD = 4;
 export const MOUSE = 5;
-export const POWER = 6;
-export const NOTIFICATIONS = 7;
-export const PROXY = 8;
-export const NETWORK = 9;
-export const PHONE = 10;
-export const DATE_TIME = 11;
-export const APPS = 12;
+export const CAMERA = 6;
+export const POWER = 7;
+export const NOTIFICATIONS = 8;
+export const PROXY = 9;
+export const NETWORK = 10;
+export const PHONE = 11;
+export const DATE_TIME = 12;
+export const APPS = 13;
 
 /** Each section's data, drawn from a window's values, in the sidebar's order. */
-const ORDER: readonly ((values: Values) => SettingsSection)[] = [about, appearance, displays, desktop, keyboard, mouse, power, notifications, proxy, network, phone, dateTime, apps].map(
+const ORDER: readonly ((values: Values) => SettingsSection)[] = [about, appearance, displays, desktop, keyboard, mouse, camera, power, notifications, proxy, network, phone, dateTime, apps].map(
   (section, index) => (values: Values) => withTips(section(values), TIPS[index]),
 );
 
-/** The window's outline: Home, then the thirteen sections, each reading `values`. */
+/** The window's outline: Home, then the fourteen sections, each reading `values`. */
 export function outline(values: Values, pins?: ResetPins): Outline {
   return {
     home: {

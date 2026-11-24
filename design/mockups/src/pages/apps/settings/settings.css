@@ -45,27 +45,27 @@
   visibility: hidden;
 }
 
-/* A row too narrow for its name beside its control (`fit` in `settings-parts.ts`): the words take
-   the first line, and the control, its reset before it, a line of its own under them at the row's
-   end, `space.s8` below; the row grows to hold both, `space.s8` above and below. */
-.k-list-row[data-stacked] {
+/* A setting's row is as tall as its words, `size.row_two_line` at least: its first line keeps
+   `space.s8` above and below what it holds, so a line that wraps grows the row and nothing is cut. */
+.k-list-row[data-setting] {
   height: auto;
+}
+
+.k-list-row[data-setting] > .k-row:first-child {
+  box-sizing: border-box;
+  min-height: var(--size-row_two_line);
   padding-block: var(--space-s8);
 }
 
-.k-list-row[data-stacked] > .k-row:first-child {
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-s8);
+/* A stacked row (`laidOut` in `settings-parts.ts`): its name's line holds its reset, which stands
+   centred on the name without making the line taller, its edges on whole device pixels. */
+.st-title-line > .st-reset {
+  --overhang: calc((var(--type-body_strong-line) - var(--size-control_sm)) / 2);
+  margin-top: round(down, var(--overhang), 1px);
+  margin-bottom: calc(2 * var(--overhang) - round(down, var(--overhang), 1px));
 }
 
-/* The words across the row; the second line, a reset and the control, at its end. */
-.k-list-row[data-stacked] > .k-row:first-child > :first-child {
-  align-self: stretch;
-}
-
-/* A stacked row's tip comes after its control's line, `space.s8` under it as that line is under the
-   words. */
-.k-list-row[data-stacked] > .k-list-tip {
-  margin-top: var(--space-s8);
+/* In a well `size.settings_row_full` wide or narrower a stacked control spans the row. */
+.st-control[data-fill] {
+  width: auto;
 }
