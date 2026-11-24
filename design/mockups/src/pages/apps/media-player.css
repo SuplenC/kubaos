@@ -749,7 +749,8 @@
   padding: var(--space-s16);
   border-radius: 0 0 var(--radius-surface) var(--radius-surface);
   background: var(--color-surface);
-  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / var(--shadow-panel-opacity));
+  /* The glass's shadow (`glass.css`), which its window, the player's glass, holds. */
+  box-shadow: var(--glass-shadow);
   opacity: var(--mp-up);
   translate: 0 calc((var(--mp-up) - 1) * 100%);
   transition: --mp-up var(--motion-long) var(--easing-emphasized_decel);
