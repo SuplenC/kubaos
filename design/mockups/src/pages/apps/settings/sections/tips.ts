@@ -80,6 +80,8 @@ export const TIPS: readonly SectionTips[] = [
       swipe: "Hold [Super] and turn the mouse wheel to step through the workspaces too.",
     },
   },
+  // Camera
+  {},
   // Power
   {
     rows: {
