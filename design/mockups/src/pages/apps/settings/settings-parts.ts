@@ -34,7 +34,6 @@ import { field, setInvalid } from "../../../lib/field.ts";
 import { withHint } from "../../../lib/hint.ts";
 import { iconButton } from "../../../lib/icon-button.ts";
 import { filling, row as layoutRow, section, stack } from "../../../lib/layout.ts";
-import { probe } from "../../../lib/probe.ts";
 import { type ListRowSpec, ROW_CONTROL, scaleOf } from "../../../lib/list.ts";
 import { beside } from "../../../lib/beside.ts";
 import { type RegionHost, settingsWell, type Section, type SubSection } from "../../../lib/sidebar-page.ts";
@@ -541,16 +540,92 @@ function settingRow(row: HTMLElement, setting: Setting, changed: () => void, res
   }
 }
 
-/** `row`'s first line as laid out: side by side, or stacked, the words over their tail. */
-function laidOut(row: HTMLElement, stacked: boolean): void {
-  row.toggleAttribute("data-stacked", stacked);
+/** A wide row's parts, kept so its layout can move them between its two forms. */
+interface RowParts {
+  readonly band: HTMLElement;
+  readonly words: HTMLElement;
+  readonly title: HTMLElement;
+  readonly tail: HTMLElement;
+  readonly reset: HTMLElement | null;
+  readonly control: HTMLElement;
+  /** Stacked: the name and its reset, on the first line. */
+  readonly titleLine: HTMLElement;
+  /** Stacked: the name's room, which takes the line up to the reset. */
+  readonly titleRoom: HTMLElement;
+  /** Stacked: the words over the control. */
+  readonly column: HTMLElement;
+}
+
+const rowParts = new WeakMap<HTMLElement, RowParts>();
+
+/** `row`'s parts, found the first time it is laid out; none for a row that never stacks. */
+function partsOf(row: HTMLElement): RowParts | null {
+  const kept = rowParts.get(row);
+  if (kept) return kept;
   const band = row.firstElementChild;
-  if (band instanceof HTMLElement) probe(band, stacked ? { role: "layout", axis: "y", gap: length("space-s8"), align: "end" } : { role: "layout", axis: "x", gap: length("space-s12"), align: "centre" });
-  // Stacked, the row is a stacked row of its own, as tall as its two lines.
+  const words = band?.firstElementChild;
+  const title = row.querySelector<HTMLElement>(".k-list-title");
+  const tail = row.querySelector<HTMLElement>(".st-tail");
+  const control = row.querySelector<HTMLElement>(".st-control");
+  if (!(band instanceof HTMLElement) || !(words instanceof HTMLElement) || !title || !tail || !control) return null;
+  const parts: RowParts = {
+    band,
+    words,
+    title,
+    tail,
+    reset: tail.querySelector<HTMLElement>(":scope > .st-reset"),
+    control,
+    titleLine: filling(layoutRow("s12", "centre")),
+    titleRoom: filling(stack(0, "start")),
+    column: stack("s8", "end"),
+  };
+  parts.titleLine.classList.add("st-title-line");
+  rowParts.set(row, parts);
+  return parts;
+}
+
+/**
+ * `row`'s first line as laid out: on one line, its words beside its reset and its control; or
+ * stacked, its name and its reset over its line, `space.s4` down, and its control under them,
+ * `space.s8` down, at the row's end, or across it where `across`.
+ */
+function laidOut(row: HTMLElement, stacked: boolean, across = false): void {
+  row.toggleAttribute("data-stacked", stacked);
+  const parts = stacked ? partsOf(row) : rowParts.get(row);
+  if (parts) {
+    const { band, words, title, tail, reset, control, titleLine, titleRoom, column } = parts;
+    if (stacked) {
+      titleRoom.replaceChildren(title);
+      titleLine.replaceChildren(titleRoom, ...(reset ? [reset] : []));
+      words.prepend(titleLine);
+      control.toggleAttribute("data-fill", across);
+      column.replaceChildren(filling(words), control);
+      band.replaceChildren(filling(column));
+    } else {
+      delete control.dataset.fill;
+      titleLine.remove();
+      words.prepend(title);
+      tail.replaceChildren(...(reset ? [reset] : []), control);
+      band.replaceChildren(words, tail);
+    }
+  }
+  described(row);
+}
+
+/** A setting's line: under its name, or under its name's line when stacked. */
+const LINE = ".k-list-title + .k-text, .st-title-line + .k-text";
+
+/**
+ * What `row`'s probe says of it: a stacked row, or one whose line wraps, is a row of its own, as
+ * tall as its lines.
+ */
+function described(row: HTMLElement): void {
   const said = JSON.parse(row.dataset.probe ?? "{}") as { variant?: string; fixed?: object };
-  const words = (said.variant ?? "").split(" ").filter((word) => word !== "" && word !== "stacked");
-  const tall = stacked || words.includes("tip");
-  row.dataset.probe = JSON.stringify({ ...said, variant: [...words, ...(stacked ? ["stacked"] : [])].join(" "), fixed: { width: false, height: !tall } });
+  const words = (said.variant ?? "").split(" ").filter((word) => word !== "" && word !== "stacked" && word !== "wraps");
+  const stacked = row.hasAttribute("data-stacked");
+  const wraps = row.querySelector(`:is(${LINE})[data-wrapped]`) !== null;
+  const tall = stacked || wraps || words.includes("tip");
+  row.dataset.probe = JSON.stringify({ ...said, variant: [...words, ...(stacked ? ["stacked"] : []), ...(wraps ? ["wraps"] : [])].join(" "), fixed: { width: false, height: !tall } });
 }
 
 /**
@@ -568,7 +643,8 @@ function laidOutCard(well: HTMLElement, width: number): void {
     rows.style.setProperty("--gap", `var(--${gap})`);
     rows.dataset.probe = JSON.stringify({ ...(JSON.parse(rows.dataset.probe ?? "{}") as object), gap: length(gap) });
   }
-  for (const row of well.querySelectorAll<HTMLElement>(".k-list-row[data-setting]")) laidOut(row, stacked && row.hasAttribute("data-wide"));
+  const across = stacked && width <= length("size-settings_row_full");
+  for (const row of well.querySelectorAll<HTMLElement>(".k-list-row[data-setting]")) laidOut(row, stacked && row.hasAttribute("data-wide"), across);
 }
 
 /** Shows `setting`'s value on `row` again, with its control's own motion where it has one. */
@@ -888,7 +964,7 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
       wells.forEach((well, index) => laidOutCard(well, widths[index]!));
       // A row's line wraps rather than being cut, since it says what the setting is for; one that
       // fits stays a single trimmed line, as every other row's does.
-      const lines = [...root.querySelectorAll<HTMLElement>(".k-list-row[data-setting] .k-list-title + .k-text")];
+      const lines = [...root.querySelectorAll<HTMLElement>(`.k-list-row[data-setting] :is(${LINE})`)];
       for (const line of lines) {
         delete line.dataset.wrapped;
         line.dataset.clamped = "line";
@@ -898,6 +974,7 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
         delete line.dataset.clamped;
         line.dataset.wrapped = "";
       }
+      for (const row of root.querySelectorAll<HTMLElement>(".k-list-row[data-setting]")) described(row);
     };
     let fitted = 0;
     new ResizeObserver(() => {

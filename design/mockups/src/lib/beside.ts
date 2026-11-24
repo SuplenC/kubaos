@@ -35,6 +35,9 @@ export function beside(main: HTMLElement, picture: HTMLElement): HTMLElement {
     const above = room - length("space-s24") * scale - pictureFor(room, scale) < length("size-beside_controls_least") * scale;
     if (box.hasAttribute("data-above") === above) return;
     box.toggleAttribute("data-above", above);
+    // The picture comes first where it stands above, so the boxes' order is the order they show in.
+    if (above) box.prepend(aside);
+    else box.append(aside);
     probe(box, { role: "layout", axis: above ? "y" : "x", gap: length(above ? "space-s32" : "space-s24"), align: "start" });
   };
   probe(box, { role: "layout", axis: "x", gap: length("space-s24"), align: "start" });

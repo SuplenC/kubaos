@@ -57,48 +57,15 @@
   padding-block: var(--space-s8);
 }
 
-/* A stacked row (`fit` in `settings-parts.ts`): its name with its reset at the end of the first
-   line, its line under it, `space.s4` down, and its control under that, `space.s8` down, `menu`
-   wide at the row's end. The reset stands centred on the name's line without making it taller. */
-.k-list-row[data-stacked] > .k-row:first-child {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "title reset"
-    "line line"
-    "control control";
-  align-items: center;
-  column-gap: var(--space-s12);
-  row-gap: 0;
+/* A stacked row (`laidOut` in `settings-parts.ts`): its name's line holds its reset, which stands
+   centred on the name without making the line taller, its edges on whole device pixels. */
+.st-title-line > .st-reset {
+  --overhang: calc((var(--type-body_strong-line) - var(--size-control_sm)) / 2);
+  margin-top: round(down, var(--overhang), 1px);
+  margin-bottom: calc(2 * var(--overhang) - round(down, var(--overhang), 1px));
 }
 
-.k-list-row[data-stacked] > .k-row:first-child > :first-child,
-.k-list-row[data-stacked] .st-tail {
-  display: contents;
-}
-
-.k-list-row[data-stacked] .k-list-title {
-  grid-area: title;
-}
-
-.k-list-row[data-stacked] .k-list-title + * {
-  grid-area: line;
-  margin-top: var(--space-s4);
-}
-
-.k-list-row[data-stacked] .st-reset {
-  grid-area: reset;
-  margin-block: calc((var(--type-body_strong-line) - var(--size-control_sm)) / 2);
-}
-
-.k-list-row[data-stacked] .st-control {
-  grid-area: control;
-  justify-self: end;
-  margin-top: var(--space-s8);
-}
-
-/* In a card `size.settings_row_full` wide or narrower a stacked control spans the row. */
-.k-list[data-full] .k-list-row[data-stacked] .st-control {
-  justify-self: stretch;
+/* In a well `size.settings_row_full` wide or narrower a stacked control spans the row. */
+.st-control[data-fill] {
   width: auto;
 }

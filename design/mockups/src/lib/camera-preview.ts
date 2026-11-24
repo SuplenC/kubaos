@@ -10,7 +10,7 @@ import lifted from "../assets/camera/lifted.svg?url";
 import { icon } from "./icon.ts";
 import { stack } from "./layout.ts";
 import { media } from "./media.ts";
-import { probe } from "./probe.ts";
+import { declare, probe } from "./probe.ts";
 import { role } from "./radius.ts";
 import { clamped } from "./text.ts";
 
@@ -32,7 +32,8 @@ const PICTURES: Record<PreviewLook, string> = { backlit, lifted };
 function inUse(by: string | null): HTMLElement {
   const box = document.createElement("span");
   box.className = "k-preview-busy k-sunken";
-  const said = clamped(by === null ? "In use by another app" : `In use by ${by}`, "subheading", "on_surface_variant");
+  // An app's name is what it says, and a long one ends in an ellipsis.
+  const said = declare(clamped(by === null ? "In use by another app" : `In use by ${by}`, "subheading", "on_surface_variant"), { variable: true });
   box.append(stack("s12", "centre", icon("video", "var(--icon-s32)", "var(--color-on_surface_variant)"), said));
   const edge = document.createElement("span");
   edge.className = "k-preview-edge";

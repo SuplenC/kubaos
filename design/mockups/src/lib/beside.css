@@ -35,7 +35,6 @@
 }
 
 .k-beside[data-above] > .k-beside-aside {
-  order: -1;
   position: static;
   width: var(--size-beside_picture_least);
 }
