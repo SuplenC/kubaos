@@ -509,12 +509,6 @@ function controlEnd(row: HTMLElement): Element | null {
 function settingRow(row: HTMLElement, setting: Setting, changed: () => void, reset: HTMLElement | null): void {
   row.dataset.setting = setting.id;
   row.toggleAttribute("data-wide", WIDE.has(setting.control.kind));
-  // Its line wraps beside its control rather than being cut: it says what the setting is for.
-  const line = row.querySelector<HTMLElement>(".k-list-title + .k-text");
-  if (line) {
-    delete line.dataset.clamped;
-    line.dataset.wrapped = "";
-  }
   if (setting.unbuilt) row.dataset.unbuilt = "";
   if (setting.shows) row.dataset.depends = "";
   const control = controlOf(setting, row, changed);
@@ -892,6 +886,18 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
       const wells = [...root.querySelectorAll<HTMLElement>(".k-list")].filter((well) => well.querySelector(".k-list-row[data-setting]"));
       const widths = wells.map((well) => well.getBoundingClientRect().width / scale);
       wells.forEach((well, index) => laidOutCard(well, widths[index]!));
+      // A row's line wraps rather than being cut, since it says what the setting is for; one that
+      // fits stays a single trimmed line, as every other row's does.
+      const lines = [...root.querySelectorAll<HTMLElement>(".k-list-row[data-setting] .k-list-title + .k-text")];
+      for (const line of lines) {
+        delete line.dataset.wrapped;
+        line.dataset.clamped = "line";
+      }
+      const cut = lines.filter((line) => line.scrollWidth > line.clientWidth + 0.5);
+      for (const line of cut) {
+        delete line.dataset.clamped;
+        line.dataset.wrapped = "";
+      }
     };
     let fitted = 0;
     new ResizeObserver(() => {
