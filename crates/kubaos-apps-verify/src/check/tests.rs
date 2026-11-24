@@ -238,6 +238,7 @@ fn a_down_checksum_file_beside_a_served_download_is_a_warning() {
     let published = rows.iter().find(|row| row.check == "published").unwrap();
     assert_eq!(published.outcome, Outcome::Warning, "{}", published.detail);
     assert!(published.detail.contains("/tool.deb.sha256"), "{}", published.detail);
+    assert_eq!(stub.requests(), 1 + crate::fetch::tries());
 }
 
 #[test]

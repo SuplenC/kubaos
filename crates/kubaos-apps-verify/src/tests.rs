@@ -85,3 +85,34 @@ fn bump_takes_ids_but_not_changed() {
     assert_eq!(parsed.ids, ["t3-code"]);
     assert!(args(&["--bump", "--changed", "origin/main"]).is_err());
 }
+
+#[test]
+fn all_goes_with_changed_and_codes_with_bump() {
+    let all = args(&["--changed", "origin/main", "--all"]).unwrap().unwrap();
+    let codes = args(&["--bump", "--codes", "/tmp/c", "t3-code"]).unwrap().unwrap();
+
+    assert!(all.all);
+    assert_eq!(codes.codes, Some(PathBuf::from("/tmp/c")));
+    assert!(args(&["--all"]).is_err());
+    assert!(args(&["--codes", "/tmp/c"]).is_err());
+}
+
+#[test]
+fn each_app_gets_the_code_it_would_exit_with_alone() {
+    let row = |app: &str, outcome| Row {
+        app: app.to_owned(),
+        check: "bump",
+        subject: "x".to_owned(),
+        outcome,
+        detail: String::new(),
+    };
+    let rows = [
+        row("moved", Outcome::Moved),
+        row("down", Outcome::Ok),
+        row("down", Outcome::Warning),
+        row("failed", Outcome::Warning),
+        row("failed", Outcome::Error),
+    ];
+
+    assert_eq!(codes(&rows), "moved 0\ndown 3\nfailed 1\n");
+}

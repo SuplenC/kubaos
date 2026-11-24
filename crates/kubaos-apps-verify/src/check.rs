@@ -270,10 +270,15 @@ pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
                 // A repository whose key or InRelease failed was reported; its packages aren't
                 // looked up.
                 let repository = match repo {
-                    Some(name) => match repos.get(name).and_then(Option::as_ref) {
-                        Some(repository) => Some(repository),
-                        None => continue,
-                    },
+                    Some(name) => {
+                        let Some(repository) = repos.get(name).and_then(Option::as_ref) else {
+                            if fresh_action {
+                                unchecked(name, packages, &mut row);
+                            }
+                            continue;
+                        };
+                        Some(repository)
+                    }
                     None => None,
                 };
                 for (machine, _) in ARCHES {
@@ -309,6 +314,20 @@ pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
 }
 
 type Report<'a> = dyn FnMut(&'static str, String, Outcome, String) + 'a;
+
+/// The error row of an action the branch changed whose repository `name` couldn't be checked, so
+/// its packages weren't looked up: a key or `InRelease` that was down only warns for the
+/// repository, which the branch didn't change, and the new packages would pass unchecked.
+fn unchecked(name: &str, packages: &[String], row: &mut Report<'_>) {
+    row(
+        "candidate",
+        packages.join(" "),
+        Outcome::Error,
+        format!(
+            "not looked up, as {name} couldn't be checked; this branch changes the action, so it can't pass unchecked"
+        ),
+    );
+}
 
 /// An outage's row as it is, or an error when the branch changed the pin it is about: that pin has
 /// never been checked, and a run that passes would let it in unchecked.
@@ -544,8 +563,8 @@ fn pinned(what: &str, url: &str, sha256: &str, row: &mut Report<'_>) {
 }
 
 /// The sha256 a vendor publishes for `url`, and where it was found: a GitHub release asset's
-/// digest, or a checksum file beside the download. A checksum file that was down, with none found
-/// beside it, is a warning.
+/// digest, or a checksum file beside the download. A checksum file that was down is a warning,
+/// and the ones after it aren't looked for.
 fn published(url: &str) -> Result<Option<(String, String)>, Problem> {
     if let Some(rest) = url.strip_prefix("https://github.com/") {
         let parts: Vec<&str> = rest.splitn(6, '/').collect();
@@ -563,7 +582,6 @@ fn published(url: &str) -> Result<Option<(String, String)>, Problem> {
         }
     }
     let (dir, file) = url.rsplit_once('/').unwrap_or(("", url));
-    let mut down = None;
     for candidate in [
         format!("{url}.sha256"),
         format!("{url}.sha256sum"),
@@ -575,12 +593,13 @@ fn published(url: &str) -> Result<Option<(String, String)>, Problem> {
                     return Ok(Some((candidate, digest)));
                 }
             }
-            Err(e) if e.class() == Class::Outage => down = down.or(Some(Problem::fetch(&e))),
+            // A checksum file that was down may be the digest the vendor publishes, so "none"
+            // would hide it; the others are on the same host, and would only spend its time.
+            Err(e) if e.class() == Class::Outage => return Err(Problem::fetch(&e)),
             Err(_) => {}
         }
     }
-    // A checksum file that was down may be the digest the vendor publishes; "none" would hide it.
-    down.map_or(Ok(None), Err)
+    Ok(None)
 }
 
 /// The sha256 a checksum file gives `file`: on the line naming it, or its only line.

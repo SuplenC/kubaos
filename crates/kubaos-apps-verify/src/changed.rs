@@ -60,6 +60,15 @@ impl Changed {
         }
     }
 
+    /// Every action and repository counted as changed, when there is no merge base to hold them
+    /// to.
+    pub fn all(manifest: &Manifest) -> Self {
+        Self {
+            base: None,
+            repos: manifest.repos().keys().cloned().collect(),
+        }
+    }
+
     /// Whether the app `id`'s action `kind` is new on the branch: the merge base's app has no
     /// action of the same kind with the same values.
     pub fn action(&self, id: &str, kind: &Kind) -> bool {

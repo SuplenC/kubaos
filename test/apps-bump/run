@@ -6,8 +6,9 @@
 #   test/apps-bump/run [--dry-run] [ID...]   those apps, or every app with a deb or download pin
 #
 # It runs on a clean checkout of main, with gh signed in (GH_TOKEN) and git able to push; the
-# `Apps bump` workflow (.github/workflows/apps-bump.yml) runs it once a day. For each app,
-# `kubaos-apps-verify --bump ID` rewrites its app.toml, then:
+# `Apps bump` workflow (.github/workflows/apps-bump.yml) runs it once a day. One
+# `kubaos-apps-verify --bump --codes FILE ID...` rewrites every app's app.toml side by side, so a
+# host that is down costs its tries once a run, and writes each app's code; then for each app:
 #   - moved: the change is committed on chore/bump-ID, made from main, and pushed when the branch
 #     doesn't already hold that app.toml; a pull request opens unless one is open, and its title
 #     and text follow the newest move. The pull request's `apps verify` check downloads each file
@@ -83,13 +84,15 @@ first_value() {
   sed -n "s/^$1 = \"\(.*\)\"\$/\1/p" | head -n 1
 }
 
-# The runs in a row ID's feed has been down, 0 when it wasn't down on the last one.
+# The runs in a row ID's feed has been down, 0 when it wasn't down on the last one. The file's
+# first line for ID counts; a count that isn't a whole number, as a damaged file has, is 0.
 outages_of() {
   local count=""
   if [[ -n $OUTAGES && -f $OUTAGES ]]; then
-    count="$(awk -v id="$1" '$1 == id { print $2 }' "$OUTAGES")"
+    count="$(awk -v id="$1" '{ sub(/\r$/, "") } $1 == id { print $2; exit }' "$OUTAGES")"
   fi
-  echo "${count:-0}"
+  [[ $count =~ ^[0-9]+$ ]] || count=0
+  echo "$((10#$count))"
 }
 
 # Sets ID's count of outages in a row to COUNT; 0 drops its line. A dry run keeps the counts.
@@ -98,7 +101,7 @@ set_outages() {
     return
   fi
   local kept
-  kept="$(awk -v id="$1" '$1 != id' "$OUTAGES" 2>/dev/null || true)"
+  kept="$(awk -v id="$1" '{ sub(/\r$/, "") } $1 != id' "$OUTAGES" 2>/dev/null || true)"
   {
     [[ -n $kept ]] && printf '%s\n' "$kept"
     (($2 > 0)) && printf '%s %s\n' "$1" "$2"
@@ -111,16 +114,28 @@ if [[ -n $OUTAGES ]]; then
   touch "$OUTAGES"
 fi
 
-verify=(cargo run -q -p kubaos-apps-verify --)
 cargo build -q -p kubaos-apps-verify
 start="$(git rev-parse HEAD)"
+codes="$(mktemp)"
+said="$(mktemp)"
+trap 'rm -f "$codes" "$said"' EXIT
+# Each app's own code is in the codes file; the run stops only on a usage error (2) or a crash,
+# which leave none.
+verified=0
+everything="$(cargo run -q -p kubaos-apps-verify -- --bump --codes "$codes" "${ids[@]}" 2>"$said")" || verified=$?
+printf '%s\n' "$everything"
+cat "$said" >&2
+if ((verified != 0 && verified != 1 && verified != 3)); then
+  echo "test/apps-bump/run: kubaos-apps-verify exited $verified" >&2
+  exit 1
+fi
 for id in "${ids[@]}"; do
   echo "== $id"
   file="apps/$id/app.toml"
   issue_title="Apps bump: $id needs a hand"
-  status=0
-  table="$("${verify[@]}" --bump "$id" 2>&1)" || status=$?
-  printf '%s\n' "$table"
+  status="$(awk -v id="$id" '$1 == id { print $2; exit }' "$codes")"
+  status="${status:-0}"
+  table="$(awk -v id="$id" 'NR == 1 || $1 == id' <<<"$everything")"
 
   if ((status == 3)); then
     git checkout -q -- "$file"

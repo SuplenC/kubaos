@@ -149,7 +149,12 @@ pub enum Cause {
     Status(u16),
     /// curl gave up for another reason, by its exit code; none when a signal stopped it.
     #[error("curl: {said}")]
-    Curl { exit: Option<i32>, said: String },
+    Curl {
+        exit: Option<i32>,
+        said: String,
+        /// Where the transfer got to, as `--write-out` said.
+        written: Written,
+    },
     #[error("the answer isn't JSON")]
     Json(#[source] serde_json::Error),
     /// The host was out of reach on every try of an earlier fetch this run.
@@ -167,15 +172,26 @@ impl Cause {
         }
     }
 
-    /// Whether the host itself was out of reach: no name, no connection, no TLS, or a timeout.
-    fn host_down(&self) -> bool {
-        matches!(
-            self,
-            Self::Curl {
-                exit: Some(5 | 6 | 7 | 28 | 35),
-                ..
-            }
-        )
+    /// The host that was out of reach, when the failure was clearly at connect time: no name, no
+    /// connection, no TLS, or a timeout before any connection. A transfer that timed out or
+    /// slowed after connecting may be one big file on a slow path, and says nothing of the host.
+    /// It is the host the transfer ended at, after its redirects, else `url`'s.
+    fn down_host<'a>(&'a self, url: &'a str) -> Option<&'a str> {
+        let Self::Curl {
+            exit: Some(exit),
+            written,
+            ..
+        } = self
+        else {
+            return None;
+        };
+        let at_connect = matches!(exit, 5 | 6 | 7 | 35) || (*exit == 28 && !written.connected);
+        let effective = if written.effective.is_empty() {
+            url
+        } else {
+            &written.effective
+        };
+        at_connect.then(|| host(effective))
     }
 
     fn timed_out(&self) -> bool {
@@ -183,20 +199,50 @@ impl Cause {
     }
 
     /// The cause of a curl run that failed: the HTTP error `--fail` stopped on, else curl's exit.
-    /// `written` is what `--write-out` put last on stderr, the final HTTP status, after curl's own
-    /// message.
+    /// `--write-out` put its [`WRITTEN`] line last on stderr, after curl's own message.
     fn of(status: ExitStatus, stderr: &[u8]) -> Self {
         let text = String::from_utf8_lossy(stderr);
         let text = text.trim_end();
         let (said, written) = text.rsplit_once('\n').unwrap_or(("", text));
-        let http: u16 = written.trim().parse().unwrap_or(0);
+        let written = Written::parse(written);
         // curl's exit 22 is `--fail` stopping on an HTTP status of 400 or more.
-        if status.code() == Some(22) && http >= 400 {
-            return Self::Status(http);
+        if status.code() == Some(22) && written.http >= 400 {
+            return Self::Status(written.http);
         }
         Self::Curl {
             exit: status.code(),
             said: said.trim().to_owned(),
+            written,
+        }
+    }
+}
+
+/// What curl's `--write-out` writes of a transfer, for [`Written::parse`].
+const WRITTEN: &str = "%{http_code} %{time_connect} %{url_effective}";
+
+/// Where a transfer got to: its last HTTP status, whether it connected, and the URL it ended at
+/// after its redirects.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Written {
+    pub http: u16,
+    pub connected: bool,
+    pub effective: String,
+}
+
+impl Written {
+    /// Reads a [`WRITTEN`] line; a field that is missing or doesn't read is its default.
+    fn parse(line: &str) -> Self {
+        let mut fields = line.split_whitespace();
+        let http = fields.next().and_then(|code| code.parse().ok()).unwrap_or(0);
+        let connected = fields
+            .next()
+            .and_then(|time| time.parse::<f64>().ok())
+            .is_some_and(|time| time > 0.0);
+        let effective = fields.next().unwrap_or_default().to_owned();
+        Self {
+            http,
+            connected,
+            effective,
         }
     }
 }
@@ -232,13 +278,15 @@ fn curl(max_time: u64) -> Command {
 /// curl stopping on an HTTP error and writing the final status last on stderr, for [`Cause::of`].
 fn failing_curl(max_time: u64) -> Command {
     let mut command = curl(max_time);
-    command.args(["--fail", "--write-out", "%{stderr}%{http_code}\n"]);
+    command
+        .args(["--fail", "--write-out"])
+        .arg(format!("%{{stderr}}{WRITTEN}\n"));
     command
 }
 
 /// `once` tried, given how many seconds the try may take of `max_time`, until it succeeds, fails
-/// with what isn't an outage, or [`RETRY`] allows no further try. A host out of reach on every try
-/// is remembered in [`DOWN`], and a later fetch from it isn't tried.
+/// with what isn't an outage, or [`RETRY`] allows no further try. A host out of reach at connect
+/// time on the last try is remembered in [`DOWN`], and a later fetch from it isn't tried.
 fn tried<T>(url: &str, max_time: u64, mut once: impl FnMut(u64) -> Result<T, Cause>) -> Result<T, FetchError> {
     let host = host(url);
     if DOWN.lock().expect("down hosts mutex poisoned").contains(host) {
@@ -256,8 +304,8 @@ fn tried<T>(url: &str, max_time: u64, mut once: impl FnMut(u64) -> Result<T, Cau
         timeouts += u32::from(cause.timed_out());
         let elapsed = start.elapsed();
         let Some(wait) = RETRY.wait(next, elapsed, timeouts) else {
-            if cause.host_down() {
-                DOWN.lock().expect("down hosts mutex poisoned").insert(host.to_owned());
+            if let Some(down) = cause.down_host(url) {
+                DOWN.lock().expect("down hosts mutex poisoned").insert(down.to_owned());
             }
             return Err(FetchError::new(url, cause));
         };
@@ -352,20 +400,26 @@ pub fn status(url: &str) -> Result<Answer, FetchError> {
     tried(url, STATUS_MAX_TIME, |max_time| {
         let output = curl(max_time)
             .args(["--output", "/dev/null"])
-            .args(["--write-out", "%{http_code} %header{cf-mitigated}", "--"])
+            .arg("--write-out")
+            .arg(format!("{WRITTEN} %header{{cf-mitigated}}"))
+            .arg("--")
             .arg(url)
             .output()
             .map_err(Cause::Spawn)?;
+        let text = String::from_utf8_lossy(&output.stdout);
+        // The challenge header comes last, after the three fields of [`WRITTEN`], none with a space.
+        let mut fields = text.trim().splitn(4, ' ');
+        let written = Written::parse(&fields.by_ref().take(3).collect::<Vec<_>>().join(" "));
+        let mitigated = fields.next().unwrap_or_default();
         if !output.status.success() {
             return Err(Cause::Curl {
                 exit: output.status.code(),
                 said: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+                written,
             });
         }
-        let written = String::from_utf8_lossy(&output.stdout);
-        let (code, mitigated) = written.trim().split_once(' ').unwrap_or((written.trim(), ""));
         let answer = Answer {
-            status: code.parse().unwrap_or(0),
+            status: written.http,
             challenged: mitigated.trim().eq_ignore_ascii_case("challenge"),
         };
         let cause = Cause::Status(answer.status);

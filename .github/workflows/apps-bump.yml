@@ -74,8 +74,9 @@ jobs:
           read -ra ids <<<"$APPS"
           nix develop --command test/apps-bump/run "${ids[@]}"
 
+      # Even when the run fails, is cancelled or times out, so the counts it took are kept.
       - name: Save the outage counts
-        if: ${{ !cancelled() }}
+        if: always()
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/apps-bump-outages

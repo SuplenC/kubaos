@@ -47,17 +47,82 @@ fn a_connection_closed_with_no_answer_is_an_outage() {
     assert_eq!(class_of(&stub.url("/key.asc")), (Class::Outage, Some(52)));
 }
 
+fn curl_exit(exit: i32, written: Written) -> Cause {
+    Cause::Curl {
+        exit: Some(exit),
+        said: String::new(),
+        written,
+    }
+}
+
 #[test]
-fn a_timeout_is_an_outage_tried_again_once_and_its_host_isnt_tried_again() {
+fn a_timeout_is_an_outage_tried_again_once() {
     let stub = Stub::always(Reply::Stall);
 
     let first = class_of(&stub.url("/key.asc"));
-    let later = get(&stub.url("/InRelease")).unwrap_err();
 
     assert_eq!(first, (Class::Outage, Some(28)));
     assert_eq!(stub.requests(), 2);
+}
+
+#[test]
+fn a_refused_host_isnt_tried_again_in_the_run() {
+    let refused = Refused::new();
+
+    let _ = get(&refused.url("/key.asc"));
+    let later = get(&refused.url("/InRelease")).unwrap_err();
+
     assert!(matches!(later.cause, Cause::HostDown(_)), "{later:?}");
     assert_eq!(later.class(), Class::Outage);
+}
+
+#[test]
+fn only_a_failure_at_connect_time_takes_a_host_down() {
+    let connected = Written {
+        http: 0,
+        connected: true,
+        effective: "https://cdn.example.com/big.deb".to_owned(),
+    };
+    let unconnected = Written {
+        connected: false,
+        ..connected.clone()
+    };
+
+    assert_eq!(
+        curl_exit(28, connected.clone()).down_host("https://example.com/big.deb"),
+        None
+    );
+    assert_eq!(
+        curl_exit(56, connected.clone()).down_host("https://example.com/big.deb"),
+        None
+    );
+    assert_eq!(
+        curl_exit(28, unconnected).down_host("https://example.com/big.deb"),
+        Some("cdn.example.com")
+    );
+    assert_eq!(
+        curl_exit(6, Written::default()).down_host("https://example.com/big.deb"),
+        Some("example.com")
+    );
+    assert_eq!(
+        curl_exit(35, connected).down_host("https://example.com/big.deb"),
+        Some("cdn.example.com")
+    );
+}
+
+#[test]
+fn a_stalling_redirect_target_doesnt_take_its_origin_down() {
+    let cdn = Stub::always(Reply::Stall);
+    let to = cdn.url("/asset");
+    let origin = Stub::new(move |path, _| match path {
+        "/big" => Reply::Redirect(to.clone()),
+        _ => Reply::Body(b"fine".to_vec()),
+    });
+
+    let _ = get(&origin.url("/big"));
+    let other = get(&origin.url("/other"));
+
+    assert!(other.is_ok(), "{other:?}");
 }
 
 #[test]
@@ -86,10 +151,7 @@ fn the_tries_wait_twice_as_long_each_time_within_the_budget() {
 #[test]
 fn a_stream_or_connection_broken_off_is_an_outage() {
     for exit in [16, 18, 55, 56, 92] {
-        let cause = Cause::Curl {
-            exit: Some(exit),
-            said: String::new(),
-        };
+        let cause = curl_exit(exit, Written::default());
 
         assert_eq!(cause.class(), Class::Outage, "exit {exit}");
     }
@@ -106,10 +168,7 @@ fn a_failed_tls_handshake_is_an_outage() {
 #[test]
 fn a_name_that_doesnt_resolve_is_an_outage() {
     for exit in [5, 6] {
-        let cause = Cause::Curl {
-            exit: Some(exit),
-            said: String::new(),
-        };
+        let cause = curl_exit(exit, Written::default());
 
         assert_eq!(cause.class(), Class::Outage);
     }

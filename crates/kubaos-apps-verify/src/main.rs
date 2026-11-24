@@ -2,8 +2,8 @@
 //!
 //! ```text
 //! kubaos-apps-verify [--root DIR] [--release CODENAME] [ID…]   those apps, or every app
-//! kubaos-apps-verify [--root DIR] --changed BASE               the apps a branch changed
-//! kubaos-apps-verify [--root DIR] --bump [ID…]                 move those apps' pins on
+//! kubaos-apps-verify [--root DIR] --changed BASE [--all]       the apps a branch changed, or all
+//! kubaos-apps-verify [--root DIR] --bump [--codes FILE] [ID…]  move those apps' pins on
 //! ```
 //!
 //! For each app, in its own actions and every setup's: a vendor repository's key against its
@@ -20,20 +20,24 @@
 //! timeout, a name that doesn't resolve, a refused or broken connection, a failed TLS handshake) is
 //! a warning: its row says `WARN`, GitHub Actions shows it as an annotation, and the run passes, as
 //! the catalog may well be right. A fetch gets 7 tries within 3 minutes, a timeout 2, and a host
-//! out of reach on every try isn't tried again in the run. It installs nothing and reads no apt,
-//! dpkg or gpg state of the machine's: keys are checked in a gpg home of their own.
+//! out of reach at connect time isn't tried again in the run. It installs nothing and reads no
+//! apt, dpkg or gpg state of the machine's: keys are checked in a gpg home of their own.
 //!
 //! `--changed BASE` checks the apps whose folder changed since the merge base with BASE, and the
 //! apps whose vendor repository changed (`system/packages.toml`, a sources file). There an outage
 //! on a pin the branch changed (an action that differs from the merge base's, or a repository whose
-//! pin or sources file changed) is an error: nothing has checked that pin yet.
+//! pin or sources file changed) is an error: nothing has checked that pin yet. `--all` checks every
+//! app, an outage on a changed pin still an error. With no merge base, as in a shallow clone, every
+//! app is checked and every pin counts as changed.
 //!
 //! `--bump` checks nothing: it moves each pinned `.deb` and download of the apps named, or of every
 //! app, on to its vendor's newest release, writing the new version, URL and sha256 into the app's
 //! `app.toml`. It exits 1 when a pin's newest release can't be found or has no file for it, as when
 //! a vendor renames its downloads, and 3 when a feed was down and nothing failed, writing nothing
-//! for that app. The daily `Apps bump` workflow runs it and opens a pull request for each app it
-//! moved, whose checks run this check on the app.
+//! for that app. `--codes FILE` writes each app's code, as it would exit for that app alone, to
+//! FILE, a line `ID CODE` an app, so one run can bump every app side by side. The daily `Apps bump`
+//! workflow runs it and opens a pull request for each app it moved, whose checks run this check on
+//! the app.
 //!
 //! # Owns
 //!
@@ -54,6 +58,8 @@ mod stub;
 
 use std::collections::BTreeSet;
 use std::env;
+use std::fmt::Write as _;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -76,18 +82,24 @@ const DEFAULT_RELEASE: &str = "resolute";
 
 const USAGE: &str = "\
 usage: kubaos-apps-verify [--root DIR] [--release CODENAME] [ID...]
-       kubaos-apps-verify [--root DIR] [--release CODENAME] --changed BASE
-       kubaos-apps-verify [--root DIR] --bump [ID...]
+       kubaos-apps-verify [--root DIR] [--release CODENAME] --changed BASE [--all]
+       kubaos-apps-verify [--root DIR] --bump [--codes FILE] [ID...]
 
 Holds the Apps catalog's pins to their upstreams: vendor keys and InRelease signatures, package
 candidates, pinned downloads' sha256, nixpkgs versions and web app URLs. Every app with no ID.
---bump moves the apps' pinned downloads on to their newest releases instead, in app.toml.";
+--changed checks the apps a branch changed since its merge base with BASE, or with --all every
+app; an outage on a pin the branch changed fails. --bump moves the apps' pinned downloads on to
+their newest releases instead, in app.toml, and --codes writes each app's exit code to FILE.";
 
 struct Args {
     root: PathBuf,
     release: String,
     changed: Option<String>,
+    /// With `--changed`, every app, not only those the branch reaches.
+    all: bool,
     bump: bool,
+    /// With `--bump`, where each app's code goes.
+    codes: Option<PathBuf>,
     ids: Vec<String>,
 }
 
@@ -96,7 +108,9 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Option<Args>, String>
         root: PathBuf::from("."),
         release: DEFAULT_RELEASE.to_owned(),
         changed: None,
+        all: false,
         bump: false,
+        codes: None,
         ids: Vec::new(),
     };
     while let Some(arg) = args.next() {
@@ -106,7 +120,9 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Option<Args>, String>
             "--root" => parsed.root = PathBuf::from(value("--root")?),
             "--release" => parsed.release = value("--release")?,
             "--changed" => parsed.changed = Some(value("--changed")?),
+            "--all" => parsed.all = true,
             "--bump" => parsed.bump = true,
+            "--codes" => parsed.codes = Some(PathBuf::from(value("--codes")?)),
             flag if flag.starts_with('-') => return Err(format!("unknown flag {flag}")),
             _ => parsed.ids.push(arg),
         }
@@ -116,6 +132,12 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Option<Args>, String>
     }
     if parsed.changed.is_some() && parsed.bump {
         return Err("--bump and --changed don't go together".to_owned());
+    }
+    if parsed.all && parsed.changed.is_none() {
+        return Err("--all goes with --changed".to_owned());
+    }
+    if parsed.codes.is_some() && !parsed.bump {
+        return Err("--codes goes with --bump".to_owned());
     }
     Ok(Some(parsed))
 }
@@ -147,6 +169,12 @@ fn main() -> ExitCode {
             if failed > 0 {
                 eprintln!("kubaos-apps-verify: {failed} failed");
             }
+            if let Some(path) = &args.codes
+                && let Err(e) = fs::write(path, codes(&rows))
+            {
+                eprintln!("kubaos-apps-verify: writing {}: {e}", path.display());
+                return ExitCode::from(2);
+            }
             ExitCode::from(exit_code(&rows, args.bump))
         }
         Err(Usage(e)) => {
@@ -166,6 +194,23 @@ fn exit_code(rows: &[Row], bump: bool) -> u8 {
     } else {
         0
     }
+}
+
+/// Each app's code, as `--bump` would exit for that app alone: a line `ID CODE` an app, in the
+/// rows' order.
+fn codes(rows: &[Row]) -> String {
+    let mut apps: Vec<&str> = Vec::new();
+    for row in rows {
+        if !apps.contains(&row.app.as_str()) {
+            apps.push(&row.app);
+        }
+    }
+    let mut out = String::new();
+    for app in apps {
+        let own: Vec<Row> = rows.iter().filter(|row| row.app == app).cloned().collect();
+        let _ = writeln!(out, "{app} {}", exit_code(&own, true));
+    }
+    out
 }
 
 /// A GitHub Actions `::warning::` line for each warning, so an outage shows on the run's summary
@@ -191,7 +236,7 @@ fn escape(text: &str) -> String {
 /// An app that isn't the catalog's, or a catalog or manifest that can't be read.
 struct Usage(String);
 
-#[expect(clippy::print_stdout, reason = "the command's output")]
+#[expect(clippy::print_stdout, clippy::print_stderr, reason = "the command's output")]
 fn run(args: &Args) -> Result<Vec<Row>, Usage> {
     let catalog = Catalog::load(&args.root.join(CATALOG)).map_err(|e| Usage(chain(&e)))?;
     let manifest = Manifest::read(&args.root.join("system/packages.toml"))
@@ -200,9 +245,18 @@ fn run(args: &Args) -> Result<Vec<Row>, Usage> {
     let mut fresh = None;
     let apps: Vec<&Folder> = match &args.changed {
         Some(base) => {
-            let (apps, merge_base) = changed(&args.root, base, &catalog)?;
-            fresh = Some(Changed::read(&args.root, &merge_base, &manifest));
-            apps
+            if let Some(merge_base) = merge_base(&args.root, base) {
+                fresh = Some(Changed::read(&args.root, &merge_base, &manifest));
+                if args.all {
+                    catalog.apps().iter().collect()
+                } else {
+                    changed(&args.root, &merge_base, &catalog)?
+                }
+            } else {
+                eprintln!("kubaos-apps-verify: no merge base with {base}: every app, every pin counted as changed");
+                fresh = Some(Changed::all(&manifest));
+                catalog.apps().iter().collect()
+            }
         }
         None if args.ids.is_empty() => catalog.apps().iter().collect(),
         None => args
@@ -246,26 +300,29 @@ fn side_by_side(apps: &[&Folder], each: impl Fn(&Folder) -> Vec<Row> + Sync) -> 
     })
 }
 
-/// The apps whose folder changed since the merge base with `base`, and those taking packages from
-/// a vendor repository whose pin or sources file changed; and the merge base.
-fn changed<'a>(root: &Path, base: &str, catalog: &'a Catalog) -> Result<(Vec<&'a Folder>, String), Usage> {
-    let git = |args: &[&str]| {
-        let output = kubaos_git::at(root)
-            .args(args)
-            .output()
-            .map_err(|e| Usage(format!("running git: {e}")))?;
-        if !output.status.success() {
-            return Err(Usage(format!(
-                "git {}: {}",
-                args.join(" "),
-                String::from_utf8_lossy(&output.stderr).trim()
-            )));
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
-    };
-    let merge_base = git(&["merge-base", base, "HEAD"])?;
-    let paths = git(&["diff", "--name-only", &merge_base, "HEAD", "--"])?;
-    Ok((touched(&paths, catalog), merge_base))
+/// The merge base of `base` and `HEAD`; none when git finds none, as in a shallow clone.
+fn merge_base(root: &Path, base: &str) -> Option<String> {
+    let output = kubaos_git::at(root).args(["merge-base", base, "HEAD"]).output().ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+}
+
+/// The apps whose folder changed since `merge_base`, and those taking packages from a vendor
+/// repository whose pin or sources file changed.
+fn changed<'a>(root: &Path, merge_base: &str, catalog: &'a Catalog) -> Result<Vec<&'a Folder>, Usage> {
+    let output = kubaos_git::at(root)
+        .args(["diff", "--name-only", merge_base, "HEAD", "--"])
+        .output()
+        .map_err(|e| Usage(format!("running git: {e}")))?;
+    if !output.status.success() {
+        return Err(Usage(format!(
+            "git diff against {merge_base}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
+    Ok(touched(&String::from_utf8_lossy(&output.stdout), catalog))
 }
 
 /// The apps the changed `paths`, one a line, reach: an app's own folder, or the pin or sources

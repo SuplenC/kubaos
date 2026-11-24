@@ -21,7 +21,8 @@
 #   of its own, so the push to main still saves every cache.
 # - apps verify, gated: `just apps-verify` on the apps a pull request changes
 #   (their folders, or their vendor repositories' pins), against the vendors'
-#   servers; every app when the check itself changes. Not on a push to main.
+#   servers; every app when the check itself changes, an outage on a pin the
+#   branch changed failing either way. Not on a push to main.
 # - shellcheck: `just shellcheck`.
 # - system files: `just system-files-check`'s two scripts and `just
 #   credits-check`'s, run straight on the runner: they need only bash, git,
@@ -373,7 +374,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [[ $ALL == true ]]; then
-            nix develop --command just apps-verify
+            nix develop --command just apps-verify --changed "origin/$BASE" --all
           else
             nix develop --command just apps-verify --changed "origin/$BASE"
           fi
