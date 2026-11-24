@@ -5,49 +5,106 @@
 //!
 //! - Reading a URL whole ([`get`]), hashing one as it streams ([`sha256`]), a URL's final status
 //!   ([`status`]) and GitHub's API, with `GITHUB_TOKEN` when it is set ([`github`]).
-//! - Telling an outage from a wrong answer ([`Class`]), and the tries before an outage is reported.
+//! - Telling an outage from a wrong answer ([`Class`]), the tries and time a fetch gets before an
+//!   outage is reported ([`Retry`]), and the hosts found out of reach this run.
 //!
 //! # Not here
 //!
 //! - What is checked against what, and how a class is reported: the checks' modules.
 
+use std::collections::BTreeSet;
 use std::env;
 use std::fmt::Write as _;
 use std::io;
 use std::io::Read as _;
 use std::io::Write as _;
+use std::process::Child;
 use std::process::Command;
 use std::process::ExitStatus;
 use std::process::Output;
 use std::process::Stdio;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use std::time::Instant;
 
 use sha2::Digest as _;
 use sha2::Sha256;
 
-/// How long one transfer may take, in seconds: a vendor's `.deb` runs to a few hundred MB. The
-/// tests stall a stub server for longer than theirs.
-const MAX_TIME: &str = if cfg!(test) { "1" } else { "900" };
+/// How long one try of a transfer may take, in seconds: a vendor's `.deb` runs to a few hundred MB.
+/// A try after the first gets what is left of [`Retry::budget`] instead.
+const MAX_TIME: u64 = if cfg!(test) { 1 } else { 900 };
 
 /// How long a web app's answer may take, in seconds; only its status is read.
-const STATUS_MAX_TIME: &str = if cfg!(test) { "1" } else { "60" };
+const STATUS_MAX_TIME: u64 = if cfg!(test) { 1 } else { 60 };
 
-/// How long reaching a server may take, in seconds, so a host that is gone fails fast instead of
-/// waiting out curl's five minutes.
+/// How long reaching a server may take, in seconds, so a host that drops packets fails in half a
+/// minute instead of curl's five.
 const CONNECT_TIMEOUT: &str = "30";
 
-/// How many times a fetch is tried while it looks like an outage, waiting [`BACKOFF`], then twice
-/// as long each time: 1, 2, 4, 8, 16 and 32 seconds. A mirror such as Launchpad's answers 503 for
-/// a minute or so at a time, and a check that gives up sooner reports an outage that has passed.
-const TRIES: u32 = if cfg!(test) { 3 } else { 7 };
+/// A transfer slower than [`SPEED_LIMIT`] bytes a second for this many seconds is a timeout, so a
+/// host that accepts and then stalls costs a minute, not [`MAX_TIME`].
+const SPEED_TIME: &str = if cfg!(test) { "1" } else { "60" };
+const SPEED_LIMIT: &str = "1024";
 
-/// The first wait between tries, doubled after each. The tests wait none, so they stay fast.
-const BACKOFF: Duration = if cfg!(test) {
-    Duration::ZERO
-} else {
-    Duration::from_secs(1)
-};
+/// How a fetch that looks like an outage is tried again.
+#[derive(Clone, Copy, Debug)]
+struct Retry {
+    /// The most tries, the first included.
+    tries: u32,
+    /// The first wait between tries, doubled after each.
+    backoff: Duration,
+    /// No try starts once this long has passed since the first began.
+    budget: Duration,
+}
+
+impl Retry {
+    /// 7 tries, waiting 1, 2, 4, 8, 16 and 32 seconds between, within 3 minutes: a mirror such as
+    /// Launchpad's answers 503 for a minute or so at a time, and a check that gives up sooner
+    /// reports an outage that has passed, while the CI job's 30 minutes hold many hosts' worst
+    /// cases.
+    const RUNS: Self = Self {
+        tries: 7,
+        backoff: Duration::from_secs(1),
+        budget: Duration::from_mins(3),
+    };
+
+    /// The tests' tries wait none, so they stay fast.
+    const TESTS: Self = Self {
+        tries: 3,
+        backoff: Duration::ZERO,
+        budget: Duration::from_secs(10),
+    };
+
+    /// The wait before try `next` (2 for the first try again), none when no try is due: the tries
+    /// or the budget are spent, or a timeout has been tried again once already, since a host that
+    /// times out twice costs minutes a try.
+    fn wait(&self, next: u32, elapsed: Duration, timeouts: u32) -> Option<Duration> {
+        if next > self.tries || timeouts > 1 {
+            return None;
+        }
+        let wait = self.backoff * 2u32.pow(next.saturating_sub(2));
+        (elapsed + wait < self.budget).then_some(wait)
+    }
+}
+
+const RETRY: Retry = if cfg!(test) { Retry::TESTS } else { Retry::RUNS };
+
+/// How many requests a fetch that stays down makes, for the other modules' tests.
+#[cfg(test)]
+pub fn tries() -> usize {
+    RETRY.tries as usize
+}
+
+/// The hosts that were out of reach on every try this run: a later fetch from one is an outage at
+/// once, so a host that drops packets costs its tries once, not once a URL.
+static DOWN: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+/// `url`'s host and port, as the scheme leaves them.
+fn host(url: &str) -> &str {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    rest.split(['/', '?', '#']).next().unwrap_or(rest)
+}
 
 /// Whether a fetch that failed says anything about the catalog.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,6 +152,9 @@ pub enum Cause {
     Curl { exit: Option<i32>, said: String },
     #[error("the answer isn't JSON")]
     Json(#[source] serde_json::Error),
+    /// The host was out of reach on every try of an earlier fetch this run.
+    #[error("{0} was out of reach earlier in this run; not tried again")]
+    HostDown(String),
 }
 
 impl Cause {
@@ -102,8 +162,24 @@ impl Cause {
         match self {
             Self::Status(status) if *status == 429 || (500..600).contains(status) => Class::Outage,
             Self::Curl { exit: Some(exit), .. } if curl_outage(*exit) => Class::Outage,
+            Self::HostDown(_) => Class::Outage,
             _ => Class::Failure,
         }
+    }
+
+    /// Whether the host itself was out of reach: no name, no connection, no TLS, or a timeout.
+    fn host_down(&self) -> bool {
+        matches!(
+            self,
+            Self::Curl {
+                exit: Some(5 | 6 | 7 | 28 | 35),
+                ..
+            }
+        )
+    }
+
+    fn timed_out(&self) -> bool {
+        matches!(self, Self::Curl { exit: Some(28), .. })
     }
 
     /// The cause of a curl run that failed: the HTTP error `--fail` stopped on, else curl's exit.
@@ -135,7 +211,7 @@ pub fn curl_outage(exit: i32) -> bool {
     matches!(exit, 5 | 6 | 7 | 16 | 18 | 28 | 35 | 47 | 52 | 55 | 56 | 92)
 }
 
-fn curl() -> Command {
+fn curl(max_time: u64) -> Command {
     let mut command = Command::new("curl");
     command.args([
         "--silent",
@@ -144,6 +220,8 @@ fn curl() -> Command {
         "--connect-timeout",
         CONNECT_TIMEOUT,
     ]);
+    command.args(["--speed-limit", SPEED_LIMIT, "--speed-time", SPEED_TIME]);
+    command.arg("--max-time").arg(max_time.to_string());
     // The tests' stub server is on loopback, which a proxy of the machine's must not stand in for.
     if cfg!(test) {
         command.args(["--noproxy", "*"]);
@@ -152,32 +230,52 @@ fn curl() -> Command {
 }
 
 /// curl stopping on an HTTP error and writing the final status last on stderr, for [`Cause::of`].
-fn failing_curl() -> Command {
-    let mut command = curl();
-    command.args([
-        "--fail",
-        "--max-time",
-        MAX_TIME,
-        "--write-out",
-        "%{stderr}%{http_code}\n",
-    ]);
+fn failing_curl(max_time: u64) -> Command {
+    let mut command = curl(max_time);
+    command.args(["--fail", "--write-out", "%{stderr}%{http_code}\n"]);
     command
 }
 
-/// `once` tried until it succeeds, fails with what isn't an outage, or has been tried [`TRIES`]
-/// times, waiting longer before each try.
-fn tried<T>(url: &str, mut once: impl FnMut() -> Result<T, Cause>) -> Result<T, FetchError> {
-    let mut wait = BACKOFF;
-    for _ in 1..TRIES {
-        match once() {
-            Err(cause) if cause.class() == Class::Outage => {
-                thread::sleep(wait);
-                wait *= 2;
-            }
-            done => return done.map_err(|cause| FetchError::new(url, cause)),
-        }
+/// `once` tried, given how many seconds the try may take of `max_time`, until it succeeds, fails
+/// with what isn't an outage, or [`RETRY`] allows no further try. A host out of reach on every try
+/// is remembered in [`DOWN`], and a later fetch from it isn't tried.
+fn tried<T>(url: &str, max_time: u64, mut once: impl FnMut(u64) -> Result<T, Cause>) -> Result<T, FetchError> {
+    let host = host(url);
+    if DOWN.lock().expect("down hosts mutex poisoned").contains(host) {
+        return Err(FetchError::new(url, Cause::HostDown(host.to_owned())));
     }
-    once().map_err(|cause| FetchError::new(url, cause))
+    let start = Instant::now();
+    let mut timeouts = 0;
+    let mut this_try = max_time;
+    let mut next = 2;
+    loop {
+        let cause = match once(this_try) {
+            Err(cause) if cause.class() == Class::Outage => cause,
+            done => return done.map_err(|cause| FetchError::new(url, cause)),
+        };
+        timeouts += u32::from(cause.timed_out());
+        let elapsed = start.elapsed();
+        let Some(wait) = RETRY.wait(next, elapsed, timeouts) else {
+            if cause.host_down() {
+                DOWN.lock().expect("down hosts mutex poisoned").insert(host.to_owned());
+            }
+            return Err(FetchError::new(url, cause));
+        };
+        thread::sleep(wait);
+        let left = RETRY.budget.saturating_sub(elapsed + wait).as_secs().max(1);
+        this_try = max_time.min(left);
+        next += 1;
+    }
+}
+
+/// `child`'s output once it has ended; killed first when `failed`, so no curl is left running.
+fn reaped(mut child: Child, failed: Option<io::Error>) -> Result<Output, Cause> {
+    if let Some(e) = failed {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(Cause::Spawn(e));
+    }
+    child.wait_with_output().map_err(Cause::Spawn)
 }
 
 fn succeeded(output: Output) -> Result<Vec<u8>, Cause> {
@@ -194,8 +292,12 @@ fn succeeded(output: Output) -> Result<Vec<u8>, Cause> {
 ///
 /// [`FetchError`] when curl can't run or the server answers with an error on the last try.
 pub fn get(url: &str) -> Result<Vec<u8>, FetchError> {
-    tried(url, || {
-        let output = failing_curl().arg("--").arg(url).output().map_err(Cause::Spawn)?;
+    tried(url, MAX_TIME, |max_time| {
+        let output = failing_curl(max_time)
+            .arg("--")
+            .arg(url)
+            .output()
+            .map_err(Cause::Spawn)?;
         succeeded(output)
     })
 }
@@ -206,8 +308,8 @@ pub fn get(url: &str) -> Result<Vec<u8>, FetchError> {
 ///
 /// [`FetchError`] when curl can't run or the server answers with an error on the last try.
 pub fn sha256(url: &str) -> Result<String, FetchError> {
-    tried(url, || {
-        let mut child = failing_curl()
+    tried(url, MAX_TIME, |max_time| {
+        let mut child = failing_curl(max_time)
             .arg("--")
             .arg(url)
             .stdout(Stdio::piped())
@@ -217,15 +319,15 @@ pub fn sha256(url: &str) -> Result<String, FetchError> {
         let mut hasher = Sha256::new();
         let mut stdout = child.stdout.take().expect("curl's stdout is piped");
         let mut buffer = vec![0; 1 << 16];
-        loop {
-            let read = stdout.read(&mut buffer).map_err(Cause::Spawn)?;
-            if read == 0 {
-                break;
+        let failed = loop {
+            match stdout.read(&mut buffer) {
+                Ok(0) => break None,
+                Ok(read) => hasher.update(&buffer[..read]),
+                Err(e) => break Some(e),
             }
-            hasher.update(&buffer[..read]);
-        }
-        let output = child.wait_with_output().map_err(Cause::Spawn)?;
-        succeeded(output)?;
+        };
+        drop(stdout);
+        succeeded(reaped(child, failed)?)?;
         Ok(hex(&hasher.finalize()))
     })
 }
@@ -247,9 +349,9 @@ pub struct Answer {
 /// [`FetchError`] when curl can't run, can't reach the server, or the server is down on the last
 /// try.
 pub fn status(url: &str) -> Result<Answer, FetchError> {
-    tried(url, || {
-        let output = curl()
-            .args(["--max-time", STATUS_MAX_TIME, "--output", "/dev/null"])
+    tried(url, STATUS_MAX_TIME, |max_time| {
+        let output = curl(max_time)
+            .args(["--output", "/dev/null"])
             .args(["--write-out", "%{http_code} %header{cf-mitigated}", "--"])
             .arg(url)
             .output()
@@ -283,8 +385,8 @@ pub fn status(url: &str) -> Result<Answer, FetchError> {
 pub fn github(path: &str) -> Result<serde_json::Value, FetchError> {
     let url = format!("https://api.github.com/{path}");
     let token = env::var("GITHUB_TOKEN").ok().filter(|token| !token.is_empty());
-    tried(&url, || {
-        let mut command = failing_curl();
+    tried(&url, MAX_TIME, |max_time| {
+        let mut command = failing_curl(max_time);
         command.args(["--header", "Accept: application/vnd.github+json"]);
         if token.is_some() {
             command.args(["--header", "@-"]);
@@ -298,11 +400,11 @@ pub fn github(path: &str) -> Result<serde_json::Value, FetchError> {
             .spawn()
             .map_err(Cause::Spawn)?;
         let mut stdin = child.stdin.take().expect("curl's stdin is piped");
-        if let Some(token) = &token {
-            writeln!(stdin, "Authorization: Bearer {token}").map_err(Cause::Spawn)?;
-        }
+        let failed = token
+            .as_ref()
+            .and_then(|token| writeln!(stdin, "Authorization: Bearer {token}").err());
         drop(stdin);
-        let body = succeeded(child.wait_with_output().map_err(Cause::Spawn)?)?;
+        let body = succeeded(reaped(child, failed)?)?;
         serde_json::from_slice(&body).map_err(Cause::Json)
     })
 }

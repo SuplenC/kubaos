@@ -15,14 +15,22 @@
 #   - failed (a vendor renamed its file, an unversioned URL serves a new file): the issue titled
 #     "Apps bump: ID needs a hand" opens, or its text follows the newest failure.
 #   - current: an open issue of the app closes, with a comment.
-#   - a feed down (a WARN row: kubaos-apps-verify passes, writing nothing): the app and its issue
-#     stay as they are, for the next run.
+#   - a feed down (kubaos-apps-verify exits 3, writing nothing): the app waits for the next run.
+#     After OUTAGE_RUNS runs down in a row its feed may be gone for good, so the "needs a hand"
+#     issue opens, or its text follows the newest outage. The count of each app's outages in a row
+#     is kept in the file APPS_BUMP_OUTAGES names, one `ID COUNT` a line, which the workflow keeps
+#     from run to run in the Actions cache; with none set, nothing is counted and an outage only
+#     waits.
 # An app that needs a hand is its issue, not a failed run: the run fails only when a step of its own
 # does. --dry-run prints each step and pushes, opens and closes nothing.
 set -euo pipefail
 
 DRY_RUN=0
 ids=()
+# The runs in a row an app's feed may be down before its issue opens: a day or two of an outage
+# passes on its own, three is a feed to look at.
+OUTAGE_RUNS=3
+OUTAGES="${APPS_BUMP_OUTAGES:-}"
 usage() {
   sed -n '2,/^set -euo/{/^set -euo/d;s/^# \{0,1\}//;p}' "$0"
 }
@@ -75,6 +83,34 @@ first_value() {
   sed -n "s/^$1 = \"\(.*\)\"\$/\1/p" | head -n 1
 }
 
+# The runs in a row ID's feed has been down, 0 when it wasn't down on the last one.
+outages_of() {
+  local count=""
+  if [[ -n $OUTAGES && -f $OUTAGES ]]; then
+    count="$(awk -v id="$1" '$1 == id { print $2 }' "$OUTAGES")"
+  fi
+  echo "${count:-0}"
+}
+
+# Sets ID's count of outages in a row to COUNT; 0 drops its line. A dry run keeps the counts.
+set_outages() {
+  if [[ -z $OUTAGES ]] || ((DRY_RUN)); then
+    return
+  fi
+  local kept
+  kept="$(awk -v id="$1" '$1 != id' "$OUTAGES" 2>/dev/null || true)"
+  {
+    [[ -n $kept ]] && printf '%s\n' "$kept"
+    (($2 > 0)) && printf '%s %s\n' "$1" "$2"
+  } >"$OUTAGES.new" || true
+  mv "$OUTAGES.new" "$OUTAGES"
+}
+
+# The counts' file is there even when no app is down, so the workflow can save it.
+if [[ -n $OUTAGES ]]; then
+  touch "$OUTAGES"
+fi
+
 verify=(cargo run -q -p kubaos-apps-verify --)
 cargo build -q -p kubaos-apps-verify
 start="$(git rev-parse HEAD)"
@@ -85,6 +121,28 @@ for id in "${ids[@]}"; do
   status=0
   table="$("${verify[@]}" --bump "$id" 2>&1)" || status=$?
   printf '%s\n' "$table"
+
+  if ((status == 3)); then
+    git checkout -q -- "$file"
+    count=$(($(outages_of "$id") + 1))
+    set_outages "$id" "$count"
+    if ((count < OUTAGE_RUNS)); then
+      echo "   a feed was down, $count of $OUTAGE_RUNS runs in a row; $id waits for the next run"
+      continue
+    fi
+    body="$(report \
+      "The daily Apps bump has found a release feed of \`$id\` down $count runs in a row:" \
+      "$table" \
+      "A feed down this long may be gone for good: check its URL and pin \`$file\` by hand if it moved; this issue closes on the first run that finds the pins current or moves them.")"
+    number="$(open_issue "$issue_title")"
+    if [[ -n $number ]]; then
+      run gh issue edit "$number" --body "$body"
+    else
+      run gh issue create --title "$issue_title" --body "$body"
+    fi
+    continue
+  fi
+  set_outages "$id" 0
 
   if ((status != 0)); then
     git checkout -q -- "$file"
@@ -98,11 +156,6 @@ for id in "${ids[@]}"; do
     else
       run gh issue create --title "$issue_title" --body "$body"
     fi
-    continue
-  fi
-
-  if grep -q '^kubaos-apps-verify: [0-9]* warned' <<<"$table"; then
-    echo "   a feed was down; $id waits for the next run"
     continue
   fi
 

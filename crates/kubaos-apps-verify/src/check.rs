@@ -4,18 +4,23 @@
 //!
 //! - [`Context`]: the checkout's package manifest and sources files, the Ubuntu release the apps
 //!   are for, and the archive's indexes, fetched once a run.
-//! - [`app`]: every check of one app's actions, in every setup, as [`Row`]s.
+//! - [`app`]: every check of one app's actions, in every setup, as [`Row`]s, an outage a warning
+//!   ([`Problem`]), or an error on a pin the branch changed.
 //!
 //! # Not here
 //!
-//! - Reading repositories: `apt.rs`. Fetching: `fetch.rs`. The table: `main.rs`.
+//! - Reading repositories: `apt.rs`. Fetching: `fetch.rs`. What a branch changed: `changed.rs`. The
+//!   table: `main.rs`.
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 
 use kubaos_core::apps::Folder;
 use kubaos_core::apps::action::Kind;
@@ -26,6 +31,7 @@ use kubaos_core::apt::Manifest;
 use crate::apt;
 use crate::apt::AptError;
 use crate::apt::Sources;
+use crate::changed::Changed;
 use crate::fetch;
 use crate::fetch::Class;
 use crate::fetch::FetchError;
@@ -138,11 +144,38 @@ pub struct Context {
     /// The Ubuntu release the apps are for, by its codename.
     release: String,
     /// Ubuntu's newest version of each package, by architecture, fetched on first use.
-    ubuntu: Mutex<BTreeMap<String, Result<Versions, Problem>>>,
+    ubuntu: Once<Result<Versions, Problem>>,
+    /// What the branch changed, under `--changed`.
+    changed: Option<Changed>,
 }
 
 /// The newest version of each package, by name.
 type Versions = BTreeMap<String, String>;
+
+/// A value per key, such as an architecture, worked out once a run. Each key has a lock of its
+/// own, so two keys are fetched side by side and only a second asker of the same key waits.
+#[derive(Debug)]
+struct Once<T> {
+    cells: Mutex<BTreeMap<String, Arc<OnceLock<T>>>>,
+}
+
+impl<T> Default for Once<T> {
+    fn default() -> Self {
+        Self {
+            cells: Mutex::new(BTreeMap::new()),
+        }
+    }
+}
+
+impl<T: Clone> Once<T> {
+    fn get_or_init(&self, key: &str, init: impl FnOnce() -> T) -> T {
+        let cell = {
+            let mut cells = self.cells.lock().expect("cache mutex poisoned");
+            Arc::clone(cells.entry(key.to_owned()).or_default())
+        };
+        cell.get_or_init(init).clone()
+    }
+}
 
 impl Context {
     pub fn new(root: PathBuf, manifest: Manifest, release: String) -> Self {
@@ -150,20 +183,25 @@ impl Context {
             root,
             manifest,
             release,
-            ubuntu: Mutex::new(BTreeMap::new()),
+            ubuntu: Once::default(),
+            changed: None,
+        }
+    }
+
+    /// The context with what the branch changed, so an outage on a changed pin fails.
+    #[must_use]
+    pub fn with_changed(self, changed: Changed) -> Self {
+        Self {
+            changed: Some(changed),
+            ..self
         }
     }
 
     /// Ubuntu's newest version of each package for `arch`, from the release, `-updates` and
     /// `-security`, each `InRelease` verified with the archive's keys.
     fn ubuntu(&self, arch: &str) -> Result<Versions, Problem> {
-        let mut cache = self.ubuntu.lock().expect("Ubuntu index cache mutex poisoned");
-        if let Some(found) = cache.get(arch) {
-            return found.clone();
-        }
-        let found = self.fetch_ubuntu(arch).map_err(|e| Problem::apt(&e));
-        cache.insert(arch.to_owned(), found.clone());
-        found
+        self.ubuntu
+            .get_or_init(arch, || self.fetch_ubuntu(arch).map_err(|e| Problem::apt(&e)))
     }
 
     fn fetch_ubuntu(&self, arch: &str) -> Result<Versions, AptError> {
@@ -189,7 +227,10 @@ impl Context {
 /// Every check of `app`'s actions, its own and every setup's.
 pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
     let mut rows = Vec::new();
+    // Whether the branch changed the pin the next rows are about, under `--changed`.
+    let fresh = Cell::new(false);
     let mut row = |check, subject: String, outcome, detail: String| {
+        let (outcome, detail) = escalated(outcome, detail, fresh.get());
         rows.push(Row {
             app: app.id.clone(),
             check,
@@ -198,12 +239,16 @@ pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
             detail,
         });
     };
+    let changed = context.changed.as_ref();
+    let fresh_repo = |name: &str| changed.is_some_and(|changed| changed.repo(name));
     let actions = app
         .actions
         .iter()
         .chain(app.setups.iter().flat_map(|setup| &setup.actions));
     let mut repos: BTreeMap<String, Option<Repository>> = BTreeMap::new();
     for action in actions {
+        let fresh_action = changed.is_some_and(|changed| changed.action(&app.id, &action.kind));
+        fresh.set(fresh_action);
         match &action.kind {
             Kind::Apt {
                 packages,
@@ -217,9 +262,11 @@ pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
                 if let Some(name) = repo
                     && !repos.contains_key(name)
                 {
+                    fresh.set(fresh_repo(name));
                     let checked = vendor(context, name, &mut row);
                     repos.insert(name.clone(), checked);
                 }
+                fresh.set(fresh_action || repo.as_deref().is_some_and(fresh_repo));
                 // A repository whose key or InRelease failed was reported; its packages aren't
                 // looked up.
                 let repository = match repo {
@@ -263,6 +310,19 @@ pub fn app(context: &Context, app: &Folder) -> Vec<Row> {
 
 type Report<'a> = dyn FnMut(&'static str, String, Outcome, String) + 'a;
 
+/// An outage's row as it is, or an error when the branch changed the pin it is about: that pin has
+/// never been checked, and a run that passes would let it in unchecked.
+fn escalated(outcome: Outcome, detail: String, fresh: bool) -> (Outcome, String) {
+    if outcome == Outcome::Warning && fresh {
+        (
+            Outcome::Error,
+            format!("{detail}; this branch changes the pin, so it can't pass unchecked"),
+        )
+    } else {
+        (outcome, detail)
+    }
+}
+
 /// A vendor repository whose key and `InRelease` checked out: what its packages are looked up in.
 #[derive(Debug)]
 struct Repository {
@@ -270,7 +330,7 @@ struct Repository {
     sources: Sources,
     release: apt::Release,
     /// Its newest version of each package, by architecture, fetched on first use.
-    indexes: Mutex<BTreeMap<String, Result<Versions, Problem>>>,
+    indexes: Once<Result<Versions, Problem>>,
 }
 
 impl Repository {
@@ -280,12 +340,10 @@ impl Repository {
         if !self.sources.serves(arch) {
             return None;
         }
-        let mut cache = self.indexes.lock().expect("repository index cache mutex poisoned");
-        let found = cache.entry(arch.to_owned()).or_insert_with(|| {
+        Some(self.indexes.get_or_init(arch, || {
             let components: Vec<&str> = self.sources.components.iter().map(String::as_str).collect();
             apt::index(&self.sources.dists(), &self.release, &components, arch).map_err(|e| Problem::apt(&e))
-        });
-        Some(found.clone())
+        }))
     }
 
     fn label(&self) -> String {
@@ -372,7 +430,7 @@ fn vendor(context: &Context, name: &str, row: &mut Report<'_>) -> Option<Reposit
                 name: name.to_owned(),
                 sources,
                 release,
-                indexes: Mutex::new(BTreeMap::new()),
+                indexes: Once::default(),
             })
         }
         Ok((verified, _)) => {
@@ -460,6 +518,11 @@ fn pinned(what: &str, url: &str, sha256: &str, row: &mut Report<'_>) {
         Err(e) => {
             let problem = Problem::fetch(&e);
             row("sha256", subject.clone(), problem.outcome, problem.detail);
+            // The host is down, so the vendor's digests beside the file would only spend their
+            // tries on it too.
+            if e.class() == Class::Outage {
+                return;
+            }
         }
     }
     match published(url) {
@@ -481,7 +544,8 @@ fn pinned(what: &str, url: &str, sha256: &str, row: &mut Report<'_>) {
 }
 
 /// The sha256 a vendor publishes for `url`, and where it was found: a GitHub release asset's
-/// digest, or a checksum file beside the download.
+/// digest, or a checksum file beside the download. A checksum file that was down, with none found
+/// beside it, is a warning.
 fn published(url: &str) -> Result<Option<(String, String)>, Problem> {
     if let Some(rest) = url.strip_prefix("https://github.com/") {
         let parts: Vec<&str> = rest.splitn(6, '/').collect();
@@ -499,18 +563,24 @@ fn published(url: &str) -> Result<Option<(String, String)>, Problem> {
         }
     }
     let (dir, file) = url.rsplit_once('/').unwrap_or(("", url));
+    let mut down = None;
     for candidate in [
         format!("{url}.sha256"),
         format!("{url}.sha256sum"),
         format!("{dir}/SHA256SUMS"),
     ] {
-        if let Ok(body) = fetch::get(&candidate)
-            && let Some(digest) = digest_for(&String::from_utf8_lossy(&body), file)
-        {
-            return Ok(Some((candidate, digest)));
+        match fetch::get(&candidate) {
+            Ok(body) => {
+                if let Some(digest) = digest_for(&String::from_utf8_lossy(&body), file) {
+                    return Ok(Some((candidate, digest)));
+                }
+            }
+            Err(e) if e.class() == Class::Outage => down = down.or(Some(Problem::fetch(&e))),
+            Err(_) => {}
         }
     }
-    Ok(None)
+    // A checksum file that was down may be the digest the vendor publishes; "none" would hide it.
+    down.map_or(Ok(None), Err)
 }
 
 /// The sha256 a checksum file gives `file`: on the line naming it, or its only line.
@@ -609,9 +679,8 @@ fn evaluate(root: &Path, system: &str, package: &str) -> Result<serde_json::Valu
 }
 
 /// A web app's URL answers with a success after its redirects, or Cloudflare's bot challenge; one
-/// that is down on every try is a warning. One
-/// of this machine's, plain HTTP on a loopback host, isn't reachable from here; any other URL that
-/// isn't HTTPS is a mismatch.
+/// that is down on every try is a warning. One of this machine's, plain HTTP on a loopback host,
+/// isn't reachable from here; any other URL that isn't HTTPS is a mismatch.
 fn web_app(url: &str, row: &mut Report<'_>) {
     if let Some(rest) = url.strip_prefix("http://") {
         let (outcome, detail) = if loopback(rest) {

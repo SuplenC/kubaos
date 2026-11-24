@@ -150,7 +150,7 @@ fn unversioned_app(url: &str) -> (tempfile::TempDir, String) {
 }
 
 #[test]
-fn a_feed_down_on_every_try_is_a_warning_that_passes_and_writes_nothing() {
+fn a_feed_down_on_every_try_is_a_warning_exits_3_and_writes_nothing() {
     let stub = Stub::always(Reply::Status(503));
     let (catalog, text) = unversioned_app(&stub.url("/tool-latest.tar.gz"));
 
@@ -158,7 +158,7 @@ fn a_feed_down_on_every_try_is_a_warning_that_passes_and_writes_nothing() {
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].outcome, Outcome::Warning, "{}", rows[0].detail);
-    assert_eq!(crate::exit_code(&rows), 0);
+    assert_eq!(crate::exit_code(&rows, true), 3);
     assert_eq!(
         std::fs::read_to_string(catalog.path().join("tool/app.toml")).unwrap(),
         text
@@ -173,5 +173,5 @@ fn a_download_that_serves_another_file_fails() {
     let rows = app(catalog.path(), "tool");
 
     assert_eq!(rows[0].outcome, Outcome::Error, "{}", rows[0].detail);
-    assert_eq!(crate::exit_code(&rows), 1);
+    assert_eq!(crate::exit_code(&rows, true), 1);
 }

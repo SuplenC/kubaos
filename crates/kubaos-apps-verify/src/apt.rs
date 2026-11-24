@@ -423,7 +423,8 @@ fn packages(dists: &str, release: &Release, base: &str, arch: &str) -> Result<BT
 }
 
 /// Fetches `InRelease` from `dists` and verifies it with `keys`; for a suite with none, `Release`
-/// and its `Release.gpg`, as apt does.
+/// and then its `Release.gpg`, as apt does. An `InRelease` that is down is reported as it is,
+/// without looking for the others.
 ///
 /// # Errors
 ///
@@ -432,13 +433,17 @@ pub fn release(dists: &str, keys: &[u8]) -> Result<(Verified, Release), AptError
     let url = format!("{dists}/InRelease");
     let verified = match fetch::get(&url) {
         Ok(inrelease) => verify(keys, Signed::Inline(&inrelease))?,
+        // A suite that is down serves no `Release` either; asking costs another round of tries.
+        Err(down) if down.class() == Class::Outage => return Err(AptError::Fetch(down)),
         Err(missing) => {
-            let detached = format!("{dists}/Release");
-            let signature = format!("{detached}.gpg");
-            // The InRelease's error is the one to report when the suite has neither.
-            let (Ok(release), Ok(signature)) = (fetch::get(&detached), fetch::get(&signature)) else {
-                return Err(AptError::Fetch(missing));
+            // The InRelease's error is the one to report when the suite has neither, unless the
+            // `Release` was down; a missing `Release.gpg` beside a `Release` is its own error.
+            let release = match fetch::get(&format!("{dists}/Release")) {
+                Ok(release) => release,
+                Err(down) if down.class() == Class::Outage => return Err(AptError::Fetch(down)),
+                Err(_) => return Err(AptError::Fetch(missing)),
             };
+            let signature = fetch::get(&format!("{dists}/Release.gpg")).map_err(AptError::Fetch)?;
             verify(
                 keys,
                 Signed::Detached {

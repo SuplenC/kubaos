@@ -2,7 +2,9 @@
 # newest releases, one pull request an app, as Dependabot does for dependencies.
 # test/apps-bump/run does the work: `kubaos-apps-verify --bump` per app, a branch chore/bump-<id>
 # and a pull request for each app that moved, and an issue "Apps bump: <id> needs a hand" for each
-# app whose newest release can't be pinned (a renamed file, an unversioned URL serving a new file).
+# app whose newest release can't be pinned (a renamed file, an unversioned URL serving a new file)
+# or whose feed has been down 3 runs in a row; each app's outages in a row are counted in a file
+# the Actions cache keeps from run to run.
 # The pull request's own checks (check.yml's `apps verify`) download each file and hold it to the
 # vendor's digest; nothing merges without a review.
 #
@@ -54,11 +56,27 @@ jobs:
           store: devshell
           cargo: true
 
+      # The newest run's counts of each app's outages in a row; a run saves its own under its id.
+      - name: Restore the outage counts
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apps-bump-outages
+          key: apps-bump-outages-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: apps-bump-outages-
+
       - name: Bump the apps
         env:
+          APPS_BUMP_OUTAGES: ${{ runner.temp }}/apps-bump-outages
           GH_TOKEN: ${{ secrets.APPS_BUMP_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.APPS_BUMP_TOKEN }}
           APPS: ${{ inputs.apps }}
         run: |
           read -ra ids <<<"$APPS"
           nix develop --command test/apps-bump/run "${ids[@]}"
+
+      - name: Save the outage counts
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apps-bump-outages
+          key: apps-bump-outages-${{ github.run_id }}-${{ github.run_attempt }}

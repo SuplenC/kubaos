@@ -19,18 +19,21 @@
 //! usage error. An upstream that is down on every try (an HTTP 5xx or 429, a redirect loop, a
 //! timeout, a name that doesn't resolve, a refused or broken connection, a failed TLS handshake) is
 //! a warning: its row says `WARN`, GitHub Actions shows it as an annotation, and the run passes, as
-//! the catalog may well be right. It installs nothing and reads no apt, dpkg or gpg state of the
-//! machine's: keys are checked in a gpg home of their own.
+//! the catalog may well be right. A fetch gets 7 tries within 3 minutes, a timeout 2, and a host
+//! out of reach on every try isn't tried again in the run. It installs nothing and reads no apt,
+//! dpkg or gpg state of the machine's: keys are checked in a gpg home of their own.
 //!
 //! `--changed BASE` checks the apps whose folder changed since the merge base with BASE, and the
-//! apps whose vendor repository changed (`system/packages.toml`, a sources file).
+//! apps whose vendor repository changed (`system/packages.toml`, a sources file). There an outage
+//! on a pin the branch changed (an action that differs from the merge base's, or a repository whose
+//! pin or sources file changed) is an error: nothing has checked that pin yet.
 //!
 //! `--bump` checks nothing: it moves each pinned `.deb` and download of the apps named, or of every
 //! app, on to its vendor's newest release, writing the new version, URL and sha256 into the app's
 //! `app.toml`. It exits 1 when a pin's newest release can't be found or has no file for it, as when
-//! a vendor renames its downloads, and warns, writing nothing, when a feed is down. The daily `Apps
-//! bump` workflow runs it and opens a pull request for each app it moved, whose checks run this
-//! check on the app.
+//! a vendor renames its downloads, and 3 when a feed was down and nothing failed, writing nothing
+//! for that app. The daily `Apps bump` workflow runs it and opens a pull request for each app it
+//! moved, whose checks run this check on the app.
 //!
 //! # Owns
 //!
@@ -43,6 +46,7 @@
 
 mod apt;
 mod bump;
+mod changed;
 mod check;
 mod fetch;
 #[cfg(test)]
@@ -61,6 +65,7 @@ use kubaos_core::apps::action::Kind;
 use kubaos_core::apps::catalog::CATALOG;
 use kubaos_core::apt::Manifest;
 
+use crate::changed::Changed;
 use crate::check::Context;
 use crate::check::Outcome;
 use crate::check::Row;
@@ -135,8 +140,6 @@ fn main() -> ExitCode {
                 print!("{}", annotations(&rows));
             }
             let warned = rows.iter().filter(|row| row.outcome == Outcome::Warning).count();
-            // HAZARD: `test/apps-bump/run` reads this line, so a feed that was down leaves the
-            // app's issue open. Reworded, the run closes it as though the pins were current.
             if warned > 0 {
                 eprintln!("kubaos-apps-verify: {warned} warned, upstream down");
             }
@@ -144,7 +147,7 @@ fn main() -> ExitCode {
             if failed > 0 {
                 eprintln!("kubaos-apps-verify: {failed} failed");
             }
-            ExitCode::from(exit_code(&rows))
+            ExitCode::from(exit_code(&rows, args.bump))
         }
         Err(Usage(e)) => {
             eprintln!("kubaos-apps-verify: {e}");
@@ -153,9 +156,16 @@ fn main() -> ExitCode {
     }
 }
 
-/// 1 when a row fails, else 0: warnings pass.
-fn exit_code(rows: &[Row]) -> u8 {
-    u8::from(rows.iter().any(|row| row.outcome.fails()))
+/// 1 when a row fails; else, for `--bump`, 3 when a row warned, so `test/apps-bump/run` can count
+/// an app's outages; else 0: a check's warnings pass.
+fn exit_code(rows: &[Row], bump: bool) -> u8 {
+    if rows.iter().any(|row| row.outcome.fails()) {
+        1
+    } else if bump && rows.iter().any(|row| row.outcome == Outcome::Warning) {
+        3
+    } else {
+        0
+    }
 }
 
 /// A GitHub Actions `::warning::` line for each warning, so an outage shows on the run's summary
@@ -187,8 +197,13 @@ fn run(args: &Args) -> Result<Vec<Row>, Usage> {
     let manifest = Manifest::read(&args.root.join("system/packages.toml"))
         .map_err(|e| Usage(chain(&e)))?
         .unwrap_or_default();
+    let mut fresh = None;
     let apps: Vec<&Folder> = match &args.changed {
-        Some(base) => changed(&args.root, base, &catalog)?,
+        Some(base) => {
+            let (apps, merge_base) = changed(&args.root, base, &catalog)?;
+            fresh = Some(Changed::read(&args.root, &merge_base, &manifest));
+            apps
+        }
         None if args.ids.is_empty() => catalog.apps().iter().collect(),
         None => args
             .ids
@@ -212,7 +227,10 @@ fn run(args: &Args) -> Result<Vec<Row>, Usage> {
         let catalog = root.join(CATALOG);
         return Ok(side_by_side(&apps, |app| bump::app(&catalog, &app.id)));
     }
-    let context = Context::new(root, manifest, args.release.clone());
+    let mut context = Context::new(root, manifest, args.release.clone());
+    if let Some(fresh) = fresh {
+        context = context.with_changed(fresh);
+    }
     Ok(side_by_side(&apps, |app| check::app(&context, app)))
 }
 
@@ -229,19 +247,25 @@ fn side_by_side(apps: &[&Folder], each: impl Fn(&Folder) -> Vec<Row> + Sync) -> 
 }
 
 /// The apps whose folder changed since the merge base with `base`, and those taking packages from
-/// a vendor repository whose pin or sources file changed.
-fn changed<'a>(root: &Path, base: &str, catalog: &'a Catalog) -> Result<Vec<&'a Folder>, Usage> {
-    let output = kubaos_git::at(root)
-        .args(["diff", "--name-only", &format!("{base}...HEAD"), "--"])
-        .output()
-        .map_err(|e| Usage(format!("running git: {e}")))?;
-    if !output.status.success() {
-        return Err(Usage(format!(
-            "git diff against {base}: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )));
-    }
-    Ok(touched(&String::from_utf8_lossy(&output.stdout), catalog))
+/// a vendor repository whose pin or sources file changed; and the merge base.
+fn changed<'a>(root: &Path, base: &str, catalog: &'a Catalog) -> Result<(Vec<&'a Folder>, String), Usage> {
+    let git = |args: &[&str]| {
+        let output = kubaos_git::at(root)
+            .args(args)
+            .output()
+            .map_err(|e| Usage(format!("running git: {e}")))?;
+        if !output.status.success() {
+            return Err(Usage(format!(
+                "git {}: {}",
+                args.join(" "),
+                String::from_utf8_lossy(&output.stderr).trim()
+            )));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    };
+    let merge_base = git(&["merge-base", base, "HEAD"])?;
+    let paths = git(&["diff", "--name-only", &merge_base, "HEAD", "--"])?;
+    Ok((touched(&paths, catalog), merge_base))
 }
 
 /// The apps the changed `paths`, one a line, reach: an app's own folder, or the pin or sources

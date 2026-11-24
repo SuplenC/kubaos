@@ -76,12 +76,29 @@ impl Stub {
     }
 }
 
-/// A loopback URL where nothing listens, which refuses the connection.
-pub fn refused(path: &str) -> String {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("binding a loopback port");
-    let port = listener.local_addr().expect("the port's address").port();
-    drop(listener);
-    format!("http://127.0.0.1:{port}{path}")
+/// A loopback port that refuses connections for as long as it is held: the client end of a
+/// connection, which is bound but not listening, so no other socket can take its port meanwhile.
+#[derive(Debug)]
+pub struct Refused {
+    port: u16,
+    _ends: (TcpListener, TcpStream, TcpStream),
+}
+
+impl Refused {
+    pub fn new() -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("binding a loopback port");
+        let client = TcpStream::connect(listener.local_addr().expect("the listener's address")).expect("connecting");
+        let (server, _) = listener.accept().expect("accepting");
+        let port = client.local_addr().expect("the client's address").port();
+        Self {
+            port,
+            _ends: (listener, client, server),
+        }
+    }
+
+    pub fn url(&self, path: &str) -> String {
+        format!("http://127.0.0.1:{}{path}", self.port)
+    }
 }
 
 fn serve(mut stream: TcpStream, route: &Route, requests: &AtomicUsize) {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::stub;
+use crate::stub::Refused;
 use crate::stub::Reply;
 use crate::stub::Stub;
 
@@ -89,6 +89,7 @@ fn sha256_row(rows: &[Row]) -> &Row {
 #[test]
 fn every_outage_of_a_pinned_download_is_a_warning_that_passes() {
     let tls = Stub::always(Reply::Body(Vec::new()));
+    let refused = Refused::new();
     let urls = [
         Stub::always(Reply::Status(503)).url("/tool.deb"),
         Stub::always(Reply::Status(500)).url("/tool.deb"),
@@ -101,7 +102,7 @@ fn every_outage_of_a_pinned_download_is_a_warning_that_passes() {
             _ => Reply::Status(404),
         })
         .url("/tool.deb"),
-        stub::refused("/tool.deb"),
+        refused.url("/tool.deb"),
         tls.url("/tool.deb").replacen("http://", "https://", 1),
     ];
 
@@ -111,7 +112,7 @@ fn every_outage_of_a_pinned_download_is_a_warning_that_passes() {
         let row = sha256_row(&rows);
         assert_eq!(row.outcome, Outcome::Warning, "{url}: {}", row.detail);
         assert!(row.detail.contains(&url), "{url}: {}", row.detail);
-        assert_eq!(crate::exit_code(&rows), 0, "{url}");
+        assert_eq!(crate::exit_code(&rows, false), 0, "{url}");
     }
 }
 
@@ -129,7 +130,7 @@ fn a_sha256_mismatch_or_a_gone_download_fails() {
     assert_eq!(sha256_row(&not_found).outcome, Outcome::Error);
     assert_eq!(sha256_row(&removed).outcome, Outcome::Error);
     for rows in [mismatch, not_found, removed] {
-        assert_eq!(crate::exit_code(&rows), 1);
+        assert_eq!(crate::exit_code(&rows, false), 1);
     }
 }
 
@@ -145,17 +146,13 @@ fn an_outage_that_passes_within_the_tries_leaves_no_warning() {
 
     assert_eq!(sha256_row(&rows).outcome, Outcome::Ok);
     assert!(rows.iter().all(|row| row.outcome != Outcome::Warning), "{rows:?}");
-    assert_eq!(crate::exit_code(&rows), 0);
+    assert_eq!(crate::exit_code(&rows, false), 0);
 }
 
 #[test]
 fn a_missing_package_candidate_fails() {
     let context = Context::new(PathBuf::from("."), Manifest::default(), "resolute".to_owned());
-    context
-        .ubuntu
-        .lock()
-        .unwrap()
-        .insert("amd64".to_owned(), Ok(Versions::new()));
+    let _ = context.ubuntu.get_or_init("amd64", || Ok(Versions::new()));
     let mut rows = Vec::new();
 
     candidate(
@@ -227,4 +224,76 @@ fn a_warning_is_a_github_annotation_and_nothing_else_is() {
         text,
         "::warning title=Upstream down::tool sha256 tool.deb (amd64): fetching https://x/tool.deb: HTTP 503%0A100%25\n"
     );
+}
+
+#[test]
+fn a_down_checksum_file_beside_a_served_download_is_a_warning() {
+    let stub = Stub::new(|path, _| match path {
+        "/tool.deb" => Reply::Body(b"served".to_vec()),
+        _ => Reply::Status(503),
+    });
+
+    let rows = pinned_rows(&stub.url("/tool.deb"), SERVED);
+
+    let published = rows.iter().find(|row| row.check == "published").unwrap();
+    assert_eq!(published.outcome, Outcome::Warning, "{}", published.detail);
+    assert!(published.detail.contains("/tool.deb.sha256"), "{}", published.detail);
+}
+
+#[test]
+fn a_download_that_is_down_skips_the_vendors_digests() {
+    let stub = Stub::always(Reply::Status(503));
+
+    let rows = pinned_rows(&stub.url("/tool.deb"), SERVED);
+
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].outcome, Outcome::Warning);
+    assert_eq!(stub.requests(), crate::fetch::tries());
+}
+
+#[test]
+fn an_inrelease_that_is_down_isnt_followed_by_the_detached_files() {
+    let down = Stub::always(Reply::Status(503));
+
+    let problem = Problem::apt(&apt::release(&down.url("/dists/stable"), HELM_KEYS).unwrap_err());
+
+    assert_eq!(problem.outcome, Outcome::Warning);
+    assert_eq!(down.requests(), crate::fetch::tries());
+}
+
+#[test]
+fn a_release_gpg_that_is_down_is_a_warning_naming_it() {
+    let stub = Stub::new(|path, _| match path {
+        "/dists/stable/Release" => Reply::Body(HELM_SUMS.to_vec()),
+        "/dists/stable/Release.gpg" => Reply::Status(503),
+        _ => Reply::Status(404),
+    });
+
+    let problem = Problem::apt(&apt::release(&stub.url("/dists/stable"), HELM_KEYS).unwrap_err());
+
+    assert_eq!(problem.outcome, Outcome::Warning, "{}", problem.detail);
+    assert!(problem.detail.contains("Release.gpg"), "{}", problem.detail);
+}
+
+#[test]
+fn a_forbidden_or_unauthorized_download_fails() {
+    for status in [401, 403, 451] {
+        let stub = Stub::always(Reply::Status(status));
+
+        let rows = pinned_rows(&stub.url("/tool.deb"), SERVED);
+
+        assert_eq!(sha256_row(&rows).outcome, Outcome::Error, "HTTP {status}");
+    }
+}
+
+#[test]
+fn an_outage_on_a_pin_the_branch_changed_is_an_error() {
+    let (fresh, fresh_detail) = escalated(Outcome::Warning, "HTTP 503".to_owned(), true);
+    let (kept, _) = escalated(Outcome::Warning, "HTTP 503".to_owned(), false);
+    let (mismatch, _) = escalated(Outcome::Mismatch, "pinned a".to_owned(), true);
+
+    assert_eq!(fresh, Outcome::Error);
+    assert!(fresh_detail.starts_with("HTTP 503; "), "{fresh_detail}");
+    assert_eq!(kept, Outcome::Warning);
+    assert_eq!(mismatch, Outcome::Mismatch);
 }
