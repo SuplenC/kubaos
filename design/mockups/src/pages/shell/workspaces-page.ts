@@ -92,7 +92,7 @@ const ROLLS: Move = {
   tracks: ROLL,
   reduced: atOnce(ROLL),
   back: "cuts",
-  sample: () => rollingMidway(3, 4, "0", "button_small"),
+  sample: () => rollingMidway(3, 4, "0", "button"),
 };
 
 /** Showing another workspace: the leaving mark turns off as the arriving one turns on, a `swap_lag` later. */
@@ -297,7 +297,7 @@ export default page<State>({
       { part: "Hairline's height", token: "size-bar_divider" },
       { part: "A name, at most", token: "space-s48" },
       { part: "Ghost", token: "icon-s16" },
-      { part: "Number's line", token: "type-button_small-line" },
+      { part: "Number's line", token: "type-button-line" },
     ],
     reflow: doesntApply("as wide as its entries; the title beside it gives way."),
   },

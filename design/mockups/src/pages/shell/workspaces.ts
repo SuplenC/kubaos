@@ -1,13 +1,13 @@
 // The bar's workspaces, as `config/quickshell/modules/bar/Workspaces.qml` draws them: a pill of its
 // own, `size.control_sm` tall on `surface_container`, `space.s4` round a row of entries. A
-// workspace is a cell `size.chip` square, its number centred, semibold (`button_small`) with
-// windows or shown, medium (`label`) empty, or its kanji in `accent`. Groups come in block order, a
-// hairline `size.chip` / 2 tall in `outline_variant` in a `space.s12` gap between them. A group
-// waiting from a desk position no screen holds is borrowed: a `secondary` tint at `opacity.tint`
-// round it, its name first in `label`, `secondary`. A group's workspaces are numbered from 1 with no
-// gap, and a group with fewer than ten ends in its `+`, a ghost: a faint `add` in `outline` at
-// `opacity.placeholder`. Clicking it adds a workspace at the next number and shows it; it stays,
-// empty, until it is deleted.
+// workspace is a cell `size.chip` square, its number centred, semibold at 14 (`button`) with
+// windows or shown, medium (`body_strong`) empty, or its kanji in `accent`. Groups come in block
+// order, a hairline `size.chip` / 2 tall in `outline_variant` in a `space.s12` gap between them. A
+// group waiting from a desk position no screen holds is borrowed: a `secondary` tint at
+// `opacity.tint` round it, its name first in `label`, `secondary`. A group's workspaces are
+// numbered from 1 with no gap, and a group with fewer than ten ends in its `+`, a ghost: a faint
+// `add` in `outline` at `opacity.placeholder`. Clicking it adds a workspace at the next number and
+// shows it; it stays, empty, until it is deleted.
 //
 // The shown workspace sits on the indicator, `primary` at the full radius, between the tints and
 // the cells. Every change of shape glides: an entry grows in or shrinks out, its width over `long`
@@ -205,9 +205,10 @@ function numberText(id: number, kanji: boolean): string {
   return kanji ? KANJI[slotOf(id) - 1]! : String(slotOf(id));
 }
 
+/** A numeral's style, lit or not: a digit at 14, semibold for a workspace with windows. */
 function numberStyle(strong: boolean, kanji: boolean): TypeStyle {
   if (kanji) return "accent";
-  return strong ? "button_small" : "label";
+  return strong ? "button" : "body_strong";
 }
 
 /** The key of group `block`'s `+`. */
@@ -495,8 +496,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /**
    * A number's light, over it: the same numeral, `primary` (an urgent one's `error`), with its glow
-   * by night; a digit a size up and heavier, `button`, so where you are reads before its colour
-   * does. It shows as far as the cell is lit, the unlit numeral fading under it.
+   * by night, in the unlit numeral's size, `button`. It shows as far as the cell is lit, the unlit numeral fading under it.
    */
   function litNumber(entry: Entry): HTMLElement {
     const urgent = entry.workspace === options.urgent;
