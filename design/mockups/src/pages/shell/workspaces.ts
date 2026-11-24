@@ -10,41 +10,43 @@
 // group's name show only while the pointer is on the workspaces. Clicking a `+` adds a workspace
 // at the next number and shows it; it stays, empty, until it is deleted.
 //
-// The shown workspace sits on the indicator, `primary` at the full radius, between the tints and
-// the cells. Every change of shape glides: an entry grows in or shrinks out, its width over `long`
-// on `emphasized_decel`, its opacity over `long` on `standard`. A new shown workspace stretches the
-// indicator: its leading edge over `medium`, its trailing edge over `long`, both on
-// `emphasized_decel`. A number that changes rolls, as the Overview's do (`lib/rolling-number.ts`):
-// the same windows drawn at another number, a drop, a delete shifting the later ones down.
+// The shown workspace's mark is lit; switching, the leaving mark turns off over `short` and the
+// arriving one turns on `duration.swap_lag` later, a dash also narrowing and widening over `medium`.
+// Every change of the row glides: an entry grows in or shrinks out, its width over `long` on
+// `emphasized_decel` (over `medium` on `standard_decel` while a workspace is carried), its opacity
+// on `standard`; one growing in rounds its width up and one shrinking out rounds down, so the row
+// holds its width to the pixel. A number that changes rolls, as the Overview's do
+// (`lib/rolling-number.ts`): the same windows drawn at another number, a drop, a delete shifting
+// the later ones down.
 //
 // The cell under the pointer takes a neutral circle a step up the container ladder,
 // `surface_container_high`, and pressed `surface_container_highest`, fading over `short`, as any
-// control's quiet hover does; the pill itself draws no line and no glow for the pointer. The shown
-// workspace's cell takes none: it is already where you are. A `+` is a cell and takes it too.
+// control's quiet hover does, while its mark dips as every bar item's content does; the part itself
+// draws no line and no glow for the pointer. The shown workspace's cell takes none: it is already
+// where you are. A `+` is a cell and takes it too.
 //
-// A workspace, empty or not, can be carried to another place; a `+` cannot. Pressed and moved `space.s8`, it lifts
-// onto a disc raised to step 1 that eases onto the pointer over `short` on `standard`, its place
-// left as a hole, empty space a cell wide; nothing else moves. The disc is in the top layer, so
-// nothing cuts it. The numbers are the places and stay; the windows move. While it is carried there
-// is one hole: the pill as it stood, the workspace taken out and the hole put where it would land,
-// so one group gives up a slot as another takes one and the pill keeps its width. Each place is
-// hit-tested where the hole would stand there, with the Overview's magnet (`lib/magnet.ts`) on it:
-// in a magnet the hole moves there, the cells between slide over and the disc snaps onto it, each
-// over `medium` on `standard_decel`, the disc's number rolling to the one it would get there, so it
-// lands already right; between magnets the hole stays and the disc follows the hand;
-// off the pill the hole goes home. Over another group, that group takes a `primary` outline; over a
-// group's ghost, the hole is its last place; over a full group, ten already, the disc dims to
-// `opacity.locked` and the hole is home, as the Overview refuses (`lib/magnet.ts`'s `refuse`).
-// Let go, the disc flies into the hole over `medium` on `emphasized_decel`. A slide moves a slot's content, never its piece of a group's tint, so the
-// tint stays one band, and a slot going out stays in its group. The shown workspace is where its
-// windows are, so the indicator follows them, gliding within a group. Carried itself, the shown
-// workspace's place is a hole like any other's: the indicator narrows out of its place as it lifts
-// and widens into its new one as it lands, never crossing a rule, a gap or a name.
-// Nothing in the pill is selected by a press or a drag.
+// A workspace, empty or not, can be carried to another place; a `+` cannot. Pressed and moved
+// `space.s8`, it lifts onto a disc raised to step 1, its number on it whatever the marks, that
+// eases onto the pointer over `short` on `standard`, its place left as a hole, empty space a cell
+// wide; nothing else moves. The disc is in the top layer, so nothing cuts it. The numbers are the
+// places and stay; the windows move. While it is carried there is one hole: the row as it stood,
+// the workspace taken out and the hole put where it would land, so one group gives up a slot as
+// another takes one and the row keeps its width. Each place is hit-tested where the hole would
+// stand there, with the Overview's magnet (`lib/magnet.ts`) on it: in a magnet the hole moves
+// there, the cells between slide over and the disc snaps onto it, each over `medium` on
+// `standard_decel`, the disc's number rolling to the one it would get there, so it lands already
+// right; between magnets the hole stays and the disc follows the hand; off the part the hole goes
+// home. Over another group, that group takes a `primary` outline, each slot drawing its piece;
+// over a group's ghost, the hole is its last place; over a full group, ten already, the disc dims
+// to `opacity.locked` and the hole is home, as the Overview refuses (`lib/magnet.ts`'s `refuse`).
+// Let go, the disc flies into the hole over `medium` on `emphasized_decel`. A slide moves a slot's
+// content, never its piece of a group's outline, so the outline stays whole, and a slot going out
+// stays in its group. Carried itself, the shown workspace's place is a hole like any other's, and
+// its mark is lit in the cell it lands in. Nothing in the part is selected by a press or a drag.
 //
 // A right click opens its menu (`lib/menu.ts`) on a popover under it, the workspace it is for marked
-// by a circle of `primary` at `opacity.tint` behind its number, fading over `short` on `standard`
-// (none on the shown one, already on the indicator): on a workspace, its own
+// by a circle of `primary` at `opacity.tint` behind its mark, fading over `short` on `standard`
+// (none on the shown one, already lit): on a workspace, its own
 // actions under "Workspace N", then its group's under "This group"; on a group's name or its ghost,
 // the group's alone, under its name. The deletes are held. Delete group closes every window in the
 // group: the screen's own group keeps one empty workspace and never goes; a borrowed group goes
@@ -229,7 +231,7 @@ function entriesOf(bands: readonly Band[], held: string | null, taking: number |
     if (name !== "") result.push({ ...blank, key: `label${band.block}`, kind: "label", block: band.block, workspace: first, space: band.spaces[0]?.key ?? "", borrowed: true, head: true, label: name, taking: takes });
     band.spaces.forEach((space, at) => {
       // A slot's key is its windows' in its group: carried to another group, it leaves one and
-      // grows in the other, never sliding across the rule with the tint it is drawn on.
+      // grows in the other, never sliding across the rule between the groups.
       result.push({ key: `${space.key}@${band.block}`, kind: space.key === held ? "hole" : "cell", block: band.block, workspace: space.id, space: space.key, borrowed: band.borrowed, head: at === 0 && name === "", tail: at === band.spaces.length - 1 && !ends, label: "", occupied: space.occupied, taking: takes });
     });
     if (ends) result.push({ key: plusKey(band.block), kind: "ghost", block: band.block, workspace: first + band.spaces.length, space: plusKey(band.block), borrowed: band.borrowed, head: band.spaces.length === 0 && name === "", tail: true, label: "", occupied: false, taking: takes });
@@ -392,7 +394,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   };
 
   /**
-   * One entry's slot: its piece of the tint and the drop outline behind, and its content. A cell's
+   * One entry's slot: its piece of the drop outline behind, and its content. A cell's
    * number that stood at `was` for the same windows rolls from it to its own.
    */
   function slot(entry: Entry, was?: number): HTMLElement {
@@ -986,8 +988,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       room.append(card);
       if (!still) list_.focus({ preventScroll: true });
     };
-    // The workspace it is for takes a light tint of primary, unless it is the shown one, already on
-    // the indicator; a group's menu marks nothing.
+    // The workspace it is for takes a light tint of primary, unless it is the shown one, already
+    // lit; a group's menu marks nothing.
     if ("workspace" in on && on.workspace !== active) {
       marked = anchor;
       anchor.dataset.menu = "";
@@ -1025,7 +1027,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /**
    * Closes every window in `band`, a borrowed group, and takes the whole group away: its rule, its
-   * name and its workspaces shrink out, its tint fading with them, and it is back, empty, once its
+   * name and its workspaces shrink out, and it is back, empty, once its
    * own screen is connected. Showing one of its workspaces, the screen shows its own group's first
    * instead, its mark lighting there.
    */

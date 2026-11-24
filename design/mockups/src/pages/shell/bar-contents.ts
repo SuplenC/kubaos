@@ -123,7 +123,7 @@ export default page<State>({
     { name: "Proxy failing", for: "a key with the error dot", sample: () => onGlass(proxyPill(true)) },
     { name: "Update, a release", for: "a dot", sample: () => onGlass(updatePill()) },
     { name: "Update, security", for: "counted", sample: () => onGlass(updatePill(3)) },
-    { name: "Live preview", for: "its symbol on the cold tint, the branch in its hint", sample: () => onGlass(previewPill()) },
+    { name: "Live preview", for: "its symbol in `cold`, flat; the branch in its hint", sample: () => onGlass(previewPill()) },
     { name: "More", for: "⋯, a new symbol: tray apps, update, preview", sample: () => onGlass(morePill()) },
     { name: "System monitor, numbers", for: "the default", sample: () => onGlass(sysmonPill()) },
     { name: "System monitor, bars", for: "a compact Meter each", sample: () => onGlass(sysmonPill({ style: "bars" })) },

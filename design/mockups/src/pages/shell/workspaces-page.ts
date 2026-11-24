@@ -65,7 +65,7 @@ const DROPS = discMove("Dropped", "Let go: the disc flies from the hand into its
 const SLIDE: Tracks = [{ part: "its content", on: "the windows of 3, now 2", target: '.shell-ws-slot[data-key="w3@0"]', property: "--ws-slide", from: 1, to: 0, duration: "medium", curve: "standard_decel" }];
 const SLIDES: Move = {
   name: "The cells between sliding over",
-  what: "Its place moved: each cell between slides a place over `medium` on `standard_decel`; its tint stays.",
+  what: "Its place moved: each cell between slides a place over `medium` on `standard_decel`.",
   tracks: SLIDE,
   reduced: atOnce(SLIDE),
   back: "plays",
