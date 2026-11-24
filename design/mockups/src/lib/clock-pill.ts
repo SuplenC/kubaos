@@ -63,6 +63,17 @@ export interface ClockPill {
 export function setClockOpen(pill: HTMLElement, view: "clock" | "weather" | null): void {
   if (view) pill.dataset.open = view;
   else delete pill.dataset.open;
+  const capsule = pill.querySelector<HTMLElement>(".k-clock-pill-capsule");
+  if (capsule) filled(capsule, view !== null || pill.hasAttribute("data-recording"));
+}
+
+/**
+ * A filled capsule is a box the row spaces, its edge `space.s8` from its neighbours; an empty one
+ * gives its room back to them and is no box at all, only the time in it.
+ */
+function filled(capsule: HTMLElement, on: boolean): void {
+  if (on) probe(capsule, { role: "box" });
+  else delete capsule.dataset.probe;
 }
 
 /**
@@ -98,6 +109,8 @@ export function clockPill(options: ClockPillOptions): ClockPill {
     const seal = document.createElement("span");
     seal.className = "k-clock-pill-seal";
     seal.append(text(words.kanji, "accent", recording ? "error_container" : "on_cold"));
+    // The disc is the part the row spaces, not the kanji inside it.
+    probe(seal, { role: "box" });
     parts.push(around(seal, false));
   }
   const date = options.date ?? "full";
@@ -131,6 +144,7 @@ export function clockPill(options: ClockPillOptions): ClockPill {
   element.classList.add("k-clock-pill");
   element.toggleAttribute("data-recording", recording);
   if (options.open) element.dataset.open = options.open;
+  filled(capsule, options.open !== undefined || recording);
   // A component of its own, not one of the bar's pills: its parts are its own, and its variants
   // are the parts it shows.
   probe(element, { role: "component", name: "ClockPill", variant: variant((options.seal ?? true) && "seal", date !== "none" && `date ${date}`, parts.some((part) => part.classList.contains("k-clock-pill-weather")) && "weather", recording && "recording"), fixed: { width: false, height: true } });
