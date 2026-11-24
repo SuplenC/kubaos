@@ -1,13 +1,14 @@
-// The bar's workspaces, as `config/quickshell/modules/bar/Workspaces.qml` draws them: a pill of its
-// own, `size.control_sm` tall on `surface_container`, `space.s4` round a row of entries. A
-// workspace is a cell `size.chip` square, its number centred, semibold at 14 (`button`) with
-// windows or shown, medium (`body_strong`) empty, or its kanji in `accent`. Groups come in block
-// order, a hairline `size.chip` / 2 tall in `outline_variant` in a `space.s12` gap between them. A
-// group waiting from a desk position no screen holds is borrowed: a `secondary` tint at
-// `opacity.tint` round it, its name first in `label`, `secondary`. A group's workspaces are
-// numbered from 1 with no gap, and a group with fewer than ten ends in its `+`, a ghost: a faint
-// `add` in `outline` at `opacity.placeholder`. Clicking it adds a workspace at the next number and
-// shows it; it stays, empty, until it is deleted.
+// The bar's workspaces, flat on the bar's glass: a row of cells `size.ws_cell` wide whatever their
+// mark, so a switch moves nothing, each holding its workspace's mark (`Marks`, a setting: numbers,
+// dots, dashes, or dot and dash), the shown one's lit in its tone. A digit is `workspace_digit`, 13
+// and medium like the kanji in `accent`, one weight lit or not, with windows or empty, so nothing
+// moves as it changes; an empty workspace's is `outline`, one with windows `on_surface_variant`.
+// Groups come in block order, parted by the bar's hairline. A group waiting from a desk position no
+// screen holds is borrowed: a stronger hairline before and after it, its name first in `label`,
+// `secondary`. A group's workspaces are numbered from 1 with no gap, and a group with fewer than
+// ten ends in its `+`: a faint `add` in `outline` at `opacity.placeholder`. The `+` and a borrowed
+// group's name show only while the pointer is on the workspaces, or the Overview is up. Clicking a
+// `+` adds a workspace at the next number and shows it; it stays, empty, until it is deleted.
 //
 // The shown workspace sits on the indicator, `primary` at the full radius, between the tints and
 // the cells. Every change of shape glides: an entry grows in or shrinks out, its width over `long`
@@ -205,10 +206,9 @@ function numberText(id: number, kanji: boolean): string {
   return kanji ? KANJI[slotOf(id) - 1]! : String(slotOf(id));
 }
 
-/** A numeral's style, lit or not: a digit at 14, semibold for a workspace with windows. */
-function numberStyle(strong: boolean, kanji: boolean): TypeStyle {
-  if (kanji) return "accent";
-  return strong ? "button" : "body_strong";
+/** A numeral's style: one for every digit, lit or not, with windows or empty, so none moves as it changes. */
+function numberStyle(kanji: boolean): TypeStyle {
+  return kanji ? "accent" : "workspace_digit";
 }
 
 /** The key of group `block`'s `+`. */
@@ -255,7 +255,7 @@ function cssPx(name: string): number {
 
 /** The room a cell leaves before its number, which it centres. */
 function numberRoom(id: number, kanji: boolean): number {
-  return (px("size-ws_cell") - advance(numberStyle(true, kanji), numberText(id, kanji))) / 2;
+  return (px("size-ws_cell") - advance(numberStyle(kanji), numberText(id, kanji))) / 2;
 }
 
 /** An entry's width in logical pixels, as `widthOf`. */
@@ -299,7 +299,7 @@ function landingOf(bands: readonly Band[], key: string): Landing | null {
 function inkInset(marks: Marks, kanji: boolean): string {
   if (marks === "dashes") return "calc((var(--size-ws_cell) - var(--size-ws_dash)) / 2)";
   if (marks !== "numbers") return "calc((var(--size-ws_cell) - var(--size-ws_dot)) / 2)";
-  const room = (px("size-ws_cell") - advance(numberStyle(true, kanji), numberText(1, kanji))) / 2;
+  const room = (px("size-ws_cell") - advance(numberStyle(kanji), numberText(1, kanji))) / 2;
   return `calc(${room} * var(--px))`;
 }
 
@@ -482,7 +482,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    * Overview's numbers do; a kanji is set in place.
    */
   function numberOf(entry: Entry, was?: number): HTMLElement {
-    const style = numberStyle(entry.occupied, kanji);
+    const style = numberStyle(kanji);
     const color = entry.occupied ? "on_surface_variant" : "outline";
     const number = document.createElement("span");
     number.className = "shell-ws-number";
@@ -496,11 +496,11 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
 
   /**
    * A number's light, over it: the same numeral, `primary` (an urgent one's `error`), with its glow
-   * by night, in the unlit numeral's size, `button`. It shows as far as the cell is lit, the unlit numeral fading under it.
+   * by night, in the unlit numeral's style. It shows as far as the cell is lit, the unlit numeral fading under it.
    */
   function litNumber(entry: Entry): HTMLElement {
     const urgent = entry.workspace === options.urgent;
-    const lit = text(numberText(entry.workspace, kanji), kanji ? "accent" : "button", urgent ? "error" : "primary");
+    const lit = text(numberText(entry.workspace, kanji), numberStyle(kanji), urgent ? "error" : "primary");
     lit.classList.add("shell-ws-lit-number");
     return lit;
   }
@@ -512,7 +512,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
    * baselines. One figure at least: the box is its figures', so a cell centres a 10 as it does a 1.
    */
   function numeral(value: number, style: TypeStyle, color: string): Rolling {
-    const centre = { style: numberStyle(true, kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
+    const centre = { style: numberStyle(kanji), words: kanji ? KANJI[KANJI.length - 1]! : "0" };
     if (!kanji) return rollingNumber({ value, widest: "0", style, color, centre });
     return rollingNumber({ value, widest: KANJI[0]!, format: (each) => KANJI[each - 1]!, figures: KANJI.join(""), style, color, centre });
   }
@@ -811,7 +811,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
   function makeDisc(id: number): { disc: HTMLElement; roll: Rolling } {
     const disc = raise(document.createElement("span"), 1);
     disc.className += " shell-ws-disc";
-    const roll = numeral(slotOf(id), numberStyle(true, kanji), "on_surface");
+    const roll = numeral(slotOf(id), numberStyle(kanji), "on_surface");
     disc.append(roll.element);
     // In the top layer, the disc is never cut by the pill or by any box the pill is drawn in; it
     // stays in the pill's tree, so it is drawn in the pill's own tokens.
@@ -853,7 +853,7 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
     if (slides) carry.roll?.set(landing.index + 1);
     else if (carry.roll) {
       // A still shows the disc's number as it stands there, rolled already.
-      const now = numeral(landing.index + 1, numberStyle(true, kanji), "on_surface");
+      const now = numeral(landing.index + 1, numberStyle(kanji), "on_surface");
       carry.roll.element.replaceWith(now.element);
       carry.roll = now;
     }

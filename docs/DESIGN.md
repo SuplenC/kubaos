@@ -116,6 +116,7 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `small` | 12 / 16 | regular | A note under a field, a subtitle under a row's title. |
 | `caption` | 11 / 16 | regular | What a key hint's key does, version lines, the smallest print. |
 | `accent` | 13 / 20 | medium, M PLUS 1 | The Japanese accent above a title. |
+| `workspace_digit` | 13 / 20 | medium | A workspace's digit in the bar: the kanji's size and stroke, one weight lit or not, so a switch moves nothing. |
 | `mono` | 12 / 16 | regular, Geist Mono | Logs, device paths, timings. |
 | `keycap` | 11 / 20 | medium, Geist Mono | The key on a `Keycap`, on the keycap's 20 line so it centres in it. |
 | `mono_large` | 14 / 20 | regular, Geist Mono | A command or key that is the subject of its line. |
@@ -132,7 +133,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 
 | Icon | Beside |
 |---|---|
-| 16 | `caption`, `small`, `label`, `mono`, `keycap`, `accent`, `button_small` |
+| 16 | `caption`, `small`, `label`, `mono`, `keycap`, `accent`, `workspace_digit`, `button_small` |
 | 20 | `body`, `body_strong`, `body_large`, `mono_large`, `button` |
 | 24 | `subheading`, `heading`, `button_large`, `clock_place`, `clock_date` |
 | 32 | `headline`, `title` |

@@ -14,7 +14,7 @@ import { length, names } from "./tokens.ts";
 export type TypeStyle =
   | "clock_rest" | "clock" | "clock_place" | "clock_date" | "hero" | "hero_number" | "display" | "title" | "headline" | "heading" | "subheading"
   | "body_large" | "body" | "body_strong" | "button_large" | "button" | "button_small" | "label"
-  | "label_number" | "small" | "caption" | "accent" | "mono" | "keycap" | "mono_large";
+  | "label_number" | "small" | "caption" | "accent" | "workspace_digit" | "mono" | "keycap" | "mono_large";
 
 const PRECISION = 64;
 /** HAZARD: Chromium clamps a font's size to 10000 px, on a canvas and in a page. A measure past it reads short. */
@@ -513,6 +513,7 @@ export const STYLE_WORDS: Record<TypeStyle, string> = {
   small: "At least 12 characters",
   caption: "Version 0.4",
   accent: "ようこそ",
+  workspace_digit: "1 2 3 4 5",
   mono: "/dev/nvme0n1p2",
   keycap: "Ctrl",
   mono_large: "kubaos update",

@@ -632,6 +632,14 @@ weight = "medium"
 family = "jp"
 use = "The Japanese accent above a title."
 
+[type.workspace_digit]
+size = 13
+line = 20
+icon = 16
+weight = "medium"
+family = "sans"
+use = "A workspace's digit in the bar: the kanji's size and stroke, one weight lit or not, so a switch moves nothing."
+
 [type.mono]
 size = 12
 line = 16

@@ -40,6 +40,7 @@ fn sample(style: Type) -> &'static str {
         Type::BodyStrong => "Samsung SSD 990 PRO",
         Type::MonoLarge => "kubaos update --dry-run",
         Type::Accent => "書体見本 ようこそ",
+        Type::WorkspaceDigit => "1 2 3 4 5 6 7 8 9 10",
         Type::ButtonSmall => "Show",
         Type::Label => "Full name",
         Type::LabelNumber => "62%  100%",
