@@ -801,7 +801,9 @@
   position: absolute;
   inset: var(--desk-top) var(--gap) var(--gap);
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Two halves in whole device pixels, the first rounded down and the second what is left, as a
+     grid splits its room in the builds. */
+  grid-template-columns: round(down, calc((100% - var(--gap)) / 2), 1px) minmax(0, 1fr);
   gap: var(--gap);
 }
 
