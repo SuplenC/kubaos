@@ -260,7 +260,10 @@ async function box(page: Page, options: Options): Promise<{ x: number; y: number
 
 async function shoot(page: Page, clip: { x: number; y: number; width: number; height: number }, file: string): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
-  const shot = await cdp.send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 1 } });
+  // The clip is painted afresh rather than read from the compositor's last frame: just after the
+  // window grows to the state's size, with other captures drawing beside it, that frame can hold
+  // only part of the state, and a capture came back cut off at its right or its foot.
+  const shot = await cdp.send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 1 }, captureBeyondViewport: true });
   await cdp.detach();
   writeFileSync(file, Buffer.from(shot.data, "base64"));
 }
