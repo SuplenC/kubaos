@@ -154,6 +154,11 @@
   flex-direction: column;
   box-sizing: border-box;
   width: var(--size-panel);
+}
+
+/* It glides only between under the bell and beside a card: placed, or measured again, it stands
+   where it goes at once, so it is never caught on its way there. */
+.k-toasts[data-glide] {
   transition: left var(--motion-long) var(--easing-emphasized_decel);
 }
 

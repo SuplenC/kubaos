@@ -310,7 +310,8 @@ function toastColumn(on: Screen, bell: Element | undefined): HTMLElement {
   const column = document.createElement("span");
   column.className = "k-toasts";
   on.over.append(column);
-  const place = () => {
+  /** `glide`: a card opening or closing moves it there; a measure puts it there at once. */
+  const place = (glide = false) => {
     const screenElement = on.element;
     if (bell) {
       const [start, end] = edgesIn(bell, screenElement);
@@ -325,15 +326,20 @@ function toastColumn(on: Screen, bell: Element | undefined): HTMLElement {
     const width = column.offsetWidth;
     const left = column.offsetLeft;
     const meets = open && open.offsetLeft < left + width && open.offsetLeft + open.offsetWidth > left;
-    if (open && (meets || column.hasAttribute("data-beside"))) {
+    const beside = Boolean(open && (meets || column.hasAttribute("data-beside")));
+    if (glide && beside !== column.hasAttribute("data-beside")) column.setAttribute("data-glide", "");
+    if (open && beside) {
       column.style.setProperty("--beside-x", `${open.offsetLeft}px`);
       column.setAttribute("data-beside", "");
     } else column.removeAttribute("data-beside");
   };
+  column.addEventListener("transitionend", (event) => {
+    if (event.target === column) column.removeAttribute("data-glide");
+  });
   const sizes = new ResizeObserver(() => place());
   sizes.observe(on.element);
-  new MutationObserver(place).observe(on.over, { attributes: true, attributeFilter: ["data-shown"], subtree: true, childList: true });
-  requestAnimationFrame(place);
+  new MutationObserver(() => place(true)).observe(on.over, { attributes: true, attributeFilter: ["data-shown"], subtree: true, childList: true });
+  requestAnimationFrame(() => place());
   return column;
 }
 
