@@ -33,13 +33,13 @@ Every picture on the wall is the `Lock` template at the screen's size, scaled in
 - **Desktop:** your desktop on it, the frame, the bar and your windows, in its own scheme in the page's mode.
 - **Lock:** your lock on it, the rest clock between the plate and the city, always in its night scheme.
 
-Switching view turns every frame. The one in front plays the whole move: from the desktop, the Lock's own locking (the windows step back, the frame and the bar slide out, the bar's time grows into the rest clock behind the city as the picture pushes in); back, the Lock's own unlocking, the clock flying into the bar's time. Its neighbours play a simpler move, their clocks fading where they stand. Every move eases a number on the element that stays, so its last frame is the rest it leaves. **W** wakes the lock in front or lets it rest, with the Lock's own waking.
+Switching view turns every frame. The one in front plays the whole move: from the desktop, the Lock's own locking (the windows step back, the bar slides out, the bar's time grows into the rest clock behind the city as the picture pushes in); back, the Lock's own unlocking, the clock flying into the bar's time. Its neighbours play a simpler move, their clocks fading where they stand. Every move eases a number on the element that stays, so its last frame is the rest it leaves. **W** wakes the lock in front or lets it rest, with the Lock's own waking.
 
 **Browsing** glides the wall: each picture's city stands `space.s24` ahead of its sky the farther it is from the front, and catches up on `spring` as it lands, so the city travels faster than the sky; the one reached pushes in, the one left eases back. **D** settles the city onto the sky or lifts it off over `long`; on a lock the clock fades out round the change and back.
 
 ## Stepping out
 
-The one in front steps out to fill the screen (F, Space, the bar's Full screen, or a click on it; on the full screen a click on the picture steps back, as F does, while the bar's controls and an awake lock's password sheet keep their own clicks): the room grows round its frame over `slow` until it is the screen, its corner and shadow going, and back over `long`. The live desktop is that picture stepped out, so:
+The one in front steps out to fill the screen (F, Space, the bar's Full screen, or a click on it; on the full screen a click on the picture steps back, as F does, while the bar's controls and an awake lock's password field keep their own clicks): the room grows round its frame over `slow` until it is the screen, its corner and shadow going, and back over `long`. The live desktop is that picture stepped out, so:
 
 - **Opening** steps the desktop back into its frame as the wall builds round it in a dark room, its frame and bar sliding out as on the wall's picture; the lamp strikes as it lands.
 - **Enter** steps the picture in front of you out, turning it into the desktop, the lamp going off as it grows.
@@ -51,7 +51,7 @@ Along the foot, glass, a pill, `space.s8` round small controls `space.s16` apart
 
 ## Reduce motion
 
-Every move is a fade over `short`: the room fades out and in round a step, the frame and the bar fade, the clock fades in its place, and nothing pushes or slides. The video's loop holds still.
+Every move is a fade over `short`: the room fades out and in round a step, the bar fades, the clock fades in its place, and nothing pushes or slides. The video's loop holds still.
 
 ## The real desktop in the frames
 
