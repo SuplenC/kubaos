@@ -264,6 +264,20 @@ canvas_settings = 400
 # The page width from which CanvasPage puts its settings beside the canvas: under it, the canvas
 # takes the page's width and the settings go below it.
 canvas_wide = 1000
+# A card of settings rows (Settings' wells) this wide or wider keeps every row on one line; under it
+# the card's rows with a wide control (a slider, a select, a choice) all stack at once, the words
+# over the control, which keeps `menu`'s width at the row's end. At `settings_row_full` or under, a
+# stacked control spans the row. A row with a small control (a switch, a button) never stacks.
+settings_row_one_line = 548
+settings_row_full = 360
+# A page with a picture beside its controls (Settings › Camera's live preview): the controls never
+# get wider than `beside_controls_most`, and never narrower than `beside_controls_least`; where they
+# would be, the picture goes above them. The picture is 40% of the page's content, held between
+# `beside_picture_least` and `beside_picture_most`, and takes all the controls leave past their most.
+beside_controls_least = 300
+beside_controls_most = 720
+beside_picture_least = 280
+beside_picture_most = 640
 # An app's window: it opens centred and floating at its default, 1120 × 720,
 # and tiled it takes its tile but never goes below its minimum, 720 × 480.
 app_width = 1120
@@ -404,6 +418,8 @@ padding = [16, 24, 32]
 [aspect]
 # A wallpaper: 16:10, as the screens it is picked for are.
 wallpaper = [16, 10]
+# A camera's picture: 16:9, as webcams send it.
+camera = [16, 9]
 # A dialog at its shortest: 5:2 of its width, so a dialog that asks little
 # stands as a card, not a strip; the room it gains goes above its buttons.
 dialog = [5, 2]

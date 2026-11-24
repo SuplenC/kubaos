@@ -4,6 +4,14 @@
 // fact or a chevron; a setting that needs a segmented choice, a slider, a select or a field gets it at
 // the row's end, in one column `size.menu` wide, so every control of a page lines up.
 //
+// A card of rows (a well) lays its rows out by its own width (`fit`): `size.settings_row_one_line`
+// wide or wider, every row on one line, its words wrapping beside its control; narrower, every row
+// of the card with a wide control (a choice, a slider, a select, a field or a part) stacks at once,
+// its name and its reset on the first line, its line under them and its control under that, `menu`
+// wide at the row's end, or across the row in a card `size.settings_row_full` wide or narrower. A
+// row with a small control (a switch, a fact, a chevron) never stacks, and no control ever shrinks.
+// The card's rows stand `space.s4` apart on one line and `space.s8` apart stacked.
+//
 // Every setting can go back to its default with a hold. Beside its control while it differs from it,
 // a held `IconButton` (Text, sm, `restart_alt`) whose ring fills round it; its place is kept while it
 // is gone, so the control never moves. At the end of its sub-section's heading while anything in the
@@ -27,7 +35,8 @@ import { withHint } from "../../../lib/hint.ts";
 import { iconButton } from "../../../lib/icon-button.ts";
 import { filling, row as layoutRow, section, stack } from "../../../lib/layout.ts";
 import { probe } from "../../../lib/probe.ts";
-import { type ListRowSpec, ROW_CONTROL } from "../../../lib/list.ts";
+import { type ListRowSpec, ROW_CONTROL, scaleOf } from "../../../lib/list.ts";
+import { beside } from "../../../lib/beside.ts";
 import { type RegionHost, settingsWell, type Section, type SubSection } from "../../../lib/sidebar-page.ts";
 import { select } from "../../../lib/select.ts";
 import { setSlider, slider } from "../../../lib/slider.ts";
@@ -80,8 +89,11 @@ export interface Setting {
   readonly unseen?: { readonly at: () => boolean; readonly reset: () => void };
   /** No backend writes it today: the page lists it as not built yet. */
   readonly unbuilt?: true;
-  /** Why it can't change here; the row is dimmed and says so in place of its line. */
-  readonly disabled?: string;
+  /**
+   * Why it can't change here; the row is dimmed and says so in place of its line. A getter where it
+   * follows another setting (an automatic switch), read as the region is drawn.
+   */
+  readonly disabled?: string | undefined;
   /** A dependent row: shown, under the row it depends on, only while this holds. */
   readonly shows?: () => boolean;
   /** Its value changes what else shows: the region is drawn again when it changes. */
@@ -137,6 +149,10 @@ export interface SettingsSection {
   readonly pages?: readonly SubPage[];
   /** The sub-page drawn open as the window opens: a sample's. */
   readonly opened?: string;
+  /** A part kept in view beside the sub-sections as they scroll (`lib/beside.ts`): Camera's live picture. */
+  readonly aside?: () => HTMLElement;
+  /** What the page shows in place of its sub-sections while it has none: no device to set. */
+  readonly instead?: () => HTMLElement;
 }
 
 /** Whether `setting` shows now: a dependent row only while what it depends on holds. */
@@ -362,8 +378,11 @@ function showReset(room: HTMLElement | null, shown: boolean): void {
 export function asSection(section: SettingsSection, pins?: ResetPins): Section {
   const defaults = new Defaults(section);
   const shared: Shared = { head: null, resetSection: () => {} };
-  const region = settingsRegion(section, defaults, shared, pins);
+  const rows = settingsRegion(section, defaults, shared, pins);
+  const aside = section.aside;
+  const region = section.instead ? () => section.instead!() : aside ? (host: RegionHost) => beside(rows(host), aside()) : rows;
   return {
+    ...(aside && !section.instead ? { wide: true as const } : {}),
     icon: section.icon,
     title: section.title,
     accent: section.accent,
@@ -478,6 +497,9 @@ function controlOf(setting: Setting, row: HTMLElement, changed: () => void): HTM
   }
 }
 
+/** The controls that stack under their words in a narrow card; the rest are small enough never to. */
+const WIDE: ReadonlySet<Control["kind"]> = new Set(["choice", "slider", "select", "field", "part"]);
+
 /** Where a row's reset goes: before its control, its fact or its switch. */
 function controlEnd(row: HTMLElement): Element | null {
   return row.querySelector(".st-control, .k-list-detail, .k-list-switch, .k-list-row > * > .k-icon:last-child, .st-tail > .k-icon:last-child");
@@ -486,6 +508,13 @@ function controlEnd(row: HTMLElement): Element | null {
 /** `row`, a `ListRow`, ending in `setting`'s control in the control column, its reset before it. */
 function settingRow(row: HTMLElement, setting: Setting, changed: () => void, reset: HTMLElement | null): void {
   row.dataset.setting = setting.id;
+  row.toggleAttribute("data-wide", WIDE.has(setting.control.kind));
+  // Its line wraps beside its control rather than being cut: it says what the setting is for.
+  const line = row.querySelector<HTMLElement>(".k-list-title + .k-text");
+  if (line) {
+    delete line.dataset.clamped;
+    line.dataset.wrapped = "";
+  }
   if (setting.unbuilt) row.dataset.unbuilt = "";
   if (setting.shows) row.dataset.depends = "";
   const control = controlOf(setting, row, changed);
@@ -528,6 +557,24 @@ function laidOut(row: HTMLElement, stacked: boolean): void {
   const words = (said.variant ?? "").split(" ").filter((word) => word !== "" && word !== "stacked");
   const tall = stacked || words.includes("tip");
   row.dataset.probe = JSON.stringify({ ...said, variant: [...words, ...(stacked ? ["stacked"] : [])].join(" "), fixed: { width: false, height: !tall } });
+}
+
+/**
+ * A card `width` logical pixels wide, its rows laid out by it: one line from
+ * `size.settings_row_one_line`, else its wide rows stacked, their control across the row at
+ * `size.settings_row_full` and under.
+ */
+function laidOutCard(well: HTMLElement, width: number): void {
+  const stacked = width < length("size-settings_row_one_line");
+  well.toggleAttribute("data-stacked", stacked);
+  well.toggleAttribute("data-full", stacked && width <= length("size-settings_row_full"));
+  const rows = well.querySelector<HTMLElement>(".k-list-rows");
+  if (rows) {
+    const gap = stacked ? "space-s8" : "space-s4";
+    rows.style.setProperty("--gap", `var(--${gap})`);
+    rows.dataset.probe = JSON.stringify({ ...(JSON.parse(rows.dataset.probe ?? "{}") as object), gap: length(gap) });
+  }
+  for (const row of well.querySelectorAll<HTMLElement>(".k-list-row[data-setting]")) laidOut(row, stacked && row.hasAttribute("data-wide"));
 }
 
 /** Shows `setting`'s value on `row` again, with its control's own motion where it has one. */
@@ -839,15 +886,12 @@ export function settingsRegion(spec: SettingsSection, defaults: Defaults, shared
       }
     }).observe(root, { childList: true, subtree: true });
 
-    // A row too narrow for its name and its line beside its control puts the control,
-    // its reset before it, on a line of its own under the words, so neither is ever cut. Every row is laid
-    // out side by side first, then each whose name is cut stacks: one read between the writes.
+    // Each card lays its rows out by its own width, read for every card before any is written.
     const fit = () => {
-      const all = [...root.querySelectorAll<HTMLElement>(".k-list-row[data-setting]")];
-      for (const row of all) laidOut(row, false);
-      // Its name or its plain line cut: either is what the row is for.
-      const cut = all.filter((row) => [...row.querySelectorAll<HTMLElement>(".k-list-title, .k-list-title + *")].some((words) => words.scrollWidth > words.clientWidth + 0.5));
-      for (const row of cut) laidOut(row, true);
+      const scale = scaleOf(root);
+      const wells = [...root.querySelectorAll<HTMLElement>(".k-list")].filter((well) => well.querySelector(".k-list-row[data-setting]"));
+      const widths = wells.map((well) => well.getBoundingClientRect().width / scale);
+      wells.forEach((well, index) => laidOutCard(well, widths[index]!));
     };
     let fitted = 0;
     new ResizeObserver(() => {
