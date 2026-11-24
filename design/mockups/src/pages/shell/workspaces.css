@@ -171,6 +171,7 @@
 .shell-ws-name {
   position: absolute;
   z-index: 2;
+  max-width: calc(2 * var(--space-s48));
   left: round(nearest, calc(var(--inset) * var(--px)), 1px);
   top: round(down, calc((var(--size-ws_cell) - var(--t-line)) / 2), 1px);
 }

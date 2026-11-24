@@ -62,9 +62,9 @@ import { icon } from "../../lib/icon.ts";
 import { withHint } from "../../lib/hint.ts";
 import { catchShare, caught, type Rect, refuse, type Zone, zoneOf } from "../../lib/magnet.ts";
 import { type MenuEntry, type MenuItemSpec, menu } from "../../lib/menu.ts";
-import { probe } from "../../lib/probe.ts";
+import { declare, probe } from "../../lib/probe.ts";
 import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
-import { advance, text, type TypeStyle } from "../../lib/text.ts";
+import { advance, clamped, text, type TypeStyle } from "../../lib/text.ts";
 import { popover } from "../../lib/tooltip.ts";
 import { cubic, durationMs, length } from "../../lib/tokens.ts";
 import { settings } from "../../site/settings.ts";
@@ -440,7 +440,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       });
     }
     if (entry.kind === "label") {
-      const name = text(entry.label, "label", "secondary");
+      // A name that varies: cut with an ellipsis at the slot's widest, `space.s48` twice.
+      const name = declare(clamped(entry.label, "label", "secondary"), { variable: true });
       name.classList.add("shell-ws-name");
       name.style.setProperty("--inset", String(Math.round(numberRoom(entry.workspace, kanji))));
       box.append(name);
@@ -465,6 +466,8 @@ export function workspaces(options: WorkspacesOptions = {}): HTMLElement {
       const plus = icon("add", "var(--icon-s16)", "var(--color-outline)");
       plus.classList.add("shell-ws-ghost");
       cell.append(plus);
+      // Its cell is the box the `+` is centred in, whatever marks the others show.
+      probe(cell, { role: "box" });
     } else {
       const mark = document.createElement("span");
       mark.className = "shell-ws-mark";
