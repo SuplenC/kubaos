@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use kubaos_core::sandbox;
+
 use super::*;
 use crate::check;
 use crate::check::Context;
@@ -10,27 +12,6 @@ use crate::stub::Stub;
 /// The repository's own Argo CD app, one `download` action of two architectures.
 fn argocd() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/argocd")
-}
-
-fn git(root: &Path, args: &[&str]) -> String {
-    let output = kubaos_git::at(root)
-        .args([
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@example.com",
-            "-c",
-            "commit.gpgsign=false",
-        ])
-        .args(args)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "git {args:?}: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8_lossy(&output.stdout).trim().to_owned()
 }
 
 /// A checkout holding Argo CD with its downloads at `base_url`, committed, then at `head_url` in
@@ -48,10 +29,10 @@ fn checkout(base_url: &str, head_url: &str) -> (tempfile::TempDir, String) {
         )
     };
     fs::write(app.join("app.toml"), pinned(base_url)).unwrap();
-    git(root.path(), &["init", "-q"]);
-    git(root.path(), &["add", "."]);
-    git(root.path(), &["commit", "-q", "-m", "base"]);
-    let base = git(root.path(), &["rev-parse", "HEAD"]);
+    sandbox::git(root.path(), &["init", "-q"]);
+    sandbox::git(root.path(), &["add", "."]);
+    sandbox::git(root.path(), &["commit", "-q", "-m", "base"]);
+    let base = sandbox::git(root.path(), &["rev-parse", "HEAD"]);
     fs::write(app.join("app.toml"), pinned(head_url)).unwrap();
     (root, base)
 }
