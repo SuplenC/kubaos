@@ -10,7 +10,7 @@ import { own, type Values } from "../settings-values.ts";
 import { choice, pick, stops, toggle } from "./kit.ts";
 
 /** Every control the page can set, by the camera's own name for it in each row's brackets. */
-export type CameraControl = "light" | "sharpness" | "autoColour" | "temperature" | "autoExposure" | "exposure" | "dim" | "boost" | "flicker";
+export type CameraControl = "light" | "sharpness" | "autoColour" | "temperature" | "autoExposure" | "exposure" | "dim" | "boost" | "flicker" | "brightness" | "contrast" | "saturation" | "hue" | "gamma";
 
 /** A camera's values, each a stop of its row's control or a switch. */
 export interface CameraValues {
@@ -23,6 +23,11 @@ export interface CameraValues {
   dim: boolean;
   boost: number;
   flicker: number;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  hue: number;
+  gamma: number;
 }
 
 /** A camera as the system lists it. */
@@ -47,7 +52,15 @@ const EXPOSURES = ["1/1000 s", "1/500 s", "1/250 s", "1/125 s", "1/60 s", "1/30 
 const BOOSTS = Array.from({ length: 21 }, (_, i) => `${i * 5} %`);
 const FLICKER = ["Off", "50 Hz", "60 Hz"];
 
-const EVERY: readonly CameraControl[] = ["light", "sharpness", "autoColour", "temperature", "autoExposure", "exposure", "dim", "boost", "flicker"];
+/** Every whole number from `from` to `to`, a negative one with a true minus sign, then `unit`. */
+const range = (from: number, to: number, unit = "") => Array.from({ length: to - from + 1 }, (_, i) => `${from + i < 0 ? "−" : ""}${Math.abs(from + i)}${unit}`);
+const BRIGHTNESS = range(-64, 64);
+const CONTRAST = range(0, 100);
+const SATURATION = range(0, 100);
+const HUE = range(-180, 180, "°");
+const GAMMA = range(100, 500);
+
+const EVERY: readonly CameraControl[] = ["light", "sharpness", "autoColour", "temperature", "autoExposure", "exposure", "dim", "boost", "flicker", "brightness", "contrast", "saturation", "hue", "gamma"];
 
 /** What a UVC camera ships set to. */
 const SHIPPED: CameraValues = {
@@ -60,6 +73,11 @@ const SHIPPED: CameraValues = {
   dim: false,
   boost: 0,
   flicker: 1,
+  brightness: BRIGHTNESS.indexOf("0"),
+  contrast: CONTRAST.indexOf("50"),
+  saturation: SATURATION.indexOf("64"),
+  hue: HUE.indexOf("0°"),
+  gamma: GAMMA.indexOf("300"),
 };
 
 /** The cameras the samples plug in, by id. */
@@ -172,7 +190,7 @@ export function camera(state: Values): SettingsSection {
     ...(offers("temperature")
       ? [
           setBy(
-            stops("temperature", "Colour temperature", "Lower looks warmer, higher looks cooler. (White balance temperature)", "thermostat", TEMPERATURES, () => now().temperature, set("temperature"), {
+            stops("temperature", "Colour temperature", "Lower looks cooler, higher looks warmer. (White balance temperature)", "thermostat", TEMPERATURES, () => now().temperature, set("temperature"), {
               initial: () => shipped().temperature,
             }),
             () => offers("autoColour") && now().autoColour,
@@ -212,10 +230,25 @@ export function camera(state: Values): SettingsSection {
       : []),
   ];
 
+  // The stand-in picture shows only backlight compensation, so these rows leave it as it is.
+  const slider = (key: "brightness" | "contrast" | "saturation" | "hue" | "gamma", title: string, line: string, icon: string, names: readonly string[]): Setting[] =>
+    offers(key) ? [stops(key, title, line, icon, names, () => now()[key], (index) => {
+        now()[key] = index;
+      }, { initial: () => shipped()[key] })] : [];
+  const finish: Setting[] = [
+    ...slider("brightness", "Brightness", "Lighter or darker all over. (Brightness)", "brightness_low", BRIGHTNESS),
+    ...slider("contrast", "Contrast", "How far light and dark stand apart. (Contrast)", "brightness_medium", CONTRAST),
+    ...slider("saturation", "Colour strength", "From grey to vivid. (Saturation)", "wallpaper", SATURATION),
+    ...slider("hue", "Tint", "Shifts every colour round the wheel. (Hue)", "repeat", HUE),
+    ...slider("gamma", "Mid-tones", "Lifts or darkens what is neither light nor dark. (Gamma)", "wb_twilight", GAMMA),
+  ];
+
+  // A camera that offers none of a section's controls has no such section.
   const subs: SettingsSub[] = [
     { title: "Picture", body: "What fixes a dark, soft or off-colour picture.", wells: [picture] },
     { title: "Fine-tuning", body: "For a picture that still isn't right.", wells: [fine] },
-  ];
+    { title: "Look", body: "How the finished picture looks.", wells: [finish] },
+  ].filter((sub) => sub.wells[0]!.length > 0);
   return {
     ...base,
     subs,

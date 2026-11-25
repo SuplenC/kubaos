@@ -169,6 +169,11 @@ const CAMERA_ITEMS: readonly Item[] = [
   cameraItem("Brighter in dim light", "fewer frames when dark", ["exposure priority", "dark"], "Off"),
   cameraItem("Boost", "brighter, with grain", ["gain", "brightness"], "0 %"),
   cameraItem("Room light flicker", "no stripes from lamps", ["power line", "frequency", "50 hz", "60 hz", "anti-flicker"], "50 Hz"),
+  cameraItem("Brightness", "lighter or darker", ["brightness", "light", "dark"], "0"),
+  cameraItem("Contrast", "light against dark", ["contrast"], "50"),
+  cameraItem("Colour strength", "grey to vivid", ["saturation", "colour", "vivid"], "64"),
+  cameraItem("Tint", "shifts every colour", ["hue", "colour"], "0°"),
+  cameraItem("Mid-tones", "lifts or darkens", ["gamma", "midtones"], "300"),
 ];
 
 /** The shots' Items, in the Daemon's order. */
