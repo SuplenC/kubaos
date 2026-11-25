@@ -38,7 +38,7 @@ function rows(): Setting[] {
     stops("boost", "Boost", "Brightens the picture electronically; more adds grain. (Gain)", "brightness_high", BOOSTS, () => boost, (index) => (boost = index), { initial: () => 3 }),
     stops("sharpness", "Sharpness", "Crisper edges; too much draws bright halos.", "visibility", SHARPNESS, () => sharpness, (index) => (sharpness = index), { initial: () => 3 }),
     choice("flicker", "Room light flicker", "Stops stripes from lights on the mains: 50 Hz in Europe, 60 Hz in the Americas. (Power-line frequency)", ["Off", "50 Hz", "60 Hz"], () => flicker, (index) => (flicker = index), { initial: () => 1 }),
-    stops("temperature", "Colour temperature", "Lower looks warmer, higher looks cooler.", "thermostat", TEMPERATURES, () => 18, () => {}, {
+    stops("temperature", "Colour temperature", "Lower looks cooler, higher looks warmer.", "thermostat", TEMPERATURES, () => 18, () => {}, {
       disabled: "Set by Automatic colour; turn it off to set it here. (White balance temperature)",
     }),
   ];

@@ -172,7 +172,7 @@ export function camera(state: Values): SettingsSection {
     ...(offers("temperature")
       ? [
           setBy(
-            stops("temperature", "Colour temperature", "Lower looks warmer, higher looks cooler. (White balance temperature)", "thermostat", TEMPERATURES, () => now().temperature, set("temperature"), {
+            stops("temperature", "Colour temperature", "Lower looks cooler, higher looks warmer. (White balance temperature)", "thermostat", TEMPERATURES, () => now().temperature, set("temperature"), {
               initial: () => shipped().temperature,
             }),
             () => offers("autoColour") && now().autoColour,
