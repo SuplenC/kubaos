@@ -462,8 +462,8 @@ function rungs<E extends HTMLElement>(part: E, gone?: number, from?: number): E 
 
 /**
  * DRAFT PART, the seek bar: the library's progress bar as a lit tube. Its track is
- * `size.scrollbar` at rest and grows to `size.progress` under the pointer; what is read ahead is
- * `outline`; chapters stand `space.s4` apart; the played part is the accent, glowing as a lit
+ * `size.scrollbar` at rest and grows to `size.progress` under the pointer; what a stream has read
+ * ahead is `outline`; chapters stand `space.s4` apart; the played part is the accent, glowing as a lit
  * tube does (`focus.near`, `focus.far`), and its head lights to the core under the pointer and
  * brighter still while held. Built once, and moved in place (`moveBar`).
  */
@@ -492,10 +492,14 @@ function seekBar(file: MediaFile): HTMLElement {
   return bar;
 }
 
-/** Moves `bar`, a seek bar of `file`, to `position`, read ahead to `buffered`. */
+/**
+ * Moves `bar`, a seek bar of `file`, to `position`, read ahead to `buffered`. Only a stream shows
+ * what it has read: a file on the disk is read whole at once, so its read part would fill the
+ * track and read as played.
+ */
 function moveBar(bar: HTMLElement, file: MediaFile, position: number, buffered: number): void {
   const chapters = file.chapters && file.chapters.length > 1 ? file.chapters : [{ at: 0, name: "" }];
-  const read = Math.max(position, buffered);
+  const read = file.stream ? Math.max(position, buffered) : position;
   bar.style.setProperty("--position", String(position));
   // The head stands on the played part's end, past the chapters' gaps before it, once laid out.
   const parts = [...bar.querySelectorAll<HTMLElement>(".mp-seek-part")];
