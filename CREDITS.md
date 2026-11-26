@@ -375,6 +375,7 @@ What the mockups (`design/mockups/`) ship to the page.
 ### Credits kept beside the files they cover
 
 - [`design/mockups/src/assets/audio/CREDITS.md`](design/mockups/src/assets/audio/CREDITS.md): the media player mockup's songs.
+- [`design/mockups/src/assets/video/CREDITS.md`](design/mockups/src/assets/video/CREDITS.md): the media player mockup's film, "First nights in Tokyo" by Guillaume J. Lauzier, CC BY 3.0.
 - [`design/mockups/src/assets/lock/CREDITS.md`](design/mockups/src/assets/lock/CREDITS.md): the Lock mockup's wallpapers and the tools that cut their depth.
 - The mockups' app icons (`design/mockups/src/assets/apps/`): each names its source and licence in its header comment.
 - [`branding/README.md`](branding/README.md): how the logo's photos were made, and their licence.
