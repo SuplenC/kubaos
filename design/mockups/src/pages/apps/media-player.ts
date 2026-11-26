@@ -14,12 +14,11 @@ import { durationMs, raw } from "../../lib/tokens.ts";
 import { barScreen } from "../shell/bar-parts.ts";
 import { SCREEN_WIDTH, TALL } from "../shell/screen-parts.ts";
 import {
-  AUDIO_TRACKS,
   BARE_SONG,
   BROKEN,
   DESKTOP,
   FILM,
-  LINES,
+  FILM_FETCHED,
   LONG_TITLE,
   MESSAGES,
   type MediaFile,
@@ -31,8 +30,11 @@ import {
   SONG,
   SONGS,
   SPEEDS,
+  STAGE_FILM,
+  STAGE_PLAYLIST,
   STREAM,
-  SUBTITLES,
+  subtitleIndex,
+  tracksOf,
   widget,
   type Colours,
 } from "./media-player-parts.ts";
@@ -42,7 +44,7 @@ import { song as analysedSong } from "./media-player-song.ts";
 
 // The states, as data.
 
-const PLAYING: PlayerState = { file: FILM, playing: true, position: 0.34, buffered: 0.52, volume: 0.62, speed: 1, index: 0, count: 1, subtitle: null };
+const PLAYING: PlayerState = { file: FILM, playing: true, position: 0.35, buffered: 0.52, volume: 0.62, speed: 1, index: 0, count: 1, subtitle: null };
 const SHOWN: PlayerState = { ...PLAYING, shown: true };
 const PAUSED: PlayerState = { ...PLAYING, playing: false };
 const IN_LIST: PlayerState = { ...SHOWN, index: 1, count: PLAYLIST.length };
@@ -112,11 +114,20 @@ function shares(): HTMLElement {
   return row("s24", "start", windowed(state, DEFAULT_WIDTH, DEFAULT_HEIGHT), stack("s8", "start", label("The control center's widget, drafted", "label"), widget({ ...state, playing: true })));
 }
 
-// The stage: the player live, with what plays and a song's visualiser as switches over it.
+/** The subtitles the fixed samples show: English, and Polish where a second is wanted. */
+const ENGLISH = subtitleIndex("eng");
+const POLISH = subtitleIndex("pol");
+/** A subtitle's sample line, for the fixed samples. */
+const sampleLine = (index: number) => tracksOf(FILM).subtitles[index]?.sample ?? "";
+
+// The stage: the player live, with what plays and a song's visualiser as switches over it. Its
+// film is the fetched cut where there is one (`STAGE_FILM`).
+
+const STAGE_PLAYING: PlayerState = { ...PLAYING, file: STAGE_FILM };
 
 const PLAYS: readonly { readonly label: string; readonly state: PlayerState }[] = [
-  { label: "Film", state: PLAYING },
-  { label: "Playlist", state: { ...PLAYING, index: 1, count: PLAYLIST.length, file: PLAYLIST[1]! } },
+  { label: "Film", state: STAGE_PLAYING },
+  { label: "Playlist", state: { ...STAGE_PLAYING, index: 1, count: STAGE_PLAYLIST.length, list: STAGE_PLAYLIST, file: STAGE_PLAYLIST[1]! } },
   { label: "Songs", state: { ...PLAYING, file: SONG, list: SONGS, index: 0, count: SONGS.length, position: 0, buffered: 1, playing: false, shown: true } },
   { label: "Bare song", state: { ...PLAYING, file: BARE_SONG, position: 0.12 } },
   { label: "Stream", state: { ...PLAYING, file: STREAM, buffering: 0.42, buffered: 0.36, position: 0.33 } },
@@ -196,6 +207,26 @@ function startsPlaying(state: PlayerState): boolean {
   return (state.playing ?? false) && !(settings().reduced && state.file?.video !== undefined);
 }
 
+/**
+ * Eases `sound`'s level to `level` over `duration.micro`, so a change never clicks, after
+ * cancelling the ramp on frame `running`; `keep` is told each frame it asks for. Returns `level`.
+ */
+function rampLevel(sound: HTMLMediaElement, level: number, keep: (frame: number) => void, running: number): number {
+  cancelAnimationFrame(running);
+  const from = sound.volume;
+  const start = performance.now();
+  const length = durationMs("micro");
+  // A frame's time is its start, which can lie before `start`: unclamped, the level would run
+  // back past `from` and out of the range a sound's volume takes.
+  const step = (now: number) => {
+    const t = Math.max(0, Math.min(1, (now - start) / length));
+    sound.volume = Math.max(0, Math.min(1, from + (level - from) * t));
+    if (t < 1) keep(requestAnimationFrame(step));
+  };
+  keep(requestAnimationFrame(step));
+  return level;
+}
+
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
   return durationMs(name) / settings().speed;
@@ -219,6 +250,11 @@ function live(): HTMLElement {
   /** The frame moving the time on while something plays, and the time of the last one, ms. */
   let frame = 0;
   let last = 0;
+  /** The film may sound: a person has pressed or keyed on the player. Until then it plays muted. */
+  let filmHeard = false;
+  /** The level the film's sound is ramping to, and the ramp's frame. */
+  let filmLevel = -1;
+  let filmRamp = 0;
 
   /** A message from a key: down from the top edge, then back after `duration.scene`. */
   const say = (message: Message) => {
@@ -233,7 +269,7 @@ function live(): HTMLElement {
   };
 
   const made = player(
-    { ...PLAYING, playing: startsPlaying(PLAYING), preview: true, visual, colours },
+    { ...STAGE_PLAYING, playing: startsPlaying(STAGE_PLAYING), preview: true, visual, colours },
     {
       volume: (value) => (say(MESSAGES.volume(value)), queueMicrotask(() => sync())),
       muted: (on) => (say(MESSAGES.volume(now().volume ?? 0, on)), queueMicrotask(() => sync())),
@@ -262,14 +298,27 @@ function live(): HTMLElement {
   /** Stops the sound and the film, and lets the sound's file go: on leaving the page or the sample. */
   const silence = () => {
     made.film()?.pause();
+    muteFilm();
+    filmHeard = false;
+    silenceSong();
+    if (sounding?.stop === silence) sounding = null;
+  };
+  /** Stops the song's sound and lets its file go. */
+  const silenceSong = () => {
     if (!audio) return;
     audio.pause();
     audio.removeAttribute("src");
     audio.load();
     audio = null;
-    sounding = null;
     heard = -1;
     cancelAnimationFrame(ramp);
+  };
+  /** Mutes the film, which plays on: a song took over the sound, or the page is left. */
+  const muteFilm = () => {
+    const film = made.film();
+    if (film) film.muted = true;
+    filmLevel = -1;
+    cancelAnimationFrame(filmRamp);
   };
   /**
    * The sound follows the state: the file, play or pause, the volume, mute, the speed. `asked` says
@@ -282,7 +331,8 @@ function live(): HTMLElement {
     run();
     if (!audio) {
       if (!asked || !file?.source || !state.playing || state.error) return;
-      sounding?.stop();
+      if (sounding?.stop !== silence) sounding?.stop();
+      muteFilm();
       audio = new Audio();
       audio.preload = "auto";
       audio.addEventListener("ended", finished);
@@ -315,13 +365,26 @@ function live(): HTMLElement {
   };
   /**
    * The film follows the state as the sound does: playing, paused, at the speed; held still while
-   * the bar is dragged, its frame following the pointer.
+   * the bar is dragged, its frame following the pointer. Its sound is the volume and mute, as a
+   * song's is, once a person has pressed or keyed on the player; muted before.
    */
   const syncFilm = () => {
     const film = made.film();
     const state = now();
     const file = state.file;
     if (!film || !file) return;
+    if (filmHeard) {
+      const level = state.muted ? 0 : loudness(state.volume ?? 1);
+      if (film.muted) {
+        // Any other sound stops first: the page makes one sound at a time.
+        if (sounding?.stop !== silence) sounding?.stop();
+        silenceSong();
+        sounding = { stop: silence };
+        film.volume = level;
+        filmLevel = level;
+        film.muted = false;
+      } else if (level !== filmLevel) filmLevel = rampLevel(film, level, (frame) => (filmRamp = frame), filmRamp);
+    }
     film.playbackRate = state.speed ?? 1;
     if (state.dragging) {
       if (!film.paused) film.pause();
@@ -329,23 +392,11 @@ function live(): HTMLElement {
     } else if (state.playing && !state.error && film.paused) void film.play().catch(() => undefined);
     else if (!state.playing && !film.paused) film.pause();
   };
-  /** Eases the sound's level to `level` over `duration.micro`. */
+  /** Eases the song's level to `level` over `duration.micro`. */
   const rampTo = (level: number) => {
     const sound = audio;
     if (!sound || level === heard) return;
-    heard = level;
-    cancelAnimationFrame(ramp);
-    const from = sound.volume;
-    const start = performance.now();
-    const length = durationMs("micro");
-    // A frame's time is its start, which can lie before `start`: unclamped, the level would run
-    // back past `from` and out of the range a sound's volume takes.
-    const step = (now: number) => {
-      const t = Math.max(0, Math.min(1, (now - start) / length));
-      sound.volume = Math.max(0, Math.min(1, from + (level - from) * t));
-      if (t < 1) ramp = requestAnimationFrame(step);
-    };
-    ramp = requestAnimationFrame(step);
+    heard = rampLevel(sound, level, (frame) => (ramp = frame), ramp);
   };
   /** Moves the sound to `position` of its song, or the film to it of the film, whichever plays. */
   const seekSound = (position: number) => {
@@ -452,13 +503,19 @@ function live(): HTMLElement {
     made.set({ index: at, file, position: 0, buffered: file.source ? 1 : 0.1, playing: true, open: undefined });
     sync(asked);
   }
+  /**
+   * Subtitles on in `index`'s language, or off: where the film really plays, its track's lines at
+   * their times (the player follows its cues); for any other file, the track's sample line.
+   */
   const subtitleTo = (index: number | null) => {
-    set({ subtitle: index, line: index === null ? undefined : LINES[index] ?? "", open: undefined });
-    say(MESSAGES.subtitles(index));
+    const file = now().file;
+    const real = made.film() !== null && file?.video !== undefined;
+    set({ subtitle: index, line: index === null || real ? undefined : tracksOf(file).subtitles[index]?.sample, open: undefined });
+    say(MESSAGES.subtitles(index, file));
   };
   const audioTo = (index: number) => {
     set({ audioTrack: index, open: undefined });
-    say(MESSAGES.audio(index));
+    say(MESSAGES.audio(index, now().file));
   };
   /**
    * Full screen on or off: the live room takes the whole screen, as mpv's window does, and the
@@ -502,9 +559,15 @@ function live(): HTMLElement {
 
   // Playing moves the time on in place every frame, only on the live stage. A bar moved on a timer
   // steps between the timer's reads; the media's clock read every frame glides at any speed, and
-  // stands where the media is on a pause, a seek or a stall.
+  // stands where the media is on a pause, a seek or a stall. The film starts as the stage is laid
+  // out on the page, as its state says, muted until a person's first press or key.
   if (CHROME) {
-    run();
+    const placed = new ResizeObserver(() => {
+      if (!root.isConnected) return;
+      placed.disconnect();
+      sync();
+    });
+    placed.observe(root);
     document.addEventListener("visibilitychange", shownAgain);
   }
 
@@ -595,7 +658,8 @@ function live(): HTMLElement {
       const items = [...(item.closest(".mp-popover")?.querySelectorAll<HTMLElement>(".k-menu-item") ?? [])];
       const index = items.indexOf(item);
       const words = (item.textContent ?? "").trim();
-      if (open === "tracks") index < AUDIO_TRACKS.length ? audioTo(index) : subtitleTo(index === AUDIO_TRACKS.length ? null : index - AUDIO_TRACKS.length - 1);
+      const audios = tracksOf(now().file).audio.length;
+      if (open === "tracks") index < audios ? audioTo(index) : subtitleTo(index === audios ? null : index - audios - 1);
       else if (open === "speed") (speedTo(SPEEDS[index] ?? 1), set({ open: undefined }));
       else if (open === "visualiser") visualTo(CHOICES[index] ?? "off");
       else if (words.startsWith("Visualiser")) set({ open: "visualiser" });
@@ -634,6 +698,16 @@ function live(): HTMLElement {
     full(!now().full);
   });
 
+  // A person's first press or key on the player lets the film sound, as a song sounds only once
+  // asked; caught before the controls act, so the press that plays it plays it heard.
+  const heardFrom = () => {
+    if (filmHeard) return;
+    filmHeard = true;
+    queueMicrotask(syncFilm);
+  };
+  root.addEventListener("pointerdown", heardFrom, { capture: true });
+  root.addEventListener("keydown", heardFrom, { capture: true });
+
   // mpv's own keys, as its default `input.conf` has them.
   root.addEventListener("keydown", (event) => {
     const key = event.key;
@@ -655,10 +729,10 @@ function live(): HTMLElement {
     else if (key === "Escape") {
       if (state.open || state.sidebar) closeAll();
       else full(false);
-    } else if (key === "j") subtitleTo(state.subtitle === null || state.subtitle === undefined ? 0 : state.subtitle + 1 < SUBTITLES.length ? state.subtitle + 1 : null);
+    } else if (key === "j") subtitleTo(state.subtitle === null || state.subtitle === undefined ? 0 : state.subtitle + 1 < tracksOf(state.file).subtitles.length ? state.subtitle + 1 : null);
     else if (key === "n" || key === "N") stepVisual(key === "n" ? 1 : -1);
     else if (key === "v") subtitleTo(state.subtitle === null || state.subtitle === undefined ? 0 : null);
-    else if (key === "#") audioTo(((state.audioTrack ?? 0) + 1) % AUDIO_TRACKS.length);
+    else if (key === "#") audioTo(((state.audioTrack ?? 0) + 1) % tracksOf(state.file).audio.length);
     else if (key === "s") say(MESSAGES.screenshot());
     else if (key === ">" || key === "Enter") playAt((state.index ?? 0) + 1, true);
     else if (key === "<") playAt((state.index ?? 0) - 1, true);
@@ -703,7 +777,7 @@ function live(): HTMLElement {
   options.append(
     question("Plays", PLAYS.map((each) => each.label), 0, (i) => {
       const next = { ...PLAYS[i]!.state, playing: startsPlaying(PLAYS[i]!.state) };
-      set({ ...PLAYING, file: undefined, error: undefined, buffering: undefined, message: undefined, open: undefined, sidebar: false, line: undefined, remaining: false, ...next, preview: true, visual, colours, full: now().full ?? false, shown: true });
+      set({ ...STAGE_PLAYING, file: undefined, error: undefined, buffering: undefined, message: undefined, open: undefined, sidebar: false, line: undefined, remaining: false, ...next, preview: true, visual, colours, full: now().full ?? false, shown: true });
       root.focus({ preventScroll: true });
       // The songs with sound are analysed once, one after the other from the first, so a skip never waits.
       if (next.file?.source) void SONGS.reduce<Promise<unknown>>((before, each) => (each.source ? before.then(() => analysedSong(each.source!, each.length).ready).catch(() => undefined) : before), Promise.resolve());
@@ -722,6 +796,7 @@ function live(): HTMLElement {
   box.className = "mp-live";
   // What plays and the visualiser are the stage's own switches, drawn above the sample at the site's size.
   box.append(stageControls(options), stageControls(songs), room, label("Drag the corner to resize it; point at it, click, scroll, or use mpv's keys; drop a song of your own on it to try it", "mono"));
+  if (!FILM_FETCHED) box.append(label("The film isn't fetched: just mockup-film fetches it. Until then its poster plays by the clock.", "mono"));
   return box;
 }
 
@@ -921,9 +996,9 @@ export default page<Shown>({
     { name: "Seeking a song", for: "the time alone: a song has no frames", sample: () => desk({ ...SONG_PLAYING, shown: true, hover: 0.62, preview: true }) },
     { name: "Volume, unfolded", for: "the speaker's slider unfolded under the pointer", sample: () => desk({ ...SHOWN, volume: 0.38, lit: "volume" }) },
     { name: "Muted", for: "the slider's toggle: its fill softens, Muted", sample: () => desk({ ...SHOWN, muted: true, lit: "volume" }) },
-    { name: "Tracks", for: "audio and subtitles in one menu, by its button", sample: () => desk({ ...SHOWN, open: "tracks", subtitle: 1, line: LINES[1] }) },
+    { name: "Tracks", for: "audio and subtitles in one menu, by its button", sample: () => desk({ ...SHOWN, open: "tracks", subtitle: POLISH, line: sampleLine(POLISH) }) },
     { name: "Subtitles off", for: "Off ticked; no line on the picture", sample: () => desk({ ...SHOWN, open: "tracks", subtitle: null }) },
-    { name: "Subtitles on, hidden", for: "the line low; it lifts over the controller", sample: () => desk({ ...PLAYING, subtitle: 0, line: LINES[0] }) },
+    { name: "Subtitles on, hidden", for: "the line low; it lifts over the controller", sample: () => desk({ ...PLAYING, subtitle: ENGLISH, line: sampleLine(ENGLISH) }) },
     { name: "Playlist", for: "several files: the corner's button, previous and next", sample: () => desk(IN_LIST) },
     { name: "Playlist, its panel", for: "the files on glass the window's height, the one playing ticked", sample: () => desk({ ...IN_LIST, sidebar: true }) },
     { name: "Playlist, the first file", for: "previous disabled at the start", sample: () => desk({ ...IN_LIST, index: 0, file: PLAYLIST[0]! }) },
@@ -934,7 +1009,7 @@ export default page<Shown>({
     { name: "Message: volume", for: "9 0 and the wheel: as the shell's volume OSD", sample: () => desk({ ...PLAYING, message: MESSAGES.volume(0.64) }) },
     { name: "Message: speed", for: "[ ]: the speed, in words", sample: () => desk({ ...PLAYING, speed: 1.21, message: MESSAGES.speed(1.21) }) },
     { name: "Message: screenshot saved", for: "s: in words", sample: () => desk({ ...PLAYING, message: MESSAGES.screenshot() }) },
-    { name: "Message over the controller", for: "a key while the controller shows", sample: () => desk({ ...SHOWN, message: MESSAGES.subtitles(1) }) },
+    { name: "Message over the controller", for: "a key while the controller shows", sample: () => desk({ ...SHOWN, message: MESSAGES.subtitles(ENGLISH, FILM) }) },
     { name: "Song", for: "the cover with depth, its colours washing the window, the levels", sample: () => desk(SONG_PLAYING) },
     { name: "Song, paused", for: "the levels settled to rest", sample: () => desk({ ...SONG_PLAYING, playing: false }) },
     ...CHOICES.filter((choice) => choice !== "off").flatMap((choice) => [

@@ -37,8 +37,9 @@ import { MOODS, QUIET, type Signal, synthetic } from "./media-player-signal.ts";
 import { song as analysedSong } from "./media-player-song.ts";
 import jungle from "../../assets/audio/drum-and-bass-jungle.opus?url";
 import intoTheLight from "../../assets/audio/into-the-light.opus?url";
-import firstNights from "../../assets/video/first-nights-in-tokyo.webm?url";
-import firstNightsPoster from "../../assets/video/first-nights-in-tokyo-poster.jpg?url";
+import sintelPoster from "../../assets/video/sintel-poster.jpg?url";
+import SINTEL from "../../assets/video/sintel.json";
+import fetched from "virtual:kubaos-film";
 import { VISUALS, type VizChoice, vizName, CHOICES } from "./media-player-viz.ts";
 import neonLit from "../../../../../branding/photo/neon-sign-lit.jpg?url";
 import stacked from "../../../../../branding/photo/neon-stacked-lit.jpg?url";
@@ -46,7 +47,8 @@ import purple from "../../assets/lock/shinjuku-purple-hour.jpg?url";
 import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
 
 // What plays: a real film and real songs, and stand-ins for the other files, their frames the
-// shipped wallpapers.
+// shipped wallpapers. The film is Sintel, cut by `just mockup-film` into a cache outside the
+// checkout (`scripts/film.sh`): only its poster frame and its cut file are committed.
 
 export interface Chapter {
   /** Where it starts, a fraction of the file. */
@@ -71,33 +73,75 @@ export interface MediaFile {
   readonly source?: string;
   /** Its moving picture, for a film the player really plays on the live stage; `picture` is its poster. */
   readonly video?: string;
+  /** Its audio tracks and subtitles, for a file with its own; any other shows the film's. */
+  readonly tracks?: Tracks;
 }
 
-/** The film's length in seconds, as the browser reads the file. */
-const FILM_LENGTH = 36.078;
+/** A subtitle track: its name in the Tracks menu, a line of it, and its file where it really plays. */
+export interface Subtitle {
+  readonly name: string;
+  /** A line of it the fixed samples show, the same on every run, with the film fetched or not. */
+  readonly sample: string;
+  /** Its WebVTT file, for the film really playing: its lines show at their times. */
+  readonly src?: string;
+}
+
+/** A file's audio tracks and subtitles, in the order the Tracks menu lists them. */
+export interface Tracks {
+  readonly audio: readonly string[];
+  readonly subtitles: readonly Subtitle[];
+}
+
+/** The cut's length in seconds: its frames, `start` to `end` of the source, at its rate. */
+const FILM_LENGTH = (SINTEL.end - SINTEL.start) / SINTEL.rate;
 
 /**
- * The real film (`assets/video/CREDITS.md`): its title and maker are its credit, so they show
- * wherever it shows. Its chapters start at the cut's own scene changes, in seconds. Its poster is
- * its frame at 0.34, where the samples stand, so a fixed sample shows the film as it is there.
+ * The film's tracks as its cut file names them, the mkv's own (`assets/video/sintel.json`), each
+ * subtitle with a line of it for the fixed samples.
+ */
+const FILM_TRACKS: Tracks = { audio: [SINTEL.audio], subtitles: SINTEL.subtitles.map(({ name, sample }) => ({ name, sample })) };
+
+/**
+ * The film (`assets/video/CREDITS.md`) as the fixed samples show it, from the committed cut file
+ * alone, so they read the same with the film fetched or not: its title and maker are its credit,
+ * so they show wherever it shows. Its chapters start at the cut's scene changes. Its poster is
+ * its frame at 0.35, where the samples stand, so a fixed sample shows the film as it is there.
  */
 export const FILM: MediaFile = {
-  title: "First nights in Tokyo",
-  by: "Guillaume J. Lauzier",
+  title: SINTEL.title,
+  by: SINTEL.by,
   length: FILM_LENGTH,
-  picture: firstNightsPoster,
-  video: firstNights,
-  chapters: [
-    { at: 0, name: "The city at night" },
-    { at: 3.837 / FILM_LENGTH, name: "The crossing" },
-    { at: 14.764 / FILM_LENGTH, name: "Neon" },
-    { at: 18.685 / FILM_LENGTH, name: "The tower and the bay" },
-    { at: 24.566 / FILM_LENGTH, name: "The temple" },
-    { at: 29.613 / FILM_LENGTH, name: "A taxi" },
-  ],
+  picture: sintelPoster,
+  chapters: SINTEL.chapters.map(({ at, name }) => ({ at: at / SINTEL.rate / FILM_LENGTH, name })),
+  tracks: FILM_TRACKS,
 };
 
-export const LONG_TITLE = "First nights in Tokyo, the crossing in the rain, the tower and the bay, the extended cut with commentary";
+/**
+ * The film the live stage plays: the fetched cut (`just mockup-film`), its length, chapters and
+ * tracks as its manifest has them; without it, the fixed one, whose poster plays by the clock.
+ */
+export const STAGE_FILM: MediaFile = fetched ? fetchedFilm(fetched) : FILM;
+
+/** The fetched cut as the player plays it, its files where the dev server serves them. */
+function fetchedFilm(cut: NonNullable<typeof fetched>): MediaFile {
+  return {
+    ...FILM,
+    title: cut.title,
+    by: cut.by,
+    length: cut.length,
+    chapters: cut.chapters.map(({ at, name }) => ({ at: at / cut.length, name })),
+    video: cut.base + cut.video,
+    tracks: {
+      audio: cut.audio.map(({ name }) => name),
+      subtitles: cut.subtitles.map(({ lang, name, file }) => ({ name, sample: SINTEL.subtitles.find((each) => each.lang === lang)?.sample ?? "", src: cut.base + file })),
+    },
+  };
+}
+
+/** Whether the film is fetched, so the live stage plays it. */
+export const FILM_FETCHED = fetched !== null;
+
+export const LONG_TITLE = "Sintel, the search for Scales across the wastes and the mountains, the extended cut with commentary";
 
 export const PLAYLIST: readonly MediaFile[] = [
   { title: "Tokyo Tower at the blue hour", length: 412, picture: tower },
@@ -169,13 +213,23 @@ export const SONGS: readonly MediaFile[] = [SONG, INTO_THE_LIGHT, ...LOCAL_SONGS
 export const STREAM: MediaFile = { title: "Tokyo walk, live", by: "a network stream", length: 5400, picture: purple, stream: true };
 export const BROKEN: MediaFile = { title: "holiday-2019.mkv", length: 0 };
 
+/** The live stage's playlist: the fixed one, the film in it the one the stage plays. */
+export const STAGE_PLAYLIST: readonly MediaFile[] = PLAYLIST.map((file) => (file === FILM ? STAGE_FILM : file));
+
 /** The desktop's wallpaper behind the player's samples: a picture the player already shows. */
 export const DESKTOP = purple;
 
-export const AUDIO_TRACKS = ["English · 5.1", "Japanese · stereo", "Commentary"] as const;
-export const SUBTITLES = ["English", "English · SDH", "Polski"] as const;
+/** A file's tracks: its own, or the film's for a file with none of its own. */
+export function tracksOf(file: MediaFile | undefined): Tracks {
+  return file?.tracks ?? FILM_TRACKS;
+}
+
+/** The film's subtitle track by its language's code (`assets/video/sintel.json`), for the samples. */
+export function subtitleIndex(lang: string): number {
+  return SINTEL.subtitles.findIndex((each) => each.lang === lang);
+}
+
 export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
-export const LINES = ["Did you bring an umbrella?", "[rain on the awning] Did you bring an umbrella?", "Wziąłeś parasol?"] as const;
 
 /** What the controller has open over it. */
 export type Open = "tracks" | "more" | "speed" | "visualiser";
@@ -634,11 +688,12 @@ function opened(state: PlayerState, rung: number): HTMLElement {
   if (open === "tracks") {
     const audio = state.audioTrack ?? 0;
     const subtitle = state.subtitle === undefined ? null : state.subtitle;
+    const tracks = tracksOf(state.file);
     content = stack(
       "s16",
       "start",
-      group("Audio", AUDIO_TRACKS.map((label, i) => ({ label, checked: i === audio }))),
-      group("Subtitles", [{ label: "Off", checked: subtitle === null }, ...SUBTITLES.map((label, i) => ({ label, checked: i === subtitle }))]),
+      group("Audio", tracks.audio.map((label, i) => ({ label, checked: i === audio }))),
+      group("Subtitles", [{ label: "Off", checked: subtitle === null }, ...tracks.subtitles.map(({ name }, i) => ({ label: name, checked: i === subtitle }))]),
     );
   } else if (open === "visualiser") {
     const now = choiceOf(state);
@@ -793,8 +848,8 @@ export const MESSAGES = {
   volume: (level: number, muted = false): Message => ({ icon: volumeSymbol(level, muted), fraction: muted ? 0 : level, words: muted ? "Muted" : String(Math.round(level * 100)), widest: "Muted" }),
   speed: (speed: number): Message => ({ icon: "speed", words: `Speed ${speedWords(speed)}` }),
   screenshot: (): Message => ({ icon: "photo_camera", words: "Screenshot saved" }),
-  subtitles: (index: number | null): Message => ({ icon: "subtitles", words: index === null ? "Subtitles off" : SUBTITLES[index] ?? "" }),
-  audio: (index: number): Message => ({ icon: "music", words: AUDIO_TRACKS[index] ?? "" }),
+  subtitles: (index: number | null, file?: MediaFile): Message => ({ icon: "subtitles", words: index === null ? "Subtitles off" : (tracksOf(file).subtitles[index]?.name ?? "") }),
+  audio: (index: number, file?: MediaFile): Message => ({ icon: "music", words: tracksOf(file).audio[index] ?? "" }),
   visual: (choice: VizChoice): Message => ({ icon: "wave_sine", words: `Visualiser · ${vizName(choice)}` }),
   full: (on: boolean): Message => ({ icon: on ? "fullscreen" : "fullscreen_exit", words: on ? "Full screen" : "Windowed" }),
 } as const;
@@ -1119,9 +1174,10 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
   };
 
   /**
-   * The film's video for `file`, at the state's position, made once and kept across builds: never
-   * a sound (it starts muted and stays so), and it plays only when its owner says. Each frame it
-   * shows lights the window: read at the video's `timeupdate`, four times a second, from a few cells.
+   * The film's video for `file`, at the state's position, made once and kept across builds, with
+   * a text track for each of its subtitles. It starts muted, and plays and sounds only when its
+   * owner says. Each frame it shows lights the window: read at the video's `timeupdate`, four
+   * times a second, from a few cells.
    */
   function filmFor(file: MediaFile): HTMLVideoElement {
     if (!film) {
@@ -1144,11 +1200,44 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     if (filmSource !== file.video) {
       filmSource = file.video!;
       film.poster = file.picture ?? "";
+      film.replaceChildren(...subtitleTracks(file));
       film.src = filmSource;
     }
     const at = (state.position ?? 0) * file.length;
     if (Math.abs(film.currentTime - at) > 0.25) film.currentTime = at;
     return film;
+  }
+
+  /**
+   * A text track for each of `file`'s subtitles with a file, off until chosen: the chosen one's
+   * line at the time is the line on the picture, its cue's lines joined into the player's one.
+   */
+  function subtitleTracks(file: MediaFile): HTMLTrackElement[] {
+    return tracksOf(file).subtitles.flatMap((subtitle, i) => {
+      if (!subtitle.src) return [];
+      const track = document.createElement("track");
+      track.kind = "subtitles";
+      track.label = subtitle.name;
+      track.src = subtitle.src;
+      track.dataset.index = String(i);
+      track.track.mode = "disabled";
+      track.track.addEventListener("cuechange", () => {
+        if (state.subtitle !== i || state.file?.video !== filmSource) return;
+        const cues = [...(track.track.activeCues ?? [])].filter((cue): cue is VTTCue => cue instanceof VTTCue);
+        const words = cues.map((cue) => cue.text.replace(/\s*\n\s*/g, " ")).join(" ");
+        if ((state.line ?? "") !== words) update({ line: words || undefined });
+      });
+      return [track];
+    });
+  }
+
+  /** Shows the chosen subtitle's track, where the film really plays, and hides the others. */
+  function followSubtitles(): void {
+    if (!film || state.file?.video !== filmSource) return;
+    for (const each of film.querySelectorAll("track")) {
+      const mode = Number(each.dataset.index) === state.subtitle ? "hidden" : "disabled";
+      if (each.track.mode !== mode) each.track.mode = mode;
+    }
   }
 
   /** The preview's video, showing `file`'s frame at `seconds`: one seek at a time, the latest wanted next. */
@@ -1208,7 +1297,8 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
       if (now.sidebar) fit(true);
       else refit = window.setTimeout(() => fit(true), durationMs("medium") / (settings().speed || 1));
     }
-    // The subtitle line.
+    // The subtitle line: the film's own track's where it really plays, else the state's.
+    followSubtitles();
     const line = screen.querySelector<HTMLElement>(".mp-subtitle");
     if (line) {
       const words = now.line && file && !file.audio && !now.error ? now.line : "";
@@ -1507,23 +1597,26 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     );
   }
 
+  /** Changes the state by `patch`: the window built again for a change of what it is, else in place. */
+  function update(patch: Patch): void {
+    const was = state;
+    state = { ...state, ...patch } as PlayerState;
+    const keys = Object.keys(patch) as (keyof PlayerState)[];
+    if (keys.some((key) => STRUCTURE.has(key) && was[key] !== state[key])) {
+      build();
+      fit(true);
+      return;
+    }
+    momentary(state, was);
+    measure();
+  }
+
   new ResizeObserver(() => fit()).observe(root);
   build();
   measure();
   return {
     element: root,
-    set: (patch) => {
-      const was = state;
-      state = { ...state, ...patch } as PlayerState;
-      const keys = Object.keys(patch) as (keyof PlayerState)[];
-      if (keys.some((key) => STRUCTURE.has(key) && was[key] !== state[key])) {
-        build();
-        fit(true);
-        return;
-      }
-      momentary(state, was);
-      measure();
-    },
+    set: update,
     state: () => state,
     bloom: blooming,
     film: () => (film && film.isConnected ? film : null),

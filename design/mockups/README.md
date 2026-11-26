@@ -10,6 +10,7 @@ In `nix develop`, which provides Node, the tokens' generator and Chromium:
 |---|---|
 | `just mockups` | Serves the site with hot reload at the address Vite prints. A change to `design/tokens.toml` regenerates `src/tokens.css` and the page follows it. |
 | `just mockup-shot PAGE [STATE…]` | Captures a page's states, each drawn alone, as PNGs ("Solo mode", below). |
+| `just mockup-film [SOURCE]` | Makes the media player's film once for the machine, outside every checkout ("The media player's film", below). |
 | `just mockup-preview [CHECKOUT] [PORT]` | Points the review address, 5174, at a checkout's site with hot reload, so it follows an agent's edits and commits live; `just mockup-preview-stop` stops it ("Live preview", below). |
 | `just mockups-build` | Type-checks, holds each registered custom property to one registration (`scripts/property-check.ts`) and builds it static into `dist/`, then draws each page in headless Chromium to write its moves' recipes into `dist/motion/PAGE.json`. |
 | `just mockups-check [PAGE…]` | Draws the pages named, or every page, at every scale, light and dark, and holds its boxes to the geometry rules and each mocked component to its twin on the specimen's pages (`docs/DESIGN.md`, "The mockups"), then holds every motion player to its recipe (`scripts/player-test.ts`). `just design-check` runs it on the pages listed in `checked-pages`, which CI holds a pull request that changes one of the mockups' inputs to (`docs/TESTING.md`, "CI"); a page joins that list once it passes with no finding and no difference. |
@@ -110,6 +111,7 @@ The Anatomy section's samples draw nothing over them at rest. Pointing at a part
 | `scripts/player-test.ts` | Seeks every motion player on the built site and holds its plot and its parts to what plays. |
 | `checked-pages` | The pages CI holds a pull request that changes one of the mockups' inputs to (`docs/TESTING.md`, "CI"), one slug a line (`just mockups-checked`). |
 | `scripts/frame-test.ts` | Walks small pages of probed boxes into geometry frames and holds the walk (`src/site/frame.ts`) to what is drawn. |
+| `scripts/film.sh`, `src/assets/video/sintel.json` | The media player's film: the recipe that cuts it into the cache, and what it cuts. |
 | `scripts/perf.ts`, `scripts/perf-trace.ts`, `scripts/perf-budgets.ts` | The speed check: it drives the pages named, reads their traces, and holds them to the budgets. |
 
 ## Adding a page
@@ -197,6 +199,14 @@ Under each measure over budget are the lines that point at its cause, from the r
 - `restyled by inner ← caller ×n`: the script whose writes made the page's style or layout stale.
 - `250 ms task (style 180 ms, script 60 ms, …)`: a long task, by what it did, then the code that ran longest in it.
 - `animation div.k-spinner spin`: an animation still running at rest, by its element and its name.
+
+## The media player's film
+
+The media player's live stage plays a five-minute cut of "Sintel" (`src/assets/video/CREDITS.md`), with its sound and its ten subtitle tracks. The cut is not in the repository: `just mockup-film` (`scripts/film.sh`) makes it once for the machine into `~/.cache/kubaos-mockups/film/` (under `$XDG_CACHE_HOME` where it is set, or in `$KUBAOS_MOCKUP_FILM`), from the film's download (681 MB), or with no network from a copy given as `just mockup-film ~/Downloads/Sintel.2010.720p.mkv.zip` (or the mkv). It checks the mkv's md5 and writes nothing on a mismatch; once the cut is there it does nothing, until `src/assets/video/sintel.json` or the encoding changes. It runs FFmpeg with libsvtav1 and libopus, and unzip, from the system: the dev shell has neither.
+
+The dev server (`just mockups`, `just mockup-preview`) serves the cut from that folder (`vite.config.ts`, `filmPlugin`), so every checkout on the machine plays the same file, and a page open as it arrives reloads with it. The film plays muted until a person presses or keys on the player; then it sounds at the player's volume, as a song does.
+
+Without it (a fresh clone, CI, the published site) the live stage shows the film's poster, moves its time by the clock, and says the film isn't fetched. The fixed samples and the shots never use the cut: they show the poster and each subtitle track's sample line from `sintel.json`, the same whether the cut is there or not.
 
 ## The Gallery's tour
 
