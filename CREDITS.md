@@ -375,7 +375,7 @@ What the mockups (`design/mockups/`) ship to the page.
 ### Credits kept beside the files they cover
 
 - [`design/mockups/src/assets/audio/CREDITS.md`](design/mockups/src/assets/audio/CREDITS.md): the media player mockup's songs.
-- [`design/mockups/src/assets/video/CREDITS.md`](design/mockups/src/assets/video/CREDITS.md): the media player mockup's film, "First nights in Tokyo" by Guillaume J. Lauzier, CC BY 3.0.
+- [`design/mockups/src/assets/video/CREDITS.md`](design/mockups/src/assets/video/CREDITS.md): the media player mockup's film, "Sintel", © copyright Blender Foundation | durian.blender.org, CC BY 3.0: one frame of it committed, and a five-minute cut that `just mockup-film` makes from the [download](https://download.blender.org/durian/movies/Sintel.2010.720p.mkv.zip) outside the repository.
 - [`design/mockups/src/assets/lock/CREDITS.md`](design/mockups/src/assets/lock/CREDITS.md): the Lock mockup's wallpapers and the tools that cut their depth.
 - The mockups' app icons (`design/mockups/src/assets/apps/`): each names its source and licence in its header comment.
 - [`branding/README.md`](branding/README.md): how the logo's photos were made, and their licence.
@@ -400,15 +400,18 @@ The development tools KubaOS is made with.
 | crane | Builds the crates with Nix (`crates/build.nix`) | Ivan Petkov | MIT | [github.com/ipetkov/crane](https://github.com/ipetkov/crane) |
 | curl | Downloads in the scripts and the dev shell | Daniel Stenberg and contributors | curl | [curl.se](https://curl.se/) |
 | Docker Engine | The end-to-end test containers (`test/run`) and the install image's build | Docker, Inc. | Apache-2.0 | [github.com/moby/moby](https://github.com/moby/moby) |
+| FFmpeg | Cuts and encodes the media player mockup's film and converts its subtitles (`just mockup-film`), with SVT-AV1 and libopus | Fabrice Bellard and the FFmpeg project | LGPL-2.1-or-later, GPL-2.0-or-later | [ffmpeg.org](https://www.ffmpeg.org/) |
 | fontconfig | Font lookup in the screenshot harness | Keith Packard | BSD-2-Clause | [fontconfig.org](http://fontconfig.org/) |
 | fontTools | Outlines a generated app icon's initial from Geist or M PLUS 1 (`design/app-icon.py`) | Just van Rossum, Behdad Esfahbod and the fontTools authors | MIT | [github.com/fonttools/fonttools](https://github.com/fonttools/fonttools) |
 | GnuPG | Checks vendor keys in the dev shell and the system scripts | Free Software Foundation, Inc. | GPL-3.0-or-later | [gnupg.org](https://gnupg.org) |
 | hyperfine | Benchmarks commands | David Peter | Apache-2.0, MIT | [github.com/sharkdp/hyperfine](https://github.com/sharkdp/hyperfine) |
+| Info-ZIP UnZip | Unpacks the media player mockup's film (`just mockup-film`) | Info-ZIP | Info-ZIP | [infozip.sourceforge.net](https://infozip.sourceforge.net/) |
 | just | Runs the repo's recipes (`justfile`) | Casey Rodarmor | CC0-1.0 | [github.com/casey/just](https://github.com/casey/just) |
 | Mesa | Software rendering for the screenshot harness | The Mesa authors | MIT for the core, other licences per file | [docs.mesa3d.org/license.html](https://docs.mesa3d.org/license.html) |
 | nixfmt | Formats the `.nix` files | NixOS | MPL-2.0 | [github.com/NixOS/nixfmt](https://github.com/NixOS/nixfmt) |
 | Node.js | Runs the mockups' build and scripts | Node.js contributors | MIT | [nodejs.org](https://nodejs.org) |
 | NumPy | The neon sign's switch-on frames (`branding/switch.py`) | Travis E. Oliphant and the NumPy Developers | BSD-3-Clause | [numpy.org](https://numpy.org/) |
+| Opus (`libopus`) | Encodes the sound of the media player mockup's film (`just mockup-film`) | Xiph.Org Foundation, Skype Limited, Octasic, Jean-Marc Valin, Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding, Erik de Castro Lopo | BSD-3-Clause | [opus-codec.org](https://opus-codec.org/) |
 | OVMF | UEFI firmware for the install's VM tests | tianocore | BSD-2-Clause | [github.com/tianocore/tianocore.github.io/wiki/OVMF](https://github.com/tianocore/tianocore.github.io/wiki/OVMF) |
 | Pillow | Draws the branding and checks the screenshots | Jeffrey 'Alex' Clark and contributors | MIT-CMU | [python-pillow.github.io](https://python-pillow.github.io/) |
 | Playwright (`playwright-core`) | Drives the headless browser that renders the mockups' shots and checks | Microsoft Corporation | Apache-2.0 | [playwright.dev](https://playwright.dev) |
@@ -416,6 +419,7 @@ The development tools KubaOS is made with.
 | QEMU | Boots the install images in the VM tests | Fabrice Bellard and the QEMU Project Developers | GPL-2.0-or-later | [qemu.org](https://www.qemu.org/) |
 | Rust | The language of the engine, the CLI, the services and the apps | The Rust Project Contributors | MIT, Apache-2.0 | [rust-lang.org](https://www.rust-lang.org/) |
 | rustfmt | Formats the Rust code (nightly, `just fmt-check`) | The Rust Project Developers | MIT, Apache-2.0 | [github.com/rust-lang-nursery/rustfmt](https://github.com/rust-lang-nursery/rustfmt) |
+| SVT-AV1 | Encodes the picture of the media player mockup's film (`just mockup-film`) | Alliance for Open Media | BSD-3-Clause-Clear | [gitlab.com/AOMediaCodec/SVT-AV1](https://gitlab.com/AOMediaCodec/SVT-AV1) |
 | sccache | Caches Rust compiles in the dev shell and CI | mozilla | Apache-2.0 | [github.com/mozilla/sccache](https://github.com/mozilla/sccache) |
 | ShellCheck | Lints the shell scripts (`just shellcheck`), and Neovim's shell files through Mason | Vidar Holen and contributors | GPL-3.0 | [github.com/koalaman/shellcheck](https://github.com/koalaman/shellcheck) |
 | Sway | The headless compositor the screenshot harness renders the shell in | Simon Ser and the Sway contributors | MIT | [swaywm.org](https://swaywm.org) |

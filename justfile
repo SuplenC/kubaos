@@ -81,7 +81,7 @@ nextest *args:
 apps-verify *args:
     cargo run -q -p kubaos-apps-verify -- "$@"
 
-# shellcheck over the repo's shell scripts (test/shellcheck/check): the Apps catalog's, the system scripts, migrations, scripts/, the test harness, the hooks. A warning or an error fails it; info and style notes are listed.
+# shellcheck over the repo's shell scripts (test/shellcheck/check): the Apps catalog's, the system scripts, migrations, scripts/, the test harness, the hooks, the mockup site's scripts. A warning or an error fails it; info and style notes are listed.
 shellcheck:
     test/shellcheck/check .
 
@@ -206,6 +206,10 @@ mockups-checked:
 [positional-arguments]
 mockup-shot page *args: _mockups-deps
     cd design/mockups && node scripts/shot.ts "$@"
+
+# The media player mockup's film, a five-minute cut of Sintel with its subtitles (design/mockups/scripts/film.sh), made once into ${XDG_CACHE_HOME:-~/.cache}/kubaos-mockups/film, where every checkout's mockup site finds it; KUBAOS_MOCKUP_FILM moves it. It downloads the film (681 MB) unless given it, `just mockup-film ~/Downloads/Sintel.2010.720p.mkv.zip` (or the mkv), checks its md5, and does nothing once the cut is there. FFmpeg with libsvtav1 and libopus, and unzip, come from the system. In `nix develop`.
+mockup-film source="":
+    design/mockups/scripts/film.sh {{ if source == "" { "" } else { quote(source) } }}
 
 # A checkout's mockup site served with hot reload on the review port, 5174, as the transient user unit kubaos-mockups, so the one address follows whichever checkout is under review: an agent's draft as its edits and commits land (`just mockup-preview ~/.t3/worktrees/kubaos/NAME`), main's again from the review checkout after (this checkout by default). The site already served there is replaced. It prints the address once the site answers. Another PORT serves beside it as kubaos-mockups-PORT.
 mockup-preview worktree=justfile_directory() port="5174":

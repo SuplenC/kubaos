@@ -1,0 +1,32 @@
+{
+  "title": "Sintel",
+  "by": "Blender Foundation",
+  "url": "https://download.blender.org/durian/movies/Sintel.2010.720p.mkv.zip",
+  "mkv": "Sintel.2010.720p.mkv",
+  "md5": "1f5de6a3822dc9ba4f1e273df9d23c2d",
+  "rate": 24,
+  "start": 2125,
+  "end": 9133,
+  "poster": 2452,
+  "chapters": [
+    { "at": 0, "name": "The mountain pass" },
+    { "at": 304, "name": "The shaman's hut" },
+    { "at": 1615, "name": "Alleys of the town" },
+    { "at": 2243, "name": "A wounded dragon" },
+    { "at": 4678, "name": "Over the rooftops" },
+    { "at": 6355, "name": "Across the wastes" }
+  ],
+  "audio": "English · stereo",
+  "subtitles": [
+    { "lang": "ger", "name": "Deutsch", "sample": "Ich suche jemanden." },
+    { "lang": "eng", "name": "English", "sample": "I'm searching for someone." },
+    { "lang": "spa", "name": "Español", "sample": "Estoy buscando a alguien." },
+    { "lang": "fre", "name": "Français", "sample": "Je recherche quelqu'un." },
+    { "lang": "ita", "name": "Italiano", "sample": "Sto cercando qualcuno." },
+    { "lang": "dut", "name": "Nederlands", "sample": "Ik ben op zoek naar iemand." },
+    { "lang": "pol", "name": "Polski", "sample": "Poszukuję kogoś." },
+    { "lang": "por", "name": "Português", "sample": "Eu preciso encontrar alguém." },
+    { "lang": "rus", "name": "Русский", "sample": "Я ищу кое кого." },
+    { "lang": "vie", "name": "Tiếng Việt", "sample": "Tôi đang tìm kiếm một người." }
+  ]
+}

@@ -9,7 +9,7 @@
 # check run it. It reads git through `safe.directory`, so root can run it on a user's checkout.
 set -euo pipefail
 
-FOLDERS=(apps scripts system migrations test config home/suites crates/self-imports .claude/hooks)
+FOLDERS=(apps scripts system migrations test config home/suites crates/self-imports .claude/hooks design/mockups/scripts)
 
 repo="$(cd "${1:-$(dirname "$0")/../..}" && pwd)"
 cd "$repo"
