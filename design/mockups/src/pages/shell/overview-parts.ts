@@ -20,7 +20,6 @@ import { focusRing, steadyGlow } from "../../lib/focus.ts";
 import { glass } from "../../lib/glass.ts";
 import { icon } from "../../lib/icon.ts";
 import { catchShare, caught as zoneCaught, inside, refuse, type Zone as Caught, zoneOf } from "../../lib/magnet.ts";
-import { type Rolling, rollingNumber } from "../../lib/rolling-number.ts";
 import { text } from "../../lib/text.ts";
 import { durationMs, length, number } from "../../lib/tokens.ts";
 import type { Easing } from "../../site/page.ts";
@@ -110,8 +109,6 @@ export interface Driver {
   readonly client: (point: Point) => Point;
   /** The middle of a workspace's miniature, a window, a group's new-workspace slot, in world points. */
   readonly centreOf: (what: { space: string } | { window: string } | { plus: string }) => Point;
-  /** Where a workspace is taken by its number, under its miniature, in world points. */
-  readonly handleOf: (space: string) => Point;
   /** The gutter's middle before place `index` of `group`. */
   readonly between: (group: string, index: number) => Point;
   readonly target: () => Target | null;
@@ -138,8 +135,6 @@ export interface Driver {
   /** A point over `side` of `window` on `space`, in world points, and the order a workspace tiles its windows in. */
   readonly sidePoint: (space: string, window: string, side: model.Side) => Point;
   readonly order: (space: string) => string[];
-  /** A workspace's number as drawn. */
-  readonly numberShown: (space: string) => string;
   /** Three fingers holding the Overview `p` of the way open, and lifting. */
   readonly swipe: (p: number) => void;
   readonly lift: () => void;
@@ -169,11 +164,19 @@ function ms(name: string): number {
   return durationMs(name) / settings().speed;
 }
 
-/** The room a screen's windows tile: under the Bar layout's band, `size.gap` from it and the screen's edges. */
+/**
+ * A screen's desktop as its miniature draws it: the screen less the Bar layout's band, which the
+ * Overview has slid away, so a miniature starts where its windows' room does.
+ */
+function desktopOf(width: number, height: number): { w: number; h: number } {
+  return { w: width, h: height - L("size-bar") };
+}
+
+/** The room a screen's windows tile, on its desktop (`desktopOf`): `size.gap` in from every edge. */
 function tilingArea(width: number, height: number): model.Rect {
   const side = L("size-gap");
-  const top = L("size-bar") + side;
-  return { x: side, y: top, w: width - 2 * side, h: height - top - side };
+  const room = desktopOf(width, height);
+  return { x: side, y: side, w: room.w - 2 * side, h: room.h - 2 * side };
 }
 
 // ── The grid ──────────────────────────────────────────────────────────────────────────────────
@@ -221,7 +224,7 @@ function arrange(width: number, height: number, specs: readonly SectionSpec[]): 
   const gap = L("space-s24");
   const apart = L("space-s32");
   const label = L("size-chip") + L("space-s8");
-  const aspect = height / width;
+  const aspect = desktopOf(width, height).h / width;
   const roomW = width - 2 * margin;
   const roomH = height - 2 * margin;
   const counts = specs.map((spec) => spec.items.length + (spec.plus ? 1 : 0));
@@ -312,14 +315,6 @@ function span(name: string, ...children: (Node | string)[]): HTMLElement {
 interface SpaceEl {
   readonly root: HTMLElement;
   readonly desk: HTMLElement;
-}
-
-/** A place's number: the badge in its top left corner, and whether it marks the shown workspace. */
-interface PlaceTag {
-  readonly root: HTMLElement;
-  readonly number: HTMLElement;
-  rolling: Rolling | null;
-  shown: boolean;
 }
 
 /** A screen drawn: the desktop with its bar, and the overview's layer over it. */
@@ -503,16 +498,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   const labelEls = new Map<string, HTMLElement>();
   /** Each window's tile on its workspace's desktop, in the screen's logical pixels. */
   const tiles = new Map<string, model.Rect>();
-  const placeTags = new Map<string, PlaceTag>();
-  // The places' numbers, over every miniature and over a workspace carried into a place, under a
-  // carried window (`overview.css`).
-  const numbers = span("ov-numbers");
-  // Over what is carried: the number of a place a carried workspace sits in, and a number fading as
-  // something settles under it or leaves it, so the order never flips in sight.
-  const numbersOver = span("ov-numbers ov-numbers-over");
-  lift.append(numbers, numbersOver);
-  /** The place a carried workspace sits in, its number over it. */
-  let placedKey: string | null = null;
 
   // ── The screens ──
 
@@ -622,13 +607,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     let made = spaceEls.get(id);
     if (made) return made;
     const desktop = span("ov-ws-desk");
-    const picture = document.createElement("img");
-    picture.className = "ov-ws-wallpaper";
-    picture.src = views[0]!.element.querySelector<HTMLImageElement>(".k-screen-wallpaper")!.src;
-    picture.alt = "";
-    picture.draggable = false;
-    desktop.append(picture);
-    const element = span("ov-ws", desktop);
+    // The new-workspace slot's card (`overview.css`): the wallpaper behind the Overview is the
+    // workspace's own desktop seen through it, so a miniature paints none.
+    const element = glass(span("ov-ws ov-card", desktop));
     element.dataset.space = id;
     made = { root: element, desk: desktop };
     spaceEls.set(id, made);
@@ -638,7 +619,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function plusEl(group: string): HTMLElement {
     let element = plusEls.get(group);
     if (element) return element;
-    element = glass(span("ov-plus", icon("add", "var(--icon-s24)", "var(--ov-plus-ink)")));
+    element = glass(span("ov-plus ov-card", icon("add", "var(--icon-s24)", "var(--ov-card-ink)")));
     element.dataset.group = group;
     plusEls.set(group, element);
     return element;
@@ -651,146 +632,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     element.dataset.group = group.id;
     labelEls.set(group.id, element);
     return element;
-  }
-
-  /**
-   * A place's number, by its group and its order there: the badge stays with the place, so as
-   * workspaces move between places during a carry the numbers stand still and the workspaces move
-   * under them; the room left open keeps its number, and a carried workspace shows none.
-   */
-  function tagOf(group: string, index: number): PlaceTag {
-    const key = `${group}#${index}`;
-    let made = placeTags.get(key);
-    if (made) return made;
-    const number = glass(span("ov-ws-number"));
-    const element = span("ov-place", number);
-    element.dataset.place = key;
-    made = { root: element, number, rolling: null, shown: false };
-    placeTags.set(key, made);
-    return made;
-  }
-
-  /** Draws the number of place `index` of `section`, `space.s8` in from its top left corner. */
-  function putTag(section: Section, index: number, on: ScreenView, motion: Motion): void {
-    const made = tagOf(section.group, index);
-    const slot = section.places[index]!;
-    const fresh = !made.root.isConnected;
-    delete made.root.dataset.gone;
-    // A place made while things move, by a drop or a room opening, fades in with it.
-    const grows = fresh && motion !== "none" && open;
-    if (fresh) {
-      numbers.append(made.root);
-      glide(made.root, "none");
-      arriving(made.root, "none");
-      made.root.style.setProperty("--ov-arrive", grows ? "0" : "1");
-      made.root.style.setProperty("--ov-tag", open ? "1" : "0");
-    }
-    const inset = L("space-s8");
-    if (fresh) {
-      made.root.style.setProperty("--ov-x", css(on.at.x + slot.x + inset));
-      made.root.style.setProperty("--ov-y", css(on.at.y + slot.y + inset));
-      commit(made.root);
-    }
-    glide(made.root, motion);
-    made.root.style.setProperty("--ov-x", css(on.at.x + slot.x + inset));
-    made.root.style.setProperty("--ov-y", css(on.at.y + slot.y + inset));
-    if (made.root.style.getPropertyValue("--ov-arrive") === "0") {
-      arriving(made.root, open && motion !== "none" ? "arrive" : "none");
-      made.root.style.setProperty("--ov-arrive", "1");
-    }
-    // It marks the shown workspace's place; carried, the place it leaves open in its own group.
-    const item = section.items[index];
-    const shownId = desk.shown.get(on.screen.id);
-    const shown = item === shownId || (item === ROOM && carry?.kind === "space" && carry.id === shownId && section.group === carry.from);
-    const value = index + 1;
-    if (made.rolling && made.shown === shown) made.rolling.set(value);
-    else {
-      made.rolling = rollingNumber({ value, widest: String(value).replace(/\d/g, "0"), style: "button_small", color: shown ? "on_primary" : "on_surface" });
-      made.shown = shown;
-      made.number.replaceChildren(made.rolling.element);
-      made.number.toggleAttribute("data-shown", shown);
-    }
-  }
-
-  /** The key of the place `space` stands in as drawn now. */
-  function placeKeyOf(space: string): string | null {
-    for (const each of views) {
-      for (const section of each.layout.sections) {
-        const k = section.items.indexOf(space);
-        if (k >= 0) return `${section.group}#${k}`;
-      }
-    }
-    return null;
-  }
-
-  /** A place's number's box, in world points. */
-  function badgeOf(key: string): model.Rect | null {
-    const at = key.lastIndexOf("#");
-    const group = key.slice(0, at);
-    const index = Number(key.slice(at + 1));
-    for (const each of views) {
-      const slot = each.layout.sections.find((section) => section.group === group)?.places[index];
-      if (slot) return { x: each.at.x + slot.x + L("space-s8"), y: each.at.y + slot.y + L("space-s8"), w: L("size-chip"), h: L("size-chip") };
-    }
-    return null;
-  }
-
-  function overlaps(a: model.Rect, b: model.Rect): boolean {
-    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-  }
-
-  /** Shows or hides a place's number over `short`, or at once. */
-  function cover(made: PlaceTag, shown: boolean, instant = false): void {
-    made.root.style.setProperty("--ov-ct", instant ? "0s" : "var(--motion-short)");
-    made.root.style.setProperty("--ov-cover", shown ? "1" : "0");
-    if (instant) commit(made.root);
-  }
-
-  /**
-   * Something has settled in place `key`, under its number: the number comes over it unseen and
-   * fades in. Unless `stays`, as a carried workspace's place does, it goes back to the numbers'
-   * own layer once faded in, what settled being on the desk below them by then.
-   */
-  function settleTag(key: string, stays: boolean): void {
-    const made = placeTags.get(key);
-    if (!made) return;
-    cover(made, false, true);
-    numbersOver.append(made.root);
-    commit(made.root);
-    cover(made, true);
-    if (stays) return;
-    later(ms("short"), () => {
-      if (placedKey !== key && made.root.parentElement === numbersOver) numbers.append(made.root);
-    });
-  }
-
-  /**
-   * Something leaves place `key`, carried: the number stays over it as it fades out, then goes back
-   * under what is carried and shows again, so nothing carried has a number over it.
-   */
-  function releaseTag(key: string): void {
-    const made = placeTags.get(key);
-    if (!made) return;
-    if (made.root.parentElement !== numbersOver) numbersOver.append(made.root);
-    cover(made, false);
-    later(ms("short"), () => {
-      if (placedKey === key) return;
-      numbers.append(made.root);
-      cover(made, true);
-    });
-  }
-
-  /** A place gone, its group shorter: its number fades where it stands, and goes. */
-  function dropTag(key: string, made: PlaceTag): void {
-    if (made.root.hasAttribute("data-gone")) return;
-    made.root.dataset.gone = "";
-    arriving(made.root, open ? "collapse" : "none");
-    made.root.style.setProperty("--ov-arrive", "0");
-    later(ms("medium"), () => {
-      if (!made.root.hasAttribute("data-gone")) return;
-      made.root.remove();
-      placeTags.delete(key);
-    });
   }
 
   // ── Where everything goes ──
@@ -858,7 +699,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /** Lays every screen out again and sends each element to its place, moving as `motion` says. */
   function place(motion: Motion): void {
     const rooms = roomsNow();
-    const numbered = new Set<string>();
     for (const each of views) {
       each.layout = arrange(each.size.w, each.size.h, specsOf(each.screen, rooms));
       const groups = model.groupsOn(desk, each.screen);
@@ -866,8 +706,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         const group = groups.find((g) => g.id === section.group)!;
         section.items.forEach((id, k) => {
           if (id !== ROOM) putSpace(id, section.places[k]!, each, motion);
-          putTag(section, k, each, motion);
-          numbered.add(`${section.group}#${k}`);
         });
         const plus = plusEl(group.id);
         if (section.plus) {
@@ -890,7 +728,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       }
       for (const [group, element] of plusEls) if (!groups.some((g) => g.id === group) && element.parentElement === each.layer) delete element.dataset.shown;
     }
-    for (const [key, made] of placeTags) if (!numbered.has(key)) dropTag(key, made);
     showRoom();
     showAim();
     showSelect();
@@ -933,10 +770,21 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.root.style.setProperty("--ov-h", css(slot.h));
     made.desk.style.setProperty("--ov-s", String(slot.s));
     made.desk.style.setProperty("--ov-unscale", String(1 / slot.s));
-    made.desk.style.setProperty("--ov-dw", css(on.size.w));
-    made.desk.style.setProperty("--ov-dh", css(on.size.h));
+    sizeDesktop(made, on);
     made.root.toggleAttribute("data-shown-here", desk.shown.get(on.screen.id) === id);
     tileSpace(id, on, motion);
+  }
+
+  /**
+   * Gives workspace `made` the desktop of screen `on`: its desktop drawn at that size, and its card,
+   * which grows to it as the miniature flies to the screen.
+   */
+  function sizeDesktop(made: SpaceEl, on: ScreenView): void {
+    const room = desktopOf(on.size.w, on.size.h);
+    for (const part of [made.root, made.desk]) {
+      part.style.setProperty("--ov-dw", css(room.w));
+      part.style.setProperty("--ov-dh", css(room.h));
+    }
   }
 
   /** A workspace made by a drop grows in from nothing where it will stand. */
@@ -952,8 +800,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     made.root.style.setProperty("--ov-h", css(slot.h));
     made.desk.style.setProperty("--ov-s", String(slot.s));
     made.desk.style.setProperty("--ov-unscale", String(1 / slot.s));
-    made.desk.style.setProperty("--ov-dw", css(on.size.w));
-    made.desk.style.setProperty("--ov-dh", css(on.size.h));
+    sizeDesktop(made, on);
     commit(made.root);
     for (const part of [made.root, made.desk]) {
       arriving(part, "arrive");
@@ -1125,7 +972,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       each.bar.style.setProperty("--ov-aside", isOpen ? "1" : "0");
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
-        for (const [k, id] of section.items.entries()) {
+        for (const id of section.items) {
           if (id === ROOM) continue;
           const made = spaceEl(id);
           const home = id === shown;
@@ -1146,19 +993,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
             part.style.setProperty("--ov-arrive", isOpen || (home && !reduced) ? "1" : "0");
             part.style.setProperty("--ov-fly", !isOpen && home ? "1" : "0");
           }
-          // A place's number shows once its miniature has come to rest there: the screen's own after
-          // its flight; the others' arrive with them.
-          const tag = tagOf(section.group, k).root;
-          tag.style.setProperty("--ov-tt", motion === "none" ? "0s" : isOpen ? "var(--motion-short)" : "var(--motion-micro)");
-          tag.style.setProperty("--ov-td", motion === "open" && home && !reduced ? "var(--motion-medium)" : motion === "open" && !reduced ? STAGGER[rankOf(id)]! : "0s");
-          if (settling) tag.style.setProperty("--ov-tt", "var(--motion-short)");
-          if (motion === "open" && home) {
-            tag.style.setProperty("--ov-tt", "0s");
-            tag.style.setProperty("--ov-tag", "0");
-            commit(tag);
-            tag.style.setProperty("--ov-tt", "var(--motion-short)");
-          }
-          tag.style.setProperty("--ov-tag", isOpen ? "1" : "0");
         }
       }
       for (const element of [...each.layer.querySelectorAll<HTMLElement>(".ov-plus, .ov-label")]) {
@@ -1187,7 +1021,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /**
    * Draws the Overview `p` of the way open, every part where the fingers have it and nothing gliding:
    * the wallpaper veiled by `p`, the screen's desktop `p` of its way into its
-   * miniature, and every other miniature, number, slot and name `p` of the way in.
+   * miniature, and every other miniature, slot and name `p` of the way in.
    */
   function follow(p: number): void {
     if (swiping === null && !open) place("none");
@@ -1202,7 +1036,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       each.bar.style.setProperty("--ov-aside", at);
       const shown = desk.shown.get(each.screen.id);
       for (const section of each.layout.sections) {
-        for (const [k, id] of section.items.entries()) {
+        for (const id of section.items) {
           if (id === ROOM) continue;
           const made = spaceEl(id);
           const home = id === shown;
@@ -1213,14 +1047,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
             part.style.setProperty("--ov-arrive", home ? "1" : at);
             part.style.setProperty("--ov-fly", home ? String(1 - swiping) : "0");
           }
-          // The others' numbers come as far as their miniatures; the screen's own, still in flight
-          // to its place, shows its number once it is there.
-          const tag = tagOf(section.group, k).root;
-          arriving(tag, "none");
-          tag.style.setProperty("--ov-arrive", "1");
-          tag.style.setProperty("--ov-tt", "0s");
-          tag.style.setProperty("--ov-td", "0s");
-          tag.style.setProperty("--ov-tag", home ? "0" : at);
         }
       }
       for (const element of [...each.layer.querySelectorAll<HTMLElement>(".ov-plus, .ov-label")]) {
@@ -1490,10 +1316,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     if (!on || !slot || !rect || !element) return;
     const at: Pose = { x: on.at.x + slot.x + rect.x * slot.s, y: on.at.y + slot.y + rect.y * slot.s, w: rect.w, h: rect.h, s: slot.s, k: 1 };
     const grab = { x: (point.x - at.x) / (rect.w * slot.s), y: (point.y - at.y) / (rect.h * slot.s) };
-    // Lifted from under its workspace's number, the number fades off it as it comes up.
-    const key = placeKeyOf(space);
-    const badge = key ? badgeOf(key) : null;
-    if (key && badge && overlaps(badge, drawn("window", at))) releaseTag(key);
     lift.append(element);
     delete element.dataset.landing;
     element.dataset.lifted = "";
@@ -1523,10 +1345,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const at: Pose = { x: on.at.x + slot.x, y: on.at.y + slot.y, w: slot.w, h: slot.h, s: slot.s, k: 1 };
     const grab = { x: (point.x - at.x) / slot.w, y: (point.y - at.y) / slot.h };
     const group = model.groupOf(desk, id);
-    // Lifted in its own place, it sits there under that place's number until it leaves it.
-    placedKey = placeKeyOf(id);
-    const own = placedKey ? placeTags.get(placedKey) : undefined;
-    if (own) numbersOver.append(own.root);
     lift.append(made.root);
     delete made.root.dataset.landing;
     made.root.dataset.lifted = "";
@@ -1584,20 +1402,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     }
     lightBin(into);
     place("reflow");
-    // A workspace leaving a place leaves its number; one that settles in a place has its number
-    // come over it once it is there.
-    const key = held.kind === "space" && target?.kind === "between" ? `${target.group}#${target.index}` : null;
-    if (placedKey && placedKey !== key) {
-      const was = placedKey;
-      placedKey = null;
-      releaseTag(was);
-    }
-    const settles = key !== null && key !== placedKey;
-    fly(held, wanted(held), duration, curve, settles ? () => {
-      if (carry !== held || placedKey !== null) return;
-      placedKey = key;
-      settleTag(key, true);
-    } : undefined);
+    fly(held, wanted(held), duration, curve);
   }
 
   // ── Where a carried thing is drawn ──
@@ -1923,14 +1728,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     delete was.element.dataset.lifted;
     was.element.dataset.landing = "";
     place("reflow");
-    fly(was, () => tilePose(was.id) ?? posed.get(was.element)!, "medium", "emphasized_decel", () => {
-      // Landed under its workspace's number: the number fades in over it.
-      const key = placeKeyOf(model.spaceOf(desk, was.id).id);
-      const at = tilePose(was.id);
-      const badge = key ? badgeOf(key) : null;
-      settleWindow(was.id);
-      if (key && badge && at && overlaps(badge, drawn("window", at))) settleTag(key, false);
-    });
+    fly(was, () => tilePose(was.id) ?? posed.get(was.element)!, "medium", "emphasized_decel", () => settleWindow(was.id));
   }
 
   /** A window's tile on its workspace's miniature as drawn now, in world points. */
@@ -1979,15 +1777,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     const now = posed.get(made.root);
     const wide = Number.parseFloat(getComputedStyle(made.desk).getPropertyValue("--ov-dw")) / settings().scale;
     if (now && wide && Math.abs(wide - on.size.w) > 0.5) posed.set(made.root, { ...now, s: (now.s * wide) / on.size.w });
-    made.desk.style.setProperty("--ov-dw", css(on.size.w));
-    made.desk.style.setProperty("--ov-dh", css(on.size.h));
+    sizeDesktop(made, on);
     tileSpace(id, on, "land");
-    // Let go in the place it sat in, its number is over it already and stays; let go elsewhere, the
-    // number of the place it lands in fades in over it once it is there.
-    const there = placeKeyOf(id);
-    const kept = placedKey !== null && placedKey === there;
-    if (placedKey && !kept) releaseTag(placedKey);
-    placedKey = null;
     fly(
       was,
       () => {
@@ -1997,14 +1788,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       },
       "medium",
       "emphasized_decel",
-      () => {
-        settleSpace(id);
-        const key = placeKeyOf(id);
-        const made = key ? placeTags.get(key) : undefined;
-        if (kept && made && key === there) {
-          if (made.root.parentElement === numbersOver) numbers.append(made.root);
-        } else if (key) settleTag(key, false);
-      },
+      () => settleSpace(id),
     );
   }
 
@@ -2094,7 +1878,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   function slotBox(on: ScreenView, holding: Posed | null = slotHolds()): model.Rect {
     const gap = L("space-s16");
     const inner = L("size-drop_slot");
-    const shape = holding ? slotShape(holding) : on.size.w / on.size.h;
+    const empty = desktopOf(on.size.w, on.size.h);
+    const shape = holding ? slotShape(holding) : empty.w / empty.h;
     const h = gap + inner + gap;
     // Whole device pixels wide, so its right edge and what it holds land on them (`slotPose`).
     const w = 2 * gap + device(inner * shape);
@@ -2704,11 +2489,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     snapshot: () => model.snapshot(desk),
     client: toClient,
     centreOf,
-    handleOf(space) {
-      const box = worldBox({ kind: "space", space });
-      const middle = L("space-s8") + L("size-chip") / 2;
-      return box ? { x: box.x + middle, y: box.y + middle } : { x: 0, y: 0 };
-    },
     between: betweenPoint,
     target: () => carry?.target ?? null,
     lifted: () => carry?.id ?? null,
@@ -2736,15 +2516,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     swipe: (p) => follow(p),
     sidePoint: (space, window, side) => sidePoint(space, { window, side }),
     order: (space) => [...model.layout(model.treeOf(desk.spaces.get(space)!), { x: 0, y: 0, w: 1600, h: 900 }, 0).entries()].sort(([, a], [, b]) => a.y - b.y || a.x - b.x).map(([id]) => id),
-    numberShown(space) {
-      for (const each of views) {
-        for (const section of each.layout.sections) {
-          const k = section.items.indexOf(space);
-          if (k >= 0) return placeTags.get(`${section.group}#${k}`)?.rolling?.element.getAttribute("aria-label") ?? "";
-        }
-      }
-      return "";
-    },
     lift: () => fingersLift(),
     learned: () => [...learned].sort(),
     tipShown: () => !tip.hasAttribute("data-learned"),

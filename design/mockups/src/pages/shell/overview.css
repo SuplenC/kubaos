@@ -24,9 +24,7 @@
 @property --ov-arrive { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-veil { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-aside { syntax: "<number>"; inherits: false; initial-value: 0; }
-@property --ov-cover { syntax: "<number>"; inherits: false; initial-value: 1; }
-@property --ov-plus-tint { syntax: "<number>"; inherits: false; initial-value: 0; }
-@property --ov-tag { syntax: "<number>"; inherits: false; initial-value: 1; }
+@property --ov-card-tint { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-sink { syntax: "<number>"; inherits: false; initial-value: 0; }
 @property --ov-shrink { syntax: "<number>"; inherits: false; initial-value: 1; }
 @property --ov-red { syntax: "<number>"; inherits: false; initial-value: 0; }
@@ -129,16 +127,19 @@
 
 /* ── A workspace ─────────────────────────────────────────────────────────────────────────────── */
 
-/* Its box at its slot; flying, it travels to the screen's corner as its desktop grows to the
-   screen; arriving, it grows in from `scale.behind` as it fades in. */
+/* Its card at its slot; flying, it travels to the screen's top left corner under the bar's band and
+   grows with its desktop to the screen's desktop (`--ov-dw` by `--ov-dh`); arriving, it grows in
+   from `scale.behind` as it fades in. */
 .ov-ws {
   position: absolute;
   left: 0;
   top: 0;
   display: block;
-  width: var(--ov-w);
-  height: var(--ov-h);
-  translate: calc(var(--ov-x) * (1 - var(--ov-fly))) calc(var(--ov-y) * (1 - var(--ov-fly)));
+  box-sizing: border-box;
+  width: calc(var(--ov-w) + (var(--ov-dw) - var(--ov-w)) * var(--ov-fly));
+  height: calc(var(--ov-h) + (var(--ov-dh) - var(--ov-h)) * var(--ov-fly));
+  translate: calc(var(--ov-x) * (1 - var(--ov-fly))) calc(var(--ov-y) * (1 - var(--ov-fly)) + var(--size-bar) * var(--ov-fly));
+  border-radius: calc(var(--radius-control) * (1 - var(--ov-fly)));
   opacity: var(--ov-arrive);
   scale: calc(var(--scale-behind) + (1 - var(--scale-behind)) * var(--ov-arrive));
   transform-origin: 50% 50%;
@@ -148,9 +149,19 @@
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-w var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-dw var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
+    --ov-dh var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
-    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear);
+    --ov-shrink var(--ov-pt, 0s) var(--ov-pe, linear),
+    --ov-card-tint var(--motion-short) var(--easing-standard);
+}
+
+/* As it flies to the screen it becomes the desktop itself: the card's glass, line and shadow thin
+   out with the flight, so the shown workspace is its windows on the sharp wallpaper. */
+.ov-ws.k-glass {
+  --ov-card-show: calc(1 - var(--ov-fly));
+  backdrop-filter: blur(calc(var(--size-glass_blur) * var(--ov-card-show))) saturate(calc(1 + (var(--scale-glass_saturate) - 1) * var(--ov-card-show)));
 }
 
 /* The screen's own desktop flies over the others, shrinking into its place and growing out of it. */
@@ -158,8 +169,10 @@
   z-index: 1;
 }
 
-/* The desktop drawn at the screen's own size and scaled into the box: the windows are the real
-   ones, seen from above. Its corners are the control radius at the miniature's size. */
+/* The desktop, the screen less the bar's band, drawn at its own size and scaled into the card: the
+   windows are the real ones, seen from above. It paints nothing of its own: the card is its
+   surface. Its corners are the card's, at the miniature's size, so a floating window is cut where
+   the card is. */
 .ov-ws-desk {
   position: absolute;
   left: 0;
@@ -183,66 +196,12 @@
         (var(--ov-s) + (1 - var(--ov-s)) * var(--ov-fly))
     )
   );
-  background: var(--color-surface_container_lowest);
-  box-shadow: 0 var(--shadow-panel-y) var(--shadow-panel-blur) rgb(from var(--color-shadow) r g b / calc(var(--opacity-window_shadow) * (1 - var(--ov-fly))));
   transition:
     --ov-s var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-dw var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-dh var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-fly var(--ov-ft, 0s) var(--ov-fe, linear),
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s);
-}
-
-.ov-ws-wallpaper {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
-
-/* A place's number, `space.s8` in from its top left corner, over the miniature and its windows. It
-   belongs to the place, not to the workspace in it: it stands still while workspaces move between
-   places, and shows once the miniature has come to rest there (`--ov-tag`), fading with a place
-   that comes or goes (`--ov-arrive`), and as something settles under it or leaves it
-   (`--ov-cover`, `overview-parts.ts`). */
-.ov-numbers {
-  position: absolute;
-  inset: 0;
-  display: block;
-}
-
-.ov-place {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: block;
-  translate: var(--ov-x) var(--ov-y);
-  opacity: calc(var(--ov-tag) * var(--ov-arrive) * var(--ov-cover));
-  transition:
-    --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
-    --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
-    --ov-tag var(--ov-tt, 0s) var(--easing-standard) var(--ov-td, 0s),
-    --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
-    --ov-cover var(--ov-ct, 0s) var(--easing-standard);
-}
-
-/* A number on the shell's glass (`lib/glass.ts`): it reads on any picture, by night and by day.
-   The screen's shown one sits on the indicator, which carries no glass edge. */
-.ov-ws-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--size-chip);
-  height: var(--size-chip);
-  border-radius: var(--radius-full);
-}
-
-.ov-ws-number.k-glass[data-shown] {
-  background: var(--color-primary);
-  box-shadow: var(--glass-shadow);
 }
 
 .ov:not([data-open]) .ov-ws:not([data-shown-here]),
@@ -257,8 +216,9 @@
   transform-origin: var(--ov-gx) var(--ov-gy);
 }
 
-.ov-ws:is([data-lifted], [data-landing]) > .ov-ws-desk {
-  box-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
+/* Lifted off the screen, its card casts the lifted shadow in place of the glass's. */
+.ov-ws.k-glass:is([data-lifted], [data-landing]) {
+  --ov-card-shadow: 0 var(--shadow-lifted-y) var(--shadow-lifted-blur) rgb(from var(--color-shadow) r g b / var(--shadow-lifted-opacity));
 }
 
 /* ── A window ────────────────────────────────────────────────────────────────────────────────── */
@@ -326,29 +286,18 @@
   z-index: 1;
 }
 
-/* The places' numbers are under everything carried, at the hand or flying: no number shows over a
-   carried thing. What is carried rides over what waits in the slot; the number of the place a
-   carried workspace sits in is over it, in a layer of its own over what is carried, as is a number
-   fading while something settles under it or leaves it; a carried window is over that too, and the
-   lit line round either over all. */
-.ov-lift > .ov-numbers {
+/* What is carried rides over what waits in the slot, a carried window over a carried workspace,
+   and the lit line round either over all. */
+.ov-lift > [data-held] {
   z-index: 1;
 }
 
-.ov-lift > [data-held] {
+.ov-lift > .ov-win[data-held] {
   z-index: 2;
 }
 
-.ov-lift > .ov-numbers-over {
-  z-index: 3;
-}
-
-.ov-lift > .ov-win[data-held] {
-  z-index: 4;
-}
-
 .ov-lift > .ov-hold {
-  z-index: 5;
+  z-index: 3;
 }
 
 /* Covered by a second thing pulled into the slot, what waits there steps out of sight over
@@ -387,35 +336,43 @@
     opacity var(--motion-short) var(--easing-standard);
 }
 
-/* The new-workspace slot reads on any picture: on the shell's glass, as the numbers are, its line
-   and its plus in `outline` and `on_surface_variant`. While something is carried it is lit, its
-   line and plus in the primary over a primary tint, at `opacity.tint`, and deeper, at
+/* The card a workspace and the new-workspace slot share, so a workspace reads as the slot does with
+   its windows on it: the shell's glass, which reads on any picture, its line `stroke.thin` of
+   `outline` in place of the glass's ring, at the miniatures' corner. The wallpaper behind the
+   Overview shows through it, the workspace's own. */
+.ov-card {
+  --ov-card-ink: var(--color-on_surface_variant);
+  --ov-card-line: var(--color-outline);
+  --ov-card-wash: var(--color-primary);
+  --ov-card-show: 1;
+  --ov-card-shadow: var(--glass-shadow);
+}
+
+/* Its tint over the glass's fill, and its line in place of the glass's ring. */
+.ov-card.k-glass {
+  background:
+    linear-gradient(rgb(from var(--ov-card-wash) r g b / var(--ov-card-tint)) 0 0),
+    rgb(from var(--color-surface) r g b / calc(var(--glass-alpha) * var(--ov-card-show)));
+  box-shadow:
+    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) rgb(from var(--ov-card-line) r g b / calc(alpha * var(--ov-card-show))),
+    var(--ov-card-shadow);
+}
+
+/* The new-workspace slot, its plus in `on_surface_variant`. While something is carried it is lit,
+   its line and plus in the primary over a primary tint, at `opacity.tint`, and deeper, at
    `opacity.selection`, as the place proposed; each change over `short`. Under the pointer with
    nothing carried, the glass lightens by `opacity.focus` of `surface`. */
 .ov-plus {
   opacity: var(--ov-arrive);
-  --ov-plus-ink: var(--color-on_surface_variant);
-  --ov-plus-line: var(--color-outline);
-  --ov-plus-wash: var(--color-primary);
   transition:
     --ov-x var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-y var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-w var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-h var(--ov-pt, 0s) var(--ov-pe, linear) var(--ov-pd, 0s),
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s),
-    --ov-plus-tint var(--motion-short) var(--easing-standard),
+    --ov-card-tint var(--motion-short) var(--easing-standard),
     box-shadow var(--motion-short) var(--easing-standard),
     opacity var(--motion-short) var(--easing-standard);
-}
-
-/* Its tint over the glass's fill, and its line in place of the glass's ring. */
-.ov-plus.k-glass {
-  background:
-    linear-gradient(rgb(from var(--ov-plus-wash) r g b / var(--ov-plus-tint)) 0 0),
-    rgb(from var(--color-surface) r g b / var(--glass-alpha));
-  box-shadow:
-    inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--ov-plus-line),
-    var(--glass-shadow);
 }
 
 .ov-plus > .k-icon {
@@ -426,13 +383,13 @@
 }
 
 .ov[data-carrying] .ov-plus {
-  --ov-plus-ink: var(--color-primary);
-  --ov-plus-line: var(--color-primary);
-  --ov-plus-tint: var(--opacity-tint);
+  --ov-card-ink: var(--color-primary);
+  --ov-card-line: var(--color-primary);
+  --ov-card-tint: var(--opacity-tint);
 }
 
 .ov[data-carrying] .ov-plus[data-proposed] {
-  --ov-plus-tint: var(--opacity-selection);
+  --ov-card-tint: var(--opacity-selection);
 }
 
 .ov-plus:not([data-shown]) {
@@ -440,8 +397,8 @@
 }
 
 .ov[data-open]:not([data-carrying]) .ov-plus:hover {
-  --ov-plus-wash: var(--color-surface);
-  --ov-plus-tint: var(--opacity-focus);
+  --ov-card-wash: var(--color-surface);
+  --ov-card-tint: var(--opacity-focus);
 }
 
 /* A waiting group's name on the same glass, as the bar names a borrowed group. */
@@ -529,8 +486,8 @@
 
 /* ── The tip and the delete slot ─────────────────────────────────────────────────────────────── */
 
-/* The tip on the shell's glass, as the numbers are, so its line reads on any picture: centred down
-   the bottom margin, under every miniature. It comes and goes with the miniatures. */
+/* The tip on the shell's glass, as the new-workspace slot is, so its line reads on any picture:
+   centred down the bottom margin, under every miniature. It comes and goes with the miniatures. */
 .ov-tip {
   position: absolute;
   left: 0;
@@ -765,7 +722,7 @@
 
 /* ── Reduced motion: places change at once, only fades play ──────────────────────────────────── */
 
-[data-reduced] .ov :is(.ov-ws, .ov-ws-desk, .ov-win, .ov-plus, .ov-room, .ov-label, .ov-ring, .ov-place) {
+[data-reduced] .ov :is(.ov-ws, .ov-ws-desk, .ov-win, .ov-plus, .ov-room, .ov-label, .ov-ring) {
   --ov-pt: 0s !important;
   --ov-ft: 0s !important;
 }
