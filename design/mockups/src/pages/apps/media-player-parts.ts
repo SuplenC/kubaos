@@ -963,6 +963,11 @@ export interface Player {
   readonly bloom: () => void;
   /** The film's video, where it really plays (the live stage); none for any other file or place. */
   readonly film: () => HTMLVideoElement | null;
+  /**
+   * Moves the time on to `position`, read ahead to `buffered`: the bar, the times and the
+   * chapter's name in place, nothing else, so playing can call it every frame.
+   */
+  readonly advance: (position: number, buffered: number) => void;
 }
 
 /** A file's signal: its sound's own analysis once ready (the calm `QUIET` until then), or its synthesised one. */
@@ -1214,20 +1219,7 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
       }
     }
     if (built && file) {
-      const position = now.position ?? 0;
-      moveBar(built.bar, file, position, now.buffered ?? position);
-      built.elapsed?.set(Math.round(position * file.length));
-      const left = built.length?.querySelector<HTMLElement>(".k-rolling");
-      if (left && now.remaining) rollers.get(left)?.set(Math.round(file.length * (1 - position)));
-      // The chapter's name, fading in as the time crosses into a new one.
-      const chapter = screen.querySelector<HTMLElement>(".mp-chapter");
-      const name = chapterAt(file, position)?.name ?? "";
-      if (chapter && chapter.textContent !== name) {
-        const fresh = text(name, "small", "on_surface_variant");
-        fresh.classList.add("mp-chapter");
-        if (chapter.textContent !== "") fresh.dataset.fresh = "";
-        chapter.replaceWith(fresh);
-      }
+      showTime(now);
       // The pointer over the bar, and the bar held.
       built.bar.toggleAttribute("data-held", now.dragging ?? false);
       built.bar.toggleAttribute("data-lit", now.lit === "bar" || now.hover !== undefined);
@@ -1287,6 +1279,29 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
         strip.replaceChildren(...fresh.childNodes);
         strip.toggleAttribute("data-words", fresh.hasAttribute("data-words"));
       } else room.replaceChildren(...(fresh ? [fresh] : []));
+    }
+  }
+
+  /**
+   * Shows the state's time: the bar, the times and the chapter's name. The times roll only as
+   * their whole second changes, so a frame that moves the bar alone leaves them be.
+   */
+  function showTime(now: PlayerState): void {
+    const file = now.file;
+    if (!built || !file) return;
+    const position = now.position ?? 0;
+    moveBar(built.bar, file, position, now.buffered ?? position);
+    built.elapsed?.set(Math.round(position * file.length));
+    const left = built.length?.querySelector<HTMLElement>(".k-rolling");
+    if (left && now.remaining) rollers.get(left)?.set(Math.round(file.length * (1 - position)));
+    // The chapter's name, fading in as the time crosses into a new one.
+    const chapter = screen.querySelector<HTMLElement>(".mp-chapter");
+    const name = chapterAt(file, position)?.name ?? "";
+    if (chapter && chapter.textContent !== name) {
+      const fresh = text(name, "small", "on_surface_variant");
+      fresh.classList.add("mp-chapter");
+      if (chapter.textContent !== "") fresh.dataset.fresh = "";
+      chapter.replaceWith(fresh);
     }
   }
 
@@ -1512,6 +1527,10 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     state: () => state,
     bloom: blooming,
     film: () => (film && film.isConnected ? film : null),
+    advance: (position, buffered) => {
+      state = { ...state, position, buffered };
+      showTime(state);
+    },
   };
 }
 

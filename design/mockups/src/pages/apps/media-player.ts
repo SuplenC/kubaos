@@ -216,6 +216,9 @@ function live(): HTMLElement {
   /** The level the sound is ramping to, and the ramp's frame. */
   let heard = -1;
   let ramp = 0;
+  /** The frame moving the time on while something plays, and the time of the last one, ms. */
+  let frame = 0;
+  let last = 0;
 
   /** A message from a key: down from the top edge, then back after `duration.scene`. */
   const say = (message: Message) => {
@@ -276,6 +279,7 @@ function live(): HTMLElement {
     const state = now();
     const file = state.file;
     syncFilm();
+    run();
     if (!audio) {
       if (!asked || !file?.source || !state.playing || state.error) return;
       sounding?.stop();
@@ -355,6 +359,46 @@ function live(): HTMLElement {
     made.set(patch);
     sync();
   };
+
+  /**
+   * Starts the frames that move the time on, while something plays on a shown page; they stop
+   * themselves as it pauses, after one more frame that stands the bar where the media stopped.
+   */
+  function run(): void {
+    if (!CHROME || frame || !now().playing || document.hidden || !root.isConnected) return;
+    last = performance.now();
+    frame = requestAnimationFrame(step);
+  }
+  function shownAgain(): void {
+    if (!root.isConnected) return document.removeEventListener("visibilitychange", shownAgain);
+    if (!document.hidden) return run();
+    cancelAnimationFrame(frame);
+    frame = 0;
+  }
+  /**
+   * A frame's time: a song's from its sound's own clock, the film's from its video's, any other
+   * file's a second a second since the last frame. Leaving the sample stops the sound and the film.
+   */
+  function step(at: number): void {
+    frame = 0;
+    if (!root.isConnected) return silence();
+    const state = now();
+    const file = state.file;
+    const since = Math.max(0, at - last) / 1000;
+    last = at;
+    if (file && !state.error && state.buffering === undefined && !state.dragging) {
+      const film = made.film();
+      const sound = audio && file.source && audio.dataset.source === file.source ? audio : null;
+      const buffered = state.buffered ?? 0;
+      if (film) made.advance(Math.min(1, film.currentTime / file.length), buffered);
+      else if (sound) made.advance(Math.min(1, sound.currentTime / file.length), buffered);
+      else if (!file.source && state.playing) {
+        const position = Math.min(1, (state.position ?? 0) + ((state.speed ?? 1) * since) / file.length);
+        made.advance(position, Math.min(1, Math.max(position + 0.18, buffered)));
+      }
+    }
+    if (state.playing) run();
+  }
   window.addEventListener("pagehide", silence, { once: true });
 
   /** Whether the controller may go: playing, no menu or playlist open. */
@@ -456,28 +500,12 @@ function live(): HTMLElement {
   };
   const stepVisual = (step: number) => visualTo(CHOICES[(CHOICES.indexOf(visual) + step + CHOICES.length) % CHOICES.length]!);
 
-  // Playing moves the time on in place, only on the live stage: a song's from its sound's own clock,
-  // the film's from its video's, any other file's a second a second. Leaving the sample stops the
-  // sound and the film.
+  // Playing moves the time on in place every frame, only on the live stage. A bar moved on a timer
+  // steps between the timer's reads; the media's clock read every frame glides at any speed, and
+  // stands where the media is on a pause, a seek or a stall.
   if (CHROME) {
-    const TICK = 0.25;
-    const tick = window.setInterval(() => {
-      if (!root.isConnected) {
-        silence();
-        return window.clearInterval(tick);
-      }
-      const state = now();
-      if (!state.playing || !state.file || state.error || state.buffering !== undefined || state.dragging) return;
-      const file = state.file;
-      const film = made.film();
-      if (film) return made.set({ position: Math.min(1, film.currentTime / file.length) });
-      if (file.source) {
-        if (!audio || audio.dataset.source !== file.source) return;
-        return made.set({ position: Math.min(1, audio.currentTime / file.length) });
-      }
-      const position = Math.min(1, (state.position ?? 0) + ((state.speed ?? 1) * TICK) / file.length);
-      made.set({ position, buffered: Math.min(1, Math.max(position + 0.18, state.buffered ?? 0)) });
-    }, TICK * 1000);
+    run();
+    document.addEventListener("visibilitychange", shownAgain);
   }
 
   // The pointer.
