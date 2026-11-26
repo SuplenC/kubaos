@@ -1114,6 +1114,8 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     if (carried) visualRoom.append(carried);
     screen.append(visualRoom);
     const playing = moves && file?.video && !state.error ? filmFor(file) : null;
+    // A film left for another file stops: out of the page, it would play on, and be heard.
+    if (film && !playing) film.pause();
     if (playing && file?.picture) {
       screen.append(playing);
       // Lit from the poster until the film's first frame is drawn, then from each frame it shows.
