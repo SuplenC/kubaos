@@ -188,6 +188,14 @@ function playLength(url: string): Promise<number | null> {
   });
 }
 
+/**
+ * Whether `state` starts playing on the live stage: as it says, except a film with reduce motion
+ * on, which waits for a press, as a song waits for one before it sounds.
+ */
+function startsPlaying(state: PlayerState): boolean {
+  return (state.playing ?? false) && !(settings().reduced && state.file?.video !== undefined);
+}
+
 /** A duration token in milliseconds under the speed setting. */
 function ms(name: string): number {
   return durationMs(name) / settings().speed;
@@ -222,11 +230,12 @@ function live(): HTMLElement {
   };
 
   const made = player(
-    { ...PLAYING, preview: true, visual, colours },
+    { ...PLAYING, playing: startsPlaying(PLAYING), preview: true, visual, colours },
     {
       volume: (value) => (say(MESSAGES.volume(value)), queueMicrotask(() => sync())),
       muted: (on) => (say(MESSAGES.volume(now().volume ?? 0, on)), queueMicrotask(() => sync())),
       take: (index) => playAt(index, true),
+      ended: () => finished(),
       live: true,
       time: () => {
         const file = now().file;
@@ -240,8 +249,16 @@ function live(): HTMLElement {
   const now = made.state;
   room.append(root);
 
-  /** Stops the sound and lets its file go: on leaving the page or the sample. */
+  /** The file playing came to its end: the playlist's next file, or stopped at the end. */
+  function finished(): void {
+    const at = now().index ?? 0;
+    if (at + 1 < (now().count ?? 1)) playAt(at + 1);
+    else set({ playing: false, position: 1 });
+  }
+
+  /** Stops the sound and the film, and lets the sound's file go: on leaving the page or the sample. */
   const silence = () => {
+    made.film()?.pause();
     if (!audio) return;
     audio.pause();
     audio.removeAttribute("src");
@@ -258,16 +275,13 @@ function live(): HTMLElement {
   const sync = (asked = false) => {
     const state = now();
     const file = state.file;
+    syncFilm();
     if (!audio) {
       if (!asked || !file?.source || !state.playing || state.error) return;
       sounding?.stop();
       audio = new Audio();
       audio.preload = "auto";
-      audio.addEventListener("ended", () => {
-        const at = now().index ?? 0;
-        if (at + 1 < (now().count ?? 1)) playAt(at + 1);
-        else set({ playing: false, position: 1 });
-      });
+      audio.addEventListener("ended", finished);
       sounding = { stop: silence };
       // It starts at its level: only a change of it ramps.
       heard = state.muted ? 0 : loudness(state.volume ?? 1);
@@ -295,6 +309,22 @@ function live(): HTMLElement {
     if (state.playing && !state.dragging && audio.paused) void audio.play().catch(() => undefined);
     else if ((!state.playing || state.dragging) && !audio.paused) audio.pause();
   };
+  /**
+   * The film follows the state as the sound does: playing, paused, at the speed; held still while
+   * the bar is dragged, its frame following the pointer.
+   */
+  const syncFilm = () => {
+    const film = made.film();
+    const state = now();
+    const file = state.file;
+    if (!film || !file) return;
+    film.playbackRate = state.speed ?? 1;
+    if (state.dragging) {
+      if (!film.paused) film.pause();
+      if (!film.seeking) film.currentTime = Math.min(state.position ?? 0, 0.999) * file.length;
+    } else if (state.playing && !state.error && film.paused) void film.play().catch(() => undefined);
+    else if (!state.playing && !film.paused) film.pause();
+  };
   /** Eases the sound's level to `level` over `duration.micro`. */
   const rampTo = (level: number) => {
     const sound = audio;
@@ -313,10 +343,13 @@ function live(): HTMLElement {
     };
     ramp = requestAnimationFrame(step);
   };
-  /** Moves the sound to `position` of its song, when it is the one playing. */
+  /** Moves the sound to `position` of its song, or the film to it of the film, whichever plays. */
   const seekSound = (position: number) => {
     const file = now().file;
-    if (audio && file?.source && audio.dataset.source === file.source) audio.currentTime = Math.min(position, 0.999) * file.length;
+    if (!file) return;
+    const film = made.film();
+    if (film) film.currentTime = Math.min(position, 0.999) * file.length;
+    if (audio && file.source && audio.dataset.source === file.source) audio.currentTime = Math.min(position, 0.999) * file.length;
   };
   const set = (patch: Parameters<typeof made.set>[0]) => {
     made.set(patch);
@@ -424,7 +457,8 @@ function live(): HTMLElement {
   const stepVisual = (step: number) => visualTo(CHOICES[(CHOICES.indexOf(visual) + step + CHOICES.length) % CHOICES.length]!);
 
   // Playing moves the time on in place, only on the live stage: a song's from its sound's own clock,
-  // any other file's a second a second. Leaving the sample stops the sound.
+  // the film's from its video's, any other file's a second a second. Leaving the sample stops the
+  // sound and the film.
   if (CHROME) {
     const TICK = 0.25;
     const tick = window.setInterval(() => {
@@ -435,6 +469,8 @@ function live(): HTMLElement {
       const state = now();
       if (!state.playing || !state.file || state.error || state.buffering !== undefined || state.dragging) return;
       const file = state.file;
+      const film = made.film();
+      if (film) return made.set({ position: Math.min(1, film.currentTime / file.length) });
       if (file.source) {
         if (!audio || audio.dataset.source !== file.source) return;
         return made.set({ position: Math.min(1, audio.currentTime / file.length) });
@@ -638,7 +674,7 @@ function live(): HTMLElement {
   options.className = "mp-options";
   options.append(
     question("Plays", PLAYS.map((each) => each.label), 0, (i) => {
-      const next = PLAYS[i]!.state;
+      const next = { ...PLAYS[i]!.state, playing: startsPlaying(PLAYS[i]!.state) };
       set({ ...PLAYING, file: undefined, error: undefined, buffering: undefined, message: undefined, open: undefined, sidebar: false, line: undefined, remaining: false, ...next, preview: true, visual, colours, full: now().full ?? false, shown: true });
       root.focus({ preventScroll: true });
       // The songs with sound are analysed once, one after the other from the first, so a skip never waits.
@@ -853,7 +889,8 @@ export default page<Shown>({
     { name: "Paused", for: "the controller stays while paused; Play's symbol", sample: () => desk(PAUSED) },
     { name: "Seeking, over the bar", for: "the tube grows, its head lit; time and chapter over it", sample: () => desk({ ...SHOWN, hover: 0.62 }) },
     { name: "Seeking, dragging", for: "held: the head brightens and follows the pointer", sample: () => desk({ ...SHOWN, dragging: true, hover: 0.47, position: 0.47 }) },
-    { name: "Seeking, a frame preview", for: "a frame over the time, rising in", sample: () => desk({ ...SHOWN, hover: 0.62, preview: true }) },
+    { name: "Seeking, a frame preview", for: "the film's frame there, its time under it, rising in", sample: () => desk({ ...SHOWN, hover: 0.62, preview: true }) },
+    { name: "Seeking a song", for: "the time alone: a song has no frames", sample: () => desk({ ...SONG_PLAYING, shown: true, hover: 0.62, preview: true }) },
     { name: "Volume, unfolded", for: "the speaker's slider unfolded under the pointer", sample: () => desk({ ...SHOWN, volume: 0.38, lit: "volume" }) },
     { name: "Muted", for: "the slider's toggle: its fill softens, Muted", sample: () => desk({ ...SHOWN, muted: true, lit: "volume" }) },
     { name: "Tracks", for: "audio and subtitles in one menu, by its button", sample: () => desk({ ...SHOWN, open: "tracks", subtitle: 1, line: LINES[1] }) },
@@ -964,6 +1001,8 @@ export default page<Shown>({
       { part: "Tube lit", token: "size-progress" },
       { part: "Its head", token: "size-slider_anchor" },
       { part: "Between chapters", token: "space-s4" },
+      { part: "Frame preview's padding", token: "space-s4" },
+      { part: "Preview off the controller", token: "space-s8" },
       { part: "Volume unfolded", token: "size-bar_label" },
       { part: "Times to the bar", token: "space-s12" },
       { part: "Playlist panel's width", token: "size-panel" },

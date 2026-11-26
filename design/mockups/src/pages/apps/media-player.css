@@ -481,6 +481,18 @@
   animation: mp-rise-in var(--motion-short) var(--easing-emphasized_decel);
 }
 
+/* A frame preview: one popover as wide as its frame, `space.s4` inside, the frame at the row's
+   radius (the popover's less that inset) and its words under it, inside the same surface. It
+   stands `space.s8` clear of the controller's top edge, as a popover stands off what it is by. */
+.mp-seek-tip[data-preview] {
+  bottom: calc(100% + var(--mp-bar-top, 0px) + var(--space-s8));
+}
+
+.mp-seek-tip[data-preview] > .k-popover {
+  width: max-content;
+  padding: var(--space-s4);
+}
+
 .mp-preview-frame {
   display: block;
   width: var(--size-thumbnail_width);
