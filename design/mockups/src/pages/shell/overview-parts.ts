@@ -858,7 +858,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /**
    * The rooms a carried workspace holds open: at its own place all the while it is carried, so its
    * group stands still, and at the place proposed in another group; a place proposed in its own
-   * group moves its one room there. The new-workspace slot opens none: it takes the workspace itself.
+   * group moves its one room there. Another group's new-workspace slot opens none: it takes the
+   * workspace itself.
    */
   function roomsNow(): RoomAt[] {
     if (carry?.kind !== "space") return [];
@@ -1224,10 +1225,11 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    * (`zonesOf`) the pointer is in, wherever the workspace is held. A place's zone lies inside it, so
    * zones of one grid never meet; a place's zone at rest and another's with a room open can, and
    * there the nearer middle wins. A
-   * workspace's place opens the room there, the group keeping its order round it; the
-   * new-workspace slot takes it as it is, the group's last place, which nothing goes after and
-   * which never steps aside. In no zone, none; over a full group, refused. The same boundary takes
-   * it in and lets it out, with nothing remembered between moves.
+   * workspace's place opens the room there, the group keeping its order round it; another group's
+   * new-workspace slot takes it as it is, that group's last place, which nothing goes after and
+   * which never steps aside. Its own group's slot is no place for it: there it would only move to
+   * the end. In no zone, none; over a full group, refused. The same boundary takes it in and lets
+   * it out, with nothing remembered between moves.
    */
   function spaceTarget(point: Point): Target | null {
     if (!carry) return null;
@@ -1257,7 +1259,8 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
    * room open (the room open in a group re-lays its places, and its row centres again), and also,
    * for a group the workspace is not from, where they stand at rest, before that room opens: a place
    * is caught from either, so the pointer over a workspace at rest proposes its place, and stays
-   * proposed as the room opening moves the places under it. The new-workspace slot likewise.
+   * proposed as the room opening moves the places under it. Another group's new-workspace slot
+   * likewise; its own group's slot has no zone.
    */
   function zonesOf(held: Carry): readonly Zone[] {
     if (zoneCache?.held === held) return zoneCache.zones;
@@ -1279,7 +1282,7 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
         const sections = opened === atRest ? [atRest] : [opened, atRest];
         for (const section of sections) {
           section.items.forEach((_, k) => add(section.places[k]!, { kind: "between", group: group.id, index: k }));
-          if (section.plus) add(section.plus, { kind: "plus", group: group.id });
+          if (section.plus && group.id !== home.group) add(section.plus, { kind: "plus", group: group.id });
         }
       }
     }
@@ -1471,9 +1474,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   /**
    * The place the carried thing sits in, if its target offers one: a tiled window in the tile it
    * would take, laid out as the drop would leave the workspace, or a lone window's on the
-   * new-workspace slot; a workspace in the room opened for it, at the room's size, or in the
-   * new-workspace slot; either in the slot. Nothing else: a workspace proposed no place is at the
-   * hand at the size it was lifted at.
+   * new-workspace slot; a workspace in the room opened for it, at the room's size, or in another
+   * group's new-workspace slot; either in the slot. Nothing else: a workspace proposed no place is
+   * at the hand at the size it was lifted at.
    * A floating window sits in no tile.
    */
   function stuckPose(): Pose | null {

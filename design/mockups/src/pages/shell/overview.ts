@@ -319,7 +319,6 @@ export default page<Shown>({
     { name: "On another screen's slot", for: "a lone window in the laptop's new slot, lit", sample: at({ view: "desk", pin: { kind: "window", window: "w-term", to: { kind: "plus", group: "g-laptop" } } }) },
     { name: "Between two workspaces", for: "a window: a new workspace there", sample: at({ pin: { kind: "window", window: "w-term", to: { kind: "between", group: "g-ext2", index: 2 } } }) },
     { name: "A workspace to another screen", for: "the centre's 4 in the room the portrait's group opens", sample: at({ view: "desk", pin: { kind: "space", space: "s9", to: { kind: "between", group: "g-ext1", index: 1 } } }) },
-    { name: "Into its group's new slot", for: "it takes the slot as the last; its own place stays open", sample: at({ pin: { kind: "space", space: "s7", to: { kind: "plus", group: "g-ext2" } } }) },
     { name: "Into a small group's new slot", for: "the 4 into Studio's slot, as its last", sample: at({ pin: { kind: "space", space: "s9", to: { kind: "plus", group: "g-studio" } } }) },
     { name: "Refused by a full group", for: "ten in use: it dims, no room", sample: at({ view: "desk", fill: "full", pin: { kind: "space", space: "s1", to: { kind: "refused", group: "g-ext2" } } }) },
     { name: "Closed", for: "the desktop it opens from", sample: at({ closed: true }) },
