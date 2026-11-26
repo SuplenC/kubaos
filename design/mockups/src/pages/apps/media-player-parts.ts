@@ -37,14 +37,16 @@ import { MOODS, QUIET, type Signal, synthetic } from "./media-player-signal.ts";
 import { song as analysedSong } from "./media-player-song.ts";
 import jungle from "../../assets/audio/drum-and-bass-jungle.opus?url";
 import intoTheLight from "../../assets/audio/into-the-light.opus?url";
+import firstNights from "../../assets/video/first-nights-in-tokyo.webm?url";
+import firstNightsPoster from "../../assets/video/first-nights-in-tokyo-poster.jpg?url";
 import { VISUALS, type VizChoice, vizName, CHOICES } from "./media-player-viz.ts";
 import neonLit from "../../../../../branding/photo/neon-sign-lit.jpg?url";
 import stacked from "../../../../../branding/photo/neon-stacked-lit.jpg?url";
 import purple from "../../assets/lock/shinjuku-purple-hour.jpg?url";
-import shibuya from "../../assets/lock/shibuya-rainy-corner.jpg?url";
 import tower from "../../assets/lock/tokyo-tower-blue-hour.jpg?url";
 
-// What plays: stand-ins for files, their frames the shipped wallpapers.
+// What plays: a real film and real songs, and stand-ins for the other files, their frames the
+// shipped wallpapers.
 
 export interface Chapter {
   /** Where it starts, a fraction of the file. */
@@ -67,22 +69,35 @@ export interface MediaFile {
   readonly mood?: keyof typeof MOODS;
   /** Its sound, for a song the player really plays: its signal is the sound's own, analysed. */
   readonly source?: string;
+  /** Its moving picture, for a film the player really plays on the live stage; `picture` is its poster. */
+  readonly video?: string;
 }
 
+/** The film's length in seconds, as the browser reads the file. */
+const FILM_LENGTH = 36.078;
+
+/**
+ * The real film (`assets/video/CREDITS.md`): its title and maker are its credit, so they show
+ * wherever it shows. Its chapters start at the cut's own scene changes, in seconds. Its poster is
+ * its frame at 0.34, where the samples stand, so a fixed sample shows the film as it is there.
+ */
 export const FILM: MediaFile = {
-  title: "Shibuya, a rainy corner",
-  length: 3730,
-  picture: shibuya,
+  title: "First nights in Tokyo",
+  by: "Guillaume J. Lauzier",
+  length: FILM_LENGTH,
+  picture: firstNightsPoster,
+  video: firstNights,
   chapters: [
-    { at: 0, name: "Opening" },
-    { at: 0.12, name: "The crossing" },
-    { at: 0.38, name: "Rain" },
-    { at: 0.61, name: "The rooftop" },
-    { at: 0.84, name: "Credits" },
+    { at: 0, name: "The city at night" },
+    { at: 3.837 / FILM_LENGTH, name: "The crossing" },
+    { at: 14.764 / FILM_LENGTH, name: "Neon" },
+    { at: 18.685 / FILM_LENGTH, name: "The tower and the bay" },
+    { at: 24.566 / FILM_LENGTH, name: "The temple" },
+    { at: 29.613 / FILM_LENGTH, name: "A taxi" },
   ],
 };
 
-export const LONG_TITLE = "Shibuya, a rainy corner at the blue hour, the director's cut with the commentary track";
+export const LONG_TITLE = "First nights in Tokyo, the crossing in the rain, the tower and the bay, the extended cut with commentary";
 
 export const PLAYLIST: readonly MediaFile[] = [
   { title: "Tokyo Tower at the blue hour", length: 412, picture: tower },
@@ -236,6 +251,8 @@ export interface Hooks {
   readonly live?: boolean;
   /** Where the song playing out loud is, in seconds, which the visualiser follows; none if silent. */
   readonly time?: () => number | null;
+  /** The film playing on the live stage reached its end. */
+  readonly ended?: () => void;
 }
 
 /** A length in seconds as the player reads one: 4:05, 1:02:10. */
@@ -330,24 +347,28 @@ export interface Ambience {
 
 const ambiences = new Map<string, Ambience>();
 
+/** The few cells a picture is drawn down to for its light, a side. */
+const CELLS = 4;
+let cellPen: CanvasRenderingContext2D | null | undefined;
+
 /**
- * The colours `picture` lights the window with, worked out from the picture itself: drawn down to a
- * few cells, each edge's cells and each corner averaged. Kept by picture, so it is worked out once.
- * In mpv the script reads them from a scaled-down frame (`screenshot-raw` at a few pixels).
+ * The colours `source` lights the window with, worked out from the picture itself: drawn down to a
+ * few cells, each edge's cells and each corner averaged. In mpv the script reads them from a
+ * scaled-down frame (`screenshot-raw` at a few pixels).
  */
-function ambienceOf(picture: HTMLImageElement): Ambience | null {
-  const known = ambiences.get(picture.src);
-  if (known) return known;
-  if (picture.naturalWidth === 0) return null;
-  const cells = 4;
-  const canvas = document.createElement("canvas");
-  canvas.width = cells;
-  canvas.height = cells;
-  const pen = canvas.getContext("2d", { willReadFrequently: true });
+function sample(source: CanvasImageSource): Ambience | null {
+  const cells = CELLS;
+  if (cellPen === undefined) {
+    const canvas = document.createElement("canvas");
+    canvas.width = cells;
+    canvas.height = cells;
+    cellPen = canvas.getContext("2d", { willReadFrequently: true });
+  }
+  const pen = cellPen;
   if (!pen) return null;
   let data: Uint8ClampedArray;
   try {
-    pen.drawImage(picture, 0, 0, cells, cells);
+    pen.drawImage(source, 0, 0, cells, cells);
     data = pen.getImageData(0, 0, cells, cells).data;
   } catch {
     return null;
@@ -368,25 +389,35 @@ function ambienceOf(picture: HTMLImageElement): Ambience | null {
     middle: average([1, 2].flatMap((x) => [1, 2].map((y) => [x, y] as const))),
     corners: [average([[0, 0], [1, 0], [0, 1]]), average([[3, 0], [2, 0], [3, 1]]), average([[0, 3], [1, 3], [0, 2]]), average([[3, 3], [2, 3], [3, 2]])],
   };
-  ambiences.set(picture.src, made);
   return made;
+}
+
+/** The colours `picture` lights the window with, kept by picture, so they are worked out once. */
+function ambienceOf(picture: HTMLImageElement): Ambience | null {
+  const known = ambiences.get(picture.src);
+  if (known) return known;
+  if (picture.naturalWidth === 0) return null;
+  const made = sample(picture);
+  if (made) ambiences.set(picture.src, made);
+  return made;
+}
+
+/** Lights `room` with the colours `made`. */
+function paint(room: HTMLElement, made: Ambience | null): void {
+  if (!made) return;
+  room.style.setProperty("--mp-left", made.left);
+  room.style.setProperty("--mp-right", made.right);
+  room.style.setProperty("--mp-top", made.top);
+  room.style.setProperty("--mp-bottom", made.bottom);
+  room.style.setProperty("--mp-middle", made.middle);
+  made.corners.forEach((each, i) => room.style.setProperty(`--mp-corner-${i}`, each));
+  room.dataset.lit = "";
 }
 
 /** Lights `room` with `picture`'s colours as soon as the picture is in. */
 function light(room: HTMLElement, picture: HTMLImageElement): void {
-  const apply = () => {
-    const made = ambienceOf(picture);
-    if (!made) return;
-    room.style.setProperty("--mp-left", made.left);
-    room.style.setProperty("--mp-right", made.right);
-    room.style.setProperty("--mp-top", made.top);
-    room.style.setProperty("--mp-bottom", made.bottom);
-    room.style.setProperty("--mp-middle", made.middle);
-    made.corners.forEach((each, i) => room.style.setProperty(`--mp-corner-${i}`, each));
-    room.dataset.lit = "";
-  };
   // Read once the picture is decoded, never before: a picture loaded but not yet decoded draws nothing.
-  picture.decode().then(apply, () => undefined);
+  picture.decode().then(() => paint(room, ambienceOf(picture)), () => undefined);
 }
 
 // The narrowing ladder: what the controller gives way in, in order, as its window narrows.
@@ -491,23 +522,35 @@ function tipWords(file: MediaFile, at: number): string {
   return chapter && chapter.name !== "" ? `${time} · ${chapter.name}` : time;
 }
 
+/** Whether the pointer over `file`'s bar shows a frame of it: a film with a picture, never a song. */
+function previews(file: MediaFile, preview: boolean): boolean {
+  return preview && !file.audio && file.picture !== undefined;
+}
+
 /**
  * What the pointer over the bar shows, over the point it is at: its time and chapter in a hint, or
- * a frame on a popover. It rises into place as it arrives (`mp-tip-in`), then follows the pointer.
+ * on a popover a frame with the words under it, one surface. `moving` is the film's own frame at
+ * the time pointed at, where the film really plays; anywhere else the frame is its picture. It
+ * rises into place as it arrives (`mp-tip-in`), then follows the pointer.
  */
-function seekTip(file: MediaFile, at: number, preview: boolean): HTMLElement {
+function seekTip(file: MediaFile, at: number, preview: boolean, moving: HTMLVideoElement | null): HTMLElement {
   // A bubble over the bar, out of its flow: held to its own boxes, not the bar's.
   const tip = probe(document.createElement("span"), { role: "box" }, { floats: true });
   tip.className = "mp-seek-tip";
   tip.style.setProperty("--at", String(at));
-  if (preview && file.picture) {
-    const frame = document.createElement("img");
-    frame.className = "mp-preview-frame";
-    frame.src = file.picture;
-    frame.alt = "";
+  if (previews(file, preview)) {
+    let frame: HTMLElement;
+    if (moving) frame = moving;
+    else {
+      const still = document.createElement("img");
+      still.src = file.picture!;
+      still.alt = "";
+      frame = still;
+    }
+    frame.classList.add("mp-preview-frame");
     const words = text(tipWords(file, at), "label_number");
     words.classList.add("mp-tip-words");
-    tip.append(popover(4, stack("s8", "centre", frame, words)));
+    tip.append(popover(4, stack("s4", "centre", frame, words)));
     tip.dataset.preview = "";
   } else tip.append(hint(tipWords(file, at), { shown: true }));
   return tip;
@@ -914,6 +957,8 @@ export interface Player {
   readonly state: () => PlayerState;
   /** Blooms the symbol of the state it just entered in the picture's middle. */
   readonly bloom: () => void;
+  /** The film's video, where it really plays (the live stage); none for any other file or place. */
+  readonly film: () => HTMLVideoElement | null;
 }
 
 /** A file's signal: its sound's own analysis once ready (the calm `QUIET` until then), or its synthesised one. */
@@ -951,6 +996,15 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
   let refit = 0;
   let running: Live | null = null;
   let pendingStill = false;
+  // The film's own picture, where it really plays: the playing video, and a second one, muted and
+  // never playing, seeked to the time the pointer is at over the bar for its frame preview, so the
+  // preview never stalls the film. Each is made once, for the first film shown.
+  const moves = hooks.live === true && CHROME && !ALL;
+  let film: HTMLVideoElement | null = null;
+  let filmSource = "";
+  let preview: HTMLVideoElement | null = null;
+  /** The time the preview is to show next, s, while it is still seeking to the last; or none. */
+  let previewWanted: number | null = null;
   const take = (index: number) => hooks.take?.(index);
   // The volume's own slider moving: the state follows it, and nothing sets the slider back.
   const inner: Hooks = {
@@ -995,7 +1049,14 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     visualRoom.className = "mp-visual";
     if (carried) visualRoom.append(carried);
     screen.append(visualRoom);
-    if (file && !file.audio && file.picture && !state.error) {
+    const playing = moves && file?.video && !state.error ? filmFor(file) : null;
+    if (playing && file?.picture) {
+      screen.append(playing);
+      // Lit from the poster until the film's first frame is drawn, then from each frame it shows.
+      const poster = document.createElement("img");
+      poster.src = file.picture;
+      light(root, poster);
+    } else if (file && !file.audio && file.picture && !state.error) {
       // One picture a source, kept across builds, so a build never decodes it again.
       let frame = pictures.get(file.picture);
       if (!frame) {
@@ -1047,6 +1108,70 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     tip = null;
     momentary(state, {});
   };
+
+  /**
+   * The film's video for `file`, at the state's position, made once and kept across builds: never
+   * a sound (it starts muted and stays so), and it plays only when its owner says. Each frame it
+   * shows lights the window: read at the video's `timeupdate`, four times a second, from a few cells.
+   */
+  function filmFor(file: MediaFile): HTMLVideoElement {
+    if (!film) {
+      film = document.createElement("video");
+      film.className = "mp-frame";
+      film.muted = true;
+      film.defaultMuted = true;
+      film.playsInline = true;
+      film.preload = "auto";
+      film.disablePictureInPicture = true;
+      const shown = film;
+      const lit = () => {
+        if (shown.isConnected && shown.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) paint(root, sample(shown));
+      };
+      shown.addEventListener("timeupdate", lit);
+      shown.addEventListener("seeked", lit);
+      shown.addEventListener("loadeddata", lit);
+      shown.addEventListener("ended", () => hooks.ended?.());
+    }
+    if (filmSource !== file.video) {
+      filmSource = file.video!;
+      film.poster = file.picture ?? "";
+      film.src = filmSource;
+    }
+    const at = (state.position ?? 0) * file.length;
+    if (Math.abs(film.currentTime - at) > 0.25) film.currentTime = at;
+    return film;
+  }
+
+  /** The preview's video, showing `file`'s frame at `seconds`: one seek at a time, the latest wanted next. */
+  function previewAt(file: MediaFile, seconds: number): HTMLVideoElement {
+    if (!preview) {
+      preview = document.createElement("video");
+      preview.muted = true;
+      preview.defaultMuted = true;
+      preview.playsInline = true;
+      preview.preload = "auto";
+      preview.disablePictureInPicture = true;
+      preview.poster = file.picture ?? "";
+      preview.src = file.video!;
+      const next = () => {
+        const shown = preview!;
+        if (previewWanted === null || shown.readyState < HTMLMediaElement.HAVE_METADATA || shown.seeking) return;
+        const wanted = previewWanted;
+        previewWanted = null;
+        if (Math.abs(shown.currentTime - wanted) > 0.01) shown.currentTime = wanted;
+      };
+      preview.addEventListener("loadedmetadata", next);
+      preview.addEventListener("seeked", next);
+      previewWanted = seconds;
+      return preview;
+    }
+    previewWanted = seconds;
+    if (preview.readyState >= HTMLMediaElement.HAVE_METADATA && !preview.seeking) {
+      previewWanted = null;
+      if (Math.abs(preview.currentTime - seconds) > 0.01) preview.currentTime = seconds;
+    }
+    return preview;
+  }
 
   /** Marks the rungs up to `at` as taken: the CSS hides and shows the parts they move. */
   function takeRung(at: number): void {
@@ -1105,11 +1230,13 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
       if (now.hover === undefined) {
         tip?.remove();
         tip = null;
-      } else if (!tip || tip.hasAttribute("data-preview") !== ((now.preview ?? false) && !!file.picture)) {
+      } else if (!tip || tip.hasAttribute("data-preview") !== previews(file, now.preview ?? false)) {
         tip?.remove();
-        tip = seekTip(file, now.hover, now.preview ?? false);
+        const moving = moves && file.video && previews(file, now.preview ?? false) ? previewAt(file, now.hover * file.length) : null;
+        tip = seekTip(file, now.hover, now.preview ?? false, moving);
         built.bar.append(tip);
       } else {
+        if (moves && file.video && tip.hasAttribute("data-preview")) previewAt(file, now.hover * file.length);
         tip.style.setProperty("--at", String(now.hover));
         const words = tip.querySelector<HTMLElement>(".mp-tip-words, .k-hint > .k-text");
         const said = tipWords(file, now.hover);
@@ -1301,10 +1428,19 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     );
   }
 
-  /** Hands the CSS what it can't know: the controller's height; and stands an open menu by its button. */
+  /**
+   * Hands the CSS what it can't know: the controller's height, and how far the bar's top is below
+   * the controller's, which a frame preview stands clear of; and stands an open menu by its button.
+   */
   function measure(): void {
     drawStill();
     root.style.setProperty("--mp-controller", built ? `${built.box.offsetHeight}px` : "0px");
+    if (built) {
+      // In the window's own pixels: its box is scaled by the page's zoom like everything in it.
+      const box = built.box.getBoundingClientRect();
+      const ratio = built.box.offsetWidth / Math.max(1, box.width);
+      built.bar.style.setProperty("--mp-bar-top", `${(built.bar.getBoundingClientRect().top - box.top) * ratio}px`);
+    }
     if (built && state.file) moveBar(built.bar, state.file, state.position ?? 0, state.buffered ?? 0);
     if (tip) tip.style.setProperty("--tip-half", `${tip.offsetWidth / 2}px`);
     place();
@@ -1371,6 +1507,7 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     },
     state: () => state,
     bloom: blooming,
+    film: () => (film && film.isConnected ? film : null),
   };
 }
 
