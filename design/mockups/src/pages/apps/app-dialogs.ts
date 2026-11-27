@@ -211,7 +211,8 @@ const LEAVES: Move = {
   sample: () => onDesktop(STEAM_QUESTION_CALLER),
 };
 
-const LONG_TITLE: Words = { short: "Steam", long: "Steam - Unable to connect to the Steam network, check your connection" };
+/** A title that doesn't start with the app's name, so the caller line stays over it as it wraps. */
+const LONG_TITLE: Words = { short: "Offline", long: "Unable to connect to the Steam network, check your connection" };
 const LONG_TEXT: Words = { short: "Done.", long: STEAM_ERROR.text };
 
 const MARKUP: Call = {
