@@ -229,8 +229,9 @@
 }
 
 /* Subtitles: mpv's own, styled by its options; lifted over the controller while it shows. The
-   line is centred in a room as wide as the window inside its padding, which puts it on whole
-   device pixels as every centred box is (`lib/centre.ts`). */
+   block is centred in a room as wide as the window inside its padding, its lines stacked a line
+   apart and each centred over the others, which puts them on whole device pixels as every centred
+   box is (`lib/centre.ts`). The room grows upward from its foot, so a second line lifts the first. */
 .mp-subtitle-room {
   position: absolute;
   inset-inline: var(--mp-pad);
@@ -241,6 +242,13 @@
 }
 
 .mp-subtitle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+}
+
+.mp-subtitle > .k-text {
   max-width: 100%;
   text-align: center;
   white-space: nowrap;

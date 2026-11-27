@@ -224,6 +224,18 @@ export function tracksOf(file: MediaFile | undefined): Tracks {
   return file?.tracks ?? FILM_TRACKS;
 }
 
+/**
+ * The subtitle on the picture: `words` a line each where they break, each line centred over the
+ * others, so a cue of two lines reads as its file sets it.
+ */
+function subtitleLines(words: string): HTMLElement {
+  const block = document.createElement("span");
+  block.className = "mp-subtitle";
+  block.dataset.words = words;
+  block.append(...words.split("\n").map((each) => text(each, "heading", "on_surface")));
+  return block;
+}
+
 /** The film's subtitle track by its language's code (`assets/video/sintel.json`), for the samples. */
 export function subtitleIndex(lang: string): number {
   return SINTEL.subtitles.findIndex((each) => each.lang === lang);
@@ -1143,8 +1155,7 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     if (file?.audio) screen.append(song(file));
     const centre = middle(state);
     if (centre) screen.append(centre);
-    const line = text("", "heading", "on_surface");
-    line.classList.add("mp-subtitle");
+    const line = subtitleLines("");
     const lineRoom = document.createElement("span");
     lineRoom.className = "mp-subtitle-room";
     lineRoom.append(line);
@@ -1212,7 +1223,8 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
 
   /**
    * A text track for each of `file`'s subtitles with a file, off until chosen: the chosen one's
-   * line at the time is the line on the picture, its cue's lines joined into the player's one.
+   * cue at the time is the subtitle on the picture, broken into lines where its file breaks it.
+   * A cue's text is read through its HTML, so markup such as `<i>` shows as its words only.
    */
   function subtitleTracks(file: MediaFile): HTMLTrackElement[] {
     return tracksOf(file).subtitles.flatMap((subtitle, i) => {
@@ -1226,7 +1238,7 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
       track.track.addEventListener("cuechange", () => {
         if (state.subtitle !== i || state.file?.video !== filmSource) return;
         const cues = [...(track.track.activeCues ?? [])].filter((cue): cue is VTTCue => cue instanceof VTTCue);
-        const words = cues.map((cue) => cue.text.replace(/\s*\n\s*/g, " ")).join(" ");
+        const words = cues.map((cue) => (cue.getCueAsHTML().textContent ?? "").trim().replace(/[^\S\n]*\n\s*/g, "\n")).join("\n");
         if ((state.line ?? "") !== words) update({ line: words || undefined });
       });
       return [track];
@@ -1304,11 +1316,7 @@ export function player(initial: PlayerState, hooks: Hooks = {}): Player {
     const line = screen.querySelector<HTMLElement>(".mp-subtitle");
     if (line) {
       const words = now.line && file && !file.audio && !now.error ? now.line : "";
-      if (line.textContent !== words) {
-        const fresh = text(words, "heading", "on_surface");
-        fresh.classList.add("mp-subtitle");
-        line.replaceWith(fresh);
-      }
+      if (line.dataset.words !== words) line.replaceWith(subtitleLines(words));
     }
     if (built && file) {
       showTime(now);
