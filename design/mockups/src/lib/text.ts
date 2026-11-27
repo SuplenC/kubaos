@@ -188,7 +188,39 @@ interface Mass {
 const masses = new Map<string, Mass>();
 /** The size the ink is drawn at to be weighed, in pixels: enough rows to place its centre finely. */
 const WEIGHED_AT = 64;
+/** Where a weighed line's baseline is, down its canvas. */
+const BASELINE = Math.round(WEIGHED_AT * 1.5);
+/**
+ * The widest slice of a line drawn at once to be weighed, in pixels. HAZARD: a canvas sized past
+ * Chromium's limit (between 40,000 and 70,000 pixels wide at this height) stops drawing for good,
+ * so every line weighed after it weighs nothing and rides up in its box; a dialog's long message
+ * is over 90,000 pixels at `WEIGHED_AT`.
+ */
+const SLICE = 4096;
 let scale: CanvasRenderingContext2D | null = null;
+
+/**
+ * `words` in `style` drawn at `WEIGHED_AT` on its baseline, `WEIGHED_AT * 1.5` down a canvas twice
+ * that tall, a slice of at most `SLICE` pixels at a time: `visit` reads each slice's pixels, top
+ * to bottom, and its width.
+ */
+function drawSlices(style: TypeStyle, words: string, visit: (pixels: Uint8ClampedArray, width: number) => void): void {
+  scale ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  if (!scale) throw new Error("no 2D canvas to weigh text with");
+  const sized = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
+  scale.font = sized;
+  const whole = Math.max(1, Math.ceil(scale.measureText(words).width));
+  for (let from = 0; from < whole; from += SLICE) {
+    const width = Math.min(SLICE, whole - from);
+    scale.canvas.width = width;
+    scale.canvas.height = WEIGHED_AT * 2;
+    scale.font = sized;
+    scale.fillStyle = "#000";
+    scale.textBaseline = "alphabetic";
+    scale.fillText(words, -from, BASELINE);
+    visit(scale.getImageData(0, 0, width, WEIGHED_AT * 2).data, width);
+  }
+}
 
 /**
  * Where `words`' ink sits in `style`: the centre of its mass above the baseline, weighed from the
@@ -199,28 +231,17 @@ export function inkMass(style: TypeStyle, words: string): Mass {
   const key = `${style}|${words}`;
   const known = masses.get(key);
   if (known !== undefined) return known;
-  scale ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-  if (!scale) throw new Error("no 2D canvas to weigh text with");
-  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
-  const width = Math.max(1, Math.ceil(scale.measureText(words).width));
-  const height = WEIGHED_AT * 2;
-  const baseline = Math.round(WEIGHED_AT * 1.5);
-  scale.canvas.width = width;
-  scale.canvas.height = height;
-  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
-  scale.fillStyle = "#000";
-  scale.textBaseline = "alphabetic";
-  scale.fillText(words, 0, baseline);
-  const pixels = scale.getImageData(0, 0, width, baseline).data;
   let sum = 0;
   let moment = 0;
-  for (let y = 0; y < baseline; y++) {
-    let row = 0;
-    for (let x = 0; x < width; x++) row += pixels[(y * width + x) * 4 + 3]!;
-    sum += row;
-    moment += row * (y + 0.5);
-  }
-  const mass = sum === 0 ? { height: 0, ink: 0 } : { height: (baseline - moment / sum) / WEIGHED_AT, ink: sum / 255 / (WEIGHED_AT * WEIGHED_AT) };
+  drawSlices(style, words, (pixels, width) => {
+    for (let y = 0; y < BASELINE; y++) {
+      let row = 0;
+      for (let x = 0; x < width; x++) row += pixels[(y * width + x) * 4 + 3]!;
+      sum += row;
+      moment += row * (y + 0.5);
+    }
+  });
+  const mass = sum === 0 ? { height: 0, ink: 0 } : { height: (BASELINE - moment / sum) / WEIGHED_AT, ink: sum / 255 / (WEIGHED_AT * WEIGHED_AT) };
   masses.set(key, mass);
   return mass;
 }
@@ -232,31 +253,21 @@ export function inkMass(style: TypeStyle, words: string): Mass {
  * the baseline.
  */
 function inkMiddle(style: TypeStyle, words: string): number {
-  scale ??= document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-  if (!scale) throw new Error("no 2D canvas to weigh text with");
-  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
-  const width = Math.max(1, Math.ceil(scale.measureText(words).width));
   const height = WEIGHED_AT * 2;
-  const baseline = Math.round(WEIGHED_AT * 1.5);
-  scale.canvas.width = width;
-  scale.canvas.height = height;
-  scale.font = font(style).font.replace(/[\d.]+px/, `${WEIGHED_AT}px`);
-  scale.fillStyle = "#000";
-  scale.textBaseline = "alphabetic";
-  scale.fillText(words, 0, baseline);
-  const pixels = scale.getImageData(0, 0, width, height).data;
   let top = height;
   let bottom = -1;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (pixels[(y * width + x) * 4 + 3]! < 128) continue;
-      top = Math.min(top, y);
-      bottom = y;
-      break;
+  drawSlices(style, words, (pixels, width) => {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (pixels[(y * width + x) * 4 + 3]! < 128) continue;
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+        break;
+      }
     }
-  }
+  });
   if (bottom < 0) return 0;
-  return (baseline - (top + bottom + 1) / 2) / WEIGHED_AT;
+  return (BASELINE - (top + bottom + 1) / 2) / WEIGHED_AT;
 }
 
 /**

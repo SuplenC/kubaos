@@ -3,7 +3,7 @@
 // what only you can type; its kind (Info, Warning, Error) told by its symbol alone. Another
 // program's dialog names its caller over the title, takes markup or its own lines, can make Cancel
 // the default and can answer itself on a timed bar. Never shorter than 5:2 of its width, nor taller
-// than its room less 48 above and below, past which its middle scrolls. The keyboard goes into it,
+// than 4:5 of it or its room less 48 above and below, past which its middle scrolls. The keyboard goes into it,
 // goes round it, and goes back as it closes.
 
 import { button } from "../../lib/button.ts";
@@ -305,6 +305,7 @@ export default page({
       { keys: ["Tab", "Shift+Tab"], does: "round its field and buttons, never out" },
       { keys: ["Up", "Down"], does: "from a button, scroll a tall middle a line" },
       { keys: ["Page Up", "Page Down"], does: "from a button, scroll it a page" },
+      { keys: ["Home", "End"], does: "from a button, scroll it to its start or end" },
       { keys: ["Enter"], does: "presses the button; in the field, its action" },
       { keys: ["Space"], does: "presses the button; in the field, a space" },
       { keys: ["Esc"], does: "does what Cancel does" },
@@ -318,11 +319,12 @@ export default page({
       { name: "A question", for: "Cancel at the start, two actions at the end", sample: () => still(QUESTION) },
       { name: "Short", for: "its least height", sample: () => still(SHORT) },
       { name: "A caller, answering itself", for: "the caller line, the timed bar and its caption", sample: () => still({ ...CALLED, timeout: { left: 18, of: 30 } }) },
-      { name: "Long", for: "its most height, the rules at the middle's edges", sample: () => capped(LONG, 0.5) },
+      { name: "Long", for: "its most height, the fades at the middle's edges", sample: () => capped(LONG, 0.5) },
     ]),
     measures: [
       { part: "Width", token: "size-dialog" },
       { part: "Least height", token: "aspect-dialog" },
+      { part: "Most height", token: "aspect-dialog_tallest" },
       { part: "Clear of its room", token: "space-s48" },
       { part: "Inset, above the buttons", token: "space-s24" },
       { part: "Buttons' hang at sides and foot", token: "space-s12" },
@@ -336,7 +338,8 @@ export default page({
       { part: "Title line", token: "type-heading-line" },
       { part: "Button", token: "size-control_md" },
       { part: "Corner", token: "radius-content" },
-      { part: "Rim, the middle's rules", token: "stroke-hairline_device_px" },
+      { part: "Rim", token: "stroke-hairline_device_px" },
+      { part: "The middle's fades", token: "space-s16" },
       { part: "Shadow drop", token: "elevation-3-ambient-y" },
       { part: "Shadow blur", token: "elevation-3-ambient-blur" },
       { part: "Rise as it opens", token: "space-s16" },

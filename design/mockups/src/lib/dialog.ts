@@ -16,33 +16,33 @@
 // dialog is not a Danger one: nothing is destroyed by answering it, so its rim and its buttons are
 // a Normal dialog's. Where another program asks (zenity), a caller line over the title names it:
 // the app's small IconTile and its name in `label`, `space.s12` above the title row, left out when
-// the title says the name already (the name, in any case, with nothing after it but punctuation).
+// the title says the name already (it starts with the name as a whole word, in any case).
 //
-// The body is the program's words: plain, or in Pango's markup (`<b>`, `<i>`, `<a href>` and its
-// entities, `lib/text.ts`'s `markup`), or kept to the caller's own lines in `mono` (`noWrap`), a
-// line longer than the dialog still breaking. A dialog that answers itself after a while shows the
-// time left as a timed bar with its caption, `space.s16` under the body, emptying to its end.
+// The body is the program's words, its line breaks kept (a blank line is a line's gap): plain, or
+// in Pango's markup (`<b>`, `<i>`, `<a href>` and its entities, `lib/text.ts`'s `markup`), or kept
+// to the caller's own lines and spaces in `mono` (`noWrap`), a line longer than the dialog still
+// breaking. A dialog that answers itself after a while shows the time left as a timed bar with its
+// caption, `space.s16` under the body, emptying to its end.
 //
 // It is never shorter than `aspect.dialog` of its width: a dialog that asks little gains the room
 // above its buttons, which stay at its foot, and its words stay at the top. It is never taller
-// than its room less `space.s48` above and below, so the dimmed screen shows round it; past that
-// only the middle, the body and what follows it, scrolls, with no bar of its own, between the
-// title and the buttons, which stay. While more of it is above or below, a soft hairline across
-// the dialog's padding marks that edge.
+// than `aspect.dialog_tallest` of its width, nor than its room less `space.s48` above and below,
+// so the dimmed screen shows round it; past either only the middle, the body and what follows
+// it, scrolls, with no bar of its own, between the title and the buttons, which stay. While more
+// of it is above or below, it fades at that edge, as a Scroll's fades do (`lib/scroll.ts`).
 //
 // The scrim dims everything behind it and takes every press, which does nothing; the dialog sits
 // in its middle on whole device pixels. Opening, the keyboard goes into the dialog, onto what it
 // asks for, else Cancel on a Danger dialog or one that makes Cancel the default, else the last
-// action; Tab and Shift+Tab go round it
-// and never leave, scrolling what they land on into view; the arrows and the page keys scroll a
-// middle too tall to show whole; Esc is its dismiss button; closing gives the keyboard back to
-// what opened it.
+// action; Tab and Shift+Tab go round it and never leave, scrolling what they land on into view;
+// the arrows, the page keys, Home and End scroll a middle too tall to show whole; Esc is its
+// dismiss button; closing gives the keyboard back to what opened it.
 
 import { iconInLine } from "./button.ts";
 import { type Action, buttonBar, type Tone } from "./button-bar.ts";
 import { glass } from "./glass.ts";
 import { iconTile } from "./icon-tile.ts";
-import { divider, filling, gap, row, stack } from "./layout.ts";
+import { filling, gap, row, stack } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
 import { captionedBar, progressBar } from "./progress.ts";
 import { markup, text, wrapped } from "./text.ts";
@@ -107,8 +107,8 @@ export interface Dialog {
   onAnswer: (answer: string) => void;
 }
 
-/** The keys that scroll the middle, and which way. */
-const SCROLLS: Readonly<Record<string, number>> = { ArrowUp: -1, ArrowDown: 1, PageUp: -1, PageDown: 1 };
+/** The keys that scroll the middle: by a line or a page, and which way, or to an end. */
+const SCROLLS: Readonly<Record<string, number>> = { ArrowUp: -1, ArrowDown: 1, PageUp: -1, PageDown: 1, Home: -Infinity, End: Infinity };
 
 /** The controls Tab stops on inside `element`, in reading order. */
 function stops(element: HTMLElement): HTMLElement[] {
@@ -132,6 +132,7 @@ export function dialog(options: DialogOptions): Dialog {
       ? iconInLine(options.icon, "heading", "var(--color-primary)")
       : iconInLine(kind.icon, "heading", `var(--color-${kind.role})`);
   const body = options.markup ? markup(options.body, "body", "on_surface_variant") : wrapped(options.body, "body", "on_surface_variant");
+  body.classList.add("k-dialog-body");
   body.toggleAttribute("data-no-wrap", options.noWrap ?? false);
   const middle: Element[] = [body];
   if (options.lists) {
@@ -149,15 +150,10 @@ export function dialog(options: DialogOptions): Dialog {
   }
   const scroller = stack(0, "start", ...middle);
   scroller.classList.add("k-dialog-scroll");
-  const above = divider();
-  above.classList.add("k-dialog-rule");
-  above.dataset.at = "above";
-  const below = divider();
-  below.classList.add("k-dialog-rule");
-  below.dataset.at = "below";
+  scroller.dataset.fades = "";
   const room = document.createElement("span");
   room.className = "k-dialog-middle";
-  room.append(scroller, above, below);
+  room.append(scroller);
   const head = row("s12", "start", symbol, filling(wrapped(options.title, "heading")));
   const answered = options.dismiss !== undefined || options.actions.length > 0;
   const bar = answered
@@ -176,7 +172,7 @@ export function dialog(options: DialogOptions): Dialog {
     column.append(spare, bar.element);
   } else column.dataset.bare = "";
   surface.append(column);
-  showEdges(scroller, room);
+  showEdges(scroller);
 
   const result: Dialog = { element: surface, land, onAnswer: () => undefined };
 
@@ -214,15 +210,33 @@ export function dialog(options: DialogOptions): Dialog {
       // Enter in the field does what its action does.
       if (!event.repeat) [...actions].reverse().find((each) => !each.disabled)?.click();
     } else if (event.key in SCROLLS && !options.asks?.contains(event.target as Node) && scroller.scrollHeight > scroller.clientHeight) {
-      // From its buttons, the arrows and the page keys scroll a middle too tall to show whole.
-      const line = length("type-body-line");
-      const by = SCROLLS[event.key]! * (event.key.startsWith("Page") ? scroller.clientHeight - line : line);
-      const reduced = surface.closest("[data-reduced]") !== null;
-      scroller.scrollBy({ top: by, behavior: reduced ? "instant" : "smooth" });
+      scrollByKey(event.key);
     } else return;
     event.preventDefault();
     event.stopPropagation();
   });
+
+  /** Where the last key sent the middle, while it is still on its way there. */
+  let heading: number | null = null;
+  scroller.addEventListener("scrollend", () => (heading = null));
+  // A wheel takes over from a key's scroll, so the next key aims from where it lands.
+  scroller.addEventListener("wheel", () => (heading = null), { passive: true });
+
+  /**
+   * Scrolls the middle as `key` says, from where the last key sent it rather than where a smooth
+   * scroll has got to, so keys pressed quickly add up instead of each cutting the last one short.
+   */
+  function scrollByKey(key: string): void {
+    const line = length("type-body-line");
+    const step = SCROLLS[key]!;
+    const most = scroller.scrollHeight - scroller.clientHeight;
+    const from = heading ?? scroller.scrollTop;
+    const by = Number.isFinite(step) ? step * (key.startsWith("Page") ? scroller.clientHeight - line : line) : step;
+    const to = Math.min(most, Math.max(0, from + by));
+    const reduced = surface.closest("[data-reduced]") !== null;
+    heading = reduced || to === scroller.scrollTop ? null : to;
+    scroller.scrollTo({ top: to, behavior: reduced ? "instant" : "smooth" });
+  }
 
   // A caller line moves every part under it, so a dialog with one is told apart from one without.
   probe(surface, { role: "component", name: "Dialog", variant: variant(options.tone ?? "Normal", caller && "caller"), fixed: { width: true, height: false } });
@@ -238,24 +252,25 @@ function callerLine(caller: Caller): HTMLElement {
 }
 
 /**
- * Whether `title` says no more than `name`: the same name, trimmed and in any case, or the name with
- * nothing after it but punctuation. Then the title carries the name and the caller line goes.
+ * Whether `title` names `name` already: it starts with the name, trimmed and in any case, as a whole
+ * word ("Steam", "Steam:" or "Steam - Fatal Error" under Steam, not "Steamworks"). Then the title
+ * carries the name and the caller line goes.
  */
 export function namesCaller(title: string, name: string): boolean {
   const app = name.trim().toLowerCase();
   const said = title.trim().toLowerCase();
-  return said.startsWith(app) && /^[\s\p{P}]*$/u.test(said.slice(app.length));
+  return app !== "" && said.startsWith(app) && !/^[\p{L}\p{N}]/u.test(said.slice(app.length));
 }
 
 /**
- * Marks `room` while `scroller` has more above (`data-above`) or below (`data-below`) than it
- * shows, as it scrolls and whenever it or what it holds changes size.
+ * Marks `scroller` while it has more above (`data-scrolled`) or below (`data-more`) than it shows,
+ * as it scrolls and whenever it or what it holds changes size, for its fades.
  */
-function showEdges(scroller: HTMLElement, room: HTMLElement): void {
+function showEdges(scroller: HTMLElement): void {
   const mark = () => {
     // A zoomed page scrolls by fractions of a pixel, and its end can be one short of the height.
-    room.toggleAttribute("data-above", scroller.scrollTop >= 1);
-    room.toggleAttribute("data-below", scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1);
+    scroller.toggleAttribute("data-scrolled", scroller.scrollTop >= 1);
+    scroller.toggleAttribute("data-more", scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1);
   };
   scroller.addEventListener("scroll", mark, { passive: true });
   const sizes = new ResizeObserver(mark);

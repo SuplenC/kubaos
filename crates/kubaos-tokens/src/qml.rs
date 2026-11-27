@@ -411,7 +411,7 @@ fn container(out: &mut Writer, tokens: &Tokens) {
     out.group(
         "    ",
         Some(
-            "Aspect ratios, width to height: a picture's box's before and after it loads, a surface's at its shortest.",
+            "Aspect ratios, width to height: a picture's box's before and after it loads, a surface's at its shortest or tallest.",
         ),
         "aspect",
         |out| {

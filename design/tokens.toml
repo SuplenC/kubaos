@@ -423,6 +423,9 @@ camera = [16, 9]
 # A dialog at its shortest: 5:2 of its width, so a dialog that asks little
 # stands as a card, not a strip; the room it gains goes above its buttons.
 dialog = [5, 2]
+# A dialog at its tallest: 4:5 of its width, so a long message scrolls in a
+# dialog that still reads as one, not a page; its room can hold it shorter.
+dialog_tallest = [4, 5]
 # CanvasPage's canvas on a page under `size.canvas_wide`: 42% of its width tall, room for a row of
 # screens and a laptop under them, capped so the settings' heading under it stays in view.
 canvas = [50, 21]
