@@ -360,8 +360,9 @@
 
 /* The new-workspace slot, its plus in `on_surface_variant`. While something is carried it is lit,
    its line and plus in the primary over a primary tint, at `opacity.tint`, and deeper, at
-   `opacity.selection`, as the place proposed; each change over `short`. Under the pointer with
-   nothing carried, the glass lightens by `opacity.focus` of `surface`. */
+   `opacity.selection`, as the place proposed; each change over `short`. A slot shut to the carried
+   thing, a workspace's own group's, keeps its rest. Under the pointer with nothing carried, the
+   glass lightens by `opacity.focus` of `surface`. */
 .ov-plus {
   opacity: var(--ov-arrive);
   transition:
@@ -382,13 +383,13 @@
   transition: color var(--motion-short) var(--easing-standard);
 }
 
-.ov[data-carrying] .ov-plus {
+.ov[data-carrying] .ov-plus:not([data-shut]) {
   --ov-card-ink: var(--color-primary);
   --ov-card-line: var(--color-primary);
   --ov-card-tint: var(--opacity-tint);
 }
 
-.ov[data-carrying] .ov-plus[data-proposed] {
+.ov[data-carrying] .ov-plus[data-proposed]:not([data-shut]) {
   --ov-card-tint: var(--opacity-selection);
 }
 

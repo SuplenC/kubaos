@@ -215,7 +215,7 @@ const DROP_SETTLES: Move = {
 
 const SLOT_LIGHTS: Move = {
   name: "The new slot lighting",
-  what: "Something lifted: the new-workspace slot's line and plus turn primary over `short`, its glass tinted; deeper as the place proposed.",
+  what: "Something lifted: each new-workspace slot that takes it turns its line and plus primary over `short`, glass tinted; deeper as proposed.",
   tracks: [{ part: "its tint", on: "the centre's slot", target: ".ov-plus", property: "--ov-card-tint", from: 0, to: { opacity: "tint" }, duration: "short", curve: "standard" }],
   reduced: "same",
   back: "plays",

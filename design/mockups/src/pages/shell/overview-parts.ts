@@ -921,6 +921,9 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     } else delete aim.dataset.shown;
     if (carry) refuse(carry.element, target?.kind === "refused");
     for (const [group, element] of plusEls) element.toggleAttribute("data-proposed", target?.kind === "plus" && target.group === group);
+    // A slot that takes the carried workspace is one with a zone, so its look and its snap agree.
+    const taking = carry?.kind === "space" ? new Set(zonesOf(carry).flatMap((each) => (each.target.kind === "plus" ? [each.target.group] : []))) : null;
+    for (const [group, element] of plusEls) element.toggleAttribute("data-shut", taking !== null && !taking.has(group));
   }
 
   let selected: string | null = null;
