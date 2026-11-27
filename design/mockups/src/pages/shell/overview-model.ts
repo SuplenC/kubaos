@@ -5,10 +5,10 @@
 //
 // A group belongs to a desk position. The screen standing there holds it; a group whose position
 // has no screen waits on the primary screen, under its own (GLOSSARY.md, "Workspace group"). A
-// workspace's number is its place in its group. An empty workspace between two in use stays as a
-// gap, so the ones after it keep their numbers; deleting the gap moves them down one. An empty one
-// at a group's end is gone unless a screen shows it, but one whose last window was just carried
-// away stays where it is: emptied is not deleted. A group holds ten workspaces at most.
+// workspace's number is its place in its group. An empty workspace stays where it is, anywhere in
+// its group, so the ones after it keep their numbers: emptied is not deleted, and only the delete
+// slot takes a workspace away, moving the ones after it down one. A group holds ten workspaces at
+// most.
 
 /** The apps the samples run, each drawn as it looks (`overview-apps.ts`). */
 export type App =
@@ -282,26 +282,8 @@ export function refuses(desk: Desk, landing: Landing, moving?: string): boolean 
   return group.spaces.length >= MOST && !(moving !== undefined && group.spaces.includes(moving));
 }
 
-/**
- * Drops the empty workspaces at a group's end that no screen shows. An empty one between two in
- * use stays, a gap holding its number, so the ones after it keep theirs. Returns the ids dropped.
- */
-function sweep(desk: Desk): string[] {
-  const gone: string[] = [];
-  for (const group of desk.groups) {
-    while (group.spaces.length > 0) {
-      const last = group.spaces.at(-1)!;
-      if (desk.spaces.get(last)!.windows.length > 0 || isShown(desk, last)) break;
-      gone.push(last);
-      group.spaces.pop();
-    }
-  }
-  for (const id of gone) desk.spaces.delete(id);
-  return gone;
-}
-
 export interface Change {
-  /** Workspaces made, and those gone (emptied, or deleted). */
+  /** Workspaces made, and those deleted. */
   readonly added: readonly string[];
   readonly removed: readonly string[];
   /** Windows closed. */
@@ -340,7 +322,6 @@ export function moveWindow(desk: Desk, window: string, landing: Landing, place?:
   else to.tree = treeOf(to);
   to.windows.push(window);
   to.focused = window;
-  // No sweep: the workspace it left is the only one the move can empty, and it stays.
   return { added, removed: [], closed: [] };
 }
 
@@ -370,7 +351,7 @@ export function moveSpace(desk: Desk, space: string, group: string, index: numbe
     }
     desk.shown.set(screenFrom.id, next);
   }
-  return { added, removed: sweep(desk), closed: [] };
+  return { added, removed: [], closed: [] };
 }
 
 /** Shows `space` on its screen, which takes the keyboard. */
@@ -378,7 +359,7 @@ export function go(desk: Desk, space: string): Change {
   const screen = screenOf(desk, space);
   desk.shown.set(screen.id, space);
   desk.focused = screen.id;
-  return { added: [], removed: sweep(desk), closed: [] };
+  return { added: [], removed: [], closed: [] };
 }
 
 // ── Deleting with a way back ──────────────────────────────────────────────────────────────────
@@ -392,8 +373,6 @@ export type Taken =
       readonly kind: "window";
       readonly window: string;
       readonly space: Space;
-      readonly group: string;
-      readonly spaceIndex: number;
       readonly index: number;
       /** Its workspace's tiling as it was, which undo puts back while nothing else has changed there. */
       readonly tree: Node | null;
@@ -404,13 +383,12 @@ export type Taken =
 export function take(desk: Desk, what: { readonly window: string } | { readonly space: string }): { taken: Taken; change: Change } {
   if ("window" in what) {
     const space = spaceOf(desk, what.window);
-    const group = groupOf(desk, space.id);
     const tree = treeOf(space);
-    const taken: Taken = { kind: "window", window: what.window, space, group: group.id, spaceIndex: group.spaces.indexOf(space.id), index: space.windows.indexOf(what.window), tree };
+    const taken: Taken = { kind: "window", window: what.window, space, index: space.windows.indexOf(what.window), tree };
     space.tree = remove(tree, what.window);
     space.windows = space.windows.filter((each) => each !== what.window);
     if (space.focused === what.window) space.focused = space.windows.at(-1) ?? null;
-    return { taken, change: { added: [], removed: sweep(desk), closed: [] } };
+    return { taken, change: { added: [], removed: [], closed: [] } };
   }
   const space = desk.spaces.get(what.space)!;
   const group = groupOf(desk, what.space);
@@ -430,30 +408,30 @@ export function take(desk: Desk, what: { readonly window: string } | { readonly 
     }
     desk.shown.set(holder.id, next);
   }
-  return { taken, change: { added, removed: [what.space, ...sweep(desk)], closed: [] } };
+  return { taken, change: { added, removed: [what.space], closed: [] } };
 }
 
-/** Puts a taken thing back where it was: a window on its workspace, made again if it had gone. */
+/**
+ * Puts a taken thing back where it was: a workspace at its place in its group, a window on its
+ * workspace, which is still there: only the delete slot takes a workspace away, and it holds one
+ * thing at a time.
+ */
 export function restore(desk: Desk, taken: Taken): Change {
-  const group = groupById(desk, taken.group);
-  const added: string[] = [];
-  let space = desk.spaces.get(taken.space.id);
-  if (!space) {
-    space = taken.kind === "space" ? taken.space : { id: taken.space.id, windows: [], focused: null };
-    desk.spaces.set(space.id, space);
-    group.spaces.splice(Math.min(taken.kind === "space" ? taken.index : taken.spaceIndex, group.spaces.length), 0, space.id);
-    added.push(space.id);
+  if (taken.kind === "space") {
+    const group = groupById(desk, taken.group);
+    desk.spaces.set(taken.space.id, taken.space);
+    group.spaces.splice(Math.min(taken.index, group.spaces.length), 0, taken.space.id);
+    return { added: [taken.space.id], removed: [], closed: [] };
   }
-  if (taken.kind === "window") {
-    const now = treeOf(space);
-    const same = taken.tree !== null && JSON.stringify(remove(taken.tree, taken.window)) === JSON.stringify(now);
-    // A floating window comes back floating; a tiled one to its place if nothing else changed there.
-    if (desk.windows.get(taken.window)?.float) space.tree = now;
-    else space.tree = same ? taken.tree : insert(now, taken.window);
-    space.windows.splice(Math.min(taken.index, space.windows.length), 0, taken.window);
-    space.focused = taken.window;
-  }
-  return { added, removed: sweep(desk), closed: [] };
+  const space = taken.space;
+  const now = treeOf(space);
+  const same = taken.tree !== null && JSON.stringify(remove(taken.tree, taken.window)) === JSON.stringify(now);
+  // A floating window comes back floating; a tiled one to its place if nothing else changed there.
+  if (desk.windows.get(taken.window)?.float) space.tree = now;
+  else space.tree = same ? taken.tree : insert(now, taken.window);
+  space.windows.splice(Math.min(taken.index, space.windows.length), 0, taken.window);
+  space.focused = taken.window;
+  return { added: [], removed: [], closed: [] };
 }
 
 /** The timer has ended: the windows taken close for real. */

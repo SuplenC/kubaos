@@ -809,10 +809,10 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
   }
 
   /** Sets how an element arrives or leaves next: its duration, curve and cue. */
-  function arriving(element: HTMLElement, motion: "open" | "close" | "arrive" | "collapse" | "settle" | "none", delay = "0s"): void {
+  function arriving(element: HTMLElement, motion: "open" | "close" | "arrive" | "settle" | "none", delay = "0s"): void {
     const reduced = settings().reduced;
     const [duration, curve] =
-      motion === "open" ? ["long", "emphasized_decel"] : motion === "close" ? ["medium", "emphasized_accel"] : motion === "collapse" ? ["medium", "emphasized_accel"] : motion === "settle" ? ["medium", "standard_decel"] : ["medium", "emphasized_decel"];
+      motion === "open" ? ["long", "emphasized_decel"] : motion === "close" ? ["medium", "emphasized_accel"] : motion === "settle" ? ["medium", "standard_decel"] : ["medium", "emphasized_decel"];
     element.style.setProperty("--ov-at", motion === "none" ? "0s" : reduced ? "var(--motion-short)" : `var(--motion-${duration})`);
     element.style.setProperty("--ov-ae", reduced ? "var(--easing-standard)" : `var(--easing-${curve})`);
     element.style.setProperty("--ov-ad", reduced ? "0s" : delay);
@@ -1707,7 +1707,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
       park(was);
       return;
     }
-    sweepGone();
     if (was.kind === "window") landWindow(was);
     else landSpace(was);
     if (pending) dressBin();
@@ -1812,27 +1811,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     for (const part of [made.root, made.desk]) glide(part, "none");
     made.root.style.setProperty("--ov-shrink", "1");
     putSpace(id, slot, home, "none");
-  }
-
-  /** Workspaces the model no longer has collapse where they stand, and go. */
-  function sweepGone(): void {
-    for (const [id, made] of spaceEls) {
-      // One waiting in the slot is out of the desk but not gone; one being deleted goes its own way.
-      if (desk.spaces.has(id) || made.root.hasAttribute("data-gone") || made.root.hasAttribute("data-binned") || made.root.hasAttribute("data-waiting")) continue;
-      collapse(id, made, "0s");
-    }
-  }
-
-  function collapse(id: string, made: SpaceEl, delay: string): void {
-    made.root.dataset.gone = "";
-    for (const part of [made.root, made.desk]) {
-      arriving(part, "collapse", delay);
-      part.style.setProperty("--ov-arrive", "0");
-    }
-    later(ms("medium") * 2 + ms("long"), () => {
-      made.root.remove();
-      spaceEls.delete(id);
-    });
   }
 
   // ── The delete slot ──
@@ -1986,7 +1964,6 @@ function engine(root: HTMLElement, options: OverviewOptions, redraw: (next: Over
     pending = { taken, what, posed: thing, drain: null };
     was.element.dataset.waiting = "";
     fly(thing, () => slotPose(thing));
-    sweepGone();
     place("reflow");
     showBin();
     drain(1);

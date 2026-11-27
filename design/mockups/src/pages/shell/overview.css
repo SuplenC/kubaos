@@ -204,8 +204,7 @@
     --ov-arrive var(--ov-at, 0s) var(--ov-ae, linear) var(--ov-ad, 0s);
 }
 
-.ov:not([data-open]) .ov-ws:not([data-shown-here]),
-.ov-ws[data-gone] {
+.ov:not([data-open]) .ov-ws:not([data-shown-here]) {
   pointer-events: none;
 }
 
