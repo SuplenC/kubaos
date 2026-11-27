@@ -7,7 +7,8 @@
 // has no screen waits on the primary screen, under its own (GLOSSARY.md, "Workspace group"). A
 // workspace's number is its place in its group. An empty workspace between two in use stays as a
 // gap, so the ones after it keep their numbers; deleting the gap moves them down one. An empty one
-// at a group's end is gone unless a screen shows it. A group holds ten workspaces at most.
+// at a group's end is gone unless a screen shows it, but one whose last window was just carried
+// away stays where it is: emptied is not deleted. A group holds ten workspaces at most.
 
 /** The apps the samples run, each drawn as it looks (`overview-apps.ts`). */
 export type App =
@@ -312,7 +313,7 @@ const NOTHING: Change = { added: [], removed: [], closed: [] };
 /**
  * Moves `window` to `landing`: onto a workspace's end, or onto a new workspace. Refused (null) by
  * a full group; nothing changes on its own workspace. A floating window floats at `float` when it
- * is given.
+ * is given. The workspace it leaves stays in its place, empty if it was its last window.
  */
 export function moveWindow(desk: Desk, window: string, landing: Landing, place?: Place, float?: Rect): Change | null {
   const from = spaceOf(desk, window);
@@ -339,7 +340,8 @@ export function moveWindow(desk: Desk, window: string, landing: Landing, place?:
   else to.tree = treeOf(to);
   to.windows.push(window);
   to.focused = window;
-  return { added, removed: sweep(desk), closed: [] };
+  // No sweep: the workspace it left is the only one the move can empty, and it stays.
+  return { added, removed: [], closed: [] };
 }
 
 /**
