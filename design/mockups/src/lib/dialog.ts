@@ -18,10 +18,11 @@
 // the app's small IconTile and its name in `label`, `space.s12` above the title row, left out when
 // the title says the name already (it starts with the name as a whole word, in any case).
 //
-// The body is the program's words: plain, or in Pango's markup (`<b>`, `<i>`, `<a href>` and its
-// entities, `lib/text.ts`'s `markup`), or kept to the caller's own lines in `mono` (`noWrap`), a
-// line longer than the dialog still breaking. A dialog that answers itself after a while shows the
-// time left as a timed bar with its caption, `space.s16` under the body, emptying to its end.
+// The body is the program's words, its line breaks kept (a blank line is a line's gap): plain, or
+// in Pango's markup (`<b>`, `<i>`, `<a href>` and its entities, `lib/text.ts`'s `markup`), or kept
+// to the caller's own lines and spaces in `mono` (`noWrap`), a line longer than the dialog still
+// breaking. A dialog that answers itself after a while shows the time left as a timed bar with its
+// caption, `space.s16` under the body, emptying to its end.
 //
 // It is never shorter than `aspect.dialog` of its width: a dialog that asks little gains the room
 // above its buttons, which stay at its foot, and its words stay at the top. It is never taller
@@ -132,6 +133,7 @@ export function dialog(options: DialogOptions): Dialog {
       ? iconInLine(options.icon, "heading", "var(--color-primary)")
       : iconInLine(kind.icon, "heading", `var(--color-${kind.role})`);
   const body = options.markup ? markup(options.body, "body", "on_surface_variant") : wrapped(options.body, "body", "on_surface_variant");
+  body.classList.add("k-dialog-body");
   body.toggleAttribute("data-no-wrap", options.noWrap ?? false);
   const middle: Element[] = [body];
   if (options.lists) {

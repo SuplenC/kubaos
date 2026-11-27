@@ -3779,7 +3779,13 @@
   flex: 1 0 0;
 }
 
-/* A body that keeps its caller's lines (`noWrap`): in `mono`, so a table of them lines up; a line
+/* The body keeps the program's line breaks: a break starts a line, and a blank line is one of the
+   body's lines empty, the gap between paragraphs. Runs of spaces close up as any text's do. */
+.k-text.k-dialog-body {
+  white-space: pre-line;
+}
+
+/* A body that keeps its caller's lines and spaces (`noWrap`): in `mono`, so a table of them lines up; a line
    longer than the dialog still breaks. */
 .k-dialog .k-text[data-no-wrap] {
   white-space: pre-wrap;
