@@ -222,7 +222,6 @@ function drawSlices(style: TypeStyle, words: string, visit: (pixels: Uint8Clampe
   }
 }
 
-
 /**
  * Where `words`' ink sits in `style`: the centre of its mass above the baseline, weighed from the
  * glyphs Geist draws, descenders left out. The eye reads a line as centred when that mass is, so
