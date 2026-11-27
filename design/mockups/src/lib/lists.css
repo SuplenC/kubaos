@@ -653,7 +653,7 @@
 }
 
 .k-scroll[data-fade-pinned],
-[data-sequence] .k-scroll {
+[data-sequence] :is(.k-scroll, [data-fades]) {
   transition: none;
 }
 
@@ -667,19 +667,34 @@
 
 /* A foot fade, the header fade's mirror: while more of the content is below, the view is masked out
    over the room below its box, where a footer band stands, and fades out over the `space.s16` above
-   it, so nothing runs under the band. A focused control scrolls in clear of either fade. */
-.k-scroll[data-foot-fade] {
+   it, so nothing runs under the band. A focused control scrolls in clear of either fade.
+   A scroller of another part's own that marks itself `data-fades` (a dialog's middle,
+   `lib/dialog.ts`) takes both fades the same way: it sets `--above` and `--below` to the room it
+   reaches into at each end, and marks `data-scrolled` and `data-more` as a Scroll's box does. */
+.k-scroll[data-foot-fade],
+[data-fades] {
   --faded-below: 0;
   transition:
     --faded var(--motion-micro) var(--easing-standard),
     --faded-below var(--motion-micro) var(--easing-standard);
 }
 
-.k-scroll[data-foot-fade][data-more] {
+/* Its own, never a fade inherited from a scroll it sits in. */
+[data-fades] {
+  --faded: 0;
+}
+
+[data-fades][data-scrolled] {
+  --faded: 1;
+}
+
+.k-scroll[data-foot-fade][data-more],
+[data-fades][data-more] {
   --faded-below: 1;
 }
 
-.k-scroll[data-foot-fade] > .k-scroll-view {
+.k-scroll[data-foot-fade] > .k-scroll-view,
+[data-fades] {
   scroll-padding-block: calc(var(--above) + var(--space-s16)) calc(var(--below) + var(--space-s16));
   mask-image: linear-gradient(
     to bottom,

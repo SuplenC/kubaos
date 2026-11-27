@@ -234,8 +234,10 @@ const NO_WRAP: Call = {
   noWrap: true,
 };
 const LONG_LABELS: Call = { ...CHROME, extra: "Open a new profile instead" };
-/** Steam's question under a title that adds to its name, so the caller line shows. */
-const STEAM_QUESTION_CALLER: Call = { ...STEAM_QUESTION, title: "Steam - Windows games" };
+/** Steam's question under a title that doesn't start with its name, so the caller line shows. */
+const STEAM_QUESTION_CALLER: Call = { ...STEAM_QUESTION, title: "Windows games" };
+/** Steam's error under a title of its own, so the caller line shows over a message that scrolls. */
+const STEAM_ERROR_LONG: Call = { ...STEAM_ERROR, title: "Fatal Error", text: Array.from({ length: 7 }, () => STEAM_ERROR.text).join("\n\n") };
 
 export default page({
   level: "apps",
@@ -299,11 +301,11 @@ export default page({
       { name: "No title, the app known", for: "the app's name stands in", sample: () => onDesktop(WINE) },
       { name: "No title, no app", for: "the kind's word stands in", sample: () => onDesktop(NOBODY) },
       { name: "The caller's icon", for: "`--icon-name`: its symbol in the kind's place", sample: () => onDesktop({ ...INFO, icon: "deployed_code" }) },
-      { name: "The title names the app", for: "the caller line goes; the title says it", sample: () => onDesktop(STEAM_QUESTION) },
+      { name: "The title names the app", for: "it starts with the app's name: the caller line goes", sample: () => onDesktop(STEAM_ERROR) },
     ],
     counts: [
       { name: "One word", for: "a message of one word", sample: () => onDesktop({ ...INFO, text: "Done." }) },
-      { name: "Scrolls inside", for: "a long message: the middle scrolls", sample: () => onDesktop({ ...STEAM_ERROR, text: Array.from({ length: 7 }, () => STEAM_ERROR.text).join("\n\n") }) },
+      { name: "Scrolls inside", for: "past 4:5 of its width the middle scrolls, faded where more is", sample: () => onDesktop(STEAM_ERROR_LONG) },
       { name: "A long path", for: "breaks where it must", sample: () => onDesktop(PATH) },
       { name: "Markup", for: "`<b>`, `<i>`, `<a>`, `&amp;`", sample: () => onDesktop(MARKUP) },
       { name: "Long button labels", for: "they stack, OK on top", sample: () => onDesktop(LONG_LABELS) },
@@ -331,11 +333,14 @@ export default page({
     ]),
     measures: [
       { part: "Dialog's width", token: "size-dialog" },
+      { part: "Least height", token: "aspect-dialog" },
+      { part: "Most height", token: "aspect-dialog_tallest" },
       { part: "Dialog's padding", token: "space-s24" },
       { part: "Caller line to title", token: "space-s12" },
       { part: "Caller's tile", token: "size-control_sm" },
       { part: "Title to body", token: "space-s12" },
       { part: "Body to field or bar", token: "space-s16" },
+      { part: "The middle's fades", token: "space-s16" },
       { part: "Corners", token: "radius-content" },
     ],
     reflow: { note: "The dialog keeps its width, centred; `--width` and `--height` are ignored.", sample: () => onDesktop(STEAM_QUESTION, { width: NARROW_WIDTH }) },

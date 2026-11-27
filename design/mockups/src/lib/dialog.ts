@@ -16,7 +16,7 @@
 // dialog is not a Danger one: nothing is destroyed by answering it, so its rim and its buttons are
 // a Normal dialog's. Where another program asks (zenity), a caller line over the title names it:
 // the app's small IconTile and its name in `label`, `space.s12` above the title row, left out when
-// the title says the name already (the name, in any case, with nothing after it but punctuation).
+// the title says the name already (it starts with the name as a whole word, in any case).
 //
 // The body is the program's words: plain, or in Pango's markup (`<b>`, `<i>`, `<a href>` and its
 // entities, `lib/text.ts`'s `markup`), or kept to the caller's own lines in `mono` (`noWrap`), a
@@ -25,10 +25,10 @@
 //
 // It is never shorter than `aspect.dialog` of its width: a dialog that asks little gains the room
 // above its buttons, which stay at its foot, and its words stay at the top. It is never taller
-// than its room less `space.s48` above and below, so the dimmed screen shows round it; past that
-// only the middle, the body and what follows it, scrolls, with no bar of its own, between the
-// title and the buttons, which stay. While more of it is above or below, a soft hairline across
-// the dialog's padding marks that edge.
+// than `aspect.dialog_tallest` of its width, nor than its room less `space.s48` above and below,
+// so the dimmed screen shows round it; past either only the middle, the body and what follows
+// it, scrolls, with no bar of its own, between the title and the buttons, which stay. While more
+// of it is above or below, it fades at that edge, as a Scroll's fades do (`lib/scroll.ts`).
 //
 // The scrim dims everything behind it and takes every press, which does nothing; the dialog sits
 // in its middle on whole device pixels. Opening, the keyboard goes into the dialog, onto what it
@@ -42,7 +42,7 @@ import { iconInLine } from "./button.ts";
 import { type Action, buttonBar, type Tone } from "./button-bar.ts";
 import { glass } from "./glass.ts";
 import { iconTile } from "./icon-tile.ts";
-import { divider, filling, gap, row, stack } from "./layout.ts";
+import { filling, gap, row, stack } from "./layout.ts";
 import { probe, variant } from "./probe.ts";
 import { captionedBar, progressBar } from "./progress.ts";
 import { markup, text, wrapped } from "./text.ts";
@@ -149,15 +149,10 @@ export function dialog(options: DialogOptions): Dialog {
   }
   const scroller = stack(0, "start", ...middle);
   scroller.classList.add("k-dialog-scroll");
-  const above = divider();
-  above.classList.add("k-dialog-rule");
-  above.dataset.at = "above";
-  const below = divider();
-  below.classList.add("k-dialog-rule");
-  below.dataset.at = "below";
+  scroller.dataset.fades = "";
   const room = document.createElement("span");
   room.className = "k-dialog-middle";
-  room.append(scroller, above, below);
+  room.append(scroller);
   const head = row("s12", "start", symbol, filling(wrapped(options.title, "heading")));
   const answered = options.dismiss !== undefined || options.actions.length > 0;
   const bar = answered
@@ -176,7 +171,7 @@ export function dialog(options: DialogOptions): Dialog {
     column.append(spare, bar.element);
   } else column.dataset.bare = "";
   surface.append(column);
-  showEdges(scroller, room);
+  showEdges(scroller);
 
   const result: Dialog = { element: surface, land, onAnswer: () => undefined };
 
@@ -238,24 +233,25 @@ function callerLine(caller: Caller): HTMLElement {
 }
 
 /**
- * Whether `title` says no more than `name`: the same name, trimmed and in any case, or the name with
- * nothing after it but punctuation. Then the title carries the name and the caller line goes.
+ * Whether `title` names `name` already: it starts with the name, trimmed and in any case, as a whole
+ * word ("Steam", "Steam:" or "Steam - Fatal Error" under Steam, not "Steamworks"). Then the title
+ * carries the name and the caller line goes.
  */
 export function namesCaller(title: string, name: string): boolean {
   const app = name.trim().toLowerCase();
   const said = title.trim().toLowerCase();
-  return said.startsWith(app) && /^[\s\p{P}]*$/u.test(said.slice(app.length));
+  return app !== "" && said.startsWith(app) && !/^[\p{L}\p{N}]/u.test(said.slice(app.length));
 }
 
 /**
- * Marks `room` while `scroller` has more above (`data-above`) or below (`data-below`) than it
- * shows, as it scrolls and whenever it or what it holds changes size.
+ * Marks `scroller` while it has more above (`data-scrolled`) or below (`data-more`) than it shows,
+ * as it scrolls and whenever it or what it holds changes size, for its fades.
  */
-function showEdges(scroller: HTMLElement, room: HTMLElement): void {
+function showEdges(scroller: HTMLElement): void {
   const mark = () => {
     // A zoomed page scrolls by fractions of a pixel, and its end can be one short of the height.
-    room.toggleAttribute("data-above", scroller.scrollTop >= 1);
-    room.toggleAttribute("data-below", scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1);
+    scroller.toggleAttribute("data-scrolled", scroller.scrollTop >= 1);
+    scroller.toggleAttribute("data-more", scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1);
   };
   scroller.addEventListener("scroll", mark, { passive: true });
   const sizes = new ResizeObserver(mark);

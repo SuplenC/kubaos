@@ -3687,9 +3687,10 @@
 
 /* A dialog (`lib/dialog.ts`): `size.dialog` wide, `space.s24` inside, at the content radius, on the
    shell's glass (`glass.css`). A Danger dialog's edge is `error` at `opacity.danger_edge`, over the
-   glass's ring. It is at least `aspect.dialog` of its width tall, on the grid, and at most its room less
-   `space.s48` above and below. It arrives rising `space.s16` into place a whole device pixel at a
-   time (`--dialog-rise`). */
+   glass's ring. It is at least `aspect.dialog` of its width tall, on the grid, and at most
+   `aspect.dialog_tallest` of it, on a device pixel, or its room less `space.s48` above and below
+   where that is less (`--dialog-tallest` is the first). It arrives rising `space.s16` into place
+   a whole device pixel at a time (`--dialog-rise`). */
 .k-dialog {
   position: relative;
   display: flex;
@@ -3697,8 +3698,9 @@
   flex: none;
   box-sizing: border-box;
   width: var(--size-dialog);
+  --dialog-tallest: round(down, calc(var(--size-dialog) / (var(--aspect-dialog_tallest))), 1px);
   min-height: round(nearest, calc(var(--size-dialog) / (var(--aspect-dialog))), var(--grid));
-  max-height: calc(100% - 2 * var(--space-s48));
+  max-height: min(var(--dialog-tallest), calc(100% - 2 * var(--space-s48)));
   padding: var(--space-s24);
   border-radius: var(--radius-content);
   translate: 0 round(nearest, calc(var(--dialog-rise) * var(--space-s16)), 1px);
@@ -3724,8 +3726,8 @@
   align-self: stretch;
 }
 
-/* The middle, `space.s12` under the title (a gap of the column's), its scroller clipped at its
-   edges with a rule on each. */
+/* The middle, `space.s12` under the title (a gap of the column's), its scroller faded at an edge
+   with more beyond it. */
 .k-dialog-middle {
   --foot: var(--space-s24);
   position: relative;
@@ -3741,25 +3743,23 @@
 /* The body and what follows it, on the dialog's content edge under the symbol and the title,
    scrolling with no bar of its own. It reaches out to the dialog's edges and holds the whole `space.s24` above the buttons under its
    end (`--foot`), so a lit field's glow inside it is never cut and never reads as more to scroll.
-   While more is below, it shows only down to its rule, `--foot` above its end. Tab scrolls what
-   it lands on `space.s12` clear of the edges it shows. */
+   It takes the scrolls' fades (`lists.css`): while more is below, it shows only down to `--foot`
+   above its end, fading out over the `space.s16` above that; while more is above, it fades in
+   over `space.s16` under its top. Tab scrolls what it lands on clear of both. */
 .k-dialog-middle > .k-dialog-scroll {
+  --above: 0px;
+  --below: var(--foot);
   flex: 0 1 auto;
   min-height: 0;
   margin-inline: calc(-1 * var(--space-s24));
   padding: 0 var(--space-s24) var(--foot);
   overflow-y: auto;
   scrollbar-width: none;
-  scroll-padding-block: var(--space-s12) calc(var(--foot) + var(--space-s12));
   outline: none;
 }
 
 .k-dialog-column[data-bare] > .k-dialog-middle {
   --foot: 0px;
-}
-
-.k-dialog-middle[data-below] > .k-dialog-scroll {
-  clip-path: inset(0 0 var(--foot));
 }
 
 .k-dialog-scroll > * {
@@ -3786,30 +3786,6 @@
   font-family: var(--type-mono-family);
   font-size: var(--type-mono-size);
   line-height: var(--type-mono-line);
-}
-
-/* A divider at the middle's top or bottom edge, across the dialog's padding, the middle scrolling
-   under it: there while more is that way, fading over `short` on `standard` as that end comes. */
-.k-dialog-rule {
-  position: absolute;
-  left: 0;
-  right: 0;
-  opacity: 0;
-  transition: opacity var(--motion-short) var(--easing-standard);
-}
-
-.k-dialog-rule[data-at="above"] {
-  top: 0;
-}
-
-/* No higher than the middle's top, where too short a room has squeezed it. */
-.k-dialog-rule[data-at="below"] {
-  bottom: min(var(--foot), 100%);
-}
-
-.k-dialog-middle[data-above] > .k-dialog-rule[data-at="above"],
-.k-dialog-middle[data-below] > .k-dialog-rule[data-at="below"] {
-  opacity: 1;
 }
 
 /* The button bar: as wide as the room its surface gives it, with no padding of its own. */
@@ -3899,9 +3875,10 @@
   overflow: hidden;
 }
 
-/* Drawn still, the room is as tall as its dialog, so it has no height to cap the dialog by. */
+/* Drawn still, the room is as tall as its dialog, so it has no height to cap the dialog by: only
+   its tallest does. */
 .k-dialog-room:not([data-tall], [data-live]) > .k-dialog {
-  max-height: none;
+  max-height: var(--dialog-tallest);
 }
 
 /* A room as short as `--tall`, the dialog in its middle and capped by it. */

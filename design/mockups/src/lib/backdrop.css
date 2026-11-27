@@ -103,7 +103,7 @@
 /* A dialog's room is the screen, less `space.s48` above and below, not the thing it sits in,
    which is only as tall as the dialog. */
 .k-backdrop-thing > .k-dialog {
-  max-height: calc(var(--backdrop-height) - 2 * var(--space-s48));
+  max-height: min(var(--dialog-tallest), calc(var(--backdrop-height) - 2 * var(--space-s48)));
 }
 
 /* The flow of questions on glass is a card of the shell's glass (`glass.css`) at a card's corner,
