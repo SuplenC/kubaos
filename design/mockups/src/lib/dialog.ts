@@ -34,10 +34,9 @@
 // The scrim dims everything behind it and takes every press, which does nothing; the dialog sits
 // in its middle on whole device pixels. Opening, the keyboard goes into the dialog, onto what it
 // asks for, else Cancel on a Danger dialog or one that makes Cancel the default, else the last
-// action; Tab and Shift+Tab go round it
-// and never leave, scrolling what they land on into view; the arrows and the page keys scroll a
-// middle too tall to show whole; Esc is its dismiss button; closing gives the keyboard back to
-// what opened it.
+// action; Tab and Shift+Tab go round it and never leave, scrolling what they land on into view;
+// the arrows, the page keys, Home and End scroll a middle too tall to show whole; Esc is its
+// dismiss button; closing gives the keyboard back to what opened it.
 
 import { iconInLine } from "./button.ts";
 import { type Action, buttonBar, type Tone } from "./button-bar.ts";
@@ -108,8 +107,8 @@ export interface Dialog {
   onAnswer: (answer: string) => void;
 }
 
-/** The keys that scroll the middle, and which way. */
-const SCROLLS: Readonly<Record<string, number>> = { ArrowUp: -1, ArrowDown: 1, PageUp: -1, PageDown: 1 };
+/** The keys that scroll the middle: by a line or a page, and which way, or to an end. */
+const SCROLLS: Readonly<Record<string, number>> = { ArrowUp: -1, ArrowDown: 1, PageUp: -1, PageDown: 1, Home: -Infinity, End: Infinity };
 
 /** The controls Tab stops on inside `element`, in reading order. */
 function stops(element: HTMLElement): HTMLElement[] {
@@ -211,15 +210,33 @@ export function dialog(options: DialogOptions): Dialog {
       // Enter in the field does what its action does.
       if (!event.repeat) [...actions].reverse().find((each) => !each.disabled)?.click();
     } else if (event.key in SCROLLS && !options.asks?.contains(event.target as Node) && scroller.scrollHeight > scroller.clientHeight) {
-      // From its buttons, the arrows and the page keys scroll a middle too tall to show whole.
-      const line = length("type-body-line");
-      const by = SCROLLS[event.key]! * (event.key.startsWith("Page") ? scroller.clientHeight - line : line);
-      const reduced = surface.closest("[data-reduced]") !== null;
-      scroller.scrollBy({ top: by, behavior: reduced ? "instant" : "smooth" });
+      scrollByKey(event.key);
     } else return;
     event.preventDefault();
     event.stopPropagation();
   });
+
+  /** Where the last key sent the middle, while it is still on its way there. */
+  let heading: number | null = null;
+  scroller.addEventListener("scrollend", () => (heading = null));
+  // A wheel takes over from a key's scroll, so the next key aims from where it lands.
+  scroller.addEventListener("wheel", () => (heading = null), { passive: true });
+
+  /**
+   * Scrolls the middle as `key` says, from where the last key sent it rather than where a smooth
+   * scroll has got to, so keys pressed quickly add up instead of each cutting the last one short.
+   */
+  function scrollByKey(key: string): void {
+    const line = length("type-body-line");
+    const step = SCROLLS[key]!;
+    const most = scroller.scrollHeight - scroller.clientHeight;
+    const from = heading ?? scroller.scrollTop;
+    const by = Number.isFinite(step) ? step * (key.startsWith("Page") ? scroller.clientHeight - line : line) : step;
+    const to = Math.min(most, Math.max(0, from + by));
+    const reduced = surface.closest("[data-reduced]") !== null;
+    heading = reduced || to === scroller.scrollTop ? null : to;
+    scroller.scrollTo({ top: to, behavior: reduced ? "instant" : "smooth" });
+  }
 
   // A caller line moves every part under it, so a dialog with one is told apart from one without.
   probe(surface, { role: "component", name: "Dialog", variant: variant(options.tone ?? "Normal", caller && "caller"), fixed: { width: true, height: false } });

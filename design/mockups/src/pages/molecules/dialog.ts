@@ -305,6 +305,7 @@ export default page({
       { keys: ["Tab", "Shift+Tab"], does: "round its field and buttons, never out" },
       { keys: ["Up", "Down"], does: "from a button, scroll a tall middle a line" },
       { keys: ["Page Up", "Page Down"], does: "from a button, scroll it a page" },
+      { keys: ["Home", "End"], does: "from a button, scroll it to its start or end" },
       { keys: ["Enter"], does: "presses the button; in the field, its action" },
       { keys: ["Space"], does: "presses the button; in the field, a space" },
       { keys: ["Esc"], does: "does what Cancel does" },

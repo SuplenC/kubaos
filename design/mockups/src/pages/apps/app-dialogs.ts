@@ -323,6 +323,8 @@ export default page({
       { keys: ["Enter"], does: "the default button: OK, or Cancel with `--default-cancel`" },
       { keys: ["Esc"], does: "Cancel, or closes: exit 1" },
       { keys: ["Tab", "Shift+Tab"], does: "field, Cancel, extra, OK, round" },
+      { keys: ["Up", "Down", "Page Up", "Page Down"], does: "from a button, scroll a long message; quick presses add up" },
+      { keys: ["Home", "End"], does: "from a button, the message's start or end" },
     ],
     order: "The field, Cancel, the extra button, OK; never out of the dialog.",
     lands: "In the field; else on Cancel with `--default-cancel`; else on OK.",
